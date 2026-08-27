@@ -264,3 +264,94 @@ Every one was wrong in the direction that flattered the work.
    stated exception to CLAUDE.md and keep the quarantine with its reason.
 4. **`ops/state/qa.pending.json`** gets false QA rows written on every vitest run
    and was reverted **twelve times** this session. REQUESTS §18 has the history.
+
+---
+
+# Round two — the Send it panel rebuilt (2026-08-27, later)
+
+Owner: divas · Lane: wt-divas2 · Branch: `claude/divas-kickoff-03y2g2` · PR #15
+
+## What landed
+
+Two commits, both pushed and both green on every leg this sandbox can run.
+
+| SHA       | What                                                                             |
+| --------- | -------------------------------------------------------------------------------- |
+| `d18ecaf` | The redesign: month calendar, confirm step on both routes, filled act buttons    |
+| `f3bf4d4` | Three defects the rendered frames showed, plus a screenshot harness that lied    |
+
+### The six things the founder asked for
+
+| Ask                                     | Where it lives                                                  |
+| --------------------------------------- | --------------------------------------------------------------- |
+| Act buttons orange with dark ink        | `Button` default variant on Save, Save all, Confirm schedule, Confirm and send |
+| A real calendar instead of a date mask  | `lib/posts/calendar-month.ts` + `components/posts/schedule-calendar.tsx` |
+| Confirm the schedule after picking      | `schedule-field.tsx` — `pending` state, nothing commits until Confirm |
+| Save as draft beside it                 | `data-schedule-draft`, the secondary                            |
+| Connection list below the picker        | `components/posts/channel-readout.tsx`                          |
+| Confirm before sending                  | `publish-now.tsx` — pick a chip, then a named confirm button    |
+
+### The one ruling this needed
+
+**docs/37 §2.3's "exactly one solid brand fill per view" is overruled for this panel.**
+Recorded as REQUESTS §31. `one-fill.test.tsx` was rewritten around the new rule
+rather than deleted: it still pins the exact list of filled controls at rest, so a
+third accidental fill fails the gate.
+
+## Three defects the frames caught that no test would have
+
+1. **The rail heading claimed something about the post.** "SEND IT TO ONE CHANNEL"
+   over two chips. The truth is about the press, not the post. Heading is now
+   "Send it now"; the one-at-a-time fact moved into the footnote where a person
+   is choosing, and is deliberately absent when there is only one channel.
+2. **The Scheduled block orphaned its own glyph.** `flex-wrap` sizes items at
+   MAX-CONTENT before breaking, so a two-sentence paragraph beside an 18px icon
+   always dropped to the next row. MEASURED at 560px: icon y=38, heading y=94.
+   After: y=38 and y=62, same row, both themes.
+3. **The time row broke around its own conjunction.** `Time [▾] or [08:05]` wrapped
+   at 390px as `[▾] or` / `[08:05]`. The second control's only label was an
+   `aria-label`, which a sighted reader never sees. Both now carry visible labels.
+
+## Two things that looked like defects and were the harness
+
+Worth knowing before the next person screenshots a component.
+
+- **A `<select>` looked desynced from the pick.** React sets its value as a DOM
+  PROPERTY; `innerHTML` carries no `selected`, so the browser paints option zero.
+  MEASURED in jsdom at the moment of the dump: select 08:00, input 08:00,
+  serialised `selected` false. The wrapper now reflects it.
+- **Channel chips rendered as bare text.** `next/image` emits `/_next/image?url=…`,
+  which only the Next server serves; over `file://` every mark 404s. The wrapper
+  now rewrites those to `public/`.
+
+**And one thing that looked like a defect and is the design.** `--ok` is `#000000`
+in light and `#ffffff` in dark, on purpose: tokens.css L2 says there is no green in
+this palette and "it worked" is one of the two states that never needs to shout.
+The Scheduled block reading as an achromatic tinted card is correct.
+
+## Verification
+
+| Leg                          | Verdict | Time    |
+| ---------------------------- | ------- | ------- |
+| turbo-typecheck-lint-test    | PASS    | 353.7s  |
+| vitest-root                  | PASS    | 4.6s    |
+| prettier-check               | PASS    | 33.2s   |
+| turbo-smoke                  | UNRUN   | —       |
+| next build + js-budget       | PASS    | 81 routes within budget |
+| design-lint                  | PASS    | five rules ok, baseline TIGHTENED |
+
+`turbo-smoke` is UNRUN and the reason is the environment, not the suite: Chromium
+in this sandbox cannot complete any outbound HTTPS request, and every `@smoke`
+spec signs in through Clerk. REQUESTS §25 carries the six measurements.
+
+Mutations proven red, never assumed: 4 on the calendar maths (including the
+fall-back DST one my own test found), 5 on the fill rule, 6 on the schedule,
+calendar and readout behaviour, 4 on the rail heading.
+
+## Still not done, and why
+
+Everything in Round one's list stands unchanged. Nothing new was deferred.
+
+## Needs a decision
+
+The same four as Round one. None has been answered.
