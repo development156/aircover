@@ -2,7 +2,6 @@
 
 import { ArrowDown } from 'lucide-react'
 
-import { Button } from '@/components/ui/button'
 import type { AutosaveStatus } from '@/components/posts/use-autosave'
 
 const POST_STATUS_COPY: Readonly<Record<AutosaveStatus, string>> = {
@@ -25,8 +24,6 @@ export interface CommitBarProps {
   status: AutosaveStatus
   /** How many selected channels have copy that is not in their row yet. */
   unsavedVersions: number
-  savingVersions: boolean
-  onSaveAll: () => void
   /** Whether the finish section exists to be linked to. */
   canFinish: boolean
 }
@@ -44,22 +41,20 @@ export interface CommitBarProps {
  * the app's bottom navigation — otherwise the one control at the end of the page
  * is the one control covered, on the one device that has the bar.
  *
- * ── WHY IT DOES NOT CARRY PUBLISH ────────────────────────────────────────────
- * Publishing is irreversible, per channel, and needs its warnings beside it. It
- * lives in `FinishPanel` and this bar links to it — see that file.
+ * ── AND WHY IT NO LONGER CARRIES SAVE EITHER ─────────────────────────────────
+ * It used to hold "Save all versions" beside the link, which put the two endings
+ * to the same piece of work in two different places: save floating over the
+ * page, send four screens down. A reader who pressed the floating one had no way
+ * to tell whether that was the whole job.
+ *
+ * Both now sit together in `SendControls`, under the dry run, with the channel
+ * list above them — "Save as draft" and "Send now", and BOTH of them write every
+ * unsaved version first. This bar keeps the two things a floating strip is
+ * actually good at: telling you whether your work is safe, and getting you to
+ * the end of the page.
  */
-export function CommitBar({
-  status,
-  unsavedVersions,
-  savingVersions,
-  onSaveAll,
-  canFinish,
-}: CommitBarProps) {
+export function CommitBar({ status, unsavedVersions, canFinish }: CommitBarProps) {
   const versionWord = unsavedVersions === 1 ? 'version' : 'versions'
-  // MEASURED in a browser snapshot: the plural helper alone rendered the button
-  // as "Save all version". "All" and a singular do not go together in English,
-  // and a count of one does not need the word "all" at all.
-  const saveAllLabel = unsavedVersions === 1 ? 'Save this version' : 'Save all versions'
 
   /**
    * ── AN EMPTY BAR IS FURNITURE, AND IT WAS THE WIDEST THING ON THE SCREEN ────
@@ -111,13 +106,6 @@ export function CommitBar({
         </p>
 
         <div className="flex flex-wrap items-center gap-2">
-          {unsavedVersions > 0 ? (
-            // The bar's one committing action, in the brand fill. Founder's
-            // ruling, REQUESTS §31.
-            <Button size="sm" onClick={onSaveAll} loading={savingVersions}>
-              {saveAllLabel}
-            </Button>
-          ) : null}
           {canFinish ? (
             // A LINK, because it navigates. `router.push` from a button would not
             // survive a reload, would not appear in the page's link list and
@@ -127,7 +115,11 @@ export function CommitBar({
               className="surface-ring-firm inline-flex h-7 shrink-0 items-center gap-icon-gap rounded-sm bg-surface px-btn-tight text-[12px] leading-none font-[550] text-ink transition-micro hover:bg-s2 max-narrow:min-h-[44px]"
             >
               <ArrowDown size={13} aria-hidden />
-              Send it
+              {/* Names the DESTINATION rather than the act, because pressing it
+                  does not save or send anything — it scrolls. A link labelled
+                  "Send it" beside an unsaved count reads as the button that
+                  makes the work safe, and it never was. */}
+              {unsavedVersions > 0 ? 'Save and send' : 'Send it'}
             </a>
           ) : null}
         </div>

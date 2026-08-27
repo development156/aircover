@@ -13,6 +13,10 @@ export interface FinishPublishProps {
   statusRows: readonly VariantStatusRow[]
   flush: () => Promise<boolean>
   saveVariantNow: (channel: Channel) => Promise<boolean>
+  /** Save the post and every dirty version, and report whether all of it landed. */
+  saveAllVersions: () => Promise<boolean>
+  /** How many versions are not in their row yet. */
+  unsavedVersions: number
 }
 
 /**
@@ -37,6 +41,8 @@ export default function FinishPublish({
   statusRows,
   flush,
   saveVariantNow,
+  saveAllVersions,
+  unsavedVersions,
 }: FinishPublishProps) {
   return (
     <div className="space-y-5 border-t border-line pt-4">
@@ -54,6 +60,8 @@ export default function FinishPublish({
             channels={channels}
             flush={flush}
             saveVariantNow={saveVariantNow}
+            saveAllVersions={saveAllVersions}
+            unsavedVersions={unsavedVersions}
             statusRows={statusRows}
             connected={connected}
           />

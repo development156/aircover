@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, test, vi } from 'vitest'
+import { describe, expect, test } from 'vitest'
 
 import { CommitBar } from './commit-bar'
 
@@ -21,8 +21,6 @@ import { CommitBar } from './commit-bar'
 const props = {
   status: 'idle' as const,
   unsavedVersions: 0,
-  savingVersions: false,
-  onSaveAll: vi.fn(),
   canFinish: false,
 }
 
@@ -78,5 +76,57 @@ describe('the commit bar shows itself only when it has something to carry', () =
     render(<CommitBar {...props} status="error" />)
     expect(visibleBar()).not.toBeNull()
     expect(screen.getByText(/post not saved$/i)).toBeInTheDocument()
+  })
+})
+
+/**
+ * ── THE BAR NO LONGER SAVES, AND THAT HAS TO STAY DELIBERATE ────────────────
+ *
+ * "Save all versions" lived here, floating over the page, while sending lived
+ * four screens down in the finish panel. Two endings to the same piece of work,
+ * in two places, one of them covering the other. Both now sit together in
+ * `SendControls` under the dry run, and BOTH of them write every unsaved version
+ * first.
+ *
+ * Putting a save button back on this bar would rebuild the split, so it is
+ * asserted rather than left to memory. The counterweight below is the point: an
+ * empty bar would satisfy an absence assertion on its own.
+ */
+describe('the bar reports, and does not commit', () => {
+  test('carries no button of any kind', () => {
+    render(<CommitBar {...props} status="unsaved" unsavedVersions={3} canFinish />)
+
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  test('still carries the way to the end of the page', () => {
+    render(<CommitBar {...props} status="unsaved" unsavedVersions={3} canFinish />)
+
+    const link = screen.getByRole('link')
+    expect(link).toHaveAttribute('href', '#finish')
+  })
+
+  test('names the destination for what waiting work will get there', () => {
+    // "Send it" beside "3 versions not saved" reads as the control that makes
+    // the work safe, and it never was — it scrolls. With versions outstanding
+    // the label says both halves of what is down there.
+    render(<CommitBar {...props} status="unsaved" unsavedVersions={3} canFinish />)
+
+    expect(screen.getByRole('link', { name: /Save and send/i })).toBeInTheDocument()
+  })
+
+  test('and drops the save half of that label once nothing is outstanding', () => {
+    // Promising a save when there is nothing to save is the same defect in the
+    // other direction.
+    render(<CommitBar {...props} status="saved" unsavedVersions={0} canFinish />)
+
+    expect(screen.getByRole('link', { name: /^Send it$/i })).toBeInTheDocument()
+  })
+
+  test('still counts the unsaved versions, which is the bar’s whole job now', () => {
+    render(<CommitBar {...props} status="unsaved" unsavedVersions={3} canFinish />)
+
+    expect(screen.getByText(/3/)).toBeInTheDocument()
+    expect(screen.getByText(/versions not saved/)).toBeInTheDocument()
   })
 })

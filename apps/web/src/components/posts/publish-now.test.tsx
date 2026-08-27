@@ -18,8 +18,7 @@ import { PublishNow } from './publish-now'
  * The duplicate case is the one that matters most: `post.channels` is a `text[]`
  * off the row, not a set. An undeduplicated list reached the copy as
  * "LinkedIn and LinkedIn", which reads as two separate broken accounts and drags
- * the sentence onto a plural verb for a single channel. It was found and fixed in
- * the schedule picker; this pins the same shape here.
+ * the sentence onto a plural verb for a single channel.
  */
 
 const noop = async () => true
@@ -31,6 +30,8 @@ const renderPublish = (channels: Channel[], connected?: ReadonlySet<Channel>) =>
       channels={toChannelSet(channels)}
       flush={noop}
       saveVariantNow={noop}
+      saveAllVersions={noop}
+      unsavedVersions={0}
       statusRows={[]}
       connected={connected}
     />,
@@ -39,26 +40,31 @@ const renderPublish = (channels: Channel[], connected?: ReadonlySet<Channel>) =>
 const set = (...channels: Channel[]) => new Set<Channel>(channels)
 
 /**
- * THE SHAPE CHANGED; THE CLAIMS DID NOT.
+ * ── THE SHAPE CHANGED TWICE; THE CLAIMS DID NOT ──────────────────────────────
  *
- * Publishing used to be one press: a "Publish to X" button that sent the post
- * to a live account with nothing between the pointer landing and the post
- * existing. It is now pick-then-confirm, so the rail carries a chip per channel
- * and a second, named button does the act.
+ * Publishing was one press per channel: a "Publish to X" button that sent the
+ * post to a live account with nothing between the pointer landing and the post
+ * existing. It became pick-a-chip-then-confirm. It is now ONE press that reaches
+ * every connected channel, with a confirm step naming them and a result LIST
+ * carrying one row per channel.
  *
- * Every assertion below was written against the old shape and is retargeted
- * rather than deleted — the thing each one protects (a channel named once, a
- * footnote that cannot describe an impossible action, Instagram's wait appearing
- * only where Instagram is involved) is unchanged and still worth guarding.
+ * Every assertion below was written against one of the older shapes and is
+ * retargeted rather than deleted, because the thing each one protects is
+ * unchanged: a channel named once, a footnote that cannot describe an impossible
+ * action, and Instagram's wait appearing only where Instagram is involved.
+ *
+ * ONE CLAIM GENUINELY CHANGED and it says so where it sits: "a mixed post names
+ * the wait only for the channel being sent to" was true of the chip rail and is
+ * false now, because one press reaches both. The new assertion is the honest
+ * one.
  */
-const pick = (root: HTMLElement, channel: Channel): HTMLElement | null =>
-  root.querySelector(`[data-publish-pick="${channel}"]`)
+const sendNow = (root: HTMLElement): HTMLElement | null => root.querySelector('[data-send-now]')
 
-/** Choose a channel, which is what now reveals the confirm panel and its copy. */
-function choose(root: HTMLElement, channel: Channel) {
-  const chip = pick(root, channel)
-  if (chip === null) throw new Error(`no pick chip for ${channel}`)
-  fireEvent.click(chip)
+/** Press Send now, which is what reveals the confirm panel and its copy. */
+function openConfirm(root: HTMLElement) {
+  const button = sendNow(root)
+  if (button === null) throw new Error('no Send now button')
+  fireEvent.click(button)
 }
 
 describe('PublishNow — the unconnected-channel warning', () => {
@@ -112,14 +118,14 @@ describe('PublishNow — the unconnected-channel warning', () => {
     const { container } = renderPublish(['linkedin'], undefined)
 
     expect(screen.queryByText(/isn’t connected yet/)).not.toBeInTheDocument()
-    expect(pick(container, 'linkedin')).toBeInTheDocument()
+    expect(sendNow(container)).toBeInTheDocument()
   })
 
-  test('says nothing when every picked channel is connected', () => {
+  test('says nothing when every channel is connected', () => {
     const { container } = renderPublish(['x', 'linkedin'], set('x', 'linkedin'))
 
     expect(screen.queryByText(/connected yet/)).not.toBeInTheDocument()
-    expect(pick(container, 'x')).toBeInTheDocument()
+    expect(sendNow(container)).toBeInTheDocument()
   })
 
   test('does not warn about a channel that is not on the live rail', () => {
@@ -130,13 +136,14 @@ describe('PublishNow — the unconnected-channel warning', () => {
     expect(screen.queryByText(/connected yet/)).not.toBeInTheDocument()
   })
 
-  test('a repeated CONNECTED channel offers one chip, not two identical ones', () => {
+  test('a repeated CONNECTED channel is listed once, not twice', () => {
     // Same `text[]` hazard on the other branch of the split: `live` is derived from
-    // the same duplicated list. Two identical X chips is both a wrong screen and a
-    // duplicate React key.
+    // the same duplicated list. It used to render two identical X chips — both a
+    // wrong screen and a duplicate React key. The chips are gone; the readout is
+    // where a channel is now named, and the same dedupe has to hold there.
     const { container } = renderPublish(['x', 'x'], set('x'))
 
-    expect(container.querySelectorAll('[data-publish-pick="x"]')).toHaveLength(1)
+    expect(container.querySelectorAll('[data-channel-status="x"]')).toHaveLength(1)
   })
 })
 
@@ -150,20 +157,18 @@ describe('PublishNow — the unconnected-channel warning', () => {
  * Two claims, both false at once — a channel the post does not use, and a real
  * publish promised forty pixels below a block saying nothing could go out. All
  * eight assertions above passed with it in place, because none of them read
- * this line. That is the argument for these four.
+ * this line. That is the argument for these.
  */
-describe('PublishNow — what the footnote may claim', () => {
-  // The CLAIM, not the sentence. It reads "This posts to LinkedIn for real,
-  // straight away" now that the confirm panel names its channel, so an
-  // assertion anchored to the old word order would fail on correct copy.
-  // Retargeted per CLAUDE.md rule 5 rather than deleted.
+describe('PublishNow — what the confirm panel may claim', () => {
   const FOOTNOTE = /for real, straight away/i
   const INSTAGRAM_WAIT = /fifteen seconds/i
 
   test('says nothing about publishing when nothing can be published', () => {
-    // No connection at all, so there is no button. A sentence describing what
-    // the button does is a claim about an action nobody on this screen can take.
-    renderPublish(['x', 'linkedin'], set())
+    // No connection at all, so there is no Send button. A sentence describing
+    // what it does is a claim about an action nobody on this screen can take.
+    const { container } = renderPublish(['x', 'linkedin'], set())
+
+    expect(sendNow(container)).toBeNull()
     expect(screen.queryByText(FOOTNOTE)).not.toBeInTheDocument()
   })
 
@@ -171,117 +176,113 @@ describe('PublishNow — what the footnote may claim', () => {
     // THE ONE THAT WOULD HAVE CAUGHT IT. The reader's only reasonable
     // conclusion from the old copy was that Sahoda thought this was an
     // Instagram post.
-    renderPublish(['x', 'linkedin'], set('x', 'linkedin'))
+    const { container } = renderPublish(['x', 'linkedin'], set('x', 'linkedin'))
+    openConfirm(container)
+
     expect(screen.queryByText(INSTAGRAM_WAIT)).not.toBeInTheDocument()
   })
 
-  test('does describe the publish once a channel is picked', () => {
+  test('does describe the send once it is confirmed', () => {
     // The counterweight: silencing the line everywhere would be the other
     // failure, and a test that only asserts absence passes against a deleted
-    // component. It now lives in the confirm panel, which is where a person is
-    // about to act rather than where they are still choosing.
+    // component. It lives in the confirm panel, which is where a person is
+    // about to act rather than where they are still deciding.
     const { container } = renderPublish(['x'], set('x'))
-    choose(container, 'x')
+    openConfirm(container)
 
     expect(screen.getByText(FOOTNOTE)).toBeInTheDocument()
   })
 
-  test('says nothing about publishing until a channel is picked', () => {
-    // NEW, and it is the point of the confirm step: before a pick there is no
-    // act to describe, and the old screen described one anyway.
+  test('says nothing about publishing until Send now is pressed', () => {
+    // The point of the confirm step: before the press there is no act to
+    // describe, and the old screen described one anyway.
     renderPublish(['x'], set('x'))
+
     expect(screen.queryByText(FOOTNOTE)).not.toBeInTheDocument()
   })
 
-  test('keeps the Instagram wait where Instagram is the thing being published', () => {
+  test('keeps the Instagram wait where Instagram is the thing being sent', () => {
     const { container } = renderPublish(['instagram'], set('instagram'))
-    choose(container, 'instagram')
+    openConfirm(container)
 
     expect(screen.getByText(INSTAGRAM_WAIT)).toBeInTheDocument()
   })
 
   /**
-   * ── THIS CASE'S CLAIM CHANGED, AND IT CHANGED FOR THE BETTER ─────────────
-   * It read "a mixed post keeps the wait, because Instagram is one of the
-   * buttons". That was correct about the old screen and it was the weaker
-   * behaviour: one footnote had to cover every button, so a person about to
-   * publish to X was told how long Instagram takes.
+   * ── THIS CASE'S CLAIM CHANGED, AND IT CHANGED BACK ───────────────────────
+   * It first read "a mixed post keeps the wait, because Instagram is one of the
+   * buttons". Then the chip rail arrived and it became "names the wait only for
+   * the channel being sent to", which was correct about that shape.
    *
-   * The confirm panel is per channel, so the sentence is now about the channel
-   * actually being sent to. Retargeted rather than deleted, and the new
-   * assertion is the opposite of the old one on purpose.
+   * One press now reaches BOTH, so the wait is a fact about this send again and
+   * hiding it would understate how long the reader is about to wait. The
+   * assertion follows the behaviour rather than the wording, and both directions
+   * are checked so it cannot pass by saying nothing.
    */
-  test('a mixed post names the wait only for the channel being sent to', () => {
+  test('a mixed post keeps the wait, because this one press reaches Instagram too', () => {
     const { container } = renderPublish(['instagram', 'x'], set('instagram', 'x'))
+    openConfirm(container)
 
-    choose(container, 'x')
-    expect(screen.queryByText(INSTAGRAM_WAIT)).not.toBeInTheDocument()
-
-    choose(container, 'x') // toggle off
-    choose(container, 'instagram')
     expect(screen.getByText(INSTAGRAM_WAIT)).toBeInTheDocument()
+    expect(screen.getByText(/This posts to Instagram and X for real/)).toBeInTheDocument()
   })
 
   test('a mixed post where only the OTHER channel is connected drops the wait', () => {
-    // `live` is the set a press would reach, not the set that was picked. With
-    // Instagram unconnected there is no Instagram chip to pick, so neither the
-    // sentence nor the act is reachable.
+    // `live` is the set a press would reach, not the set that was chosen. With
+    // Instagram unconnected it is not in `live`, so neither the sentence nor the
+    // act is reachable for it.
     const { container } = renderPublish(['instagram', 'x'], set('x'))
+    openConfirm(container)
 
-    expect(pick(container, 'instagram')).toBeNull()
-    choose(container, 'x')
     expect(screen.getByText(FOOTNOTE)).toBeInTheDocument()
     expect(screen.queryByText(INSTAGRAM_WAIT)).not.toBeInTheDocument()
+    expect(screen.getByText(/This posts to X for real/)).toBeInTheDocument()
   })
 })
 
 /**
- * WHAT THE RAIL'S HEADING IS ALLOWED TO CLAIM.
+ * WHAT THE SEND CONTROLS CLAIM ABOUT THEMSELVES.
  *
- * MEASURED in a rendered frame: a post on Instagram, LinkedIn and X, with
- * Instagram and LinkedIn live, printed the eyebrow "SEND IT TO ONE CHANNEL"
- * directly above TWO chips. Read as a heading over that rail it says the post
- * is going to a single channel, which is not what the screen means and not what
- * the post is doing. What is actually true is about the PRESS: each confirm
- * sends to one channel, and the reader can come back and send the other.
- *
- * So the fact moved to the footnote, where a person is choosing, and the
- * heading now names the act. These pin the claim rather than the wording.
+ * The rail heading once read "SEND IT TO ONE CHANNEL" above TWO chips — a
+ * heading that made a claim about the POST rather than about the press. The
+ * chips are gone and the claim is now the opposite one: this press reaches every
+ * connected channel. It has to be said, because a reader who expects one channel
+ * per press will not expect four posts.
  */
-describe('PublishNow — what the rail heading claims', () => {
-  test('never heads a two-chip rail with a sentence about one channel', () => {
+describe('PublishNow — what the send controls claim', () => {
+  test('never says a press goes to one channel when it goes to two', () => {
+    // The defect verbatim, from the shape before this one.
     renderPublish(['instagram', 'linkedin'], set('instagram', 'linkedin'))
 
-    // The defect verbatim. Deliberately exact: this is the string that shipped.
     expect(screen.queryByText(/Send it to one channel/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/one at a time/i)).not.toBeInTheDocument()
   })
 
-  test('still says the rail is for sending, so the heading is not merely absent', () => {
-    // The counterweight. An assertion that only checks absence passes against a
-    // deleted heading, which would be a worse screen than the wrong one.
-    renderPublish(['instagram', 'linkedin'], set('instagram', 'linkedin'))
-
-    expect(screen.getByText(/Send it now/i)).toBeInTheDocument()
-  })
-
-  test('states the one-at-a-time fact where the reader is choosing', () => {
-    // Moved, not dropped. It is true and a person needs it: two live channels
-    // means two presses, and a reader who expects one press to do both would
-    // leave thinking half the post failed.
-    renderPublish(['instagram', 'linkedin'], set('instagram', 'linkedin'))
-
-    expect(screen.getByText(/sends to one at a time/i)).toBeInTheDocument()
-  })
-
-  test('does not claim "one at a time" when there is only one channel to send to', () => {
-    // With a single live channel there is no second press to warn about, and
-    // "one at a time" would be an implication the screen cannot cash: it reads
-    // as though something else is queued behind it.
+  test('offers both endings, named for what they do', () => {
+    // The counterweight to every absence assertion above: a screen with neither
+    // button would satisfy all of them.
     renderPublish(['linkedin'], set('linkedin'))
 
-    expect(screen.queryByText(/one at a time/i)).not.toBeInTheDocument()
-    expect(
-      screen.getByText(/Pick the channel\. Nothing is sent until you confirm it\./),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Save as draft/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Send now/i })).toBeInTheDocument()
+  })
+
+  test('lists where the post is going, including the channels it cannot reach', () => {
+    // The readout the schedule route already had and this one did not. It is the
+    // answer to "where is this going", which is the question a person asks in
+    // the second before pressing an irreversible button.
+    const { container } = renderPublish(['instagram', 'linkedin', 'x'], set('instagram'))
+
+    expect(container.querySelector('[data-channel-readout]')).not.toBeNull()
+    expect(container.querySelectorAll('[data-channel-status]')).toHaveLength(3)
+  })
+
+  test('offers Save as draft even when nothing can be sent', () => {
+    // Work still has to be safe on a post with no connections. Hiding both
+    // buttons because one of them cannot work would strand the writer.
+    const { container } = renderPublish(['linkedin'], set())
+
+    expect(screen.getByRole('button', { name: /Save as draft/i })).toBeInTheDocument()
+    expect(sendNow(container)).toBeNull()
   })
 })

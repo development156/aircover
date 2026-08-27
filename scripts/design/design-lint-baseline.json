@@ -84,7 +84,7 @@
   },
   "breakpoint_total": 0,
   "breakpoint": {},
-  "typesize_total": 729,
+  "typesize_total": 728,
   "typesize": {
     "app/(app)/approvals/page.tsx": 2,
     "app/(app)/assets/page.tsx": 1,
@@ -239,7 +239,7 @@
     "components/posts/post-card.tsx": 1,
     "components/posts/post-filters.tsx": 2,
     "components/posts/post-metrics-panel.tsx": 1,
-    "components/posts/publish-now.tsx": 3,
+    "components/posts/publish-now.tsx": 2,
     "components/posts/publish-preview.tsx": 5,
     "components/posts/status-badge.tsx": 1,
     "components/posts/variant-conflict-notice.tsx": 2,
