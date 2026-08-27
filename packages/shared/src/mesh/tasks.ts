@@ -154,10 +154,49 @@ export const BrandExtractOutputSchema = z.object({
 })
 export type BrandExtractOutput = z.infer<typeof BrandExtractOutputSchema>
 
+/**
+ * THE SEVEN THINGS A WRITER CAN ASK FOR, AND THE ONE RULE THEY ALL SHARE.
+ *
+ * The first three are selection-scoped and have been here since the editor was
+ * built. The four TONE modes were added for the whole-body control: a writer who
+ * types their own caption and wants it improved without having to select
+ * anything.
+ *
+ * Every one of them, including the tone modes, must keep the author's MEANING
+ * and fix their grammar. That is not a nicety on this product — the composer's
+ * body is the writer's own words about their own business, and a mode that
+ * invented a claim would put a sentence nobody said in front of their customers.
+ * `caption-rewrite.ts` carries the wording that enforces it and a test asserts
+ * that no tone directive omits it.
+ *
+ * `creative` is the one that had to be worded carefully. It is the founder's own
+ * word for the mode, and it means more expressive LANGUAGE, never a new fact.
+ */
 export const CaptionRewriteInputSchema = z.object({
-  text: z.string(),
-  instruction: z.enum(['rewrite', 'shorten', 'hookify']),
-  selection: z.string().optional(),
+  /**
+   * Bounded, and the bound is a cost control rather than a style rule.
+   *
+   * `caption_rewrite` is a FLAT one-credit charge whatever it is handed, so an
+   * unbounded string is an unbounded provider bill against a fixed price. There
+   * was no cap: the selection path could be handed a 50,000-character selection
+   * and the whole-body path a whole article, both for one credit.
+   *
+   * 8,000 is well clear of every channel's own limit — the largest is LinkedIn
+   * at 3,000 — so no legal caption can hit it, and the composer's canonical body
+   * has no limit of its own by design. A writer drafting something longer to
+   * adapt downward is not refused the editor; only this one paid button.
+   */
+  text: z.string().max(8_000),
+  instruction: z.enum([
+    'rewrite',
+    'shorten',
+    'hookify',
+    'polish',
+    'professional',
+    'friendly',
+    'creative',
+  ]),
+  selection: z.string().max(8_000).optional(),
 })
 export type CaptionRewriteInput = z.infer<typeof CaptionRewriteInputSchema>
 

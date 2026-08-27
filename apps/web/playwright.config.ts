@@ -143,7 +143,34 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'off',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  /**
+   * ── AN ESCAPE HATCH FOR A SANDBOX THAT SHIPS ITS OWN CHROMIUM ──────────────
+   * Unset everywhere that matters, so CI and a laptop both launch the browser
+   * Playwright downloaded for the pinned version, exactly as before.
+   *
+   * It exists because this suite could not run AT ALL in the claude.ai/code
+   * container, and the reason was neither the app nor the network: the image
+   * pre-installs Chromium build 1194 at `/opt/pw-browsers` and forbids
+   * `playwright install`, while the `@playwright/test` this repo pins looks for
+   * build 1228 and for the headless SHELL rather than the full browser. Every
+   * one of the 118 @smoke tests failed in about 3ms with
+   * "Executable doesn't exist at .../chromium_headless_shell-1228/…" — which
+   * reads exactly like a broken suite and is not one.
+   *
+   * Pointing this at the browser that IS installed is the whole fix:
+   *   PLAYWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium pnpm test:smoke
+   */
+  projects: [
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        ...(process.env.PLAYWRIGHT_CHROMIUM_PATH === undefined
+          ? {}
+          : { launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH } }),
+      },
+    },
+  ],
   webServer: {
     /**
      * Dev by default, but overridable — and the override is not a convenience.

@@ -46,35 +46,52 @@ async function openExact(user: ReturnType<typeof userEvent.setup>): Promise<void
 // Far enough ahead to clear every channel's 5-minute minimum lead.
 const future = (offsetMs: number) => new Date(Date.now() + offsetMs).toISOString()
 
-describe('ScheduleField', () => {
-  test('shows the stored value as local wall-clock time', () => {
+/**
+ * ── THE CONTROL THESE FIVE WERE WRITTEN AGAINST NO LONGER EXISTS ─────────────
+ * They reached a `datetime-local` input and asserted its `.value` string. The
+ * field is a month calendar now, and — the change that matters more — a pick no
+ * longer commits: it waits for "Confirm schedule" instead of calling
+ * `schedulePost` on the first tap.
+ *
+ * Every GUARANTEE below is the one its predecessor asserted, retargeted at the
+ * screen that now carries it rather than deleted. What a stored time renders
+ * as, that a replaced value re-syncs, that removing it returns to the picker,
+ * that a pending pick is not wiped by a re-render, and that a confirmed time
+ * does not bounce back into the picker. Nothing was loosened to let the new
+ * field pass.
+ */
+describe('ScheduleField — a stored time, and what happens to it', () => {
+  const committed = () => document.querySelector('[data-schedule-committed]')
+
+  test('renders a stored time as words rather than a date mask', () => {
     const iso = future(86_400_000)
     render(<ScheduleField channels={toChannelSet(['x'])} value={iso} onChange={vi.fn()} />)
 
-    const expected = new Date(iso)
-    expect(input().value).toMatch(
-      new RegExp(
-        `^${expected.getFullYear()}-.*T\\d{2}:${String(expected.getMinutes()).padStart(2, '0')}$`,
-      ),
-    )
+    const at = new Date(iso)
+    expect(committed()).toBeTruthy()
+    // The DAY and the CLOCK, both on screen. "27/08/2026, 09:00" is a value;
+    // "Thursday, 27 August at 9:00 am" is a commitment, and that is the whole
+    // reason this panel replaced the mask.
+    expect(screen.getByText(new RegExp(`\\b${at.getDate()}\\b`))).toBeInTheDocument()
+    expect(screen.getByText(/\bat\b.*\d/)).toBeInTheDocument()
   })
 
   test('re-syncs when the stored value is replaced underneath it', () => {
     const first = future(86_400_000)
-    const second = future(172_800_000)
+    const second = future(3 * 86_400_000)
     const { rerender } = render(
       <ScheduleField channels={toChannelSet(['x'])} value={first} onChange={vi.fn()} />,
     )
-    const before = input().value
+    const before = committed()?.textContent ?? ''
 
     // What `loadTheirs` does after a divergence.
     rerender(<ScheduleField channels={toChannelSet(['x'])} value={second} onChange={vi.fn()} />)
 
-    expect(input().value).not.toBe(before)
-    expect(input().value).toContain(String(new Date(second).getDate()).padStart(2, '0'))
+    expect(committed()?.textContent).not.toBe(before)
+    expect(committed()?.textContent).toContain(String(new Date(second).getDate()))
   })
 
-  test('clears the field when the stored value is removed', () => {
+  test('removing the stored value returns to the picker, not to a blank panel', () => {
     const { rerender } = render(
       <ScheduleField
         channels={toChannelSet(['x'])}
@@ -84,26 +101,35 @@ describe('ScheduleField', () => {
     )
     rerender(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />)
 
-    // The value is gone from the field AND the field has folded back to the
-    // named choices, which is the state a person with no schedule should meet.
-    expect(screen.queryByLabelText(/schedule/i)).toBeNull()
-    expect(screen.getByText(/stays a draft/i)).toBeInTheDocument()
+    expect(committed()).toBeNull()
+    // The state a person with no schedule should meet: something to pick with.
+    expect(document.querySelector('[data-schedule-calendar]')).toBeTruthy()
+    expect(screen.getByText(/pick a day and a time/i)).toBeInTheDocument()
   })
 
-  test('does not eat keystrokes while the typed value is not yet committed', async () => {
+  test('a pending pick is not wiped by a re-render that changes nothing', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
-    // value stays null throughout: an incomplete datetime never reaches onChange,
-    // which is exactly when a mismatch-keyed re-sync would wipe the input.
-    render(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={onChange} />)
+    const { rerender } = render(
+      <ScheduleField channels={toChannelSet(['x'])} value={null} onChange={onChange} />,
+    )
 
-    await openExact(user)
-    await user.type(input(), '2030-01-01T10:30')
+    await user.click(screen.getAllByRole('button', { name: /^Tomorrow morning/ })[0]!)
+    const summary = document.querySelector('[data-schedule-summary]')?.textContent ?? ''
+    expect(summary).toMatch(/going out/i)
 
-    expect(input().value).toBe('2030-01-01T10:30')
+    // The parent re-renders constantly while typing elsewhere on the page. A
+    // re-sync keyed on a draft/value MISMATCH rather than on the prop changing
+    // would throw the pick away here, which is the defect the original of this
+    // test was written for.
+    rerender(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={onChange} />)
+
+    expect(document.querySelector('[data-schedule-summary]')?.textContent).toBe(summary)
+    // And nothing has been written: picking is not confirming.
+    expect(onChange).not.toHaveBeenCalled()
   })
 
-  test('a committed edit round-trips without the field jumping', async () => {
+  test('a confirmed time lands in the committed panel and stays there', async () => {
     const user = userEvent.setup()
     let stored: string | null = null
     const onChange = vi.fn((iso: string | null) => {
@@ -113,13 +139,15 @@ describe('ScheduleField', () => {
       <ScheduleField channels={toChannelSet(['x'])} value={stored} onChange={onChange} />,
     )
 
-    await openExact(user)
-    await user.type(input(), '2030-01-01T10:30')
-    const typed = input().value
+    await user.click(screen.getAllByRole('button', { name: /^Tomorrow morning/ })[0]!)
+    await user.click(screen.getByRole('button', { name: /Confirm schedule/ }))
+
+    expect(onChange).toHaveBeenCalledTimes(1)
     // Feed the committed value back the way the parent does.
     rerender(<ScheduleField channels={toChannelSet(['x'])} value={stored} onChange={onChange} />)
 
-    expect(input().value).toBe(typed)
+    expect(committed()).toBeTruthy()
+    expect(document.querySelector('[data-schedule-calendar]')).toBeNull()
   })
 })
 
@@ -133,11 +161,13 @@ describe('what setting a time actually does', () => {
   const NOT_LIVE = /auto-publish isn't live yet/i
 
   test('says a time does not publish the post', async () => {
+    // Reached by picking a day on the calendar rather than by typing into the
+    // date mask this replaced. Same claim, same moment in the journey: the
+    // instant a reader forms the belief "this will go out then".
     const user = userEvent.setup()
     render(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />)
 
-    await openExact(user)
-    await user.type(input(), '2030-01-01T10:30')
+    await user.click(document.querySelector('[data-schedule-choice="hour"]') as HTMLElement)
 
     expect(screen.getByText(NOT_LIVE)).toBeInTheDocument()
   })
@@ -317,6 +347,11 @@ describe('scheduling without knowing what a date input is', () => {
     expect(button).not.toBeNull()
     const printed = button!.textContent ?? ''
     await user.click(button as HTMLElement)
+    // Picking is no longer committing: the instant only reaches the parent once
+    // "Confirm schedule" is pressed. The label's honesty is unchanged and is
+    // still what this asserts.
+    expect(stored).toBeNull()
+    await user.click(screen.getByRole('button', { name: /Confirm schedule/ }))
 
     expect(stored).not.toBeNull()
     const committed = new Date(stored as unknown as string)
@@ -370,6 +405,7 @@ describe('scheduling without knowing what a date input is', () => {
       />,
     )
     await user.click(document.querySelector('[data-schedule-choice="hour"]') as HTMLElement)
+    await user.click(screen.getByRole('button', { name: /Confirm schedule/ }))
     expect(stored).not.toBeNull()
 
     rerender(
@@ -459,5 +495,128 @@ describe('what the picker promises about when it goes out', () => {
 
     expect(screen.getByText(/LinkedIn isn’t connected/)).toBeInTheDocument()
     expect(screen.queryByText(/goes out between/i)).not.toBeInTheDocument()
+  })
+})
+
+/**
+ * THE CALENDAR, THE CONFIRM, AND THE DRAFT.
+ *
+ * Three things the field could not do before: show a month, wait to be
+ * confirmed, and offer a way to stop without leaving a schedule behind.
+ */
+describe('picking a day, and only then committing it', () => {
+  const dayCells = () => document.querySelectorAll('[data-schedule-calendar] [aria-pressed]')
+
+  test('renders a full month grid rather than a date mask', () => {
+    render(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />)
+
+    // Six rows of seven, always, so the panel does not change height between
+    // months. The number is the point: a ragged grid is not a calendar.
+    expect(dayCells()).toHaveLength(42)
+  })
+
+  test('a day before the channels own lead cannot be pressed', () => {
+    render(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />)
+
+    const yesterday = new Date(Date.now() - 86_400_000)
+    const cell = screen.getByRole('button', {
+      name: yesterday.toLocaleDateString('en-GB', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      }),
+    })
+
+    // Disabled, not merely styled: a control that accepts a value it is about
+    // to refuse has wasted the click and taught the reader not to trust the grid.
+    expect(cell).toBeDisabled()
+  })
+
+  test('picking a day writes nothing until Confirm schedule is pressed', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={onChange} />)
+
+    const soon = new Date(Date.now() + 3 * 86_400_000)
+    await user.click(
+      screen.getByRole('button', {
+        name: soon.toLocaleDateString('en-GB', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        }),
+      }),
+    )
+
+    // THE CHANGE THAT MATTERS. A pick used to run `schedulePost`, which moves
+    // the row out of `draft`, on one tap. A person exploring "what does Friday
+    // look like" had committed their post to a queue.
+    expect(onChange).not.toHaveBeenCalled()
+    expect(document.querySelector('[data-schedule-summary]')?.textContent).toMatch(/going out/i)
+
+    await user.click(screen.getByRole('button', { name: /Confirm schedule/ }))
+
+    expect(onChange).toHaveBeenCalledTimes(1)
+    const committedAt = new Date(onChange.mock.calls[0]![0] as string)
+    expect(committedAt.getDate()).toBe(soon.getDate())
+  })
+
+  test('Confirm schedule cannot be pressed before there is anything to confirm', () => {
+    render(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />)
+
+    expect(screen.getByRole('button', { name: /Confirm schedule/ })).toBeDisabled()
+  })
+
+  test('Save as draft takes back a schedule that was already confirmed', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(
+      <ScheduleField
+        channels={toChannelSet(['x'])}
+        value={future(86_400_000)}
+        onChange={onChange}
+      />,
+    )
+
+    // From the committed panel, the way back is named and visible rather than
+    // being "empty the date mask by hand".
+    await user.click(screen.getByRole('button', { name: /Change the time/ }))
+    await user.click(screen.getByRole('button', { name: /Save as draft/ }))
+
+    expect(onChange).toHaveBeenCalledWith(null)
+  })
+})
+
+describe('what the reader is told about where it is going', () => {
+  test('names every channel the post is going to, with its own verdict', () => {
+    render(
+      <ScheduleField
+        channels={toChannelSet(['x', 'linkedin'])}
+        value={null}
+        onChange={vi.fn()}
+        connected={new Set(['x'] as const)}
+      />,
+    )
+
+    const readout = document.querySelector('[data-channel-readout]')
+    expect(readout).toBeTruthy()
+    expect(readout?.querySelector('[data-channel-status="x"]')?.textContent).toMatch(/connected/i)
+    // Not a sentence the reader has to parse into a list: LinkedIn gets its own
+    // row and its own way out.
+    expect(readout?.querySelector('[data-channel-status="linkedin"]')?.textContent).toMatch(
+      /connect it/i,
+    )
+  })
+
+  test('an unread connection state says so, rather than claiming a channel is off', () => {
+    // `connected === undefined` means the read did not happen. A red cross there
+    // would send someone to reconnect an account that is fine.
+    render(<ScheduleField channels={toChannelSet(['linkedin'])} value={null} onChange={vi.fn()} />)
+
+    const status = document.querySelector('[data-channel-status="linkedin"]')?.textContent ?? ''
+    expect(status).toMatch(/not checked/i)
+    expect(status).not.toMatch(/connect it/i)
   })
 })

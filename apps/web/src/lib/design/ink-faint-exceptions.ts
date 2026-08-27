@@ -198,4 +198,29 @@ export const INK_FAINT_EXCEPTIONS: Readonly<Record<string, InkFaintException>> =
     reason:
       'Four uses — table headers plus role and seat meta, all read by an operator managing access. Pre-dates the v3 readability guards.',
   },
+  /**
+   * THE ONE USE HERE THAT THE WCAG DISABLED EXEMPTION ACTUALLY COVERS.
+   *
+   * A calendar day before the channels' own minimum lead is rendered as a real
+   * `<button disabled>`: it cannot be pressed, cannot be focused and cannot be
+   * activated by any input method. That is precisely the case 1.4.3 exempts,
+   * and it is what `--ink-faint` exists for.
+   *
+   * `text-muted` would be worse rather than safer. A past day drawn at the same
+   * weight as a selectable one invites the click it is going to refuse, and the
+   * grid then has to explain itself. The contrast step IS the affordance.
+   *
+   * Adjacent-month days, which ARE selectable, deliberately use `text-muted`
+   * instead — the two states are different and are drawn differently.
+   */
+  'src/components/posts/schedule-calendar.tsx': {
+    uses: 1,
+    // `legitimate`, not `debt`: this is correct and permanent. WCAG 1.4.3
+    // exempts disabled controls, and these cells are genuinely disabled rather
+    // than merely dimmed. Nothing is owed a fix, so there is no card.
+    kind: 'legitimate',
+    since: '2026-08-27',
+    reason:
+      "A calendar day before the channels' minimum lead, rendered as a genuinely disabled button. WCAG 1.4.3 exempts disabled controls, and the dimming is the affordance that stops a click the grid would refuse.",
+  },
 })

@@ -3,7 +3,10 @@ import { ensureZernioProfile } from '@sahoda/publishing'
 import { isZernioPlatform, type ZernioPlatform } from '@sahoda/shared'
 
 import { checkCountableLimit } from '@/lib/billing/entitlements'
+import { setPendingConnectHeader, type ConnectMode } from '@/lib/connections/pending-connect'
 import { readConnectionSlots } from '@/lib/connections/read'
+import { connectPlatformFor, needsPairingCode } from '@/lib/zernio/connect-platform'
+import { selectionPlatformFor } from '@/lib/zernio/selection'
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { readActiveWorkspace } from '@/lib/workspaces'
@@ -44,6 +47,13 @@ export async function POST(request: Request): Promise<Response> {
     // no adapter can publish, producing a connection that looks live and is not.
     // Defaults to instagram so the existing caller keeps working unchanged.
     let platform: ZernioPlatform = 'instagram'
+    /**
+     * How the customer started this. `redirect` is the default because it is the
+     * behaviour that has always worked and the one every caller falls back to when
+     * the browser blocks a popup — a missing or unrecognised value must never
+     * produce the newer path.
+     */
+    let mode: ConnectMode = 'redirect'
     try {
       const body: unknown = await request.json()
       const asked = (body as { platform?: unknown } | null)?.platform
@@ -51,6 +61,7 @@ export async function POST(request: Request): Promise<Response> {
         if (!isZernioPlatform(asked)) return fail('That channel cannot be connected here.', 400)
         platform = asked
       }
+      if ((body as { mode?: unknown } | null)?.mode === 'popup') mode = 'popup'
     } catch {
       // No body at all is fine — instagram is the default.
     }
@@ -133,10 +144,105 @@ export async function POST(request: Request): Promise<Response> {
       return fail('Couldn’t start the connection. Try again.', 500)
     }
 
-    const authUrl = await client.connectUrl(platform, profileId, zernioReturnUrl())
+    // ── REFUSE RATHER THAN SEND THEM SOMEWHERE THAT CANNOT RECEIVE THEM ──────
+    // `zernioReturnUrl()` is null when no environment variable can name an
+    // absolute origin. It used to fall back to `''`, producing the relative
+    // `/api/oauth/zernio/return`, which Zernio resolves against its OWN host —
+    // so the customer approved access at the platform and was returned to
+    // zernio.com. Stopping here costs them nothing; the grant they would have
+    // given is real and cannot be taken back.
+    //
+    // ── AND THE INTENT RIDES ON IT, NOT ONLY IN THE COOKIE ───────────────────
+    // Both the mode and the platform were carried by `sahoda_connect` alone, and
+    // it kept not arriving: our origin -> Zernio -> Google -> Zernio -> us is four
+    // hops and two cross-site boundaries, and a `SameSite=Lax` cookie that
+    // "should" survive that evidently does not in every browser. Two reported
+    // defects came out of the one missing cookie — the popup answered with a 303
+    // and loaded the app inside itself, and create-scoping fell to its fail-closed
+    // branch so a real connect wrote no row. Zernio appends its own result params
+    // with the URL API and preserves an existing query string, so what we put here
+    // comes back. The cookie is still set, still read first, and this is the
+    // fallback for the trip it does not survive. RETURN_MODE_PARAM in
+    // lib/zernio/return-url.ts carries the argument for why neither value can
+    // widen anything.
+    const returnTo = zernioReturnUrl({ mode, platform })
+    if (!returnTo) {
+      return fail(
+        'Connecting isn’t available right now. This deployment has no return address.',
+        503,
+      )
+    }
+
+    // ── OUR NAME FOR THE CHANNEL IS NOT ZERNIO'S ─────────────────────────────
+    // `x` and `gbp` are OUR ids. Connect wants `twitter` and `googlebusiness`,
+    // and passing ours straight through is why those two buttons answered
+    // "Couldn't start the connection. Try again." on every press, while
+    // Instagram, LinkedIn and Facebook worked — for those three the two names
+    // happen to be the same string. See lib/zernio/connect-platform.ts: this is
+    // the FOURTH platform vocabulary in this integration and the only one nobody
+    // had mapped.
+    /**
+     * ── THE RAIL IS CHOSEN BEFORE THE NAME IS LOOKED UP ──────────────────────
+     * Telegram has a name Zernio understands and no consent screen to send
+     * anybody to. Reaching `connectUrl` for it would ask for an `authUrl` that
+     * the endpoint does not return, and the client would throw MISSING_FIELDS —
+     * which is how this platform used to answer "Couldn't start the connection.
+     * Try again." on every press, a retry that could never succeed.
+     *
+     * Refused here, by name, with the flow that DOES work named in the sentence.
+     * `no-impossible-remedy.spec.ts` is the standing rule: a remedy that cannot
+     * work is worse than saying plainly what to do instead.
+     */
+    if (needsPairingCode(platform)) {
+      return fail('Telegram links from inside Telegram. Use the code on its card.', 400)
+    }
+
+    const connectName = connectPlatformFor(platform)
+    if (connectName === null) {
+      // Telegram. `GET /v1/connect/telegram` returns an access CODE for a bot,
+      // not an authUrl, so there is no consent screen to open. Refused here
+      // rather than discovered downstream when `connectUrl` throws for want of a
+      // field — which is exactly how it was found.
+      return fail('Telegram links from inside Telegram. Use the code on its card.', 400)
+    }
+
+    /**
+     * ── ZERNIO'S OWN PICKER IS TURNED OFF FOR THE TWO THAT HAVE ONE ──────────
+     * Facebook resolves to every Page the customer administers and Google Business
+     * to every location, and Zernio creates NO ACCOUNT until one is chosen. Left to
+     * itself it hosts that choice on zernio.com — which is the screen the founder
+     * reported without knowing what it was ("it opens another new website ... change
+     * from social media connector to Sahodalabs"), and which MEASURED 2026-08-27
+     * ended with zero facebook accounts on this key.
+     *
+     * `headless` sends the browser back to our return route with the OAuth state
+     * instead, and the return route renders the picker. See lib/zernio/selection.ts
+     * for why only these two are switched.
+     *
+     * Every other platform passes `false` and keeps the flow that works today.
+     */
+    const headless = selectionPlatformFor(platform) !== null
+    const authUrl = await client.connectUrl(connectName, profileId, returnTo, { headless })
+
+    // ── THE ONLY RECORD OF WHAT THE CUSTOMER ASKED FOR ────────────────────────
+    // Written as a HEADER on this very response, not through `cookies()`. This
+    // route answers with a `Response` it builds itself, and mutating the
+    // request-scoped cookie store put nothing on it — so the cookie was never
+    // sent and the return trip always read `null`. Two reported bugs came out of
+    // that one omission: the popup showed the app instead of closing, and a
+    // genuine connect wrote no row at all. See lib/connections/pending-connect.ts.
+    //
+    // Attached LAST, after every refusal above has had its chance. A cookie set
+    // before a 403 would authorise a create for a connect that never happened.
     return Response.json(
       { ok: true, authUrl },
-      { status: 200, headers: { 'cache-control': 'no-store' } },
+      {
+        status: 200,
+        headers: {
+          'cache-control': 'no-store',
+          'set-cookie': setPendingConnectHeader({ platform, mode }),
+        },
+      },
     )
   } catch (error) {
     await reportServerError(error, { action: 'zernioStart', workspaceId })

@@ -51,14 +51,24 @@ not a description somebody wrote down — it is a fact about how the database is
 holding a customer's data carries a `workspace_id` column, and the boundary between two customers is
 enforced by the database itself (PostgreSQL row-level security), not by the application.
 
-**MEASURED 2026-08-25: 49 tables.** They are listed in full in §3, and
+**MEASURED 2026-08-26: 52 tables.** They are listed in full in §3, and
 `packages/db/tests/data_handling_doc.pglite.test.ts` fails the build if that number or that list
-stops matching the database. (It read 48 on 2026-08-23, the figure this sentence carried until now;
-the forty-ninth is `marketing_observations`.)
+stops matching the database. (It read 49 on 2026-08-25, the figure this sentence carried until now;
+the three new ones are the library's folder system, `asset_folders`, `asset_folder_items` and
+`asset_smart_folders`. It read 48 on 2026-08-23; the forty-ninth was `marketing_observations`.)
 
-> **Production holds 47 of those 49 today.** Two are created by migrations that are written and
-> deliberately not yet applied: `ledger_actor_redactions` (see §5) and `marketing_observations`.
-> Counted from production directly on 2026-08-23.
+> **Production holds 51 of those 52 today.** MEASURED against production on 2026-08-26 by counting
+> `public` base tables carrying a `workspace_id` column, not inferred from the migration list.
+>
+> **Exactly one is missing: `ledger_actor_redactions`** (see §5), whose migration is written and
+> deliberately not applied.
+>
+> This paragraph said "47 of those 52" and named five unapplied tables an hour before this edit,
+> and it was wrong in both halves. `marketing_observations` had already been applied when that was
+> written; the count was carried forward from a 2026-08-23 reading rather than re-measured. **The
+> three folder tables were applied on 2026-08-26** and are now live. If you are about to quote a
+> figure from this file, re-measure it first: that is the second time this one paragraph has gone
+> stale by being copied instead of counted.
 
 Three tables hold personal data and do **not** carry a `workspace_id`, so they are invisible to any
 sweep built on that rule. This was a real gap and it is worth stating plainly because it is the kind
@@ -87,8 +97,11 @@ the table belongs to one identified workspace.
 | --- | --- | --- | --- |
 | `ai_provider_logs` | AI usage records | no direct identifiers | removed |
 | `asset_derivatives` | the per-channel crops made from your pictures | `created_by` | removed |
+| `asset_folder_items` | which folders you filed each picture in | `added_by` | removed |
+| `asset_folders` | the folders you made, and their names | `name` `created_by` | removed |
+| `asset_smart_folders` | the saved searches you named, and their rules | `name` `query` `created_by` | removed |
 | `asset_usages` | where each picture is used | no direct identifiers | removed |
-| `assets` | your picture library | `title` `created_by` | removed |
+| `assets` | your picture library, including anything in its trash | `title` `created_by` | removed |
 | `audience_snapshots` | who follows you | no direct identifiers | removed |
 | `audit_logs` | a record of admin actions | `actor` | removed |
 | `billing_profiles` | who your invoices are made out to | `legal_name` `address` `billing_email` | removed |
@@ -156,6 +169,25 @@ for anybody. A database queried this way answers with an empty list rather than 
 indistinguishable from "you have none". The export therefore **names it, with the reason**, and never
 renders it as an empty section. It is deleted with everything else.
 
+**`assets` — "deleted" now has two meanings, and only the second removes anything.** Since
+2026-08-27 a customer deleting a picture moves it to a trash: `assets.deleted_at` is set, the row
+stays, its folders and its post attachments stay, and **the file itself stays in storage**. Only
+"Delete for good" removes the row and the bytes.
+
+Three consequences worth stating plainly, because a reader would otherwise assume the first meaning
+covers everything:
+
+- **A copy of the data (§4.1) includes trashed pictures.** The export queries the table directly and
+  does not filter on `deleted_at`, so nothing a customer deleted-but-not-permanently is missing from
+  the copy they are given. That is correct: those files are still theirs and still held.
+- **Deleting everything (§4.2) removes trashed pictures too.** Erasure is scoped by workspace and
+  never consults `deleted_at`, so the trash is emptied with the rest. There is no residue.
+- **Nothing expires on its own.** No scheduled process reads `deleted_at`, so a trashed picture is
+  held until a person empties the trash. Sahoda therefore does **not** promise anywhere that deleted
+  files disappear after any number of days, because nothing would make that true.
+  `packages/db/tests/assets-trash.test.ts` asserts that no database function reads that column, so
+  the day a sweeper is added the guard fails and this paragraph has to be rewritten with it.
+
 ### Tables that exist and are NOT a customer's data
 
 Named here so that "we hold nothing else" is a statement somebody can check rather than a promise.
@@ -222,7 +254,7 @@ back. Both are re-checked on the server and the name is checked a third time by 
 because the delete is an addressable endpoint whatever the screen does. Only the **owner** of a
 workspace can do it.
 
-**What is removed:** every row in all 49 tables except the four in the next paragraph, plus every
+**What is removed:** every row in all 52 tables except the four in the next paragraph, plus every
 file in storage, plus the encrypted keys for the linked social accounts, plus the sign-in profile of every member
 for whom this was their last workspace — not only the person who pressed the button.
 
@@ -619,10 +651,10 @@ would be doing the thing it warns about.
 - Every base table carrying a `workspace_id`, from the database's own catalogue, on every build.
 - Whether each one is in the export list, and whether its stated readability matches its actual
   policies.
-- One complete cycle: create a workspace, fill all 49 tables, delete it, and count what is left —
+- One complete cycle: create a workspace, fill all 52 tables, delete it, and count what is left —
   including a second workspace that must be untouched.
 - That a FAILED deletion leaves everything exactly as it was. A trigger is installed that refuses to
-  let one table go; the deletion raises, naming the table, and all 49 tables still hold every row.
+  let one table go; the deletion raises, naming the table, and all 52 tables still hold every row.
   This is the only thing that demonstrates "all or nothing" rather than asserting it.
 - Whether the deletion writes to the financial ledger. It does not, and that is asserted against the
   function's own source.

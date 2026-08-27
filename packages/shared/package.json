@@ -3,6 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "_sideEffects": "The barrel re-exports every module, and without this webpack must assume each one might have a side effect, so NOTHING is tree-shaken: every route that imports one type from @sahoda/shared ships all of it. MEASURED: adding search-tokens.ts put 11 unrelated routes ~8 kB over budget. `*.css` is listed because tokens.css IS a side effect and a blanket false would let webpack drop the stylesheet.",
+  "sideEffects": [
+    "*.css"
+  ],
   "exports": {
     ".": "./src/index.ts",
     "./tokens.css": "./tokens.css"

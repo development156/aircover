@@ -128,7 +128,13 @@ export function AssetUpload({ label = 'Add photos' }: { label?: string }) {
         ) : null}
 
         {!pending && outcome !== null && outcome.added > 0 ? (
-          <p className="rounded-input bg-ok-bg px-3 py-2.5 text-[13px] text-ok">
+          // B4: this was a full-width `<p>` inside a flex column whose own
+          // width is set by the WIDEST sibling (the limits sentence below it),
+          // so a ten-character confirmation rendered inside a box built for a
+          // much longer line — the "wide grey slab" the founder circled.
+          // `inline-flex w-fit` makes the box hug its own text instead of the
+          // column's width.
+          <p className="inline-flex w-fit rounded-input bg-ok-bg px-3 py-2.5 text-[13px] text-ok">
             {outcome.added === 1 ? 'Added 1 photo.' : `Added ${outcome.added} photos.`}
           </p>
         ) : null}
