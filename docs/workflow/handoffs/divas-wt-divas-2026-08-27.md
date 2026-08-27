@@ -304,10 +304,70 @@ post, so "create one and connect again" is a remedy that cannot work there.
 | The picker does NOT tell the opener | make it signal too | 3 |
 | The remedy names "Edit settings" | soften it to "the other option" | 1 |
 
+
+## Round thirteen: why the other eleven do not connect
+
+The founder: X, Instagram and LinkedIn connect, the rest do not. **Measured each
+one rather than assuming a shared cause, and there is no shared cause.**
+
+| Platform | `GET /v1/connect/{p}` | What actually stops it |
+|---|---|---|
+| twitter, instagram, linkedin | 200 + authUrl | nothing — these work |
+| facebook | 200 + authUrl | needs a Page in the grant. Picker built |
+| googlebusiness | 200 + authUrl | needs a location. Picker built, never seen render |
+| discord, pinterest, reddit, slack, threads, tiktok, whatsapp, youtube | 200 + authUrl | **nothing measurable.** Untested only because of the slot cap |
+| telegram | 200 + **code, no authUrl** | our own code refused it. **Built this round** |
+| snapchat | **403** `PLATFORM_BETA_RESTRICTED` | upstream, not fixable here |
+
+**Zernio is not a cap.** MEASURED `GET /v1/billing`: `plan.isPaid: true`,
+`isUsageBased: true`, `hasAccess: true`, `limits.profiles: -1`, not suspended.
+It will create as many accounts as we ask for.
+
+**The real cap is ours.** Free allows 2 channels
+(`packages/shared/src/billing/plans.ts:52`) and workspace
+`8846b067-5662-4e1e-9bba-cf1830c01fe5` has **no subscription row**, so it is on
+Free with one connection (x) and one slot left. Connecting a third is refused by
+our own gate — correctly, and that refusal is very likely most of what "the rest
+are not connecting" has meant.
+
+### Telegram, built
+
+`GET /v1/connect/telegram` returns no `authUrl`. MEASURED, it returns
+`{ code: "ZRN-DLPTJW", botUsername: "LateScheduleBot", expiresIn: 900,
+instructions: [...] }`. The customer adds the bot as an administrator of their
+channel and messages it the code; the link completes inside Telegram.
+
+| Piece | File |
+|---|---|
+| Issue a code, poll for the landing | `api/oauth/zernio/telegram/route.ts` |
+| The code panel on the card | `components/connections/telegram-connect.tsx` |
+| The code, held server-side | `lib/connections/pending-telegram.ts` |
+| Which rail a platform travels on | `lib/zernio/connect-platform.ts` `needsPairingCode` |
+
+`telegram` rejoins `ZERNIO_PLATFORMS`. That list was always the wrong place to
+express "no authUrl" — it governs whether a workspace may HOLD the connection,
+and membership is what lets the reconcile sweep find the account at all.
+
+**Nothing the poll returns is trusted.** The account is re-derived from
+`listAccounts` under the profile read from our own table. The code rides an
+httpOnly cookie, because `PATCH /connect/telegram?code=` answers for ANY code
+with its status and, once landed, the channel's title.
+
+| Guard | Mutation applied | Went red |
+|---|---|---|
+| The poll re-derives the account | trust the poll's own | 2 |
+| The plan gate precedes the code | issue first, gate after | 2 |
+| No attempt in flight is not `pending` | report pending | 1 |
+| Telegram is off the OAuth rail | put it back on | 1 |
+| Only Telegram gets the code panel | give it to every card | 4 |
+| The refusal names the control that works | restore "isn't built yet" | 1 |
+| The code cookie validates its shape | — asserted directly, 5 tests |
+
 ## Shared surfaces touched
 
 - **`packages/shared/src/enums.ts`** — `ConnectionPlatformSchema` 6→14 values,
-  `ZERNIO_PLATFORMS` 5→13. **`ChannelSchema` is UNCHANGED at 6.** These are
+  `ZERNIO_PLATFORMS` 5→13, **then 13→14 when telegram rejoined it in round
+  thirteen**. Anything iterating `ZERNIO_PLATFORMS` now sees telegram. **`ChannelSchema` is UNCHANGED at 6.** These are
   additive widenings of a union: they break EXHAUSTIVE `Record<…>` maps and
   `switch` statements, not readers. Six files in `apps/web` became compile
   errors and were fixed; another lane holding a `Record<ConnectionPlatform, …>`
