@@ -1,5 +1,7 @@
 import { ChevronRight } from 'lucide-react'
 
+import { cn } from '@/lib/utils'
+
 /**
  * Page heading — the kit's `.sl-page-title` / `.sl-page-sub`.
  *
@@ -17,10 +19,23 @@ import { ChevronRight } from 'lucide-react'
  * route would be offering navigation that cannot happen — the impossible remedy
  * `no-impossible-remedy.spec.ts` forbids, wearing navigation chrome.
  *
- * So it states a LOCATION. `aria-current="page"` says which segment the reader is
- * on, and the `h1` stays the one word that names the screen, so the document
- * outline is unchanged for anyone arriving by heading. The day a real parent
- * route exists, the title becomes a `<Link>` here and no page changes.
+ * So it states a LOCATION, and it is NOT wrapped in a `<nav>`. A landmark whose
+ * every segment is inert announces a navigation region holding nothing to
+ * navigate, which is the same objection this file already makes to wrapping a
+ * lone heading. `aria-current="page"` says which segment the reader is on, and
+ * the `h1` stays the one word that names the screen, so the document outline is
+ * unchanged for anyone arriving by heading. The day a real parent route exists,
+ * the title becomes a `<Link>` here, the landmark becomes correct, and it can be
+ * added in the same commit as the anchor rather than ahead of it.
+ *
+ * ── `min-w-0` IS SCOPED TO THE TRAIL, AND THAT IS NOT FUSSINESS ──────────────
+ * Thirty-two screens render this component and exactly one passes a `crumb`.
+ * `min-w-0` lets a flex child shrink below its content width, so putting it on
+ * the wrapper unconditionally would change how the title block competes with its
+ * siblings on all thirty-one of the others — a layout change nothing on those
+ * screens asked for and no test here would see. The trail needs it, because it
+ * adds a second and third item to a row that already sits in a `flex-wrap`
+ * header; the bare title never did.
  *
  * The segment is `type-h3` in ink rather than the reference's brand colour, and
  * that is a measurement rather than a preference: `--acc` is `#ff6600`, which is
@@ -41,17 +56,15 @@ export function PageTitle({
   const title = <h1 className="text-[20px] leading-7 font-[650] tracking-[-0.02em]">{children}</h1>
 
   return (
-    <div className="min-w-0">
-      {/* No `<nav>` when there is no trail: a landmark wrapping one heading
-          announces a navigation region that holds nothing to navigate. */}
+    <div className={cn(crumb && 'min-w-0')}>
       {crumb ? (
-        <nav aria-label="Location" className="flex flex-wrap items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           {title}
           <ChevronRight size={15} aria-hidden className="shrink-0 text-muted" />
           <span aria-current="page" className="type-h3 text-ink">
             {crumb}
           </span>
-        </nav>
+        </div>
       ) : (
         title
       )}
