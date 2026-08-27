@@ -84,7 +84,7 @@
   },
   "breakpoint_total": 0,
   "breakpoint": {},
-  "typesize_total": 727,
+  "typesize_total": 724,
   "typesize": {
     "app/(app)/approvals/page.tsx": 2,
     "app/(app)/assets/page.tsx": 1,
@@ -162,7 +162,6 @@
     "components/composer/extras-pane.tsx": 1,
     "components/composer/gbp-options.tsx": 3,
     "components/composer/gbp-topic-options.tsx": 3,
-    "components/composer/hashtag-field.tsx": 3,
     "components/composer/not-built-yet.tsx": 1,
     "components/composer/poll-options.tsx": 6,
     "components/composer/relink-control.tsx": 3,

@@ -234,10 +234,90 @@ export function normalizeHashtags(hashtags: readonly string[] | undefined): stri
  * The tail appended to a body when hashtags are published: a blank line, then the
  * tags separated by single spaces. One definition, used by both the counter and
  * the formatter, so the number on screen describes the string that goes out.
+ *
+ * KEPT, and no longer on the publish path. `keywordTail` is what `formatForPlatform`
+ * and `charCountFor` now use — see the block below for the founder's ruling. This
+ * stays because the two functions are what PROVES the change: `hashtag-format.test.ts`
+ * renders the same stored list through both and asserts they differ, so a silent
+ * revert to the `#` form fails rather than passing quietly.
  */
 export function hashtagTail(hashtags: readonly string[] | undefined): string {
   const tags = normalizeHashtags(hashtags)
   return tags.length === 0 ? '' : `\n\n${tags.join(' ')}`
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * KEYWORDS, NOT HASHTAGS — `[marketing]` rather than `#marketing`
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *
+ * Founder's ruling, from the caption brief: "There are supposed to be keywords
+ * instead of hashtags in the following format : [marketing]". Recorded in full,
+ * with what it costs, as REQUESTS §34.
+ *
+ * ── THE STORED FIELD DOES NOT CHANGE, AND THAT IS DELIBERATE ─────────────────
+ * `post_variants.extras.hashtags` is untyped jsonb holding a `string[]`, and
+ * production rows already carry `#chai`-shaped values. Renaming the KEY would
+ * orphan every one of them; renaming the CONCEPT costs nothing. So the storage
+ * key stays `hashtags` and only the rendering moves.
+ *
+ * ── WHICH IS WHY THE NORMALISER STRIPS A LEADING HASH ────────────────────────
+ * A row written before this ruling holds `#chai`. Wrapping that naively yields
+ * `[#chai]`, which is neither format and looks like a bug. The `#` comes off
+ * first, so old rows render in the new form on read with no migration.
+ */
+
+/** A keyword token, bare — no `#`, no brackets, no surrounding whitespace. */
+function bareKeyword(raw: string): string {
+  const trimmed = raw.trim()
+  // Both legacy shapes, in either order: `#chai`, `[chai]`, and `[#chai]`.
+  const unwrapped =
+    trimmed.startsWith('[') && trimmed.endsWith(']') ? trimmed.slice(1, -1).trim() : trimmed
+  return unwrapped.startsWith('#') ? unwrapped.slice(1).trim() : unwrapped
+}
+
+/**
+ * Normalise the keyword list into the exact tokens that will be published.
+ *
+ * The same contract `normalizeHashtags` has: empties dropped, duplicates removed
+ * case-insensitively, order preserved because the writer chose it. What differs
+ * is the shape — `[marketing]`, not `#marketing`.
+ *
+ * A keyword may contain SPACES, and that is the point of the brackets. `#chai
+ * pune` is two hashtags; `[chai pune]` is one keyword, which is what somebody
+ * searching actually types. `normalizeHashtags` could never express that.
+ */
+export function normalizeKeywords(keywords: readonly string[] | undefined): string[] {
+  if (keywords === undefined) return []
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of keywords) {
+    if (typeof raw !== 'string') continue
+    const bare = bareKeyword(raw)
+    if (bare === '') continue
+    const key = bare.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(`[${bare}]`)
+  }
+  return out
+}
+
+/**
+ * The tail appended to a body when keywords are published: a blank line, then the
+ * bracketed keywords separated by single spaces.
+ *
+ * ── THIS PUBLISHES LITERALLY, AND THE READER SEES IT BEFORE IT DOES ──────────
+ * `[marketing]` reaches the platform exactly as written. That is the literal
+ * reading of the ruling, and it is the reading the product can most easily
+ * correct: `charCountFor` counts this tail and `PublishPreview` renders it, so
+ * the bracketed list is on screen and inside the character meter before anybody
+ * presses Send. If the brackets are meant to be stripped at publish, this
+ * function is the only place that changes.
+ */
+export function keywordTail(keywords: readonly string[] | undefined): string {
+  const tokens = normalizeKeywords(keywords)
+  return tokens.length === 0 ? '' : `\n\n${tokens.join(' ')}`
 }
 
 /**
@@ -255,7 +335,7 @@ export function hashtagTail(hashtags: readonly string[] | undefined): string {
  * string that will actually be sent, including the separating blank line.
  */
 export function charCountFor(spec: PlatformSpec, draft: VariantDraft): number {
-  const base = Array.from(draft.body).length + Array.from(hashtagTail(draft.hashtags)).length
+  const base = Array.from(draft.body).length + Array.from(keywordTail(draft.hashtags)).length
   if (spec.linkPolicy === 'counted_fixed' && draft.hasLink) {
     return base + X_LINK_WEIGHT
   }
@@ -370,7 +450,7 @@ export function formatForPlatform(
   // away. GBP is the one exception: `linkPolicy: 'plain'` aside, a Google Business
   // post is a local business update and hashtags do nothing there, so the box is
   // simply not part of that channel's output.
-  const body = spec.channel === 'gbp' ? variant.body : variant.body + hashtagTail(variant.hashtags)
+  const body = spec.channel === 'gbp' ? variant.body : variant.body + keywordTail(variant.hashtags)
 
   switch (spec.channel) {
     case 'x':

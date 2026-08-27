@@ -1,22 +1,40 @@
 'use client'
 
 import { useState } from 'react'
-import { CONSTRAINTS, normalizeHashtags, type Channel } from '@sahoda/shared'
+import { CONSTRAINTS, normalizeKeywords, type Channel } from '@sahoda/shared'
 
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { parseKeywordInput } from '@/lib/posts/keyword-input'
 
 import { NotBuiltYet } from './not-built-yet'
 
-export interface HashtagFieldProps {
+export interface KeywordFieldProps {
   channel: Channel
   label: string
+  /**
+   * The stored list. Still `extras.hashtags` in the database and still named
+   * that in the props, because renaming an untyped jsonb KEY would orphan every
+   * production row that already carries one. Only the concept and the rendering
+   * moved. See `normalizeKeywords`.
+   */
   hashtags: string[] | undefined
   onChange: (hashtags: string[] | undefined) => void
 }
 
 /**
- * The hashtags for ONE channel — a box that has never existed.
+ * The keywords for ONE channel.
+ *
+ * ── KEYWORDS, NOT HASHTAGS ───────────────────────────────────────────────────
+ * Founder's ruling: "There are supposed to be keywords instead of hashtags in
+ * the following format : [marketing]" (REQUESTS §34). The box, the placeholder,
+ * the help text and the published tail all say `[marketing]` now.
+ *
+ * ── AND A KEYWORD MAY CONTAIN A SPACE ────────────────────────────────────────
+ * That is what the brackets buy, and it is why this no longer splits on
+ * whitespace. `#chai pune` is two hashtags; `[chai in pune]` is one keyword, and
+ * it is what somebody searching actually types. `parseKeywordInput` separates on
+ * commas, newlines and the brackets themselves.
  *
  * ── WHAT WAS MISSING ─────────────────────────────────────────────────────────
  * `extras.hashtags` is counted by the character meter, capped by
@@ -43,7 +61,7 @@ export interface HashtagFieldProps {
  * do nothing at all and `formatForPlatform` drops them, which is why that card
  * says so rather than offering an empty promise.
  */
-export function HashtagField({ channel, label, hashtags, onChange }: HashtagFieldProps) {
+export function KeywordField({ channel, label, hashtags, onChange }: KeywordFieldProps) {
   const spec = CONSTRAINTS[channel]
   /**
    * What the writer is typing, kept separately from the stored list.
@@ -53,17 +71,21 @@ export function HashtagField({ channel, label, hashtags, onChange }: HashtagFiel
    * the space stripped, and a duplicate would vanish mid-word. So the raw text
    * is local and the normalised list is what is stored.
    */
-  const [raw, setRaw] = useState(() => (hashtags ?? []).join(' '))
-  const tags = normalizeHashtags(raw.split(/[\s,]+/))
+  const [raw, setRaw] = useState(() => normalizeKeywords(hashtags).join(' '))
+  const tags = normalizeKeywords(parseKeywordInput(raw))
   const over = spec.maxHashtags !== undefined && tags.length > spec.maxHashtags
 
   // Google Business posts are local business updates. `formatForPlatform`
-  // deliberately drops hashtags for gbp, so a box here would collect text that
-  // is thrown away before it reaches Google — a dead end with extra steps.
+  // deliberately drops the tail for gbp, so a box here would collect text that is
+  // thrown away before it reaches Google — a dead end with extra steps.
+  //
+  // UNCHANGED BY THE KEYWORD RULING, and worth saying why: the tail is dropped
+  // for GBP whatever shape it takes, so the sentence is still true. It is now
+  // about keywords rather than hashtags because that is what the box holds.
   if (channel === 'gbp') {
     return (
       <NotBuiltYet>
-        Hashtags do nothing on a Google Business post, so Sahoda leaves them off this one.
+        A keyword list does nothing on a Google Business post, so Sahoda leaves it off this one.
       </NotBuiltYet>
     )
   }
@@ -71,11 +93,9 @@ export function HashtagField({ channel, label, hashtags, onChange }: HashtagFiel
   return (
     <div className="space-y-1.5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <Label htmlFor={`hashtags-${channel}`}>Hashtags</Label>
+        <Label htmlFor={`hashtags-${channel}`}>Keywords</Label>
         {spec.maxHashtags !== undefined ? (
-          <span
-            className={over ? 'text-[12px] font-semibold text-danger' : 'text-[12px] text-muted'}
-          >
+          <span className={over ? 'type-meta font-semibold text-danger' : 'type-meta text-muted'}>
             <span className="tabular-nums">{tags.length}</span>
             <span className="sr-only"> of </span>
             <span aria-hidden> / </span>
@@ -88,20 +108,25 @@ export function HashtagField({ channel, label, hashtags, onChange }: HashtagFiel
         data-hashtags={channel}
         value={raw}
         error={over}
-        placeholder="#chai #pune"
+        placeholder="chai in pune, monsoon specials"
         onChange={(event) => {
           setRaw(event.target.value)
-          const next = normalizeHashtags(event.target.value.split(/[\s,]+/))
+          const next = normalizeKeywords(parseKeywordInput(event.target.value))
           // `undefined`, not `[]`, when the box is empty: the stored shape has
           // always meant "this channel has no tags" by absence, and writing an
           // empty array would change what every reader of `extras` sees.
           onChange(next.length === 0 ? undefined : next)
         }}
       />
-      <p className="text-[12.5px] text-muted">
+      {/* SHOWS THE EXACT PUBLISHED FORM, because that is the whole question the
+          founder's ruling raises. `[chai] [pune]` reaches the platform literally,
+          so the reader sees the literal string before pressing Send rather than
+          discovering it on a live account. Separated by commas as typed; shown in
+          brackets as published. */}
+      <p className="type-sm text-muted">
         {tags.length === 0
-          ? `They are published at the end of the ${label} copy, and count towards its limit.`
-          : `Published at the end, and already counted in the ${label} limit above.`}
+          ? `Separate them with commas. They are published at the end of the ${label} copy as ${'[keyword]'}, and count towards its limit.`
+          : `Published at the end as ${tags.join(' ')}, and already counted in the ${label} limit above.`}
       </p>
       {/* ── NO "cannot suggest hashtags" NOTE HERE, AND THAT IS DELIBERATE ──
           It was here, and MEASURED in a 1440 screenshot it printed the same

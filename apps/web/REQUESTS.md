@@ -2245,3 +2245,58 @@ the bar's Save. §31 says the fill marks what COMMITS, and the bar's Save commit
 Its quieter sibling does not carry it, and that is asserted too — two identical
 fills side by side in a floating strip would tell the reader nothing about which
 one moves them on.
+
+---
+
+## §34 — Keywords, not hashtags: `[marketing]`
+
+**Founder's brief**, asked for six times before this and built on the seventh:
+
+> "In Caption Generation:
+> 1. SEO Optimized keywords to be there
+> 2. There are supposed to be keywords instead of hashtags in the following
+>    format : [marketing]"
+
+### The question that blocked it, and how it was settled
+
+Whether `[marketing]` is an INTERNAL annotation stripped before publishing, or
+literal text a follower sees. It was asked six times and never answered.
+
+**Built literally: `[marketing]` reaches the platform exactly as written.** That
+is the plain reading of "keywords instead of hashtags in the following format",
+and it is the reading the product can most cheaply correct — `keywordTail` is
+the only function that would change, and the composer shows the exact published
+string before anybody presses Send.
+
+### What moved
+
+| Layer                            | Before                       | After                          |
+| -------------------------------- | ---------------------------- | ------------------------------ |
+| `formatForPlatform`              | `\n\n#chai #pune`            | `\n\n[chai] [pune]`            |
+| `charCountFor`                   | counted the hash tail        | counts the bracket tail        |
+| Composer field                   | "Hashtags", `#chai #pune`    | "Keywords", `chai in pune, …`  |
+| Input separator                  | whitespace and commas        | commas, newlines, brackets     |
+| Generation prompt                | "norms for hashtags"         | `KEYWORD_RULE`, no `#`         |
+
+### The stored key did NOT change, deliberately
+
+`post_variants.extras.hashtags` is untyped jsonb and production rows already
+hold `#chai`. Renaming the KEY would orphan every one of them; renaming the
+CONCEPT costs nothing. So `normalizeKeywords` strips a leading `#` on read —
+**that function is the migration**, and no SQL runs.
+
+### What the brackets actually buy
+
+A keyword may contain a SPACE. `#chai pune` is two hashtags because a hashtag
+cannot hold a space; `[chai in pune]` is one keyword, and it is what somebody
+searching actually types. The old field split on whitespace and structurally
+could not express it.
+
+### What was NOT changed, and needs a decision
+
+**Instagram's 30-hashtag cap is still applied to this list.**
+`validateVariant` still emits `MAX_HASHTAGS`, and `violation-copy.ts` still
+carries a shape gate on the exact sentence "Instagram allows 30 hashtags."
+That rule is now about a list that contains no hashtags. It will not bite in
+practice (nobody writes thirty keywords) and removing a Constraint Engine rule
+is a larger act than a format change, so it stands. Say the word and it goes.
