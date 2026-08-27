@@ -2,7 +2,7 @@
 
 **Owner** divas · **Lane** wt-divas3 · **Role** advisor
 
-**Branch** `claude/divas-kickoff-xdoxoa` at `95afafa`, 13 commits beyond `3137bc3`.
+**Branch** `claude/divas-kickoff-xdoxoa` at `76bc0c6`, 15 commits beyond `3137bc3`.
 PR [#18](https://github.com/development156/sahodalabs/pull/18) → `wt-core`, draft,
 body rewritten at `1bb19d7` because the old one was stale on three counts.
 Pushed: yes.
@@ -42,6 +42,8 @@ build deleted more than it added.
 | 11 | `a64c1f8` | **Trash and restore. Deleting a photo is no longer permanent.** |
 | 12 | `7201fdc` | Drag a photo onto a folder |
 | 13 | `95afafa` | Shift-click a range, select all, drag a folder into a folder |
+| 14 | `906fa59` | Handoff for the second half |
+| 15 | `76bc0c6` | **Both migrations APPLIED.** Details panel dropped. |
 
 `asset_folders`, `asset_folder_items` and `asset_smart_folders` are **live in
 production** (`rloztdhzfliyvpvxsgjl`). Founder approved applying only mine; the
@@ -279,7 +281,7 @@ newest-first by default and `added:7d` is already a search token, so a sidebar
 row for it would re-state the default view. A control that teaches a person the
 product has more places than it has is a cost, not a feature.
 
-### Two measurement failures of mine, both worth carrying forward
+### Three measurement failures of mine, all worth carrying forward
 
 **1. A string replace that matched nothing looks exactly like a guard that does
 not guard.** I reported a mutation on `canAcceptFolder` as NOT going red and
@@ -288,7 +290,16 @@ had joined the two lines of that arrow function, so a multi-line replace changed
 the file not at all. Applied properly it goes red.
 **Verify the mutation landed before reading the result.**
 
-**2. A negative assertion with no settle is an assertion about nothing.** Every
+**2. I named a lever without measuring it.** Offering the founder a way to
+shrink `/assets`, I said "the cheapest thing to drop is the details panel". They
+said drop it. **MEASURED: 823661 -> 822072, which is 1589 bytes.** The panel was
+a thin WRAPPER around `AssetDetail`, and `AssetDetail` stays in the route because
+Quick Look renders it — so there was never more than the wrapper to save. The
+route is genuinely smaller and the ratchet is tightened, but I presented 1.6 kB
+as if it were the answer to an 8 kB problem. **Measure a saving before you offer
+it as one.**
+
+**3. A negative assertion with no settle is an assertion about nothing.** Every
 action on this screen runs inside `startTransition`, so
 `expect(fn).not.toHaveBeenCalled()` immediately after a `fireEvent` passes
 whether or not the call was about to happen. THREE tests were doing that. A
@@ -320,11 +331,13 @@ added the guard goes red and the copy has to change in the same commit.
 ---
 
 ## What was NOT done, and why
-- **TWO migrations are written and NOT applied**, both needing the founder:
-  `20260827060000_folder_names_normalize_nfc.sql` and
-  `20260827090000_assets_trash.sql`. Until the second is applied `/assets`
-  reports that it could not read the library — **by design**, PostgREST `42703`,
-  rather than showing a trash that silently holds nothing.
+- ~~Two migrations unapplied~~ **BOTH ARE NOW APPLIED** to `rloztdhzfliyvpvxsgjl`
+  on the founder's word, and verified by reading production back rather than by
+  trusting the apply. Six guards were broken in production and watched to
+  refuse, inside a `do` block that rolls every write back: the NFC index raised
+  `unique_violation` on two root folders differing only by normalisation, and a
+  trashed row left the live filter, entered the trash filter, and kept both its
+  bytes (653851) and its storage path. **11 assets, all live, nothing touched.**
 - **Every drag is jsdom-tested only.** No real pointer has driven one on this
   lane, because Playwright cannot run here. Drag and drop is exactly the kind of
   thing jsdom models loosely, so treat the browser check as outstanding.
