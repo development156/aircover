@@ -80,7 +80,15 @@ describe('the Marketing Brain readers (real Postgres, in-process)', () => {
              ('${OTHER_WS}', 'Other WS', 'other-ws', '${USER}')
       on conflict (id) do nothing;
     `)
-  })
+    // 60s, not the 10s default. This hook boots a FULL Postgres schema with
+    // bootFullSchema() before 25 tests run against it. MEASURED 2026-08-27: it
+    // passes 25/25 alone and dies "Hook timed out in 10000ms" inside the full
+    // 5,734-test run - where 0 tests FAILED and the skip count jumped 13 -> 38,
+    // which is the signature of a worker starved of time, not of a broken
+    // assertion. Sibling PGlite suites already budget explicitly
+    // (export-drift 30_000, webhook-handler 120_000); this one was left on the
+    // default. Nothing here is weakened: all 25 must still pass.
+  }, 60_000)
 
   /**
    * Isolation is a transaction, not a cleanup.
