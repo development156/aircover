@@ -1,6 +1,6 @@
 'use server'
 
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { auth } from '@clerk/nextjs/server'
 import { revalidatePath } from 'next/cache'
 import {
@@ -11,6 +11,7 @@ import {
   describeTrash,
 } from '@sahoda/shared'
 
+import { duplicateMessage } from '@/lib/assets/duplicate-copy'
 import { kindForProvenMime } from '@/lib/assets/kind'
 import { readAsset, readTrashedAssets } from '@/lib/assets/read'
 import { offerForAsset } from '@/lib/media/offer-asset'
@@ -71,6 +72,51 @@ function unusableChannels(candidate: {
 }
 
 /**
+ * Does this workspace already hold these exact bytes?
+ *
+ * ── LIVE **AND** TRASHED, AND THE TWO GET DIFFERENT SENTENCES ────────────────
+ * Matching only live rows would mean deleting a photo and re-uploading it
+ * silently makes a second copy, with the first still sitting in the trash. That
+ * is the worst of both: two rows, two objects, and a person who thinks they have
+ * one file.
+ *
+ * So a trashed match is reported too, and pointed at the trash. Restoring is
+ * the right action there — the bytes are already in storage and re-uploading
+ * them would pay for the same file twice.
+ *
+ * Returns null on a READ FAILURE as well as on no match, and that is a
+ * deliberate choice in favour of the upload: refusing a file because a
+ * duplicate CHECK failed would block real work over a convenience. The cost of
+ * being wrong here is one redundant row, which a person can delete; the cost of
+ * the other way is a photo they cannot add.
+ */
+async function findByContentHash(
+  supabase: ReturnType<typeof createServerSupabase>,
+  workspaceId: string,
+  contentHash: string,
+): Promise<{ title: string | null; deleted_at: string | null } | null> {
+  try {
+    const { data, error } = await supabase
+      .from('assets')
+      .select('title, deleted_at')
+      .eq('workspace_id', workspaceId)
+      .eq('content_sha256', contentHash)
+      // A live row wins over a trashed one when both exist: "you already have
+      // this" is more useful than "it is in your trash" when both are true.
+      .order('deleted_at', { ascending: true, nullsFirst: true })
+      .limit(1)
+      .maybeSingle()
+
+    if (error || !data) return null
+    const title = typeof data.title === 'string' && data.title.trim() !== '' ? data.title : null
+    const deletedAt = typeof data.deleted_at === 'string' ? data.deleted_at : null
+    return { title, deleted_at: deletedAt }
+  } catch {
+    return null
+  }
+}
+
+/**
  * Add a file to the library.
  *
  * ── WHAT IS REFUSED AND WHAT IS MERELY REPORTED ──────────────────────────────
@@ -110,6 +156,19 @@ export async function uploadAsset(formData: FormData): Promise<UploadAssetState>
     }
 
     const bytes = new Uint8Array(await file.arrayBuffer())
+
+    // ── THE SAME BUFFER THE SNIFFER READS ──────────────────────────────────
+    // Hashed here rather than in a second pass: the bytes are already in
+    // memory and reading a 40 MB file twice to answer one question is waste.
+    const contentHash = createHash('sha256').update(bytes).digest('hex')
+
+    const existing = await findByContentHash(supabase, workspace.id, contentHash)
+    if (existing !== null) {
+      // NOTHING is uploaded and NOTHING is written. The object never reaches
+      // the bucket, so a refused duplicate costs no storage — which is half the
+      // point of checking before the upload rather than after it.
+      return { ok: false, message: duplicateMessage(existing.title, existing.deleted_at) }
+    }
 
     const sniffed = sniffImage(bytes)
     if (!sniffed.ok) return { ok: false, message: sniffed.message }
@@ -156,22 +215,43 @@ export async function uploadAsset(formData: FormData): Promise<UploadAssetState>
     const rawName = typeof file.name === 'string' ? file.name.trim() : ''
     const title = rawName === '' ? null : rawName.slice(0, MAX_TITLE)
 
-    const { data, error } = await supabase
+    const row = {
+      id: assetId,
+      workspace_id: workspace.id,
+      storage_path: objectPath,
+      kind,
+      mime: candidate.mime,
+      bytes: candidate.bytes,
+      width: candidate.width,
+      height: candidate.height,
+      title,
+      created_by: userId,
+    }
+
+    // ── DEPLOY-SAFE, AND THIS IS NOT DEFENSIVENESS FOR ITS OWN SAKE ──────────
+    // `content_sha256` arrives with a migration that a human applies, and this
+    // code ships before that happens. Writing the column unconditionally would
+    // make PostgREST answer `42703` and BREAK EVERY UPLOAD until the migration
+    // lands — the worst possible failure for the one action this screen exists
+    // for, and a strictly worse trade than losing duplicate detection.
+    //
+    // So the hash is attempted, and on `42703` ONLY the insert is retried
+    // without it. Any other error falls through to the real error path
+    // unchanged. Once the migration is applied the retry is unreachable, and
+    // `assets-trash.test.ts` proves the column exists in the schema the tests
+    // boot — so this cannot quietly become the normal path.
+    let { data, error } = await supabase
       .from('assets')
-      .insert({
-        id: assetId,
-        workspace_id: workspace.id,
-        storage_path: objectPath,
-        kind,
-        mime: candidate.mime,
-        bytes: candidate.bytes,
-        width: candidate.width,
-        height: candidate.height,
-        title,
-        created_by: userId,
-      })
+      .insert({ ...row, content_sha256: contentHash })
       .select('*')
       .single()
+
+    if (error?.code === '42703') {
+      console.warn('[assets] content_sha256 column absent; upload proceeding without a hash')
+      const retry = await supabase.from('assets').insert(row).select('*').single()
+      data = retry.data
+      error = retry.error
+    }
 
     if (error || !data) {
       await removeObject(supabase, uploadedPath)
