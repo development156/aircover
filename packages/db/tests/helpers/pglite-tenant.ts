@@ -305,6 +305,14 @@ const SHAPE_OVERRIDES: Readonly<Record<string, Readonly<Record<string, string>>>
   // is precisely the value the check exists to reject. Empty arrays satisfy the
   // key requirement without pretending the fixture has real evidence in it.
   marketing_observations: { evidence: `'{"data": [], "postIds": []}'::jsonb` },
+  // `check (query ? 'mode' and query -> 'rules' …)` — a smart folder's saved
+  // question must BE a question. The ladder's only jsonb rung is `'{}'`, which is
+  // exactly the shape that check exists to reject, so the table went unseeded and
+  // two isolation assertions below reported it as unreadable by its own owner.
+  // The value is the smallest legal query: one mode, one rule.
+  asset_smart_folders: {
+    query: `'{"mode": "all", "rules": [{"field": "description", "is": "missing"}]}'::jsonb`,
+  },
 }
 
 function candidates(
