@@ -63,6 +63,19 @@ export const AssetSchema = z.object({
    * default only stops that one honest failure from becoming two.
    */
   deleted_at: z.string().nullable().default(null),
+  /**
+   * SHA-256 of the file's exact bytes, for duplicate detection at upload.
+   *
+   * `.default(null)` for the reason `deleted_at` gives above: this file parses
+   * PER ROW so a bad row costs one tile, and a required field missing in the
+   * window between deploy and migration would cost the entire library.
+   *
+   * NULL for every row uploaded before the column existed. A NULL never
+   * matches, so an older duplicate is simply not detected — and nothing claims
+   * otherwise. The absence of a match is never rendered as "you have nothing
+   * like this".
+   */
+  content_sha256: z.string().nullable().default(null),
 })
 export type Asset = z.infer<typeof AssetSchema>
 

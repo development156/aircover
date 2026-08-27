@@ -49,6 +49,9 @@ const ASSET = {
   // so nothing here would behave differently — but the field is required, and a
   // fixture that omitted it would be describing a row the database cannot hold.
   deleted_at: null,
+  // No hash: this fixture predates the column, exactly like a real row
+  // uploaded before the migration. Nothing here reads it.
+  content_sha256: null,
 }
 
 describe('offerForAsset is total', () => {

@@ -142,6 +142,57 @@ describe('assets.deleted_at (real Postgres)', () => {
     expect(rows.rows[1]?.indexdef).toMatch(/WHERE \(deleted_at IS NOT NULL\)/i)
   })
 
+  // ── THE CONTENT HASH, AND WHY IT IS NOT UNIQUE ─────────────────────────────
+  it('the hash index exists, is partial, and is NOT unique', async () => {
+    // Not unique on purpose. A unique index would make the DATABASE refuse a
+    // second upload, and the refusal a person needs is a sentence naming the
+    // file they already have with a way to open it — a constraint violation
+    // cannot carry that. It would also break the trash: delete a file, upload it
+    // again, and the insert would collide with the trashed row.
+    const rows = await db.query<{ indexdef: string }>(
+      `select indexdef from pg_indexes where indexname = 'assets_content_hash_idx'`,
+    )
+    expect(rows.rows).toHaveLength(1)
+    const def = rows.rows[0]?.indexdef ?? ''
+    expect(def).not.toMatch(/UNIQUE/i)
+    // Partial: a NULL hash can never answer "does this workspace hold these
+    // bytes", so indexing the NULLs would pay for every pre-existing row on
+    // every upload forever.
+    expect(def).toMatch(/WHERE \(content_sha256 IS NOT NULL\)/i)
+  })
+
+  it('two rows CAN share a hash, which is what keeps the trash usable', async () => {
+    // The behaviour the non-unique index buys. If this ever starts failing,
+    // somebody has added a unique constraint and delete-then-re-upload is broken.
+    await db.exec(`
+      update assets set content_sha256 = 'deadbeef'
+       where workspace_id = '${WS}';
+    `)
+    const shared = await db.query<{ n: number }>(
+      `select count(*)::int as n from assets
+        where workspace_id = '${WS}' and content_sha256 = 'deadbeef'`,
+    )
+    expect(shared.rows[0]?.n).toBe(2)
+    await db.exec(`update assets set content_sha256 = null where workspace_id = '${WS}';`)
+  })
+
+  it('a pre-existing row has a NULL hash, so it can never match one', async () => {
+    // Rows uploaded before the column existed. A NULL never equals anything in
+    // SQL, so the lookup simply misses them — and no copy claims the whole
+    // library was checked.
+    const nulls = await db.query<{ n: number }>(
+      `select count(*)::int as n from assets
+        where workspace_id = '${WS}' and content_sha256 is null`,
+    )
+    expect(nulls.rows[0]?.n).toBe(2)
+
+    const matched = await db.query<{ n: number }>(
+      `select count(*)::int as n from assets
+        where workspace_id = '${WS}' and content_sha256 = 'anything'`,
+    )
+    expect(matched.rows[0]?.n).toBe(0)
+  })
+
   it('nothing sweeps deleted_at, so no retention can be promised anywhere', async () => {
     // The claim the screen is forbidden to make, checked at its source. If a
     // sweeper is ever added it gets its own migration and this guard is the one
