@@ -28,6 +28,15 @@ export interface PickerCopy {
   channel: string
   /** Singular noun for one choice: "Page", "location". */
   noun: string
+  /**
+   * The second sentence of the empty state, per channel.
+   *
+   * Separate because the remedy genuinely differs and a shared sentence would
+   * have to be vague enough to fit both — which is the one thing this product's
+   * empty states are not allowed to be. A Facebook Page is free to create in a
+   * minute; a Google Business location has to be verified by post.
+   */
+  extra: string
 }
 
 const ESCAPES: Readonly<Record<string, string>> = {
@@ -57,14 +66,47 @@ const STYLE =
   `li{margin:0 0 2px}label{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;` +
   `border:1px solid currentColor;border-radius:8px;cursor:pointer}` +
   `label span{display:block}small{display:block;opacity:.7}` +
-  `button{font:inherit;padding:10px 18px;border-radius:8px;cursor:pointer;width:100%}`
+  `button{font:inherit;padding:10px 18px;border-radius:8px;cursor:pointer;width:100%}` +
+  `ul.why{list-style:disc;padding-left:20px}ul.why li{margin:0 0 10px}`
 
-function shell(title: string, body: string): string {
+/**
+ * THE SIGNAL THAT LETS THE OPENER STOP WAITING.
+ *
+ * ── THE BUG THIS CLOSES ──────────────────────────────────────────────────────
+ * Reported as "after connect it didnt show up connect on website". MEASURED from
+ * the founder's screenshot: the Facebook card sat on **"Opening Facebook…"** with
+ * the popup showing this page's empty state beside it.
+ *
+ * `useConnectFlow` waits for one of four signals and every one of them is emitted
+ * by `popupCloser` — the page a FINISHED connect ends on. These pages are the
+ * other way a connect can end, and they emitted nothing at all, so the button
+ * spun until the customer closed the window by hand.
+ *
+ * Byte-identical to the closer's script and deliberately duplicated rather than
+ * shared: both are inline script inside hand-built HTML responses that cannot
+ * import anything, and the channel name is already a literal on three sides.
+ *
+ * ONLY on a page where the flow is OVER. The picker itself is mid-flow — signal
+ * there and the opener refreshes, stops waiting, and shows "Not connected" behind
+ * a window still asking the customer which Page.
+ */
+const SIGNAL_HOME =
+  `<script>(function(){` +
+  `try{var c=new BroadcastChannel("sahoda-connect");` +
+  `c.postMessage({type:"sahoda:connect-outcome"});c.close();}catch(e){}` +
+  `try{if(window.opener&&!window.opener.closed){` +
+  `window.opener.postMessage({type:"sahoda:connect-outcome"},window.location.origin);}}catch(e){}` +
+  // NO `window.close()`. The closer shuts itself because it has nothing to say;
+  // this page has a sentence the customer needs to read, and closing it out from
+  // under them is how the remedy goes unread.
+  `})();</script>`
+
+function shell(title: string, body: string, signal = false): string {
   return (
     `<!doctype html><html lang="en"><head><meta charset="utf-8">` +
     `<meta name="viewport" content="width=device-width,initial-scale=1">` +
     `<title>${escapeHtml(title)}</title><style>${STYLE}</style></head>` +
-    `<body>${body}</body></html>`
+    `<body>${body}${signal ? SIGNAL_HOME : ''}</body></html>`
   )
 }
 
@@ -125,11 +167,23 @@ export function pickerPage(
 export function nothingToPickPage(copy: PickerCopy, backHref: string): string {
   return shell(
     `No ${copy.noun} to connect`,
-    `<h1>No ${escapeHtml(copy.channel)} ${escapeHtml(copy.noun)} came back</h1>` +
-      `<p>${escapeHtml(copy.channel)} let Sahoda in, and then listed no ${escapeHtml(copy.noun)} ` +
-      `for this account. Nothing was connected and nothing was charged.</p>` +
-      `<p>Create or get access to a ${escapeHtml(copy.noun)} in ${escapeHtml(copy.channel)}, ` +
-      `then connect again.</p>` +
+    `<h1>${escapeHtml(copy.channel)} sent back no ${escapeHtml(copy.noun)}</h1>` +
+      `<p>${escapeHtml(copy.channel)} let Sahoda in and then listed no ` +
+      `${escapeHtml(copy.noun)} for this account. Nothing was connected and nothing ` +
+      `was charged.</p>` +
+      `<p>There are two reasons this happens, and the first is the common one.</p>` +
+      `<ul class="why">` +
+      `<li><strong>The ${escapeHtml(copy.noun)} was not included in what you ` +
+      `approved.</strong> ${escapeHtml(copy.channel)} remembers an earlier approval ` +
+      `and offers to reuse it. Connect again, and on ` +
+      `${escapeHtml(copy.channel)}'s screen choose <strong>Edit settings</strong> ` +
+      `rather than Continue, then tick the ${escapeHtml(copy.noun)} you want.</li>` +
+      `<li><strong>This account administers no ${escapeHtml(copy.noun)} at all.</strong> ` +
+      `${escapeHtml(copy.extra)}</li>` +
+      `</ul>` +
       `<p><a href="${escapeHtml(backHref)}">Open Connections</a></p>`,
+    // The flow is over. Signal home so the Connect button stops waiting — without
+    // this it sits on "Opening Facebook…" until the window is closed by hand.
+    true,
   )
 }

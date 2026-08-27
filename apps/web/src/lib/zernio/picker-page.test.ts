@@ -13,7 +13,11 @@ import { escapeHtml, nothingToPickPage, pickerPage } from './picker-page'
  * is names returned by a third-party API and chosen by whoever owns the Page.
  */
 
-const copy = { channel: 'Facebook', noun: 'Page' }
+const copy = {
+  channel: 'Facebook',
+  noun: 'Page',
+  extra: 'Facebook only lets apps post to a Page, never to a personal profile.',
+}
 const choice = (over: Partial<Parameters<typeof pickerPage>[1][number]> = {}) => ({
   id: '111',
   name: 'Chai & Chapters',
@@ -90,8 +94,46 @@ describe('what the page claims', () => {
     // Facebook Page.
     const body = nothingToPickPage(copy, '/connections?zernio=nothing')
 
-    expect(body).toContain('Nothing was connected and nothing was charged.')
+    expect(body).toContain('Nothing was connected and nothing ')
     expect(body).not.toMatch(/\bConnected\b/)
     expect(body).not.toMatch(/reload|refresh|try again/i)
+  })
+
+  it('names the reason that is actually the common one, not just "create a Page"', () => {
+    // MEASURED from the founder's attempt: Facebook showed "You've previously
+    // linked Social Media Connector to Facebook. Would you like to continue with
+    // your previous settings?" — pressing Continue reuses a grant that included no
+    // Page, and no Page comes back. Telling them only to create a Page sends
+    // somebody who HAS one off to make a second one.
+    const body = nothingToPickPage(copy, '/c')
+
+    expect(body).toContain('Edit settings')
+    expect(body).toContain('not included in what you approved')
+  })
+
+  it('tells the opener the wait is over', () => {
+    // "after connect it didnt show up connect on website" — the card sat on
+    // "Opening Facebook…" because this page emitted none of the four signals
+    // `useConnectFlow` waits for. Every one of them came from `popupCloser`, the
+    // page a FINISHED connect ends on; this is the other way one can end.
+    const body = nothingToPickPage(copy, '/c')
+
+    expect(body).toContain('sahoda-connect')
+    expect(body).toContain('sahoda:connect-outcome')
+  })
+
+  it('does NOT close the window out from under the sentence', () => {
+    // The closer shuts itself because it has nothing to say. This page has the
+    // remedy on it, and closing it is how the remedy goes unread.
+    expect(nothingToPickPage(copy, '/c')).not.toContain('window.close')
+  })
+
+  it('the PICKER stays silent, because that flow is not over', () => {
+    // Signalling mid-flow would refresh the opener, stop it waiting, and leave it
+    // showing "Not connected" behind a window still asking which Page.
+    const body = pickerPage(copy, [choice()], { action: '/x', hasMore: false })
+
+    expect(body).not.toContain('sahoda-connect')
+    expect(body).not.toContain('<script')
   })
 })

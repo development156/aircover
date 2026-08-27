@@ -18,10 +18,27 @@ export const SELECT_PATH = '/api/oauth/zernio/select'
  * decides what the customer clicks.
  */
 const COPY: Readonly<Record<ZernioSelectionPlatform, PickerCopy & { empty: string }>> = {
-  facebook: { channel: 'Facebook', noun: 'Page', empty: 'no-pages' },
+  facebook: {
+    channel: 'Facebook',
+    noun: 'Page',
+    // Names the thing that is actually true of Facebook: it cannot post to a
+    // personal profile at all, only to a Page. Saying "create a Page" without
+    // that fact reads as a hoop rather than a requirement.
+    extra:
+      'Facebook only lets apps post to a Page, never to a personal profile. ' +
+      'Create one at facebook.com/pages/create, then connect again.',
+    empty: 'no-pages',
+  },
   googlebusiness: {
     channel: 'Google Business Profile',
     noun: 'location',
+    // Deliberately NOT the Facebook sentence with the noun swapped. A location
+    // is verified by Google, often by post, so "create one and connect again" is
+    // a remedy that cannot work today and `no-impossible-remedy.spec.ts` is the
+    // standing rule against exactly that.
+    extra:
+      'A location has to exist and be verified in Google Business Profile before ' +
+      'it can be connected. Check business.google.com with this Google account.',
     empty: 'no-locations',
   },
 }
