@@ -1,6 +1,6 @@
 # Handoff — jiban — wt-jiban2 — 2026-08-27
 
-**Branch** `claude/lead-design-7m7ios` at `<sha>`. Lane `wt-jiban2`. Pushed: yes.
+**Branch** `claude/lead-design-7m7ios` at `a5c21d5`. Lane `wt-jiban2`. Pushed: yes.
 
 The harness pinned this session to `claude/lead-design-7m7ios` and it cannot leave
 it. `sahoda.owner` and `sahoda.lane` are set to `jiban` / `wt-jiban2`, and the work
