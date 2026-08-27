@@ -141,14 +141,21 @@ export function ScheduleField({
   if (committed !== null && !editing) {
     return (
       <div className="space-y-3" data-guide="post-schedule" data-schedule-committed>
-        <div className="surface-ring flex flex-wrap items-start gap-3 rounded-card bg-ok-bg p-3">
+        {/* NOT `flex-wrap`. A wrapping flex line sizes each item at its
+            MAX-CONTENT width before deciding, so a two-sentence paragraph beside
+            an 18px glyph always exceeded the line and dropped to the row below.
+            MEASURED at 560px in both themes: the glyph sat at y=38 and the day
+            it belongs to at y=94, reading as an orphaned icon above an
+            unheaded block. `min-w-0` on the text is what lets it shrink
+            instead. */}
+        <div className="surface-ring flex items-start gap-3 rounded-card bg-ok-bg p-3">
           <CalendarCheck
             size={18}
             strokeWidth={1.8}
             className="mt-0.5 shrink-0 text-ok"
             aria-hidden
           />
-          <div className="space-y-0.5">
+          <div className="min-w-0 space-y-0.5">
             <p className="type-eyebrow text-ok">Scheduled</p>
             <p className="type-h3 text-ink">
               {longDay(committed)} at {clockTime(committed)}

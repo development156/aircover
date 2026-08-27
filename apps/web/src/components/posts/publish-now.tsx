@@ -223,9 +223,12 @@ export function PublishNow({
         <PendingLines lines={PENDING_LINES} />
       ) : (
         <div className="space-y-2">
-          <p className="type-eyebrow text-muted">
-            {live.length === 1 ? 'Send it to' : 'Send it to one channel'}
-          </p>
+          {/* "Send it to one channel" was here and it read as a claim about
+              the POST rather than about the press: a person with two live
+              channels was told, above two chips, that this post goes to one
+              channel. What is true is narrower and belongs in the footnote
+              below, where the reader is choosing. */}
+          <p className="type-eyebrow text-muted">Send it now</p>
           <div
             role="group"
             aria-label="Which channel to publish to"
@@ -256,7 +259,9 @@ export function PublishNow({
 
           {chosen === null ? (
             <p className="type-meta text-muted">
-              Pick a channel. Nothing is sent until you confirm it.
+              {live.length === 1
+                ? 'Pick the channel. Nothing is sent until you confirm it.'
+                : 'Pick a channel. This sends to one at a time, and nothing goes out until you confirm it.'}
             </p>
           ) : (
             <div className="surface-ring space-y-2 rounded-card bg-s2 p-3" data-publish-confirm>

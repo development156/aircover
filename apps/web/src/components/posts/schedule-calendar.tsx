@@ -153,42 +153,54 @@ export function ScheduleCalendar({
         })}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
-        <label htmlFor="schedule-time" className="type-meta shrink-0 text-muted">
-          Time
-        </label>
-        <Select
-          id="schedule-time"
-          value={chosenTime}
-          onChange={(event) => pickTime(event.target.value)}
-          className="max-w-[140px]"
-        >
-          {/* The chosen time may be one the half-hour list does not carry —
-              a stored 16:45, or an exact time typed below. It is added rather
-              than silently snapped to the nearest slot, which would change a
-              schedule the writer already set. */}
-          {SLOTS.some((slot) => slot.value === chosenTime) ? null : (
-            <option value={chosenTime}>{labelFor(chosenTime)}</option>
-          )}
-          {SLOTS.map((slot) => (
-            <option key={slot.value} value={slot.value}>
-              {slot.label}
-            </option>
-          ))}
-        </Select>
-        <span className="type-meta text-muted">or</span>
-        <input
-          // `post-schedule` moved here from the `datetime-local` this replaced.
-          // It is the id `e2e/date-field-theme.spec.ts` reads, and that spec is
-          // about `color-scheme` on a native date control — which is exactly
-          // what this still is.
-          id="post-schedule"
-          type="time"
-          aria-label="Exact time"
-          value={chosenTime}
-          onChange={(event) => (event.target.value === '' ? null : pickTime(event.target.value))}
-          className="type-sm h-control rounded-sm border-none bg-surface px-2 text-ink shadow-[inset_0_0_0_1px_var(--line)] transition-micro focus:shadow-[inset_0_0_0_1px_var(--brand),0_0_0_3px_var(--t50)] focus:outline-none max-narrow:min-h-[44px]"
-        />
+      {/* ── TWO WAYS IN, EACH WITH ITS OWN VISIBLE LABEL ────────────────────
+          These were one line reading `Time [dropdown] or [08:05]`. At 390px it
+          broke as `[dropdown] or` / `[08:05]`, stranding the conjunction at the
+          end of a row and leaving the second control with nothing naming it —
+          its only label was `aria-label`, which a sighted reader never gets.
+          A conjunction is not a label. Each control now says what it is, and
+          the pair stacks instead of splitting a sentence. */}
+      <div className="flex flex-wrap items-end gap-2 border-t border-line pt-3">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <label htmlFor="schedule-time" className="type-meta text-muted">
+            Time
+          </label>
+          <Select
+            id="schedule-time"
+            value={chosenTime}
+            onChange={(event) => pickTime(event.target.value)}
+            className="w-full"
+          >
+            {/* The chosen time may be one the half-hour list does not carry —
+                a stored 16:45, or an exact time typed alongside. It is added
+                rather than silently snapped to the nearest slot, which would
+                change a schedule the writer already set. */}
+            {SLOTS.some((slot) => slot.value === chosenTime) ? null : (
+              <option value={chosenTime}>{labelFor(chosenTime)}</option>
+            )}
+            {SLOTS.map((slot) => (
+              <option key={slot.value} value={slot.value}>
+                {slot.label}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="post-schedule" className="type-meta text-muted">
+            Or an exact time
+          </label>
+          <input
+            // `post-schedule` moved here from the `datetime-local` this
+            // replaced. It is the id `e2e/date-field-theme.spec.ts` reads, and
+            // that spec is about `color-scheme` on a native time control, which
+            // is exactly what this still is.
+            id="post-schedule"
+            type="time"
+            value={chosenTime}
+            onChange={(event) => (event.target.value === '' ? null : pickTime(event.target.value))}
+            className="type-sm h-control rounded-sm border-none bg-surface px-2 text-ink shadow-[inset_0_0_0_1px_var(--line)] transition-micro focus:shadow-[inset_0_0_0_1px_var(--brand),0_0_0_3px_var(--t50)] focus:outline-none max-narrow:min-h-[44px]"
+          />
+        </div>
       </div>
     </div>
   )
