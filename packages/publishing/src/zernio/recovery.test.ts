@@ -13,20 +13,41 @@ const CHANNELS = Object.keys(CONSTRAINTS) as Channel[]
  * the publish endpoint.
  */
 describe('the platform vocabularies, which are three and not one', () => {
-  it('edit accepts only X, and spells it twitter', () => {
-    // *"expected one of \"twitter\"|\"discord\"|\"facebook\"|\"reddit\""* — the
-    // endpoint's whole enum, in its own words. LinkedIn, Instagram and Google
-    // Business are in none of it.
+  /**
+   * ── A TRUNCATED ERROR MESSAGE READ AS A COMPLETE ENUM ──────────────────────
+   * This test used to be called "edit accepts only X, and spells it twitter" and
+   * asserted `linkedin` and `gbp` were null. Its evidence was a real 400 from
+   * 2026-08-20, quoted in the comment:
+   *
+   *   expected one of "twitter"|"discord"|"facebook"|"reddit"
+   *
+   * The error was CUT OFF after four values. The spec's actual enum is
+   * [twitter, discord, facebook, reddit, linkedin, telegram, pinterest,
+   * googlebusiness, youtube, slack] — and the first four are exactly the four
+   * that were seen. So the observation was real, correctly recorded, and led to
+   * a conclusion about ABSENCE that a truncated list cannot support.
+   *
+   * The lesson is narrow and worth keeping: an enum read out of an error string
+   * proves what IS accepted, never what is not. The values below come from the
+   * spec, where the list ends because it ends.
+   */
+  it('edit spells X as twitter, and accepts more than X', () => {
     expect(recoveryPlatform('x', 'edit')).toBe('twitter')
-    expect(recoveryPlatform('linkedin', 'edit')).toBeNull()
-    expect(recoveryPlatform('gbp', 'edit')).toBeNull()
+    expect(recoveryPlatform('linkedin', 'edit')).toBe('linkedin')
+    expect(recoveryPlatform('gbp', 'edit')).toBe('googlebusiness')
+    expect(recoveryPlatform('facebook', 'edit')).toBe('facebook')
+    expect(recoveryPlatform('telegram', 'edit')).toBe('telegram')
+    // Instagram's own API has no edit for a published feed post. Absent from the
+    // spec's enum, not merely absent from an error message.
     expect(recoveryPlatform('instagram', 'edit')).toBeNull()
   })
 
-  it('unpublish accepts three of four, and Instagram is the one it does not', () => {
+  it('unpublish accepts every channel but Instagram', () => {
     expect(recoveryPlatform('x', 'unpublish')).toBe('twitter')
     expect(recoveryPlatform('linkedin', 'unpublish')).toBe('linkedin')
     expect(recoveryPlatform('gbp', 'unpublish')).toBe('googlebusiness')
+    expect(recoveryPlatform('facebook', 'unpublish')).toBe('facebook')
+    expect(recoveryPlatform('telegram', 'unpublish')).toBe('telegram')
     expect(recoveryPlatform('instagram', 'unpublish')).toBeNull()
   })
 
@@ -84,16 +105,47 @@ describe('what a writer is told about an action that does not exist', () => {
   })
 
   /**
-   * Exactly one of this product's four channels can have a live post edited.
-   * Pinned as a NUMBER so that a channel quietly gaining or losing the capability
-   * shows up as a failing count rather than as nobody noticing.
+   * WHICH CHANNELS CAN BE RECOVERED, PINNED AS A LIST SO A CHANGE IS VISIBLE.
+   *
+   * ── AND IT WORKED, WHICH IS WHY THESE NUMBERS MOVED ─────────────────────────
+   * This read `edit → ['x']` and carried the sentence "exactly one of this
+   * product's four channels can have a live post edited". That was true when it
+   * was written and had since gone stale in the direction nobody checks: the
+   * capability GREW and our map still refused it, so /posts drew no Edit control
+   * for LinkedIn or Google Business and nobody went looking for a button that
+   * had never existed.
+   *
+   * Both lists below are MEASURED against `docs.zernio.com/api/openapi`,
+   * 2026-08-26:
+   *
+   *   POST /v1/posts/{postId}/edit       platform enum
+   *     [twitter, discord, facebook, reddit, linkedin, telegram, pinterest,
+   *      googlebusiness, youtube, slack]
+   *   POST /v1/posts/{postId}/unpublish  platform enum
+   *     [threads, facebook, twitter, linkedin, youtube, pinterest, reddit,
+   *      bluesky, googlebusiness, telegram]
+   *
+   * Instagram is absent from BOTH, and that is the one thing here that did not
+   * change: Instagram's own API has no edit for a published feed post.
    */
   it('counts what is actually possible today', () => {
-    expect(CHANNELS.filter((c) => canRecover(c, 'edit'))).toEqual(['x'])
-    expect(CHANNELS.filter((c) => canRecover(c, 'unpublish')).sort()).toEqual([
+    expect(CHANNELS.filter((c) => canRecover(c, 'edit')).sort()).toEqual([
+      'facebook',
       'gbp',
       'linkedin',
+      'telegram',
       'x',
     ])
+    expect(CHANNELS.filter((c) => canRecover(c, 'unpublish')).sort()).toEqual([
+      'facebook',
+      'gbp',
+      'linkedin',
+      'telegram',
+      'x',
+    ])
+    // The invariant that survives every vocabulary change: Instagram can do
+    // neither, so a writer is never offered a recovery that cannot run.
+    expect(canRecover('instagram', 'edit')).toBe(false)
+    expect(canRecover('instagram', 'unpublish')).toBe(false)
   })
 })

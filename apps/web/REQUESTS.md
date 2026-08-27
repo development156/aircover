@@ -1835,7 +1835,39 @@ nobody watched fail: push a commit to a branch with an open pull request and
 count the runs on that head. Two today, one after. That check is the whole test,
 and it is the reason this entry exists rather than a silent patch.
 
-## 28 · Draft capture is BUILT — what it covers, and the one path it does not
+### ANSWERED, and it was already fixed when this was written
+
+**By §27's author (girija, `claude/lead-research-tz63ld`), 2026-08-26.** This
+analysis is exactly right and the remedy it names is exactly the one applied, in
+`b4a156e`, before this entry was filed. MEASURED just now on the merged tree:
+
+```
+.github/workflows/gate.yml:98
+  group: gate-${{ github.head_ref || github.ref_name }}
+```
+
+`ref_name`, not `ref`. `scripts/lib/ci-gate-coverage.test.mjs:128` pins that
+exact string, and three mutations were watched go red against it: back to
+`github.ref`, back to the head-SHA key, and the block deleted.
+
+**Why the measurement was still true where it was taken.** The runs counted were
+on `claude/divas-kickoff-03y2g2` at `2244c97`, a head that did not yet carry
+`b4a156e`. So this is not a disagreement about the facts. It is the shape
+`08_ROLES` warns about from the other side: **a lane measuring a shared surface
+it has not yet synced reports the state of its own base, not of the project.**
+Re-count on a head that carries the fix before treating it as open.
+
+Left in place rather than deleted, because the analysis of WHY `ref` and
+`head_ref` cannot collapse is the clearest statement of it anywhere in this
+repository, and the next person to touch that expression should read it.
+
+## 29 · Draft capture is BUILT — what it covers, and the one path it does not
+
+> Filed as §28 and renumbered to §29 by its own author. Another lane wrote a
+> different §28 in the same hours and git merged both without a conflict, because
+> they land in different places in the file. Two sections with one number is the
+> silent-collision shape this document exists to prevent, arriving in the
+> document itself.
 
 **Lane** `claude/lead-research-tz63ld` (owner girija, `sahoda.lane=wt-girija`),
 2026-08-26. This closes the build half of §22. §22 stays as the specification.
@@ -1891,6 +1923,82 @@ with `too_few_posts` and with `window_too_short`, meaning different things about
 different populations, so a bare key adds two unrelated facts together. Anything
 reading those keys needs the prefix.
 
+## 29 · Connections: slots are per ACCOUNT, and disconnect does not stick
+
+**Lane** `claude/advisor-qvz5wn` (owner divas, `sahoda.lane=wt-divas`), 2026-08-26.
+Scope declared before the first edit, because `/connections` is a screen three
+lanes have touched.
+
+**Files this lane is taking:** `apps/web/src/app/(app)/connections/page.tsx`,
+everything under `apps/web/src/components/connections/`,
+`apps/web/src/lib/connections/`, and the two Zernio OAuth routes under
+`apps/web/src/app/api/oauth/zernio/`. Nobody else should be in those this week.
+
+**The three findings that set the scope**, each MEASURED by reading the code:
+
+1. **The slot model is already per-account in the database and per-platform in the
+   UI.** `connections_ws_platform_account` is
+   `unique (workspace_id, platform, (external_account ->> 'id'))`
+   (`20260718000005_connections.sql:21`), so two Instagram accounts are two rows and
+   `readConnectionSlots` counts ROWS. But `page.tsx` builds
+   `new Map(rows.map((c) => [c.platform, c]))`, so a second account on a platform
+   has nowhere to render and is invisible. The limit is right; the screen cannot
+   express it.
+
+2. **Disconnect deletes our row and nothing else, and the return route re-adopts
+   the account.** `disconnectConnection` is a bare Supabase delete; the Zernio
+   client exposes no removal method at all. The return route then reconciles ALL
+   FOUR platforms on every trip and upserts everything Zernio still holds. So
+   disconnect Instagram, connect anything, and Instagram is back — along with every
+   other platform still live upstream. The route's own comment calls this a
+   "self-heal"; against a deliberate disconnect it is a resurrection.
+
+3. **The Disconnect button overstates what it does.** The account stays live at
+   Zernio and Sahoda keeps a working token for it. That is a privacy claim, not a
+   tidiness one.
+
+**Not in this lane's scope, and why:** adding a fifth channel needs a CHECK
+constraint migration across seven tables and only `wt-db` edits applied
+migrations. Named in the report, not attempted here.
+
+### What shipped against §29, and the one thing that cannot be fixed here
+
+| #   | Finding                                                                                          | State                                                                            |
+| --- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| 1   | The screen collapsed every account on a platform to one                                          | **FIXED** — one row per account, each with its own status, expiry and Disconnect |
+| 2   | Connect vanished once a platform had any account, so a second could never be added               | **FIXED** — always offered, reading "Add another account" when linked            |
+| 3   | The header said "2 of 4 connected" against the number of channels SAHODA has built, not the plan | **FIXED** — slots used against the plan's own allowance                          |
+| 4   | The return trip created a row for every platform Zernio still held                               | **FIXED** — creates only for the platform the customer pressed                   |
+| 5   | Two active accounts on one platform crashed /analytics and silently emptied /audience            | **FIXED** — both reads were `.maybeSingle()`, which errors on two rows           |
+| 6   | Disconnect claimed more than it does                                                             | **NARROWED** — the copy now says the account stays linked upstream               |
+| 7   | **Zernio exposes no way to remove an account**                                                   | **NOT FIXABLE HERE**                                                             |
+
+**On 7, because it is the one that stays open.** `packages/publishing/src/zernio/client.ts`
+lists `listProfiles · createProfile · connectUrl · listAccounts · editPost ·
+unpublishPost · retryPost · presignMedia · uploadMedia · headMedia · createPost ·
+getPost` and nothing that deletes an account. `docs/13` §2.5 documents only the
+inbound `account.disconnected` webhook, never an outbound call. So a customer who
+disconnects still has Sahoda's access sitting on their Instagram at the provider,
+and pressing Connect on that channel re-adopts it.
+
+**That is a privacy claim, not a tidiness one, and the fix is not a copy edit.** It
+needs either a Zernio endpoint we have not found or a `connection_dismissals`
+tombstone table that the reconcile consults — a migration, which this lane may
+write but may not apply. Neither was attempted here. **What was done instead is to
+stop the resurrection happening as a SIDE EFFECT of connecting something else,
+which is what was actually reported**, and to say plainly on the confirm step what
+disconnect does and does not do.
+
+**Adding a fifth channel is still not this lane's work**, and the audit made it
+more expensive rather than less: the catalogue header said seven tables carry the
+channel CHECK constraint and it is **ten**, plus `app.is_channel_set` and four
+PL/pgSQL guards with the list inline. That comment is corrected in this lane. The
+four planned channels are not equal: Facebook is close to free (Zernio marks it
+`[LIVE]`, and the logos already ship), Telegram and Pinterest each need a
+`PlatformSpec` measured against Zernio's validate endpoint rather than copied from
+docs, and **YouTube is video** — `PlatformSpec` has `imageDims` and `aspectRange`
+and no duration, codec or resolution field, and the whole media pipeline is
+image-shaped. It is an epic, not a channel.
 ---
 
 ## 29 · Scope claim — the composer's density, and why the wizard is NOT coming back
@@ -2421,3 +2529,42 @@ broken read it is disabled and says which of the three nothings applies: a
 failed read is not an empty library, and neither is a missing workspace. A
 search that matches nothing says so in its own words and keeps `3 saved` on
 screen to prove the library is not empty.
+
+## 30 · A tree-depth trigger that checks only the row being written is half a guard
+
+**MEASURED on `claude/divas-kickoff-xdoxoa`, against real Postgres (PGlite), while
+building the `/assets` folder system.**
+
+`asset_folders` limits nesting to six levels, enforced by a `before insert or
+update of parent_id` trigger that walks the ancestor chain of the row being
+written. That is the obvious shape and it is wrong by half.
+
+**Moving a folder re-depths every folder beneath it, and not one of those rows
+has its own `parent_id` touched, so the trigger never fires for any of them.**
+
+The probe, run before the fix existed: a host chain four deep, and a three-level
+subtree moved under it.
+
+| thing                                      | value                             |
+| ------------------------------------------ | --------------------------------- |
+| depth the dragged folder landed at         | **5**, comfortably legal          |
+| result of the move                         | **ALLOWED**, no error             |
+| depth of the deepest descendant afterwards | **7**, past the table's own limit |
+
+The dragged folder itself fits, which is why a guard measuring only the written
+row reports nothing wrong. The rows that broke the rule were never inspected.
+
+**The fix** is a second half in the same trigger: a recursive walk DOWN from the
+row being written, giving the height of its subtree, checked as
+`above + below > 6`. On insert a new row has no descendants, so that reduces to
+the plain depth rule and costs nothing. Both walks carry a runaway bound, because
+a walk over a graph you did not build is an infinite loop waiting for one bad row.
+
+**The general rule, which is not specific to folders:** any constraint on a
+POSITION in a hierarchy is a constraint on a subtree, and a trigger that fires
+per-row sees only the node whose position a person can already see. The nodes
+that break the rule are the ones whose rows nobody wrote.
+
+`packages/db/tests/asset-folders-rls.test.ts` carries the guard, and it was
+mutation-proven: removing the subtree half makes the refused move return
+`{"rows":[]}` (allowed) and turns two tests red.

@@ -10,11 +10,24 @@ import { createServerSupabase } from '@/lib/supabase/server'
 // back to the first membership (see resolveActiveWorkspace).
 export const ACTIVE_WORKSPACE_COOKIE = 'sahoda_ws'
 
-/** View-model projection of `workspaces` — the switcher needs only these three. */
+/**
+ * View-model projection of `workspaces`.
+ *
+ * The switcher needs the first three and nothing else. `timezone` rides along
+ * because /settings needs it and the alternative was a SECOND round trip on
+ * that page for one field: `read-waterfall` counts round-trip opportunities,
+ * and it was right to refuse the extra one. This read already runs on every
+ * authenticated request and is memoised per request, so one more short column
+ * costs a few bytes and no latency, where a separate read costs a full trip.
+ *
+ * `null` means nobody has told us where the business is. It is not a missing
+ * value to be defaulted, and the settings row says so out loud.
+ */
 export interface WorkspaceOption {
   id: string
   name: string
   slug: string
+  timezone: string | null
 }
 
 /**
@@ -50,7 +63,7 @@ export async function readWorkspaces(): Promise<WorkspacesRead> {
     const supabase = createServerSupabase()
     const { data, error } = await supabase
       .from('workspaces')
-      .select('id, name, slug')
+      .select('id, name, slug, timezone')
       .order('created_at', { ascending: true })
 
     if (error || !data) {

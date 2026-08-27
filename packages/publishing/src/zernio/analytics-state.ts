@@ -73,6 +73,13 @@ export const CHANNEL_REPORTING_WINDOW: Readonly<Record<Channel, ReportingWindow>
   x: UNKNOWN_WINDOW,
   gbp: UNKNOWN_WINDOW,
   linkedin: UNKNOWN_WINDOW,
+  // UNKNOWN for both, and that is the honest entry rather than a placeholder.
+  // `UNKNOWN_WINDOW` means "we have not measured this channel's reporting lag",
+  // and the reader renders an absence mark instead of a figure. Copying
+  // Instagram's measured lag across would put a number on screen that no
+  // observation supports.
+  facebook: UNKNOWN_WINDOW,
+  telegram: UNKNOWN_WINDOW,
 }
 
 export function reportingWindowFor(channel: Channel): ReportingWindow {

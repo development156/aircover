@@ -50,18 +50,35 @@ export async function accountForWorkspace(
   profile: ScopedProfileId,
 ): Promise<ScopedAccountId> {
   const supabase = createServerSupabase()
+  // ── `.limit(1)` AND AN ORDER, NEVER `.maybeSingle()` ────────────────────────
+  // This was `.maybeSingle()`, which asks PostgREST to enforce a cardinality of at
+  // most one and answers PGRST116 when two rows match. A workspace holding two
+  // active Instagram accounts is not an error — the unique index is
+  // `(workspace_id, platform, external_account ->> 'id')`, so it is a shape the
+  // schema has always allowed — but every caller of this function reached it
+  // through `scopeForWorkspace`, so the second account did not degrade a reading:
+  // it threw a `ScopeError` and took /analytics and /audience down with it.
+  //
+  // The order is what makes the answer a DECISION rather than whichever row
+  // Postgres happened to return. Callers here ask for "this workspace's
+  // Instagram", which with several accounts has no single true answer, so the
+  // rule is stated instead of guessed: the FIRST account connected is the one a
+  // platform-shaped question resolves to. A screen that means a specific account
+  // addresses it by id through `accountFromRoute` below, which is the path that
+  // exists precisely because this one cannot tell two accounts apart.
   const { data, error } = await supabase
     .from('connections')
-    .select('workspace_id, external_account, status')
+    .select('workspace_id, external_account, status, created_at')
     .eq('workspace_id', workspaceId)
     .eq('platform', platform)
     .eq('status', 'active')
-    .maybeSingle()
+    .order('created_at', { ascending: true })
+    .limit(1)
 
   if (error) {
     throw new ScopeError(`Could not read this workspace’s ${platform} connection: ${error.message}`)
   }
-  return scopeAccount(data, workspaceId, profile)
+  return scopeAccount(data?.[0] ?? null, workspaceId, profile)
 }
 
 /**

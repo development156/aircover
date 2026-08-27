@@ -3,7 +3,7 @@ import Link from 'next/link'
 import type { Channel, Connection } from '@sahoda/shared'
 
 import { ChannelLogo } from '@/components/connections/channel-logo'
-import { CHANNEL_LABELS } from '@/components/posts/channel-label'
+import { PLATFORM_LABELS } from '@/components/posts/channel-label'
 import { brainRing } from '@/lib/brand/brain-ring'
 import type { BrainRead } from '@/lib/brand/read-brain'
 
@@ -203,7 +203,7 @@ export function ConnectionsCard({ connections }: { connections: Connection[] | n
                   <ChannelLogo channel={channel} size={18} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate type-meta font-[550] text-ink">
-                      {CHANNEL_LABELS[channel]}
+                      {PLATFORM_LABELS[channel]}
                     </span>
                     <span className="block type-meta text-muted">Not connected</span>
                   </span>
@@ -226,7 +226,7 @@ export function ConnectionsCard({ connections }: { connections: Connection[] | n
                 <ChannelLogo channel={connection.platform} size={18} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate type-meta font-[550] text-ink">
-                    {CHANNEL_LABELS[connection.platform]}
+                    {PLATFORM_LABELS[connection.platform]}
                   </span>
                   <span className="block type-meta text-muted">
                     {connection.status === 'active' ? 'Connected' : 'Needs attention'}

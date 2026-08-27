@@ -1,7 +1,7 @@
 import { AlertTriangle } from 'lucide-react'
 import type { Connection } from '@sahoda/shared'
 
-import { CHANNEL_LABELS } from '@/components/posts/channel-label'
+import { PLATFORM_LABELS } from '@/components/posts/channel-label'
 import { healthMessage, needsAttention } from '@/lib/connections/health'
 
 /**
@@ -39,7 +39,7 @@ export function ConnectionHealthBanner({
       <ul className="space-y-1">
         {attention.map(({ connection, health }) => (
           <li key={connection.id} className="text-[13px] text-warn">
-            {healthMessage(CHANNEL_LABELS[connection.platform], health)}
+            {healthMessage(PLATFORM_LABELS[connection.platform], health)}
           </li>
         ))}
       </ul>
