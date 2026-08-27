@@ -20,7 +20,7 @@
   "/(app)/billing/checkout/[orderId]": 608789,
   "/(app)/create/post": 603637,
   "/(app)/create": 608789,
-  "/(app)/connections": 691660,
+  "/(app)/connections": 699554,
   "/(app)/campaigns": 684002,
   "/(app)/home/loading": 603637,
   "/(app)/home": 686882,

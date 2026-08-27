@@ -72,6 +72,13 @@ export type FormattedContent =
     }
   | { channel: 'linkedin'; text: string; media: MediaRef[] }
   | { channel: 'instagram'; caption: string; media: MediaRef[] }
+  // `text`, like x and linkedin: a Facebook page post is a message with optional
+  // photos, and Zernio's field for it is the same one.
+  | { channel: 'facebook'; text: string; media: MediaRef[] }
+  // `caption` rather than `text`, and the name is load-bearing. A Telegram post
+  // WITH media is a caption capped at 1024; without media it is a message capped
+  // at 4096. See the spec entry below for why this channel takes the lower one.
+  | { channel: 'telegram'; caption: string; media: MediaRef[] }
 
 /**
  * The words that will actually appear on the platform, whatever the channel
@@ -88,10 +95,12 @@ export function publishedTextOf(content: FormattedContent): string {
   switch (content.channel) {
     case 'x':
     case 'linkedin':
+    case 'facebook':
       return content.text
     case 'gbp':
       return content.summary
     case 'instagram':
+    case 'telegram':
       return content.caption
   }
 }
@@ -158,6 +167,61 @@ export const CONSTRAINTS: Record<Channel, PlatformSpec> = {
     maxMediaMB: 5,
     maxMediaCount: 9,
     perDayCap: 10,
+    scheduleMinLeadMinutes: SCHEDULE_MIN_LEAD_MINUTES,
+  },
+  /**
+   * ── FACEBOOK PAGES ─────────────────────────────────────────────────────────
+   * `perDayCap` is MEASURED: Zernio's own spec states its anti-abuse caps as
+   * "Instagram 100/day, Facebook 100/day, Threads 250/day, X/Twitter 50/day,
+   * Pinterest 25/day, 50/day for every other platform", plus a 25-per-hour
+   * velocity cap. That is the cap that will actually refuse a post, so it is the
+   * one written here.
+   *
+   * ⚠ `maxChars` IS [DOC], NOT MEASURED, AND IT IS OWED A PROBE.
+   * 63,206 is Meta's long-published figure and it is not in Zernio's spec. This
+   * file's own Instagram entry is the reason that matters: its aspect floor was
+   * [DOC]-sourced at 0.8, was wrong, and refused images Instagram accepts. The
+   * house rule is to measure against `POST /v1/tools/validate/post`
+   * (`scripts/zernio/validate-probe.mjs`) before a spec is trusted. Nobody has
+   * run that probe for Facebook. Treat this number as provisional.
+   */
+  facebook: {
+    channel: 'facebook',
+    publishable: true,
+    maxChars: 63206,
+    linkPolicy: 'plain',
+    mediaTypes: ['image/jpeg', 'image/png'],
+    maxMediaMB: 8,
+    maxMediaCount: 10,
+    perDayCap: 100,
+    scheduleMinLeadMinutes: SCHEDULE_MIN_LEAD_MINUTES,
+  },
+  /**
+   * ── TELEGRAM ───────────────────────────────────────────────────────────────
+   * `maxChars: 1024` is MEASURED and is deliberately the LOWER of two real
+   * limits. Zernio's spec names them together: "Telegram 4096 text / 1024
+   * caption". A Telegram post carrying a photo is a caption and stops at 1024; a
+   * text-only one runs to 4096.
+   *
+   * `PlatformSpec` has one `maxChars` and cannot express "depends on whether
+   * there is a picture". Of the two available wrong answers, 4096 lets a writer
+   * fill 3,000 characters, attach a photo, and have the publish REFUSED after the
+   * work is done — the failure-after-commitment this engine exists to prevent.
+   * 1024 refuses earlier and never breaks a publish. The narrower limit wins
+   * until the spec can carry both.
+   *
+   * `perDayCap: 50` is the "50/day for every other platform" line in the same
+   * Zernio passage.
+   */
+  telegram: {
+    channel: 'telegram',
+    publishable: true,
+    maxChars: 1024,
+    linkPolicy: 'plain',
+    mediaTypes: ['image/jpeg', 'image/png'],
+    maxMediaMB: 8,
+    maxMediaCount: 10,
+    perDayCap: 50,
     scheduleMinLeadMinutes: SCHEDULE_MIN_LEAD_MINUTES,
   },
   instagram: {
@@ -381,6 +445,10 @@ export function formatForPlatform(
       return { channel: 'linkedin', text: body, media }
     case 'instagram':
       return { channel: 'instagram', caption: body, media }
+    case 'facebook':
+      return { channel: 'facebook', text: body, media }
+    case 'telegram':
+      return { channel: 'telegram', caption: body, media }
   }
 }
 

@@ -114,7 +114,16 @@ export async function listConnectedChannels(): Promise<Set<Channel>> {
   return read.status === 'ok' ? read.channels : new Set()
 }
 
-/** ConnectionPlatform is wider than Channel — a platform we cannot compose for is not one. */
+/**
+ * `ConnectionPlatform` and `Channel` COINCIDE TODAY at four values.
+ *
+ * This comment used to say the first was "wider than" the second, which was a
+ * statement about intent read as a statement about fact — `enums.ts` itself says
+ * "they coincide today at four values; do not collapse them". The two are kept
+ * separate as design headroom, and the narrowing below is still correct and still
+ * required, because they are free to diverge and nothing type-level makes them
+ * move together.
+ */
 const CHANNEL_SET: ReadonlySet<Channel> = new Set(ChannelSchema.options)
 
 /**

@@ -1,19 +1,20 @@
 import type { Connection } from '@sahoda/shared'
 
+import { ChannelAccounts } from '@/components/connections/channel-accounts'
+import { ChannelDetails } from '@/components/connections/channel-details'
 import { ChannelLogo } from '@/components/connections/channel-logo'
 import { ConnectButton } from '@/components/connections/connect-button'
-import { DisconnectButton } from '@/components/connections/disconnect-button'
-import { ReconnectButton } from '@/components/connections/reconnect-button'
+import { TelegramConnect } from '@/components/connections/telegram-connect'
+import { needsPairingCode } from '@/lib/zernio/connect-platform'
 import { XRationMeter, type XRationMeterProps } from '@/components/connections/x-ration-meter'
-import { Badge, type Rung } from '@/components/ui/badge'
-import { accountLabel } from '@/lib/connections/account-label'
 import {
   READINESS_CLASS,
   READINESS_LABEL,
   asChannel,
+  asPlatform,
   type CatalogueEntry,
 } from '@/lib/connections/catalogue'
-import { connectionHealth, handleOf } from '@/lib/connections/health'
+import { channelDetailContent } from '@/lib/connections/details'
 
 /**
  * ONE TILE PER CHANNEL — connected or not, built or not.
@@ -49,8 +50,16 @@ import { connectionHealth, handleOf } from '@/lib/connections/health'
  */
 export interface ChannelTileProps {
   entry: CatalogueEntry
-  /** The live row, when one exists. */
-  connection?: Connection
+  /**
+   * EVERY account linked on this channel, oldest first. Empty when none is.
+   *
+   * This was a single optional `connection`, which was the screen's half of the
+   * belief that a platform holds one account. It does not: the unique index is
+   * `(workspace_id, platform, external_account ->> 'id')` and the plan counts
+   * ROWS, so four Instagram accounts are four slots and were, until now, one
+   * visible tile showing whichever row was written last.
+   */
+  connections: readonly Connection[]
   /** Why connecting is unavailable right now, if it is. */
   disabledReason?: string
   disabled?: boolean
@@ -59,28 +68,20 @@ export interface ChannelTileProps {
   now?: Date
 }
 
-function statusOf(
-  connection: Connection | undefined,
-  now: Date,
-): { rung: Rung; label: string } | null {
-  if (!connection) return null
-  const health = connectionHealth(connection, now)
-  if (connection.status === 'active' && health.kind === 'ok') {
-    return { rung: 'active', label: 'Connected' }
-  }
-  // Everything else needs a person. A dead token and an expiring one are the
-  // same problem to whoever's posts stop going out.
-  return { rung: 'urgent', label: 'Needs you' }
-}
-
 /**
  * The channel half of the tile — identical in both the connectable and the
  * coming-soon shapes, which is the point. Being unbuilt is a reason to look
  * PROVISIONAL, not a reason to be a different component.
  */
-function ChannelHeader({ entry }: { entry: CatalogueEntry }) {
+function ChannelHeader({
+  entry,
+  details,
+}: {
+  entry: CatalogueEntry
+  details: ReturnType<typeof channelDetailContent>
+}) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-1.5">
       <div className="flex items-start gap-2">
         <ChannelLogo channel={entry.id} />
         {/* NO `truncate`. The name is this tile's whole subject and it comes from
@@ -104,17 +105,41 @@ function ChannelHeader({ entry }: { entry: CatalogueEntry }) {
           is quiet by construction on the two channels that need a caveat, and a
           solid brand fill on the two that have earned it. Ink on the fill, never
           white (§1.2). */}
-      <span
-        /* A DISTINCT hook from the tile's own `data-readiness`. Both carried the
-           same attribute, so a `[data-readiness="..."]` query matched the
-           <article> on a connectable channel and the chip on a coming-soon one —
-           two different elements answering one selector. The dark-mode guard
-           below caught it by reading a 0px border off the wrapper. */
-        data-readiness-chip={entry.readiness}
-        className={`${READINESS_CLASS[entry.readiness]} type-chip self-start rounded-sm px-[7px] py-[3px]`}
-      >
-        {READINESS_LABEL[entry.readiness]}
-      </span>
+      {/* The rung and the way IN to everything behind it, on one line.
+
+          Details sits here rather than on the tile's floor because the floor is
+          where the actions are — Connect, Disconnect, Add another — and a control
+          that only opens a reference panel does not belong in a row of controls
+          that change a customer's account. It is also the one control every tile
+          has, connectable or not, which is why it is beside the rung that is also
+          on every tile. */}
+      {/* ── THE RUNG MOVED BESIDE `kind`, NOT BESIDE THE NAME ─────────────
+          The argument above is about the NAME: it is variable-width and comes
+          from the catalogue, so a fixed-width chip sharing its row is paid for
+          by it in silence. `kind` is neither — one or two short words from the
+          same eight-row table — so the chip can sit with it and the tile loses a
+          whole row. That row mattered: this grid went from eight tiles to
+          twenty on 2026-08-26, so every row of tile chrome is now paid for
+          twenty times and the screen was reported as looking bad. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+        <span
+          /* A DISTINCT hook from the tile's own `data-readiness`. Both carried the
+             same attribute, so a `[data-readiness="..."]` query matched the
+             <article> on a connectable channel and the chip on a coming-soon one —
+             two different elements answering one selector. The dark-mode guard
+             below caught it by reading a 0px border off the wrapper. */
+          data-readiness-chip={entry.readiness}
+          className={`${READINESS_CLASS[entry.readiness]} type-chip self-start rounded-sm px-[7px] py-[3px]`}
+        >
+          {READINESS_LABEL[entry.readiness]}
+        </span>
+        <ChannelDetails
+          label={details.label}
+          blurb={details.blurb}
+          rows={details.rows}
+          note={details.note}
+        />
+      </div>
     </div>
   )
 }
@@ -141,13 +166,9 @@ function ComingSoonTile({ entry }: { entry: CatalogueEntry }) {
       /* The same lift, so a planned channel reads as a card on a roadmap
          rather than a dead box — while `.is-proposed` keeps it visibly
          provisional. No shadow: it is not offering an action. */
-      className="is-proposed flex h-full flex-col gap-3 rounded-card p-4 transition-micro hover:-translate-y-px"
+      className="is-proposed flex h-full flex-col gap-2.5 rounded-card p-3.5 transition-micro hover:-translate-y-px"
     >
-      <ChannelHeader entry={entry} />
-      {/* What the channel is FOR. Present tense describes the channel, not an
-          offer — the "Coming soon" rung above and the line below both say we
-          cannot do it yet, so this sentence never has to carry that too. */}
-      <p className="type-sm text-muted">{entry.blurb}</p>
+      <ChannelHeader entry={entry} details={channelDetailContent(entry, 0)} />
       {/* NOT "Not connected". That is the sentence a CONNECTABLE channel uses, and
           on a tile with no adapter it implies the customer could fix it by
           connecting — the exact confusion between "unbuilt" and "unconfigured"
@@ -164,36 +185,58 @@ function ComingSoonTile({ entry }: { entry: CatalogueEntry }) {
           remedy.spec.ts` exists to catch, and the same failure this component's
           header rejects a `<button disabled>` for. The floor keeps the honest
           sentence until the notify flow is real. */}
-      <p className="type-sm mt-auto border-t border-line-soft pt-3 text-muted">
-        Sahoda can&rsquo;t post here yet.
-      </p>
+      {/* ── THE ONE SENTENCE, AND IT SAYS WHICH KIND OF NOTHING THIS IS ────
+          The blurb above it was removed with every other tile's: it described
+          the channel and this line describes US, and only the second is what a
+          reader on this row needs. It is the entry's own words rather than a
+          constant, because "Sahoda can't post here yet" was true of eight
+          different situations and is now true of one — a platform we cannot even
+          link. Snapchat is not unbuilt, it is refused: 403
+          `PLATFORM_BETA_RESTRICTED`. A remedy-shaped sentence there would be the
+          impossible remedy `no-impossible-remedy.spec.ts` forbids. */}
+      <p className="type-sm mt-auto border-t border-line-soft pt-2.5 text-muted">{entry.blurb}</p>
     </div>
   )
 }
 
 export function ChannelTile({
   entry,
-  connection,
+  connections,
   disabled,
   disabledReason,
   ration,
   now = new Date(),
 }: ChannelTileProps) {
+  /**
+   * ── THE BRANCH IS ABOUT LINKING, NOT ABOUT PUBLISHING ────────────────────
+   * This was `asChannel`, which asks "can Sahoda POST here". Those were the same
+   * question only while every connectable platform was also publishable. Eight
+   * are now connect-only, and under the old branch all eight would have rendered
+   * as unbuilt cards with no control at all — while the schema, the start route
+   * and the plan gate were every one of them willing.
+   *
+   * `asPlatform` asks the question this component is actually about: can a row
+   * exist in `connections` for this id. A planned id cannot — the CHECK
+   * constraint sees to that — so this branch is still the type system and the
+   * schema agreeing rather than a runtime guess.
+   */
+  const platform = asPlatform(entry.id)
+  if (platform === null) return <ComingSoonTile entry={entry} />
+  /** Publishable channels only. Drives nothing but the account rows' own copy. */
   const channel = asChannel(entry.id)
-  // A planned channel cannot hold a connection row — the database CHECK
-  // constraint sees to that — so this branch is the type system and the schema
-  // agreeing rather than a runtime guess.
-  if (channel === null) return <ComingSoonTile entry={entry} />
 
-  const status = statusOf(connection, now)
-  const handle = connection ? handleOf(connection) : null
-  const account = connection ? accountLabel(connection.external_account) : null
-  const health = connection ? connectionHealth(connection, now) : null
+  const linked = connections.length > 0
+  const details = channelDetailContent(entry, connections.length)
 
   return (
     <article
       data-channel={entry.id}
-      data-connected={connection ? 'true' : 'false'}
+      data-connected={linked ? 'true' : 'false'}
+      /* The ACCOUNT count, so a guard can tell one Instagram account from two
+         without walking the DOM. `data-connected` cannot: it was true for one
+         and true for two, which is exactly how a second account went missing
+         from this screen without any check noticing. */
+      data-account-count={connections.length}
       data-readiness={entry.readiness}
       /* ── HOVER IS A LIFT, AND IT COSTS NOTHING ──────────────────────────
          A 1px rise, a firmer ring and the card shadow — no colour change, so
@@ -201,60 +244,57 @@ export function ChannelTile({
          `transition-micro` is the product's own duration/easing pair, and
          tokens.css zeroes it under `prefers-reduced-motion`, so this needs no
          media query of its own and no dependency. */
-      className="surface-ring flex h-full flex-col rounded-card bg-surface p-4 transition-micro hover:-translate-y-px hover:shadow-card hover:surface-ring-firm"
+      className="surface-ring flex h-full flex-col rounded-card bg-surface p-3.5 transition-micro hover:-translate-y-px hover:shadow-card hover:surface-ring-firm"
     >
-      <ChannelHeader entry={entry} />
+      <ChannelHeader entry={entry} details={details} />
 
-      {/* What Sahoda does with this channel, in one sentence. It sits ABOVE the
-          divider because it is a claim about the CHANNEL, which is what this
-          zone is for — putting it below would file "what Instagram is for"
-          under "what your workspace has done about it". */}
-      <p className="type-sm mt-2 text-muted">{entry.blurb}</p>
+      {/* ── THE BLURB LEFT THE TILE FACE, AND IT DID NOT LEAVE THE SCREEN ──
+          It read "Publish posts, reels and stories directly to Instagram." on
+          every card. One sentence is ~40px, twenty cards is ~800px of prose
+          nobody reads twice, and it answered a question ("what is Instagram
+          for") that almost nobody on this screen is asking. It is still one tap
+          away, verbatim, inside Details — `channelDetailContent` passes the same
+          string — which is where the reader who IS asking will look.
 
-      {/* THE DIVIDER IS THE AXIS. Above: the channel. Below: your account.
+          What replaced it is nothing. The tile is shorter, and shorter is the
+          whole request. */}
+
+      {/* THE DIVIDER IS THE AXIS. Above: the channel. Below: your accounts.
           A hairline rather than a gap, because §6 is explicit that a gap past a
           point wants to be a divider — and because two zones separated only by
           space read as one zone with awkward spacing. */}
-      <hr className="my-3 border-0 border-t border-line-soft" />
+      <hr className="my-2.5 border-0 border-t border-line-soft" />
 
-      <div className="flex min-h-[20px] items-center justify-between gap-2">
-        {status ? (
-          <Badge rung={status.rung}>{status.label}</Badge>
-        ) : (
-          /* ── A CHIP, AND THE DOT IS NOT THE MESSAGE ──────────────────────
-             "Not connected" was plain grey text beside a Badge on the
-             connected tiles: one slot, two vocabularies, which is the exact
-             §3.3 defect the divider above was introduced to end — it fixed
-             the SUBJECT split and left the TREATMENT split standing.
+      {linked ? (
+        <ChannelAccounts
+          channel={channel}
+          platform={platform}
+          label={entry.short}
+          connections={connections}
+          now={now}
+        />
+      ) : (
+        /* ── A CHIP, AND THE DOT IS NOT THE MESSAGE ──────────────────────
+           "Not connected" was plain grey text beside a Badge on the
+           connected tiles: one slot, two vocabularies, which is the exact
+           §3.3 defect the divider above was introduced to end — it fixed
+           the SUBJECT split and left the TREATMENT split standing.
 
-             It is not a `Badge`, because the ladder ranks how much a thing
-             NEEDS YOU and an unconnected channel needs nothing; rung 4 would
-             put a tick on it. So it is a chip in the same shape at a quieter
-             weight.
+           It is not a `Badge`, because the ladder ranks how much a thing
+           NEEDS YOU and an unconnected channel needs nothing; rung 4 would
+           put a tick on it. So it is a chip in the same shape at a quieter
+           weight.
 
-             The wash is `--brand-wash` at alpha 0.06, which
-             `accent-area-budget.spec.ts` skips (it ignores any paint under
-             0.08), so four of these cost the screen's accent budget nothing.
-             The dot is decorative and the WORDS carry the claim — hue is
-             never load-bearing here (docs/37 §1). */
-          <span className="type-chip inline-flex items-center gap-1.5 rounded-pill bg-brand-wash px-2 py-1 text-muted">
-            <span aria-hidden className="size-1.5 rounded-pill bg-brand" />
-            Not connected
-          </span>
-        )}
-        {/* The expiry line. 60 days, no refresh, no warning from anyone — so a
-            tile that says "Connected" without saying "for how much longer" is
-            the shape of a customer finding out a week after their posts died. */}
-        {health && health.kind === 'ok' && health.daysLeft !== null ? (
-          <span className="type-sm num shrink-0 text-muted">{health.daysLeft}d left</span>
-        ) : null}
-      </div>
-
-      {connection && (handle || account) ? (
-        <p className="type-sm mt-1 truncate text-muted">
-          {handle ? `@${handle.replace(/^@/, '')}` : account}
-        </p>
-      ) : null}
+           The wash is `--brand-wash` at alpha 0.06, which
+           `accent-area-budget.spec.ts` skips (it ignores any paint under
+           0.08), so four of these cost the screen's accent budget nothing.
+           The dot is decorative and the WORDS carry the claim — hue is
+           never load-bearing here (docs/37 §1). */
+        <span className="type-chip inline-flex w-fit items-center gap-1.5 rounded-pill bg-brand-wash px-2 py-1 text-muted">
+          <span aria-hidden className="size-1.5 rounded-pill bg-brand" />
+          Not connected
+        </span>
+      )}
 
       {/* X only. The one channel that bills per post says so here, before the
           button that starts the flow — never after the money is gone. */}
@@ -266,21 +306,44 @@ export function ChannelTile({
           describes. */}
       {/* A HAIRLINE OVER THE CONTROL, matching the one that splits the tile.
           The tiles carry different amounts of content — X alone holds the spend
-          row — so without a rule the buttons floated at whatever height their
-          own card ended at. `mt-auto` already pinned them to the floor; the
-          border makes that floor visible, so eight cards read as one row. */}
-      <div className="mt-auto flex items-center gap-2 border-t border-line-soft pt-3">
-        {connection ? (
-          <>
-            {health && health.kind !== 'ok' ? (
-              <ReconnectButton platform={channel} label={entry.short} />
-            ) : null}
-            <DisconnectButton connectionId={connection.id} label={account ?? entry.label} />
-          </>
+          row, and a channel with three accounts holds three rows — so without a
+          rule the buttons floated at whatever height their own card ended at. */}
+      <div className="mt-auto flex items-center gap-2 border-t border-line-soft pt-2.5">
+        {/* ── CONNECT IS ALWAYS OFFERED, AND THAT IS THE FIX ────────────────
+            The tile used to render Connect ONLY when the platform had no
+            connection at all, so once a workspace linked one Instagram account
+            there was no control anywhere in the product that could add a
+            second — while the database, the plan gate and both OAuth routes
+            were all perfectly willing to hold one. The screen was the whole
+            blocker.
+
+            The words change with what is already there, because "Connect
+            Instagram" beside a connected Instagram account is an offer to do
+            something that has already been done. `disabled` still carries the
+            plan's answer, so a full plan says so here rather than starting a
+            flow that the start route would refuse with a 403 after the customer
+            had gone to the consent screen. */}
+        {/* ── ONE CHANNEL DOES NOT OPEN A WINDOW, AND IT IS NOT AN EXCEPTION
+            TO HIDE ────────────────────────────────────────────────────────
+            MEASURED: `GET /v1/connect/telegram` returns no `authUrl` at all,
+            only a pairing code the customer messages to a bot. There is no
+            consent screen to pop up and no return trip to wait for, so
+            `ConnectButton` — which is entirely about opening a window and
+            listening for it to come home — cannot serve it. It answered
+            "Couldn't start the connection. Try again." on every press until
+            this branch existed.
+
+            A branch on the platform id rather than a prop, because the two
+            controls have different SHAPES: one is a button, the other is a
+            code and a set of steps that stays on screen while the customer
+            goes to another app. */}
+        {needsPairingCode(platform) ? (
+          <TelegramConnect disabled={disabled} disabledReason={disabledReason} />
         ) : (
           <ConnectButton
-            platform={channel}
+            platform={platform}
             label={entry.short}
+            addingAnother={linked}
             disabled={disabled}
             disabledReason={disabledReason}
           />

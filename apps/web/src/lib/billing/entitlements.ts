@@ -39,8 +39,20 @@ export function getCheckEntitlement(): CheckEntitlementFn {
  * the truth is "we could not reach the database" is a fabricated reason that sends
  * the customer to a pricing page for a problem that is ours.
  */
+/**
+ * `blocked` carries the LIMIT as well as the sentence.
+ *
+ * It used to carry the sentence alone, which was enough while the only caller
+ * rendered that sentence and nothing else. A meter cannot be drawn from a
+ * sentence: /connections needs the denominator to say "4 of 4 slots used", and
+ * parsing the number back out of English is the sort of thing that works until
+ * the copy is rewritten. The gate already has it — `details.limit` — so this is
+ * carrying a value that was being thrown away, not computing a new one.
+ */
 export type LimitVerdict =
-  { kind: 'allowed'; limit: number } | { kind: 'blocked'; sentence: string } | { kind: 'unknown' }
+  | { kind: 'allowed'; limit: number }
+  | { kind: 'blocked'; sentence: string; limit: number }
+  | { kind: 'unknown' }
 
 interface DeniedDetails {
   limit: number
@@ -106,6 +118,7 @@ export async function checkCountableLimit(
 
   return {
     kind: 'blocked',
+    limit: details.limit,
     sentence: planLimitSentence({
       dimension,
       planId: PlanIdSchema.parse(details.planId),

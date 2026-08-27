@@ -1,12 +1,21 @@
 import { auth } from '@clerk/nextjs/server'
-import { reconcileAccounts } from '@sahoda/publishing'
-import { ZERNIO_PLATFORMS } from '@sahoda/shared'
+import { reconcileFromAccounts } from '@sahoda/publishing'
+import { isZernioPlatform, ZERNIO_PLATFORMS, type ZernioPlatform } from '@sahoda/shared'
 
 import { checkCountableLimit } from '@/lib/billing/entitlements'
+import { CLEAR_PENDING_CONNECT, readPendingConnect } from '@/lib/connections/pending-connect'
 import { connectionKey, readConnectionSlots } from '@/lib/connections/read'
+import { connectPlatformFor } from '@/lib/zernio/connect-platform'
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { readActiveWorkspace } from '@/lib/workspaces'
+import { setPendingSelectionHeader } from '@/lib/connections/pending-selection'
+import { pickerCopyFor, SELECT_PATH } from '@/lib/zernio/picker-copy'
+import { connectFailedPage, nothingToPickPage, pickerPage } from '@/lib/zernio/picker-page'
+import { connectFailureCopy, readConnectFailure } from '@/lib/zernio/connect-error'
+import { PLATFORM_LABELS } from '@/components/posts/channel-label'
+import { readSelectionRedirect, unresolvedSelection } from '@/lib/zernio/selection'
+import { RETURN_MODE_PARAM, RETURN_PLATFORM_PARAM } from '@/lib/zernio/return-url'
 import { zernioClient } from '@/lib/zernio/server'
 
 /**
@@ -32,10 +41,11 @@ export const dynamic = 'force-dynamic'
 /**
  * One account Zernio returned, tagged with the platform it was asked for.
  *
- * Derived from `reconcileAccounts` rather than restated — a field added there shows
- * up here as a type error rather than being silently dropped on the way to the RPC.
+ * Derived from `reconcileFromAccounts` rather than restated — a field added there
+ * shows up here as a type error rather than being silently dropped on the way to
+ * the RPC.
  */
-type ReconciledForPlatform = Awaited<ReturnType<typeof reconcileAccounts>>[number] & {
+type ReconciledForPlatform = ReturnType<typeof reconcileFromAccounts>[number] & {
   platform: (typeof ZERNIO_PLATFORMS)[number]
 }
 
@@ -62,6 +72,106 @@ function escapeAttr(value: string): string {
 }
 
 /**
+ * THE POPUP'S LAST DOCUMENT — it tells the opener and shuts itself.
+ *
+ * ── WHY IT DOES NOT USE `window.opener` AS ITS PRIMARY SIGNAL ────────────────
+ * It did, and it failed every time in the real world. Google's sign-in pages
+ * serve `Cross-Origin-Opener-Policy: same-origin`; the moment the popup lands on
+ * one the browser moves it into a NEW browsing context group and **severs
+ * `window.opener` permanently**. Coming back to our own origin afterwards does
+ * not restore it. Our own headers were never the question.
+ *
+ * So the closer's `opener`-is-null fallback ran, and its fallback was
+ * `location.replace('/connections?…')` — which loaded the ENTIRE APP inside a
+ * 620px window while the opener sat on "Opening…". Reported as "it opens a popup
+ * and it opens another new website and connects there".
+ *
+ * `BroadcastChannel` is scoped by ORIGIN rather than by window relationship, so
+ * it crosses that boundary. `opener.postMessage` is still attempted for the case
+ * where the chain survived, and costs nothing when it did not.
+ *
+ * ── AND IT NEVER LOADS THE APP AGAIN ─────────────────────────────────────────
+ * `window.close()` can also be refused once COOP has changed the browsing context
+ * group, so this page must be readable on its own. It says one sentence and
+ * stops. The old fallback replaced a self-contained confirmation with a second
+ * copy of the product in a window too small to use it, which is worse than doing
+ * nothing at all.
+ *
+ * ── AND IT MUST NOT BE A REDIRECT, WHICH IS WHAT IT ACTUALLY WAS ────────────
+ * THIS is why every earlier attempt at closing the popup failed, including the
+ * COOP work above and the query-parameter work below it. This page was served
+ * with `status: 303` and a `Location` header. A browser FOLLOWS a 303 — the body
+ * is never rendered, no script in it ever runs, and the popup navigates to
+ * /connections. Reported four times, most precisely as: "it is opening this
+ * website in the same popup itself ... /connections?zernio=connected".
+ *
+ * The `Location` header was copied from `backError`, where it is inert because a
+ * 4xx/5xx `Location` is not followed and it exists only to make the intended
+ * destination visible to a log reader and to `curl -I`. On a 303 it is not inert
+ * at all. So the closer sends NO `Location`, ever: the destination is in the body
+ * as a real link, which is the only place a popup should be offered one.
+ *
+ * ── THE STATUS LINE STILL TELLS THE TRUTH ────────────────────────────────────
+ * This route exists in its current shape because a failure leaving as 303 was
+ * invisible to a 4xx/5xx log filter, and that property is kept: a failed popup
+ * connect is still a 5xx. What changes is the SUCCESS status, from 303 to 200.
+ * Both are "this worked" to the filter that matters, and only one of them makes
+ * the browser walk away from the page before it can run.
+ */
+function popupCloser(
+  request: Request,
+  httpStatus: number,
+  status: string,
+  detail?: string,
+): Response {
+  const target = connectionsUrl(request, status, detail)
+  const safe = escapeAttr(target)
+  const worked = status === 'connected' || status === 'nothing' || status === 'limit'
+  const line = worked
+    ? 'Connected. You can close this window.'
+    : 'That connection didn’t finish. You can close this window and try again.'
+
+  return new Response(
+    `<!doctype html><html lang="en"><head><meta charset="utf-8">` +
+      `<meta name="viewport" content="width=device-width,initial-scale=1">` +
+      `<title>${worked ? 'Connected' : 'Didn’t finish'}</title>` +
+      `<style>body{font:16px/1.5 system-ui,sans-serif;margin:0;display:grid;` +
+      `place-items:center;min-height:100vh;padding:24px;text-align:center}` +
+      `a{color:inherit}</style></head>` +
+      `<body><div><p>${line}</p>` +
+      // A link, never an auto-navigate. Someone whose window will not close can
+      // get back to the app deliberately; nobody has the app loaded at them.
+      `<p><a href="${safe}">Open Connections</a></p></div>` +
+      `<script>(function(){` +
+      // FIRST, and the one that actually works: origin-scoped, so COOP cannot
+      // reach it. The channel name matches lib/connections/use-connect-flow.ts.
+      `try{var c=new BroadcastChannel("sahoda-connect");` +
+      `c.postMessage({type:"sahoda:connect-outcome"});c.close();}catch(e){}` +
+      // SECOND, for the case where the opener chain did survive. `location.origin`
+      // and nothing else — a wildcard would post the outcome to whatever happened
+      // to open this window.
+      `try{if(window.opener&&!window.opener.closed){` +
+      `window.opener.postMessage({type:"sahoda:connect-outcome"},window.location.origin);}}catch(e){}` +
+      // THIRD. May be refused after COOP changed the browsing context group, which
+      // is why the sentence above stands on its own.
+      `try{window.close();}catch(e){}` +
+      `})();</script></body></html>`,
+    {
+      status: httpStatus,
+      headers: {
+        'content-type': 'text/html; charset=utf-8',
+        'cache-control': 'no-store',
+        'set-cookie': CLEAR_PENDING_CONNECT,
+        // NO `location`. See the header: this response is HTML that must RENDER,
+        // and a `Location` on the 3xx this used to send made the browser follow
+        // it instead. `backError` can keep one only because 4xx/5xx are not
+        // followed.
+      },
+    },
+  )
+}
+
+/**
  * A real outcome: the connect worked, or there was genuinely nothing new to record.
  * 303 is correct here and the logs are already truthful about it.
  */
@@ -70,7 +180,17 @@ function backOk(
   status: 'connected' | 'nothing' | 'limit',
   detail?: string,
 ): Response {
-  return Response.redirect(connectionsUrl(request, status, detail), 303)
+  // Hand-built rather than `Response.redirect`, whose headers are immutable, so
+  // the pending-connect cookie can be spent on the way out. Same 303, same
+  // `Location` — `real outcomes keep their 303` still holds.
+  return new Response(null, {
+    status: 303,
+    headers: {
+      location: connectionsUrl(request, status, detail),
+      'set-cookie': CLEAR_PENDING_CONNECT,
+      'cache-control': 'no-store',
+    },
+  })
 }
 
 /** The sentence in the fallback body. Ours, never a message from Zernio or Postgres. */
@@ -121,6 +241,9 @@ function backError(
       headers: {
         'content-type': 'text/html; charset=utf-8',
         'cache-control': 'no-store',
+        // Spent on a failure too. A cookie surviving a failed trip would sit
+        // there authorising a create on whatever the customer did next.
+        'set-cookie': CLEAR_PENDING_CONNECT,
         // Not followed by browsers on a 4xx/5xx, and deliberately kept anyway: it is
         // what makes the intended destination visible to a log reader and to curl -I.
         location: target,
@@ -130,10 +253,119 @@ function backError(
 }
 
 export async function GET(request: Request): Promise<Response> {
+  /**
+   * ── WHAT THE CUSTOMER PRESSED, READ FIRST ─────────────────────────────────
+   * Read from an httpOnly cookie our own start route set, never from the query
+   * string — see lib/connections/pending-connect.ts for why that distinction is
+   * load-bearing on this route in particular.
+   *
+   * Read at the TOP because it decides the SHAPE of every answer below, failures
+   * included: a popup that gets a 303 just leaves a second copy of /connections
+   * sitting in a 620px window, and the customer has to close it and work out for
+   * themselves whether anything happened.
+   *
+   * `null` when the cookie expired, was never set (a bookmarked replay), or the
+   * browser dropped it. That is not an error: the trip still REFRESHES every row
+   * we already hold, which is the whole of the documented self-heal that matters.
+   * What it may not do without this is CREATE.
+   */
+  const pending = await readPendingConnect()
+
+  /**
+   * ── THE ONE QUERY PARAMETER THIS ROUTE READS, AND WHY IT IS ALLOWED ────────
+   * The cookie above is still the only thing that can authorise a CREATE, and
+   * that has not changed. But it turned out not to survive the round trip
+   * reliably, and the popup flag rode on it: the customer pressed Connect, a
+   * popup opened, and the return trip answered with a 303 because `pending` was
+   * null — so the popup loaded a second copy of /connections instead of closing.
+   * Reported three times, most recently as "the popup still not closing".
+   *
+   * `mode` steers PRESENTATION and nothing else: an HTML page that says "you can
+   * close this window" versus a redirect. Forging it changes which of those two a
+   * customer sees. It cannot name a workspace, a platform, an account or a plan,
+   * and it cannot cause one row to be written. That is the whole distinction the
+   * header of this file draws, and this value sits on the safe side of it.
+   *
+   * EITHER source is enough. The cookie still works where it survives, and the
+   * absence of both still means redirect, so the older path remains what a
+   * stripped or mangled value produces.
+   */
+  const params = new URL(request.url).searchParams
+  const popup = pending?.mode === 'popup' || params.get(RETURN_MODE_PARAM) === 'popup'
+
+  /**
+   * WHICH PLATFORM MAY HAVE A ROW CREATED FOR IT ON THIS TRIP.
+   *
+   * The cookie first, always. The parameter is the fallback for the trip it did
+   * not survive, and it is validated against the shared allowlist rather than
+   * used as given: an unknown string produces `null`, which is the fail-closed
+   * branch, not a create for a channel nobody has heard of.
+   *
+   * `null` still means no create. Losing both a cookie and a query parameter
+   * leaves the trip doing what it has always done for a replay — refreshing every
+   * row we already hold and creating none.
+   */
+  const askedPlatform = params.get(RETURN_PLATFORM_PARAM)
+  // Typed as the union rather than `string`. Both sources are already narrowed —
+  // the cookie parses against the allowlist and the query parameter is checked by
+  // `isZernioPlatform` — and stating that in the type is what lets this value be
+  // handed to the selection helpers without a cast that would erase the check.
+  const createFor: ZernioPlatform | null =
+    pending?.platform ??
+    (askedPlatform !== null && isZernioPlatform(askedPlatform) ? askedPlatform : null)
+
   const ok = (status: 'connected' | 'nothing' | 'limit', detail?: string) =>
-    backOk(request, status, detail)
+    // 200, NOT 303. A 303 is a redirect and a browser follows it, so the closer's
+    // body never rendered and its script never ran — the whole reason the popup
+    // kept showing /connections instead of shutting. Still a success status, so
+    // the 4xx/5xx log filter this route was built around reads it the same way.
+    popup ? popupCloser(request, 200, status, detail) : backOk(request, status, detail)
   /** Each failure carries the status a log reader would expect for that cause. */
-  const fail = (httpStatus: number, detail: string) => backError(request, httpStatus, detail)
+  const fail = (httpStatus: number, detail: string) =>
+    popup
+      ? popupCloser(request, httpStatus, 'error', detail)
+      : backError(request, httpStatus, detail)
+
+  /**
+   * ── THE PLATFORM REFUSED, AND WE USED TO THROW THAT AWAY ──────────────────
+   * Zernio's spec: "On failure every platform appends error details, starting
+   * with `error` and `platform`." This route ignores every query parameter, and
+   * that rule is right about IDS — an accountId from the browser can name
+   * somebody else's account — and wrong about this one. An error string names no
+   * resource and decides nothing; it is read here, matched against a small
+   * allowlist to choose OUR sentence, and shown with the provider's own words
+   * underneath.
+   *
+   * Dropping it is how the founder ended up reading Zernio's dashboard to find
+   * out that Google had answered `invalid_grant` — a fact we were handed and
+   * discarded, while our own screen said only that nothing had been found.
+   *
+   * FIRST, before the session is even resolved: a refusal is a refusal whether
+   * or not the workspace reads cleanly, and answering it needs nothing else.
+   */
+  const failure = readConnectFailure(params)
+  if (failure !== null) {
+    await reportServerError(
+      new Error(`zernioReturn: ${createFor ?? 'unknown'} refused — ${failure.code}`),
+      { action: 'zernioReturn' },
+    )
+    const channel = createFor === null ? 'That channel' : PLATFORM_LABELS[createFor]
+    const copy = connectFailureCopy(failure, channel)
+    const body = connectFailedPage(
+      copy,
+      failure.detail,
+      connectionsUrl(request, 'error', 'refused'),
+    )
+    // A 502: the customer's request was fine and so was ours; the platform said
+    // no. Visible to the 4xx/5xx log filter this route was rebuilt around, which
+    // is the whole reason a failure never leaves here as a success status.
+    return popup
+      ? new Response(body, {
+          status: 502,
+          headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
+        })
+      : backError(request, 502, 'refused')
+  }
 
   let workspaceId: string | undefined
   try {
@@ -184,6 +416,99 @@ export async function GET(request: Request): Promise<Response> {
       return ok('nothing', 'no-profile')
     }
 
+    /**
+     * ── THE CONNECT THAT IS NOT FINISHED YET ─────────────────────────────────
+     * Facebook and Google Business come back here BEFORE an account exists: the
+     * customer approved, and Zernio is waiting to be told which Page or which
+     * location. `step` is Zernio's own marker for that state and nothing else sets
+     * it, so its absence is every connect that has ever worked.
+     *
+     * MEASURED 2026-08-27: this is the entire reason "facebook is not connecting".
+     * The reconcile below ran correctly, found no facebook account, and reported
+     * that honestly — because there was none to find. See lib/zernio/selection.ts.
+     *
+     * Placed AFTER the profile lookup because the check it performs needs it: the
+     * `profileId` on this URL came through the browser and is compared against the
+     * one we read from our own table, never used. That is the same tenant boundary
+     * `upsert_zernio_connection` enforces as PROFILE_MISMATCH, applied a layer up
+     * so a mismatched pick never reaches Zernio at all.
+     */
+    const selection = readSelectionRedirect(params, createFor)
+    if (selection !== null) {
+      if (selection.state.profileId !== profileId) return fail(403, 'profile-mismatch')
+
+      const copy = pickerCopyFor(selection.platform)
+      const owedPlatform = selection.platform
+      let listed: Awaited<ReturnType<typeof client.listConnectChoices>>
+      try {
+        listed = await client.listConnectChoices(selection.platform, selection.state)
+      } catch (error) {
+        await reportServerError(error, { action: 'zernioSelectList', workspaceId })
+        // Ours, not theirs: the grant at the platform is real and the only thing
+        // that failed is our read of what it unlocked.
+        return fail(502, 'choices-unreadable')
+      }
+
+      if (listed.choices.length === 0) {
+        /**
+         * REPORTED, because it is the one branch here nobody can measure from
+         * outside. MEASURED 2026-08-27: the founder reached this page, which
+         * proves headless mode, the redirect parsing and our picker all work —
+         * Facebook simply handed back no Pages. Whether that keeps happening,
+         * and for which platform, is a fact worth having rather than inferring
+         * from a screenshot next time.
+         *
+         * The count and the platform only. Nothing about the account, and no
+         * token.
+         */
+        await reportServerError(
+          new Error(`zernioReturn: ${owedPlatform} returned zero choices to pick from`),
+          { action: 'zernioReturn', workspaceId },
+        )
+        // NOT `ok('nothing')`. That status renders "Connected", and nothing was —
+        // Zernio creates no account until a choice is committed. This says what
+        // actually happened and offers the only remedy that can work.
+        return new Response(
+          nothingToPickPage(copy, connectionsUrl(request, 'nothing', copy.empty)),
+          {
+            status: 200,
+            headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
+          },
+        )
+      }
+
+      /**
+       * The page carries the ids and NOT the token. `tempToken` is a live Facebook
+       * user access token; it goes into an httpOnly cookie the POST reads back, so
+       * it never reaches the markup. See lib/connections/pending-selection.ts.
+       *
+       * The pending-connect cookie is deliberately NOT cleared here. This trip
+       * created nothing, the customer has not finished pressing Connect, and the
+       * create it authorises is still owed on the trip after the pick.
+       */
+      return new Response(
+        pickerPage(copy, listed.choices, {
+          // The mode rides the form action so the trip AFTER the pick still knows
+          // it is in a popup and still ends on the closer rather than loading the
+          // whole app into a 620px window. Presentation only — the same value
+          // RETURN_MODE_PARAM already carries, and the same argument covers it.
+          action: popup ? `${SELECT_PATH}?${RETURN_MODE_PARAM}=popup` : SELECT_PATH,
+          hasMore: listed.hasMore,
+        }),
+        {
+          status: 200,
+          headers: {
+            'content-type': 'text/html; charset=utf-8',
+            'cache-control': 'no-store',
+            'set-cookie': setPendingSelectionHeader({
+              platform: selection.platform,
+              state: selection.state,
+            }),
+          },
+        },
+      )
+    }
+
     // EVERY platform, not the one the redirect claims. The query string is
     // attacker-influenceable and is ignored wholesale; asking Zernio for each
     // platform under our own profile costs a few reads and cannot be steered.
@@ -196,17 +521,56 @@ export async function GET(request: Request): Promise<Response> {
     // OTHER platform had already returned, and the whole trip left as a generic
     // `unexpected`. Each read is now caught where it happens and becomes its own
     // recorded outcome, so the platforms that answered are still recorded.
-    const reads = await Promise.all(
-      ZERNIO_PLATFORMS.map(async (platform) => {
-        try {
-          const found = await reconcileAccounts(client, { profileId, platform })
-          return { platform, read: true, accounts: found.map((a) => ({ ...a, platform })) }
-        } catch (error) {
-          await reportServerError(error, { action: 'zernioReturn', workspaceId })
-          return { platform, read: false, accounts: [] as ReconciledForPlatform[] }
-        }
-      }),
-    )
+    /**
+     * ── ONE REQUEST, THIRTEEN QUESTIONS ──────────────────────────────────────
+     * This was `Promise.all(ZERNIO_PLATFORMS.map(… reconcileAccounts …))`, and
+     * `reconcileAccounts` fetches the WHOLE account list and filters it. So a
+     * single connect fired one identical request per platform — thirteen, twelve
+     * of them discarded.
+     *
+     * MEASURED from the live response headers: `x-ratelimit-limit: 60` a minute.
+     * Three connect attempts inside a minute therefore approached the ceiling on
+     * their own, and a 429 arrives here as a READ FAILURE — so the account the
+     * customer connected seconds ago is reported as not found, on a trip where
+     * nothing about it was wrong. The list was five long before 2026-08-26, so
+     * the change that added the connect-only platforms made this 2.6x worse.
+     *
+     * `listAccounts` is not platform-filtered, so one call answers every
+     * platform. The per-platform loop below is now pure in-memory filtering.
+     */
+    let all: Awaited<ReturnType<typeof client.listAccounts>> | null = null
+    try {
+      all = await client.listAccounts(profileId)
+    } catch (error) {
+      await reportServerError(error, { action: 'zernioReturn', workspaceId })
+    }
+
+    /**
+     * ── AND THE FAILURE SEMANTICS ARE UNCHANGED ON PURPOSE ───────────────────
+     * Each platform used to catch its own error so one platform's failure could
+     * not discard the accounts another had already returned. With a single call
+     * there is only one thing to fail, and when it does EVERY platform is
+     * genuinely unreadable — which is what the shape below still says. The
+     * downstream branches (`unreadable.length === ZERNIO_PLATFORMS.length` and
+     * the `partial` report) therefore keep working without knowing anything
+     * changed, and "we never successfully asked" is still never reported as
+     * "we asked and there was nothing".
+     */
+    const reads = ZERNIO_PLATFORMS.map((platform) => {
+      if (all === null) {
+        return { platform, read: false, accounts: [] as ReconciledForPlatform[] }
+      }
+      // See the header on connect-platform.ts: `x` is `twitter` to Zernio and
+      // `gbp` is `googlebusiness`. Asking in our own vocabulary is what made a
+      // real X connect invisible.
+      const zernioPlatform = connectPlatformFor(platform)
+      if (zernioPlatform === null) {
+        return { platform, read: true, accounts: [] as ReconciledForPlatform[] }
+      }
+      const found = reconcileFromAccounts(all, { profileId, zernioPlatform })
+      // Tagged with OUR id on the way out. Only the question was theirs.
+      return { platform, read: true, accounts: found.map((a) => ({ ...a, platform })) }
+    })
 
     const unreadable = reads.filter((r) => !r.read).map((r) => r.platform)
     const accounts = reads.flatMap((r) => r.accounts)
@@ -216,10 +580,40 @@ export async function GET(request: Request): Promise<Response> {
     // measurement we did not make must not be reported as a measurement.
     if (unreadable.length === ZERNIO_PLATFORMS.length) return fail(500, 'read')
 
-    // Zernio has no accounts under our profile, and every platform answered to say
-    // so. Nothing went wrong — the user may simply have cancelled at the consent
-    // screen — so this stays a 303.
-    if (accounts.length === 0 && unreadable.length === 0) return ok('nothing')
+    /**
+     * ── "WE ASKED AND THERE WAS NOTHING" IS THE WRONG SENTENCE FOR TWO OF THEM ─
+     * Facebook and Google Business create NO account at Zernio until a Page or a
+     * location is committed. So for those two, arriving here with an empty list
+     * after the customer pressed Connect is not the ordinary empty answer — it is
+     * the selection step having failed to reach us, and reporting it as `nothing`
+     * is what made this defect cost three rounds: the screen said the same words
+     * for "you cancelled" and for "the step we depend on did not happen".
+     *
+     * The report carries the PARAMETER NAMES that came back and never their
+     * values. `tempToken` is a live Facebook user access token; its name says
+     * which shape arrived, which is the entire diagnostic, and it is safe to put
+     * in an error report where the token is not.
+     */
+    if (accounts.length === 0 && unreadable.length === 0) {
+      const owed = unresolvedSelection(createFor, params)
+      if (owed !== null) {
+        await reportServerError(
+          new Error(
+            `zernioReturn: ${owed.platform} came back with no account and no readable pick. ` +
+              `Params seen: ${owed.sawParams.join(',') || '(none)'}`,
+          ),
+          { action: 'zernioReturn', workspaceId },
+        )
+        // A 502, not a 303. Nothing is wrong with the customer's request and
+        // nothing is wrong with their grant — the step between them did not
+        // land, which is ours, and a failure that leaves as a success status is
+        // exactly what this route was rebuilt to stop hiding.
+        return fail(502, 'pick-not-received')
+      }
+      // Every other platform: genuinely nothing, and the user may simply have
+      // cancelled at the consent screen. Still a success.
+      return ok('nothing')
+    }
 
     // ── PLAN LIMIT ON CHANNELS (owner ruling #5) ─────────────────────────────
     // Free allows 2 channels; this loop used to write every account Zernio
@@ -265,6 +659,34 @@ export async function GET(request: Request): Promise<Response> {
       const isRefresh = slots.keys.has(connectionKey(account.platform, account.accountId))
 
       if (!isRefresh) {
+        /**
+         * ── A ROW IS ONLY EVER CREATED FOR THE PLATFORM THE CUSTOMER PRESSED ──
+         * This is the disconnect-then-reconnect fix, and it is deliberately the
+         * narrowest rule that closes it. Every account we ALREADY hold is still
+         * refreshed, whatever platform it is on, so the self-heal this route was
+         * built around keeps working. What can no longer happen is a platform the
+         * customer never touched — or one they explicitly disconnected — arriving
+         * back in the table as a side effect of connecting something else.
+         *
+         * Skipped SILENTLY rather than counted as `overLimit` or `unwritten`. It
+         * is neither: the plan had room and the write did not fail. Nothing was
+         * refused and nothing broke, so there is no outcome to report — reporting
+         * one would put correct behaviour in the failure channel, which is the
+         * mistake the `overLimit` branch below already exists to avoid.
+         */
+        if (createFor !== null && account.platform !== createFor) continue
+
+        /**
+         * NO RECORD OF A PRESS, NO CREATE — neither cookie nor parameter. A
+         * replay of this URL, or an attempt abandoned long enough for both to be
+         * gone. Refusing to create is
+         * the fail-closed direction: the customer presses Connect again and the
+         * next trip has a fresh cookie, which costs one click. Creating instead
+         * costs them the disconnect they asked for, silently, and that is the
+         * defect being fixed.
+         */
+        if (createFor === null) continue
+
         if (admitted >= headroom) {
           overLimit.push(account.platform)
           continue
@@ -328,7 +750,9 @@ export async function GET(request: Request): Promise<Response> {
     // same thing: an account they connected at Zernio that this app cannot see.
     const missed = [...unreadable, ...unwritten]
     if (missed.length > 0)
-      return backError(request, 500, `${missed.length}-not-recorded`, 'partial')
+      return popup
+        ? popupCloser(request, 500, 'partial', `${missed.length}-not-recorded`)
+        : backError(request, 500, `${missed.length}-not-recorded`, 'partial')
 
     // Some accounts were declined by the PLAN. Ranked below `partial` on purpose: a
     // genuine failure outranks a policy decision, and reporting a limit while a write
