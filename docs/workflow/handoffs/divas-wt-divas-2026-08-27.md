@@ -1,8 +1,13 @@
 # Handoff — divas — wt-divas — 2026-08-27
 
-**Branch** `claude/advisor-qvz5wn`. Lane `wt-divas`. Pushed: yes.
-Base `wt-core` at `42c35e85`, 2 commits ahead. PR #14 was MERGED mid-session,
-so the branch was rebased onto the trunk and these two are follow-up work.
+**Branch** `claude/advisor-qvz5wn` at `7f101c39`. Lane `wt-divas`. Pushed: yes.
+Base `wt-core` at `bf46eaa4`. **PR #14 MERGED** mid-session (verified from the
+detail endpoint: `merged: true`, merged_by `IDIVASM`, at `93a01789`). Everything
+after it is follow-up work and rides **PR #20**, open and draft.
+
+The harness pinned this session to a `claude/...` branch it cannot leave. That
+is fine and is why the filename says `wt-divas`: the lane is the identity, not
+the branch.
 
 This session is one long thread: `/connections`. The founder reported a defect,
 I fixed it, they tested, and reported the next one. Seven rounds. **Four of the
@@ -38,9 +43,16 @@ public.upsert_zernio_connection overload count = 1
 
 ## What was NOT done, and why
 
-**`turbo run test:smoke` (Playwright) is UNRUN on this entire lane.** Not
-passed. Chromium in this sandbox cannot complete any outbound HTTPS request and
-every `@smoke` spec signs in through Clerk.
+**`turbo run test:smoke` (Playwright) is UNRUN on this lane — 1 spec of 37 is
+not the suite.** `connections-honesty.spec.ts` passes, 3 of 3, MEASURED twice.
+The other 115 @smoke tests have not been run anywhere and are UNRUN, not passed.
+
+This sentence used to read "Chromium in this sandbox cannot complete any
+outbound HTTPS request and every @smoke spec signs in through Clerk", offered as
+the reason the leg could never run here. The first half is still true of
+Chromium's own socket. **The conclusion was wrong** — round sixteen has the
+measurement — and the leg does run here now, given
+`PLAYWRIGHT_CHROMIUM_PATH` and `SAHODA_BROWSER_VIA_NODE=1`.
 
 **The `/connections` layout has never been SEEN render.** Twenty tiles across
 three groups, verified by types and unit tests only. The Playwright MCP browser
@@ -578,6 +590,81 @@ under `PLAYWRIGHT_CHROMIUM_PATH`, the rebase surfaced it as a conflict, and two
 env vars for one hatch is worse than either. Theirs is upstream, so theirs
 stands. Use `PLAYWRIGHT_CHROMIUM_PATH`.
 
+## Round seventeen: the budget line that only ever goes red in CI
+
+PR #20's first Vercel build failed:
+
+```
+js-budget FAILED — /(app)/connections  683.9 kB > 675.4 kB budget +8 kB slack
+```
+
+Not this PR's code. `/connections` grew in #14, which is merged, and the budget
+line for it was never regenerated. Regenerated here from a real build with
+`PERF_BUDGET_WRITE=1`: **691660 -> 699797**, MEASURED.
+
+`PERF_BUDGET_WRITE=1` rewrites **all 81 routes**, not one. Every other route
+moved +120 bytes on a shared chunk, and taking that whole file would raise 80
+budgets nobody measured a need for. The slack is 8 kB, so 120 bytes needs none.
+Only the connections line is committed.
+
+**The mutation did not go red, and that is the finding.** Restoring 691660
+locally still PASSES: this box builds the route 516 bytes smaller than Vercel
+does, so the old ceiling clears it by 55 bytes and misses Vercel's by 461. The
+guard fires correctly when given a figure it can fail on (691000 -> red, same
+message shape), so it works; it simply cannot reproduce a CI-only overage from
+here. **A local js-budget pass is not evidence the Vercel build will pass.**
+
+## Round eighteen: two independent fixes to one line, and the CI outage ending
+
+The founder's ask — "merge wt-core into this branch so playwright can run" — is
+finished. What followed was keeping PR #20 mergeable while the trunk moved
+underneath it twice.
+
+**PR #14's merge was nearly misread.** `list_pull_requests` returned
+`merged: false, state: closed` for it, which reads as "closed unmerged". The
+detail endpoint says `merged: true`, `merged_by: IDIVASM`. **The list endpoint's
+`merged` field is not reliable; the detail endpoint is.** Had I trusted the
+list, this lane's whole session would have been filed as thrown away.
+
+**Vercel failed, and it was ours.** `js-budget` on `/(app)/connections`, fixed
+in `be6dd631` — round seventeen below has the detail.
+
+**Then `wt-core` fixed the SAME line.** `814b0342`, "record /connections at its
+true post-integration size", landed while PR #20 was building, and the merge
+conflicted on exactly one line:
+
+| Side | `/(app)/connections` | Where the figure came from |
+|---|---|---|
+| this lane, `be6dd631` | 699797 | a local build |
+| `wt-core` `814b0342` | **700313** | the Vercel-measured size |
+
+**Took `wt-core`'s**, resolved in `7f101c39`. It is the larger ceiling and the
+CI-truthful one: 700313 is exactly the 683.9 kB Vercel reported, while the local
+build reads 516 bytes light. Taking theirs loses nothing and is the better
+number. This is the case the merge rules describe as "both sides changed the
+same logic" — and it did NOT need a decision, because one side is measured on
+the machine that actually gates.
+
+**`wt-core` independently confirmed this lane's contention diagnosis.** It
+brought `eb5224bf` (cap vitest workers), `a964402e` (the assets Undo race) and
+fixes to the pglite suites — the exact tests the Stop hook reported red here
+three times and that this lane attributed to a Playwright run holding the box.
+Three separate confirmations now, and the last two are somebody else's commits
+rather than this lane's own reasoning.
+
+### The CI outage has ENDED
+
+MEASURED: `typecheck · lint · test · format` on `be6dd631` ran
+**18:02:34 → 18:15:44Z, 13m10s, conclusion `success`.** Across the 34
+consecutive checks measured earlier today every job finished in 1-6s with
+`runner_id: 0`, `runner_name` empty and no step executed. A real gate here takes
+10-13 minutes, and this was one.
+
+**So GitHub Actions is worth reading again.** Every "RED, and not this lane's"
+line in this file and in the PR descriptions was true when written and is now
+history, not a standing condition. The next session should read CI results
+normally rather than dismissing them.
+
 ## Shared surfaces touched
 
 - **`packages/shared/src/enums.ts`** — `ConnectionPlatformSchema` 6→14 values,
@@ -650,6 +737,17 @@ reached the same key. Replaced with an assertion on the literal string the route
 hands over, then a faithful reimplementation of the real filter. That version
 does go red.
 
+
+**One guard was written and could NOT be shown to fail, and that is recorded
+rather than papered over.** Restoring the old `/(app)/connections` budget
+(691660) does not turn `js-budget` red on this box: it builds the route 516
+bytes lighter than Vercel, clearing the old ceiling by 55 bytes while missing
+Vercel's by 461. The guard does fire when handed a figure it can fail on
+(691000 -> red, message shape identical to Vercel's), so the guard works. It
+cannot reproduce a CI-only overage from here. **A local `js-budget` pass is not
+evidence the Vercel build will pass** — the only proof is a Vercel build, and
+`be6dd631` got one.
+
 ## Anything retracted
 
 **"A genuine CI failure on `06147bb` is plausible."** I said that when the
@@ -668,63 +766,63 @@ account was somewhere it is not.
 400** — and omits `reddit`, `slack` and `googlebusiness`, **all three of which
 answer 200**. Every platform in this lane was probed individually instead.
 
+
+**"Chromium here cannot reach the app, so the smoke leg can never run in this
+sandbox."** Carried by this file, by `node-transport.ts`'s note 1 and by the
+repo's `CLAUDE.md`. RETRACTED on four measurements (round sixteen): Chromium
+loads a static server on loopback with 200 and the Next dev server with
+ERR_CONNECTION_RESET, because Clerk's middleware 307s the navigation out to
+https and Playwright prints the failure against the url it started at. The leg
+runs here now.
+
+**"GitHub Actions is red for reasons that are not this lane's, and will stay
+that way."** True for 34 consecutive checks and no longer true. MEASURED:
+`typecheck · lint · test · format` on `be6dd631`, 13m10s, `success`. The
+runner-allocation outage has ended.
+
+**`list_pull_requests` reporting `merged: false`.** Not a retraction of a claim
+I published, but of one I nearly did: the list endpoint returned
+`merged: false, state: closed` for PR #14 while the detail endpoint returned
+`merged: true`. **Trust the detail endpoint.**
+
 ## What the next session in THIS lane should pick up
 
-1. **Ask the founder to test the preview.** The database now accepts all
-   fourteen platforms and the code is deployed; nobody has confirmed a single
+1. **Run the full `@smoke` leg.** It is the one thing that changed today and the
+   one thing not finished. All 118, with
+   `PLAYWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium-1194/chrome-linux/chrome`
+   and `SAHODA_BROWSER_VIA_NODE=1`. One spec is proved; expect others to fail on
+   their own stale figures the way `connections-honesty` did, and retarget those
+   rather than deleting them. **Do not run it beside a vitest run** — the box
+   loses that race, three times today.
+2. **Read CI results normally again.** The outage is over. Anything in this file
+   that dismisses a red GitHub check is history, not a standing condition.
+3. **Ask the founder to test the preview.** Still nobody has confirmed a single
    connect end to end since the migrations landed. Facebook is the sharpest
    test — it was purely database-blocked.
-2. **The X spend meter's row height.** Smallest real win left, needs no CI.
-3. **The Zernio question about Google Business.** Offered twice, never answered.
-4. **Refresh the PR body** before requesting review.
-5. **`/post/new`** — owed since the second message of the session.
-
-## Round seventeen: the budget line that only ever goes red in CI
-
-PR #20's first Vercel build failed:
-
-```
-js-budget FAILED — /(app)/connections  683.9 kB > 675.4 kB budget +8 kB slack
-```
-
-Not this PR's code. `/connections` grew in #14, which is merged, and the budget
-line for it was never regenerated. Regenerated here from a real build with
-`PERF_BUDGET_WRITE=1`: **691660 -> 699797**, MEASURED.
-
-`PERF_BUDGET_WRITE=1` rewrites **all 81 routes**, not one. Every other route
-moved +120 bytes on a shared chunk, and taking that whole file would raise 80
-budgets nobody measured a need for. The slack is 8 kB, so 120 bytes needs none.
-Only the connections line is committed.
-
-**The mutation did not go red, and that is the finding.** Restoring 691660
-locally still PASSES: this box builds the route 516 bytes smaller than Vercel
-does, so the old ceiling clears it by 55 bytes and misses Vercel's by 461. The
-guard fires correctly when given a figure it can fail on (691000 -> red, same
-message shape), so it works; it simply cannot reproduce a CI-only overage from
-here. **A local js-budget pass is not evidence the Vercel build will pass.**
+4. **The X spend meter's row height.** Smallest real win left, needs no CI.
+5. **The Zernio question about Google Business.** Offered twice, never answered.
+6. **`/post/new`** — owed since the second message of the session.
 
 ## Gate
 
-Re-run on `302308c0` after the container restarted, `--force --concurrency=1`,
-nothing else running, not piped. Every leg below is this run, not an earlier one.
+Run on `7f101c39` — the merge that resolved the `wt-core` conflict — with
+`--force --concurrency=1`, nothing else running, not piped.
 
 | Leg | Result |
 |---|---|
-| `turbo run typecheck lint test` | **PASS** — 27/27 tasks, `Cached: 0`, 5m48s, exit 0 |
-| — `@sahoda/web` | **PASS** — 452 files, 3 skipped |
-| — `@sahoda/sites` | **PASS** — 53 files |
-| — `@sahoda/db` | **PASS** — 36 files, 12 skipped |
-| — `@sahoda/jobs` | **PASS** — 34 files |
-| — `@sahoda/billing` | **PASS** — 30 files, 1 skipped |
-| — `@sahoda/publishing` / `mesh` / `shared` | **PASS** — 27 / 26 / 26 files |
-| — `@sahoda/research` | **PASS** — 13 files |
-| `prettier --check .` | **PASS** — exit 0 |
-| `connections-honesty.spec.ts --grep @smoke` | **PASS** — 3 passed, exit 0, 3.2m |
-| `turbo run test:smoke` (all 118) | **UNRUN.** One spec is proved, the suite is not |
-| GitHub Actions `gate` | **RED, and not this lane's.** Every job 1-6s, `runner_id: 0`, no step executed |
+| `turbo run typecheck lint test` | **PASS** — 27/27 tasks, `Cached: 0`, 9m45s, exit 0 |
+| `pnpm format:check` | **PASS** — exit 0 |
+| `js-budget` | **PASS** — 81 routes within budget |
+| `connections-honesty.spec.ts --grep @smoke` | **PASS** — 3 passed, exit 0. Run on `be6dd631`, one commit back; the only change since is a budget figure |
+| `turbo run test:smoke` (all 118) | **UNRUN.** One spec of 37 files is proved. The suite is not |
+| GitHub Actions `typecheck · lint · test · format` | **PASS** — on `be6dd631`, 13m10s, `success`. A real run |
+| Vercel | **PASS** — `success`, "Deployment has completed", on `be6dd631` |
 
-**The smoke leg now runs in this sandbox**, which it never has before. It needs
-two env vars and neither is a default:
+A full-tree count for the record, from the same run: `@sahoda/web` 452 files
+(3 skipped), `sites` 53, `db` 36 (12 skipped), `jobs` 34, `billing` 30 (1
+skipped), `publishing` 27, `mesh` 26, `shared` 26, `research` 13.
+
+**The smoke leg now runs in this sandbox**, which it never has before:
 
 ```
 PLAYWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium-1194/chrome-linux/chrome \
@@ -732,21 +830,20 @@ SAHODA_BROWSER_VIA_NODE=1 \
 pnpm --filter @sahoda/web exec playwright test --grep @smoke
 ```
 
-`connections-honesty.spec.ts` is the only spec MEASURED green. The other 115
-@smoke tests are **UNRUN**, not passed, and one authenticated spec passing is
-evidence the transport works, not evidence the suite does. Run the full leg
-before this reaches `wt-web`.
-
 ### Three gate failures reported during this session, all contention
 
 The Stop hook reported `@sahoda/jobs#test`, then `@sahoda/web#test`, then seven
 red files across `store.pglite`, `workspace-timezone.pglite`,
-`workspaces-contract.pglite`, `asset-library` and `copy-tools`. None is a
-defect in this diff. MEASURED: each package passes alone, and the full 27-task
-run above is green with `Cached: 0`. The hook fires while a Playwright run and
-its dev server hold the box, and the pglite suites stand up real Postgres
-in-process, so they lose that race first. **Group failures by cause, never
-count them** — five unrelated suites red at once is an environment.
+`workspaces-contract.pglite`, `asset-library` and `copy-tools`. None is a defect
+in this lane. MEASURED: each package passes alone, and every full 27-task run
+above is green with `Cached: 0`. The hook fires while a Playwright run and its
+dev server hold the box, and the pglite suites stand up real Postgres
+in-process, so they lose that race first. **Group failures by cause, never count
+them** — five unrelated suites red at once is an environment.
+
+`wt-core` then shipped `eb5224bf` (cap vitest workers) and `a964402e` (the
+assets Undo race) for exactly these tests, which is the diagnosis confirmed by
+somebody else's commits.
 
 One environmental failure remains genuine and is not this lane's:
 `lib/privacy/export-drift.test.ts` cannot resolve `db.<project>.supabase.co`
