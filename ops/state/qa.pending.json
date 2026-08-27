@@ -728,6 +728,32 @@
       "summary_plain": "The unit checks passed (1188 passed) for @sahoda/jobs ONLY — this run was filtered and does not cover the workspace.",
       "details": "run 1 EXIT=0 @sahoda/jobs:test:       Tests  396 passed (396)\nrun 2 EXIT=0 @sahoda/jobs:test:       Tests  396 passed (396)\nrun 3 EXIT=0 @sahoda/jobs:test:       Tests  396 passed (396)",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtbh66ra-9bb3a208",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-27T12:04:27.957Z",
+      "finished_at": "2026-08-27T12:04:27.957Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks passed for ...[origin/main] ONLY — this run was filtered and does not cover the workspace.",
+      "details": "TURBO_EXIT=0\nFMT_EXIT=0\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): MESH_ERROR\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): INSERT_FAILED\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): @sahoda/billing: missing required env — SUPABASE_DB_URL\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): MESH_ERROR\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): MESH_ERROR\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): @sahoda/billing: missing required env — SUPABASE_DB_URL\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n Tasks:    18 successful, 18 total\nCached:    18 cached, 18 total",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtbh66ra-96ddaa3",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-27T12:04:27.957Z",
+      "finished_at": "2026-08-27T12:04:27.957Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks passed for ...[origin/main] ONLY — this run was filtered and does not cover the workspace.",
+      "details": "TURBO_EXIT=0\nFMT_EXIT=0\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): MESH_ERROR\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): INSERT_FAILED\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): @sahoda/billing: missing required env — SUPABASE_DB_URL\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): MESH_ERROR\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): MESH_ERROR\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): @sahoda/billing: missing required env — SUPABASE_DB_URL\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n Tasks:    18 successful, 18 total\nCached:    18 cached, 18 total",
+      "duration_ms": null
     }
   ]
 }
