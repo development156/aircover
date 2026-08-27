@@ -164,3 +164,182 @@ billing), `5428226762` (a correction that was itself wrong and carried a
 FABRICATED run URL), `5429343976` (the retraction, with job-level evidence).
 **Billing is neither confirmed nor ruled out**; from this side a quota block and
 a capacity shortage are indistinguishable.
+
+---
+
+# Session 19 — the /connections redesign against a reference screenshot
+
+**Branch** `claude/lead-design-7m7ios` at `5736edfc`. Lane `wt-jiban`. Pushed: yes.
+PR [#21](https://github.com/development156/sahodalabs/pull/21) → `wt-core`, draft,
+`mergeable_state: clean`.
+
+The harness pinned this session to `claude/lead-design-7m7ios` and it cannot leave
+it. `sahoda.owner` / `sahoda.lane` are `jiban` / `wt-jiban`. Note that
+`jiban-wt-jiban2-2026-08-27.md` also records work on this same branch: two lanes
+have now shipped through one `claude/...` branch, so **the branch is no longer a
+proxy for the lane** and only these files say which is which.
+
+## What shipped
+
+| # | What | Proof | Covered by |
+| --- | --- | --- | --- |
+| 1 | `PageTitle` gained an optional `crumb`, so /connections opens `Connections › Integrate` | `page-title.tsx:57`, `f11d60d7` | `page-title.test.tsx` ×5 |
+| 2 | A glyph on every category rail row, drawn as a local sprite | `kind-glyph.tsx`, `f11d60d7` | `kind-glyph.test.tsx` ×5, `connection-marketplace.test.tsx` ×1 |
+| 3 | The channel card states what the platform is for again, `line-clamp-2` | `channel-tile.tsx:282`, `f11d60d7` | `channel-tile.test.tsx` ×2 |
+| 4 | Search field h-10 → h-11 (44px) | `connection-marketplace.tsx:176` | none — a size, not a claim |
+| 5 | Page subtitle rewritten and WIDENED | `connections/page.tsx:249` | none — see below |
+| 6 | `min-w-0` scoped to the trail; the empty `<nav>` landmark removed | `page-title.tsx:59`, `5736edfc` | `page-title.test.tsx` ×2, both mutation-proven |
+
+## The reference asked for three things this did not copy, each on a measurement
+
+**MEASURED, all three.** They are the whole of the founder-facing argument.
+
+| The reference has | What shipped | The number |
+| --- | --- | --- |
+| Solid green Connect buttons on every card | `secondary`, unchanged | 20 solid brand fills fail `accent-budget.spec.ts`, which enforces one primary ACTION per view |
+| The trail's second segment in the brand colour | `type-h3 text-ink` | `--acc` is `#ff6600` = **2.94:1** on `--canvas`; 16px/650 is not WCAG large text, so the floor is 4.5:1 |
+| Category icons, imported | A hand-drawn sprite | 11 `lucide-react` icons → **693.0 kB against a 683.9 kB budget +8 kB slack**, 1.1 kB over. Same build without them: `js-budget ok`. Sprite: route chunk 10.2 kB, inside budget |
+
+The third one is the interesting one. Session 18's `connection-marketplace.tsx`
+header refused seven glyphs on a byte measurement and ended "if they come back,
+they come back with a shared sprite". They came back as a shared sprite, and the
+budget refused the naive version a second time before it did.
+
+## What was NOT done, and why
+
+- **The Playwright leg is UNRUN, and this is the worst the environment has been.**
+  `scripts/sandbox-probe.mjs` reports **`NO_BROWSER`** — the Chromium binary is not
+  installed at all, where previous sessions at least had one that could not reach
+  HTTPS. So **every responsive claim in this session is INFERRED from class names**:
+  1 column below 700px, 2 columns 700–1180 with the rail as a horizontal strip,
+  sidebar + 2 columns 1180–1360, sidebar + 3 columns above 1360.
+  `connections-widths.spec.ts` covers the rail at seven widths for free once it runs.
+- **No screenshot.** Same cause.
+- **The placeholder is "Search channels", not the requested "Search integrations…".**
+  The product's noun is *channel* — `Channel` the type, "Connect your channels",
+  "No channels match that". A second word for one thing is drift, and the brief's
+  own §4 permits alignment with existing product wording. **This is a deliberate
+  deviation from an explicit instruction and the founder was told so.**
+- **The subtitle is not the requested sentence.** "Browse available platforms and
+  choose the next connection to add" is true of less of this screen than what it
+  replaces, because the screen also manages linked accounts and disconnects them.
+  Copy rule 1. It keeps the sentence's JOB and widens it: "Browse every platform
+  Sahoda can connect, add the next one, and manage what is already linked."
+- **No `/connections/integrate` route was created.** The trail states a location and
+  neither segment is an anchor. Making it real is a route split, not a design change.
+- **The /connections dead-space item and the four `outline-accent` admin sites at
+  2.94:1** are untouched. Both are open findings from Sessions 16–18, outside this ask.
+
+## Shared surfaces touched
+
+**One, and it reaches 32 screens.**
+
+- **`apps/web/src/components/page-title.tsx`** — gained an OPTIONAL `crumb?: string`.
+  Additive; **breaks no constructor**, and 31 of the 32 call sites pass nothing and
+  render byte-identical markup. That last clause is a claim a reviewer partially
+  refuted and it took `5736edfc` to make true: the first version put `min-w-0` on
+  the wrapper unconditionally, which lets a flex child shrink below its content
+  width and would have changed layout on all 31. Now conditional, with a guard.
+- **NEW** `apps/web/src/components/connections/kind-glyph.tsx` — exports `KindGlyph`,
+  `DRAWN_KINDS`, `isDrawn`. Nothing outside /connections imports it.
+- `apps/web/src/components/connections/channel-tile.tsx` and
+  `connection-marketplace.tsx` — internal to /connections.
+- **`scripts/design/design-lint-baseline.json`: NOT touched.** The two literals I
+  first inlined (`text-[20px]`, `text-[13px]`) failed the lint, and the fix was to
+  put them back inside `PageTitle` where they were already baselined rather than to
+  widen the baseline. Font-size baseline still 698, spacing still 129.
+- `apps/web/scripts/perf/js-budget.json`: **NOT touched.** The budget refused the
+  glyphs twice and was not raised to fit them.
+- `packages/shared`, `packages/db`, `packages/publishing`: untouched.
+
+## Contract, migration or money
+
+**None.** No `packages/shared` change, no migration, no price, no ledger call.
+
+The OAuth and connect path is byte-identical, MEASURED with `git diff --quiet`
+per path: `connect-button`, `reconnect-button`, `disconnect-button`,
+`telegram-connect`, `channel-accounts`, `app/api/oauth/**`, `lib/connections/read.ts`,
+`catalogue.ts`, `use-connect-flow.ts`. An independent `reviewer` agent was asked to
+refute that and could not.
+
+## Guards written, and the mutation that proved each
+
+Seven mutations, each applied, watched go red, and reverted.
+
+| Mutation | Result |
+| --- | --- |
+| drop `'Team chat'` from the glyph map | **RED** — `expected [ 'Team chat' ] to deeply equal []`, and it NAMES the kind |
+| remove the fallback (`ICON[id] as never`) | **RED** — `expected undefined to be { … }` on the undrawn-category case |
+| delete `<KindGlyph>` from the rail row | **RED** — `expected  to have a length of 1 but got +0` |
+| delete the blurb `<p>` from the tile face | **RED** — `Unable to find an element with the text: Publish posts, reels and stories…` |
+| remove `line-clamp-2` | **RED** — `expected 'type-sm mt-2 text-muted' to contain 'line-clamp-2'` |
+| make `min-w-0` unconditional | **RED** — `expected 'min-w-0' not to contain 'min-w-0'` |
+| put the empty `<nav aria-label="Location">` back | **RED** — `expected <nav …> to be null` |
+
+**One guard I wrote could NOT fail, and I caught it before committing.** The rail
+glyph assertion was `expect(row.querySelector('svg[aria-hidden]')).not.toBeNull()`.
+It passed with the glyph deleted, because **`lucide-react` sets `aria-hidden` on
+every icon it renders**, so the selector matched the row's other icons regardless.
+It counts the row's own `svg` children now, which is the thing on the screen. This
+is the sixth guard in this repository found passing by not looking.
+
+## Anything retracted
+
+**Two, and both are Session 18's own claims from this same lane.**
+
+1. **"The category rows carry no icon" is reversed.** Session 18 measured seven
+   lucide glyphs at 2,612 bytes and refused them. The refusal stands as arithmetic
+   and was RE-MEASURED here, not overruled: eleven lucide imports failed the budget
+   again, by 1.1 kB. What changed is the drawing method, not the appetite.
+2. **"The blurb left the tile face" is reversed on the founder's ruling.** The ~800px
+   measurement is not disputed; `line-clamp-2` bounds it, which was the half of the
+   argument that was about height rather than about relevance.
+
+**And one of my own, mid-session.** The first `connection-marketplace.tsx` header
+rewrite said the glyphs "now fit inside the slack" because `814b0342` re-recorded
+the budget. That was FALSE when written — the lucide version did not fit — and it
+also cited `lib/connections/kind-icons.ts`, a path that no longer existed by then.
+Both corrected in `f11d60d7` before the commit landed.
+
+## Anything that changes an assumption
+
+**A plain `pnpm --filter @sahoda/web exec vitest run` is now red in this sandbox and
+it is NOT the diff.** `src/lib/privacy/export-drift.test.ts` fails 2 with
+`getaddrinfo ENOTFOUND db.<project>.supabase.co`. **MEASURED on `50603f62`, the
+commit before this session's work: identical failure.** The turbo gate reports it
+as skipped (3 skipped) rather than failed, so the two invocations disagree — if a
+future session sees 2 red there, check the base commit before blaming a diff.
+
+## What the next session in THIS lane should pick up
+
+1. **Run the browser leg somewhere with a browser.** `NO_BROWSER` here. Every
+   responsive claim in this session is INFERRED. `smoke` on `.github/workflows/gate.yml`
+   by hand, or `node scripts/browser-run.mjs --remote`.
+2. **Two questions were put to the founder and neither is answered.** (a) Should
+   `/connections/integrate` become a real route, which is what would make the trail's
+   segments into links; (b) the card sentence restoration overrules a same-day
+   measurement and they were told so.
+3. **Inherited, unchanged from Session 18:** the folder animation is still blocked on
+   "here or divas"; the four admin `outline-accent` sites are still at 2.94:1;
+   /connections' first tile row still carries ~135px of dead space;
+   `connections-honesty.spec.ts:119-121` is still unverified.
+
+## Gate
+
+Forced, clean tree, repo root, nothing piped.
+
+| Leg | Real output | Verdict |
+| --- | --- | --- |
+| `turbo run typecheck lint test --concurrency=1 --force` | `Tasks: 27 successful, 27 total` · `Cached: 0 cached, 27 total` · 5m36s | **PASS** |
+| ↳ `@sahoda/web:test` | `456 passed \| 3 skipped (459)` files · `5752 passed \| 11 skipped` tests, 129s | **PASS** |
+| ↳ `@sahoda/web:lint` (design-lint) | `lint ok`, spacing 129 / font size 698 / dead breakpoint 0, none new | **PASS** |
+| `prettier --check .` (root) | `All matched files use Prettier code style!` | **PASS** |
+| `pnpm --filter @sahoda/web build` | `next build` clean · `js-budget ok: 81 routes within budget` · `/connections 10.2 kB` | **PASS** |
+| `reviewer` agent on the diff | no blockers; 1 Should + 1 Nit, both fixed in `5736edfc` | **PASS** |
+| `playwright test --list` | `277 tests in 72 files` · `--grep @smoke` → `118 tests in 37 files` | matches root `CLAUDE.md`, no drift |
+| Playwright EXECUTION | `sandbox-probe` = `NO_BROWSER` | **UNRUN** |
+| Vercel preview | Building on `f11d60d7` when last seen; not re-checked on `5736edfc` | **UNVERIFIED** |
+
+**CI executed again.** A `check_suite.completed` success arrived on `50603f62` at
+20:25 UTC, which closes the "zero executed jobs since 26 August 11:01" finding
+Session 18 recorded across six PRs. Not re-checked on `5736edfc`.
