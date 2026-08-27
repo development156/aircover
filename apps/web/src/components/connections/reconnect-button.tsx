@@ -36,8 +36,20 @@ export function ReconnectButton({
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <Button size="sm" onClick={start} disabled={pending}>
-        <RefreshCw size={14} aria-hidden />
+      {/* `loading` rather than `disabled` + a swapped label: it sets `aria-busy`
+          and the disable in one place, so a screen-reader user is told the
+          control is working instead of just losing it. The one control on this
+          page that already used `loading` (Disconnect) behaved differently from
+          the two that did not.
+
+          INTEGRATION NOTE: wt-jiban wrote this against a hand-rolled
+          `useTransition` + `fetch('/api/oauth/zernio/start')` and called the
+          handler `run`. wt-divas had since moved this control onto the shared
+          `useConnectFlow` hook — a popup opened synchronously on the click with
+          a full-page redirect behind it for browsers that block one — whose
+          handler is `start`. The hook is kept; only the a11y fix is taken. */}
+      <Button size="sm" onClick={start} loading={pending}>
+        {pending ? null : <RefreshCw size={14} aria-hidden />}
         {pending ? 'Opening…' : `Reconnect ${label}`}
       </Button>
       {error ? <span className="text-[12px] text-danger">{error}</span> : null}
