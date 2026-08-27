@@ -1,6 +1,6 @@
 'use client'
 
-import { LayoutGrid, ListChecks, PanelLeft, PanelRight, Rows3, X } from 'lucide-react'
+import { LayoutGrid, ListChecks, PanelLeft, Rows3, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 import { SortMenu } from '@/components/assets/sort-menu'
@@ -25,8 +25,6 @@ export function LibraryToolbar({
   onOpenSidebarOnPhone,
   sort,
   onSortChange,
-  detailsOpen,
-  onToggleDetails,
   children,
 }: {
   view: LibraryView
@@ -40,8 +38,6 @@ export function LibraryToolbar({
   onOpenSidebarOnPhone: () => void
   sort: SortOption
   onSortChange: (next: SortOption) => void
-  detailsOpen: boolean
-  onToggleDetails: () => void
   children: React.ReactNode
 }) {
   return (
@@ -59,18 +55,6 @@ export function LibraryToolbar({
       <div className="min-w-[220px] flex-1">{children}</div>
 
       <SortMenu sort={sort} onSortChange={onSortChange} />
-
-      <button
-        type="button"
-        onClick={onToggleDetails}
-        aria-pressed={detailsOpen}
-        data-guide="assets.detailsToggle"
-        title="File details"
-        className="hidden shrink-0 items-center gap-1.5 rounded-pill bg-s2 px-3 py-1.5 type-sm font-semibold text-ink transition-micro hover:bg-s1 wide:flex"
-      >
-        <PanelRight size={14} aria-hidden />
-        Details
-      </button>
 
       <div
         role="group"

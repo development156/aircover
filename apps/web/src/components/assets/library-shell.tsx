@@ -3,7 +3,6 @@
 import type { ComponentPropsWithRef, ComponentProps } from 'react'
 
 import { LibraryContent } from '@/components/assets/library-content'
-import { LibraryDetailsPanel } from '@/components/assets/library-details-panel'
 import { LibraryOverlays } from '@/components/assets/library-overlays'
 import { LibrarySearch } from '@/components/assets/library-search'
 import { LibrarySidebar } from '@/components/assets/library-sidebar'
@@ -24,8 +23,6 @@ export function LibraryShell({
   sidebar,
   content,
   trash,
-  detailsOpen,
-  details,
   status,
   overlays,
   shortcutSheet,
@@ -45,8 +42,6 @@ export function LibraryShell({
    * branch would be a chance to leave a control on screen that does nothing.
    */
   trash: React.ReactNode | null
-  detailsOpen: boolean
-  details: ComponentProps<typeof LibraryDetailsPanel>
   status: ComponentProps<typeof LibraryStatus>
   overlays: ComponentProps<typeof LibraryOverlays>
   shortcutSheet: ComponentProps<typeof ShortcutSheet>
@@ -63,8 +58,6 @@ export function LibraryShell({
         </div>
 
         {trash ?? <LibraryContent {...content} />}
-
-        {detailsOpen ? <LibraryDetailsPanel {...details} /> : null}
       </div>
 
       <LibraryStatus {...status} />
