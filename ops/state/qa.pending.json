@@ -897,6 +897,32 @@
       "summary_plain": "The smoke, unit checks ran together and something failed.",
       "details": "EXIT=1\n    Error: width 1440: the X allowance is rendered\n    Expected pattern: /\\d+ posts remaining this month/i\n    test-results/connections-honesty-connec-9878c-y-rule-holds-at-four-widths-chromium/test-failed-1.png\n  1 failed\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: playwright test connections-honesty.spec.ts --grep 'every rule holds' '--workers=1' '--retries=0' '--reporter=list'\n=== tree restored ===\n M apps/web/e2e/connections-honesty.spec.ts\n M ops/state/qa.pending.json",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtbs6m1r-43c477a1",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-27T17:12:43.548Z",
+      "finished_at": "2026-08-27T17:12:43.548Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The typecheck, lint, unit checks ran together and something failed.",
+      "details": "@sahoda/billing:test:      39|     await ledger.close()\n@sahoda/billing:test:        |                  ^\n@sahoda/billing:test:      40|     await db.close()\n@sahoda/billing:test:      41|   })\n@sahoda/billing:test: \n@sahoda/billing:test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯\n@sahoda/billing:test: \n@sahoda/billing:test: [ELIFECYCLE] Test failed. See above for more details.\n@sahoda/jobs:test: [ELIFECYCLE] Test failed. See above for more details.\n@sahoda/db:test: [ELIFECYCLE] Test failed. See above for more details.\n@sahoda/web:typecheck: [ELIFECYCLE] Command failed.\n@sahoda/web:test: [ELIFECYCLE] Test failed. See above for more details.\n@sahoda/billing#test:  ERROR  command (/home/user/sahodalabs/packages/billing) /root/.local/share/pnpm/.tools/pnpm/11.3.0/bin/pnpm run test exited (1)\n\n Tasks:    22 successful, 27 total\nCached:    0 cached, 27 total\n  Time:    3m32.825s \nFailed:    @sahoda/billing#test\n\n ERROR  run failed: command  exited (1)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtbs7z7l-4346504b",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-27T17:13:47.262Z",
+      "finished_at": "2026-08-27T17:13:47.262Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks passed for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
+      "details": " Tasks:    9 successful, 9 total",
+      "duration_ms": null
     }
   ]
 }

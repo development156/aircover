@@ -1,7 +1,8 @@
 # Handoff — divas — wt-divas — 2026-08-27
 
 **Branch** `claude/advisor-qvz5wn`. Lane `wt-divas`. Pushed: yes.
-Base `wt-core` at `3137bc3`, 13 commits ahead.
+Base `wt-core` at `42c35e85`, 2 commits ahead. PR #14 was MERGED mid-session,
+so the branch was rebased onto the trunk and these two are follow-up work.
 
 This session is one long thread: `/connections`. The founder reported a defect,
 I fixed it, they tested, and reported the next one. Seven rounds. **Four of the
@@ -492,6 +493,91 @@ picker and the half that parses the redirect have to arrive together. `whatsapp`
 and `snapchat` replace it as live examples, and a new test asserts Pinterest is
 now accepted.
 
+## Round sixteen: the loopback reset was an https reset wearing a localhost url
+
+The founder asked for one thing: **"merge wt-core into this branch so playwright
+can run"**. The merge was the easy half.
+
+`wt-core` merged clean, eight commits, twelve files, no conflicts. Then the
+suite still could not run, and the reason it could not run had been recorded
+WRONG in three places, including this repository's own `CLAUDE.md`.
+
+Every authenticated spec died on
+
+```
+net::ERR_CONNECTION_RESET at http://127.0.0.1:3100/sign-in
+```
+
+and `node-transport.ts`'s note 1 read that as proof that loopback must not be
+intercepted. The suite has carried that reading for two days.
+
+**MEASURED 2026-08-27, through a logging TCP proxy placed in front of the dev
+server.** The request REACHES Next. Clerk's middleware answers
+
+```
+307 -> https://<fapi>.clerk.accounts.dev/v1/client/handshake?redirect_url=...
+```
+
+and Chromium follows THAT hop on its own socket, which is the network that does
+not work. Playwright reports a navigation failure against the url the navigation
+STARTED at, so an https reset is printed as a localhost one.
+
+Four measurements, in the order that made it obvious:
+
+| Probe | Result |
+|---|---|
+| Chromium → `http://127.0.0.1:3199/` (python static, loopback-bound) | **200** |
+| Chromium → `http://127.0.0.1:3198/` (python static, `0.0.0.0`-bound) | **200** |
+| Chromium → `http://127.0.0.1:3100/sign-in` (Next dev) | **ERR_CONNECTION_RESET** |
+| Node/`curl` → the same Next url | **200** |
+
+The first two are what proved loopback innocent, and the bind address innocent
+with it. Two dead ends were eliminated on the way: it is not compression (a 404
+route with `accept-encoding: identity` resets the same), and it is not a scheme
+upgrade (MEASURED: the response carries no `Strict-Transport-Security`).
+
+**The fix is one rule, symmetric with the transport's own note 5: whoever can
+make the hop, makes it.** Every request now goes through Node; the chain is
+handed BACK to Chromium the moment its next hop is loopback, and picked up again
+the moment that hop redirects out. Node carries the browser's own `Cookie`
+header, so the app sees the same session Chromium does. Note 1 has been
+rewritten in place to say what was measured rather than what was assumed.
+
+MEASURED, `connections-honesty.spec.ts --grep @smoke`: **3 failed → 3 passed.**
+That is the first Clerk-authenticated spec ever to pass in this sandbox.
+
+### Three stale claims, and none of them was the transport's fault
+
+Once sign-in worked, the spec started failing on its own assertions — every one
+stale, and stale because nothing has read these lines while the screen beneath
+them changed twice.
+
+| Assertion | Was | Is | Why it moved |
+|---|---|---|---|
+| planned channels | `4` | `1` | The tile branch moved from `asChannel` (six publishable) to `asPlatform` (fourteen linkable), so three cards drawn as unbuilt are connectable. MEASURED off the catalogue: 15 entries, 1 with no platform, `snapchat` |
+| a coming-soon tile offers no control | any `button, a, [role=button], [aria-disabled]` | the same, minus the details disclosure | `ChannelHeader` is shared between both tile shapes on purpose and carries the disclosure on every tile. The rule is about a control that offers an action and does nothing; one that opens a panel is not that |
+| the X allowance | `X posts this month \d+ of \d+` | `\d+ posts remaining this month` | The meter counts DOWN since `wt-core`'s `741418ef`. Both claims survive: a real numeral, and attribution |
+
+The third needs its own line, because the attribution MOVED. `allowance is ours
+rather than X` is now inside the pricing disclosure, so it is not in the page's
+text while that disclosure is closed. The visible attribution is the meter's
+second line, and `x-ration-meter.tsx` is explicit that dropping it makes the
+line above it a false claim about X. That is the line the guard now reads.
+
+The planned-channel figure stays a **literal** on purpose. Derived from the
+catalogue it would agree with itself forever and guard nothing; a literal is
+what makes the next platform to land show up as a red test rather than as a
+silently different screen.
+
+### One duplicate withdrawn
+
+This branch carried its own `SAHODA_CHROMIUM_PATH` opt-in, so a sandbox whose
+bundled Chromium build does not match `@playwright/test` can point at the one it
+has. **It is not in the branch.** `wt-core` reached the same fix independently
+under `PLAYWRIGHT_CHROMIUM_PATH`, the rebase surfaced it as a conflict, and two
+env vars for one hatch is worse than either. Theirs is upstream, so theirs
+stands. Use `PLAYWRIGHT_CHROMIUM_PATH`.
+
 ## Shared surfaces touched
 
 - **`packages/shared/src/enums.ts`** — `ConnectionPlatformSchema` 6→14 values,
@@ -547,6 +633,15 @@ No price, no ledger, no credit path touched.
 | Focus refreshes the tiles | delete the `focus` listener | 1 |
 | Focus listener is removed | delete the `removeEventListener` | 1 |
 | Disconnect copy is true | restore "stays linked at the publishing provider" | 2 |
+| Planned channels are counted | `asPlatform('discord')` → `null` | 1 — expected 1, got 2 |
+| A coming-soon tile offers no control that ACTS | a `<button>Connect</button>` on the tile | 1 — expected 0, got 1 |
+| The X allowance is attributed | delete the "From Sahoda's ration" line | 1 |
+| The X allowance is a real figure | replace `{remaining}` with an em dash | 1 |
+
+Every one of the four above was mutated in the PRODUCT, not in the test, and
+each was WATCHED going red before the mutation was reverted. The em-dash
+mutation is the exact shape (`100 of —`) this guard was originally written
+against, which is why it is the one worth keeping.
 
 **One guard was written, watched, and found NOT to guard.** After adding `x` to
 the route test's mocked platforms I restored the vocabulary defect and **all 49
