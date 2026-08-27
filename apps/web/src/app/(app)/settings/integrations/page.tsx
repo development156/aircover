@@ -2,7 +2,7 @@ import Link from 'next/link'
 
 import { ChannelLogo } from '@/components/connections/channel-logo'
 import { SettingCard, SettingRow } from '@/components/settings/setting-row'
-import { CHANNEL_LABELS } from '@/components/posts/channel-label'
+import { PLATFORM_LABELS } from '@/components/posts/channel-label'
 import { buttonVariants } from '@/components/ui/button'
 import { readConnections } from '@/lib/connections/read'
 
@@ -50,7 +50,7 @@ export default async function SettingsIntegrationsPage() {
         read.connections.map((connection) => (
           <SettingRow
             key={connection.id}
-            label={CHANNEL_LABELS[connection.platform]}
+            label={PLATFORM_LABELS[connection.platform]}
             hint={connection.status === 'active' ? 'Connected' : 'Needs attention'}
             control={<ChannelLogo channel={connection.platform} size={20} />}
           />
