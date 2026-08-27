@@ -681,20 +681,50 @@ answer 200**. Every platform in this lane was probed individually instead.
 
 ## Gate
 
-Run on `16fe547`, `--force --concurrency=1`, not piped.
+Re-run on `302308c0` after the container restarted, `--force --concurrency=1`,
+nothing else running, not piped. Every leg below is this run, not an earlier one.
 
 | Leg | Result |
 |---|---|
-| `turbo run typecheck lint test` | **PASS** — 27/27 tasks, `Cached: 0`, exit 0 |
-| — `@sahoda/web` | **PASS** — 5053 passed, 13 skipped |
-| — `@sahoda/publishing` | **PASS** — 469 passed |
-| — `@sahoda/jobs` | **PASS** — 396 passed |
-| — `@sahoda/db` | **PASS** — 622 passed, 207 skipped |
-| — `@sahoda/billing` | **PASS** — 401 passed, 13 skipped |
-| `prettier --check .` | **PASS** |
-| `turbo run test:smoke` (Playwright) | **UNRUN** — not passed. Chromium here cannot reach any HTTPS host |
-| GitHub Actions `gate` | **RED, and not this lane's.** MEASURED across 13 consecutive checks: every job 2-3s with `runner_id: 0`, `runner_name` empty, no step executed. No run created at all since 20:29Z on 26 Aug. A real gate here takes 10-12 minutes |
+| `turbo run typecheck lint test` | **PASS** — 27/27 tasks, `Cached: 0`, 5m48s, exit 0 |
+| — `@sahoda/web` | **PASS** — 452 files, 3 skipped |
+| — `@sahoda/sites` | **PASS** — 53 files |
+| — `@sahoda/db` | **PASS** — 36 files, 12 skipped |
+| — `@sahoda/jobs` | **PASS** — 34 files |
+| — `@sahoda/billing` | **PASS** — 30 files, 1 skipped |
+| — `@sahoda/publishing` / `mesh` / `shared` | **PASS** — 27 / 26 / 26 files |
+| — `@sahoda/research` | **PASS** — 13 files |
+| `prettier --check .` | **PASS** — exit 0 |
+| `connections-honesty.spec.ts --grep @smoke` | **PASS** — 3 passed, exit 0, 3.2m |
+| `turbo run test:smoke` (all 118) | **UNRUN.** One spec is proved, the suite is not |
+| GitHub Actions `gate` | **RED, and not this lane's.** Every job 1-6s, `runner_id: 0`, no step executed |
 
-One environmental failure worth knowing: `lib/privacy/export-drift.test.ts`
-cannot resolve `db.<project>.supabase.co` from this sandbox. It fails
-identically on an unmodified tree — MEASURED by stashing.
+**The smoke leg now runs in this sandbox**, which it never has before. It needs
+two env vars and neither is a default:
+
+```
+PLAYWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium-1194/chrome-linux/chrome \
+SAHODA_BROWSER_VIA_NODE=1 \
+pnpm --filter @sahoda/web exec playwright test --grep @smoke
+```
+
+`connections-honesty.spec.ts` is the only spec MEASURED green. The other 115
+@smoke tests are **UNRUN**, not passed, and one authenticated spec passing is
+evidence the transport works, not evidence the suite does. Run the full leg
+before this reaches `wt-web`.
+
+### Three gate failures reported during this session, all contention
+
+The Stop hook reported `@sahoda/jobs#test`, then `@sahoda/web#test`, then seven
+red files across `store.pglite`, `workspace-timezone.pglite`,
+`workspaces-contract.pglite`, `asset-library` and `copy-tools`. None is a
+defect in this diff. MEASURED: each package passes alone, and the full 27-task
+run above is green with `Cached: 0`. The hook fires while a Playwright run and
+its dev server hold the box, and the pglite suites stand up real Postgres
+in-process, so they lose that race first. **Group failures by cause, never
+count them** — five unrelated suites red at once is an environment.
+
+One environmental failure remains genuine and is not this lane's:
+`lib/privacy/export-drift.test.ts` cannot resolve `db.<project>.supabase.co`
+from this sandbox. It fails identically on an unmodified tree, MEASURED by
+stashing.

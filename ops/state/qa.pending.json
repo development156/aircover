@@ -923,6 +923,19 @@
       "summary_plain": "The typecheck checks passed for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": " Tasks:    9 successful, 9 total",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtbt0q7l-6cbe6da8",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-27T17:36:08.619Z",
+      "finished_at": "2026-08-27T17:36:08.619Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks passed for @sahoda/jobs ONLY — this run was filtered and does not cover the workspace.",
+      "details": "JOBS_EXIT=0\n@sahoda/jobs:test:  Test Files  34 passed (34)",
+      "duration_ms": null
     }
   ]
 }
