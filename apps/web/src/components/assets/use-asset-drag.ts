@@ -4,9 +4,13 @@ import { useState } from 'react'
 
 import {
   ASSET_DRAG_MIME,
+  FOLDER_DRAG_MIME,
   decodeAssetDrag,
+  folderDragType,
+  folderIdFromTypes,
   encodeAssetDrag,
   isAssetDrag,
+  isFolderDrag,
 } from '@/lib/assets/drag-payload'
 
 /**
@@ -87,6 +91,82 @@ export function useFolderDropTarget(onFiles: (ids: string[]) => void) {
         const ids = decodeAssetDrag(event.dataTransfer.getData(ASSET_DRAG_MIME))
         if (ids.length > 0) onFiles(ids)
       },
+    },
+  }
+}
+
+/**
+ * A FOLDER being dragged onto another folder, to live inside it.
+ *
+ * ── THE REFUSAL IS DECIDED BEFORE THE DROP, NOT AFTER ────────────────────────
+ * `canMoveFolder` already knows every reason a move is impossible: a folder
+ * cannot go inside itself, cannot go inside its own descendant, and cannot take
+ * its subtree past the depth limit. The caller runs it while the drag is still
+ * in the air and passes `accepts`, so an impossible target simply never
+ * highlights and the browser draws the no-entry cursor.
+ *
+ * The alternative — accept every drop and report a refusal afterwards — makes a
+ * person complete a gesture, wait, and read a sentence explaining that what they
+ * just did was never going to work. A control that cannot do the thing should
+ * not look like it can.
+ *
+ * The server still runs the same check, and so does the database trigger. This
+ * is the third statement of one rule, and it is the one that makes the screen
+ * honest rather than the one that makes it safe.
+ */
+export function useFolderMoveTarget(
+  accepts: (folderId: string) => boolean,
+  onMove: (folderId: string) => void,
+) {
+  const [over, setOver] = useState(false)
+
+  const readId = (event: React.DragEvent): string => event.dataTransfer.getData(FOLDER_DRAG_MIME)
+
+  return {
+    isOver: over,
+    dropProps: {
+      onDragOver: (event: React.DragEvent) => {
+        const dragged = folderIdFromTypes(event.dataTransfer.types)
+        // Not a folder drag, or one this target cannot take. Returning without
+        // `preventDefault` is how a target says "not here", and the browser
+        // draws the no-entry cursor. The id comes from the TYPES because the
+        // payload is unreadable until the drop.
+        if (dragged === null || !accepts(dragged)) return
+        event.preventDefault()
+        event.dataTransfer.dropEffect = 'move'
+        setOver(true)
+      },
+      onDragLeave: () => setOver(false),
+      onDrop: (event: React.DragEvent) => {
+        if (!isFolderDrag(event.dataTransfer.types)) return
+        event.preventDefault()
+        setOver(false)
+        // The payload is authoritative here — it is readable now, and a type
+        // name is a place a value can be truncated. `folderIdFromTypes` is for
+        // the decision DURING the drag; this is for the act.
+        const id = readId(event) || (folderIdFromTypes(event.dataTransfer.types) ?? '')
+        // Re-checked at the DROP as well. The tree can change under a drag —
+        // another tab, another person — and `accepts` was answered against the
+        // tree as it was when the pointer entered.
+        if (id !== '' && accepts(id)) onMove(id)
+      },
+    },
+  }
+}
+
+/** Props for a folder row that can be picked up and moved. */
+export function useFolderDragSource(folderId: string) {
+  return {
+    draggable: true,
+    onDragStart: (event: React.DragEvent) => {
+      event.dataTransfer.setData(FOLDER_DRAG_MIME, folderId)
+      // The id again, as a TYPE, so a target can decide during the drag. Both
+      // are set because each is readable at a different moment.
+      event.dataTransfer.setData(folderDragType(folderId), '')
+      event.dataTransfer.effectAllowed = 'move'
+      // Stopped so a folder inside a folder does not start TWO drags, the
+      // child's and its parent row's, with the outer one winning.
+      event.stopPropagation()
     },
   }
 }

@@ -4,7 +4,11 @@ import { FolderOpen } from 'lucide-react'
 import type { AssetFolder } from '@sahoda/shared'
 
 import { SidebarRow } from '@/components/assets/library-sidebar-row'
-import { useFolderDropTarget } from '@/components/assets/use-asset-drag'
+import {
+  useFolderDragSource,
+  useFolderDropTarget,
+  useFolderMoveTarget,
+} from '@/components/assets/use-asset-drag'
 import { DELETE_ITEM_KEY, RENAME_ITEM_KEY } from '@/components/assets/library-shortcuts'
 import {
   isContextMenuKey,
@@ -32,6 +36,8 @@ export function FolderRow({
   collapsed,
   onGoTo,
   onDropFiles,
+  canAcceptFolder,
+  onMoveFolder,
   renderMenu,
 }: {
   folder: AssetFolder
@@ -42,10 +48,44 @@ export function FolderRow({
   onGoTo: (next: LibraryLocation) => void
   /** Files dropped onto this folder. Absent means this row takes no drops. */
   onDropFiles?: (folderId: string, ids: string[]) => void
+  /**
+   * Would moving `draggedId` inside THIS folder be allowed? Answered from
+   * `canMoveFolder` while the drag is still in the air, so an impossible target
+   * never lights up.
+   */
+  canAcceptFolder?: (draggedId: string) => boolean
+  onMoveFolder?: (draggedId: string, newParentId: string) => void
   renderMenu?: (folder: AssetFolder, trigger: ContextMenuTrigger) => React.ReactNode
 }) {
   const trigger = useContextMenuTrigger()
-  const { isOver, dropProps } = useFolderDropTarget((ids) => onDropFiles?.(folder.id, ids))
+  const files = useFolderDropTarget((ids) => onDropFiles?.(folder.id, ids))
+  const moves = useFolderMoveTarget(
+    (draggedId) => (canAcceptFolder ? canAcceptFolder(draggedId) : false),
+    (draggedId) => onMoveFolder?.(draggedId, folder.id),
+  )
+  const dragSource = useFolderDragSource(folder.id)
+  const takesFolders = canAcceptFolder !== undefined && onMoveFolder !== undefined
+
+  // Both sets of handlers on one row. Each ignores the other's MIME type, so
+  // they compose without either having to know the other exists — which is the
+  // reason the two drags carry different types at all.
+  const dropProps = {
+    onDragEnter: files.dropProps.onDragEnter,
+    onDragOver: (event: React.DragEvent) => {
+      files.dropProps.onDragOver(event)
+      if (takesFolders) moves.dropProps.onDragOver(event)
+    },
+    onDragLeave: (event: React.DragEvent) => {
+      files.dropProps.onDragLeave(event)
+      if (takesFolders) moves.dropProps.onDragLeave()
+    },
+    onDrop: (event: React.DragEvent) => {
+      files.dropProps.onDrop(event)
+      if (takesFolders) moves.dropProps.onDrop(event)
+    },
+  }
+  const isOver = files.isOver || (takesFolders && moves.isOver)
+
   return (
     <SidebarRow
       icon={FolderOpen}
@@ -80,8 +120,9 @@ export function FolderRow({
           : undefined
       }
       menu={renderMenu ? renderMenu(folder, trigger) : undefined}
-      dropProps={onDropFiles ? dropProps : undefined}
-      isDropTarget={onDropFiles ? isOver : false}
+      dropProps={onDropFiles || takesFolders ? dropProps : undefined}
+      isDropTarget={onDropFiles || takesFolders ? isOver : false}
+      dragProps={takesFolders ? dragSource : undefined}
     />
   )
 }

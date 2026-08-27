@@ -68,7 +68,7 @@ export function LibraryContent({
   selectMode: boolean
   selected: ReadonlySet<string>
   onOpen: (id: string) => void
-  onToggleSelect: (id: string) => void
+  onToggleSelect: (id: string, shift: boolean) => void
   onQuickLook: (id: string) => void
   onClearSearch: () => void
   insideFolderId: string | null
