@@ -1,12 +1,30 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
 import type { Channel, ChannelSet } from '@sahoda/shared'
 
 import { cancelSchedule, schedulePost } from '@/app/actions/posts-schedule'
-import { ScheduleField } from '@/components/posts/schedule-field'
 import { Button } from '@/components/ui/button'
+
+/**
+ * ── LOADED WHEN THE ROW IS OPENED, NOT WHEN THE PAGE IS ──────────────────────
+ * `ScheduleField` pulls in a month calendar, a half-hourly slot table and the
+ * per-channel connection readout. On `/posts/[id]` that is the screen's whole
+ * purpose. Here it sits behind a collapsed row that most visits never open, and
+ * shipping it on first load pushed `/planner` past its JavaScript budget:
+ * MEASURED on Vercel at 835.8 KiB against 827.5 + 8 KiB of slack. The static
+ * import cost every planner visit those bytes to render a button.
+ *
+ * `ssr: false` because the field is interactive from its first frame — it reads
+ * the reader's own clock in an effect and renders a waiting line until it has
+ * one, so there is no server output worth sending.
+ */
+const ScheduleField = dynamic(
+  () => import('@/components/posts/schedule-field').then((m) => m.ScheduleField),
+  { ssr: false },
+)
 
 export interface PlannerRescheduleProps {
   postId: string
@@ -88,8 +106,10 @@ export function PlannerReschedule({
             itself two columns to the left. */}
         {open ? 'Close' : current ? 'Reschedule' : 'Schedule'}
       </Button>
+      {/* w-80, not w-64: a seven-column month grid in 256px leaves each day
+          about 30px, under the 44px touch floor and too tight to read. */}
       {open ? (
-        <div className="w-64" aria-busy={pending}>
+        <div className="w-80" aria-busy={pending}>
           <ScheduleField
             channels={channels}
             value={current}
