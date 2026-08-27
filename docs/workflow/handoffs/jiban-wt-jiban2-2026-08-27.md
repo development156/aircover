@@ -134,6 +134,24 @@ channels in five kinds; the screenshot shows twelve in two. MEASURED against
 | `prettier --check .`    | `All matched files use Prettier code style!`                                 | PASS    |
 | `pnpm --filter @sahoda/web build` | `next build` clean · `js-budget ok: 81 routes within budget`       | PASS    |
 
+**One transient red, recorded because a green that follows a red is worth
+naming.** The session's stop hook ran `pnpm turbo run typecheck test
+--filter="...[origin/main]" && pnpm format:check` and reported
+`@sahoda/web#test ... exited (1)`, with no test name in the three lines it
+relayed. It does not reproduce:
+
+| Run                                                                       | Result                                                       |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `turbo run test --filter=@sahoda/web --force` (uncached, nothing else running) | `393 passed | 3 skipped` · `4977 passed | 13 skipped`, exit 0 |
+| the hook's exact command, verbatim                                         | `Tasks: 18 successful, 18 total`, exit 0                      |
+| `pnpm format:check`                                                       | clean                                                         |
+
+I could not root-cause it and will not call it a flake on that basis: what I can
+say is MEASURED above, and that a forced uncached run of the failing package is
+green. The likeliest reading is a collision on the one shared live database
+`@sahoda/db` uses, which root `CLAUDE.md` names explicitly, but I did not prove
+it and the hook's output does not contain enough to.
+
 The 118-second test run is not a cache replay. The build leg is worth its own
 line: it FAILED first, at `/(app)/connections 684.3 kB > 675.4 kB budget +8 kB
 slack`, which is how the icon question got answered by measurement instead of by
