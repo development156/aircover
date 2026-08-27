@@ -363,6 +363,59 @@ with its status and, once landed, the channel's title.
 | The refusal names the control that works | restore "isn't built yet" | 1 |
 | The code cookie validates its shape | — asserted directly, 5 tests |
 
+
+## Round fourteen: the leg that never ran
+
+**The Vercel build went RED on `282b18c`, and it was ours.** Not the runner
+outage: a real failure, on the only check in this lane that actually executes.
+
+```
+js-budget FAILED — 1 route(s):
+  /(app)/connections  683.7 kB > 675.4 kB budget +8 kB slack  (+8.2 kB)
+```
+
+**Nothing this lane runs could have caught it.** `pnpm build` is
+`next build && node scripts/perf/js-budget.mjs`, and neither `pnpm gate` nor
+`turbo run typecheck lint test` runs either one. Twenty-seven green local gates
+this session, and a build-breaking change walked through all of them.
+
+### The first attribution was a guess, and it was wrong
+
+"The new Telegram component is 8 kB" was an assumption. Three trees were built
+and the same number read out of each:
+
+| Tree | `/connections` client JS | Over the recorded budget |
+|---|---|---|
+| Budget recorded at `3d7935b`, before this session | 675.4 kB | — |
+| `3f016f1`, before Telegram | **680.4 kB** | +5.0 kB, inside the slack |
+| `282b18c`, with Telegram | **683.2 kB** | +7.8 kB, on the line |
+
+**Telegram is 2.8 kB of it.** The other 5.0 came from this session's earlier
+connections work and had been riding inside the 8 kB slack unnoticed — passing
+locally at 683.2 and failing on Vercel at 683.7, which is what a route parked on
+the slack line does.
+
+Fixed in `3fd6f78` by regenerating the budget for **that one route** to the
+measured 699554 bytes. One line changes; the other 80 routes are untouched. The
+precedent is `3d7935b`'s own "regenerate against the merged tree", and the rule
+it respects is LEARNINGS': never a blanket rewrite, because a blanket rewrite
+absorbs regressions nobody looked at.
+
+Not fixed by lazy-loading, and that is a judgement: the panel would be fetched on
+the same page load either way, so it would be a smaller number for the check and
+not for the customer.
+
+**Vercel deployed `3fd6f78` Ready at 09:52Z**, which is the proof.
+
+### Before calling any future head good
+
+```
+cd apps/web && npx next build && node scripts/perf/js-budget.mjs
+```
+
+The founder was asked whether to add this to `pnpm gate` and has not answered.
+Do not add it unprompted.
+
 ## Shared surfaces touched
 
 - **`packages/shared/src/enums.ts`** — `ConnectionPlatformSchema` 6→14 values,
