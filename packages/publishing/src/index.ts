@@ -66,6 +66,8 @@ export {
   type ZernioClientDeps,
   type ZernioAccount,
   type ZernioConnectChoice,
+  type ZernioTelegramCode,
+  type ZernioTelegramStatus,
   type ZernioSelectionPlatform,
   type ZernioSelectionState,
   type ZernioProfile,

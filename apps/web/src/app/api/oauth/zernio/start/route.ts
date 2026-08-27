@@ -5,7 +5,7 @@ import { isZernioPlatform, type ZernioPlatform } from '@sahoda/shared'
 import { checkCountableLimit } from '@/lib/billing/entitlements'
 import { setPendingConnectHeader, type ConnectMode } from '@/lib/connections/pending-connect'
 import { readConnectionSlots } from '@/lib/connections/read'
-import { connectPlatformFor } from '@/lib/zernio/connect-platform'
+import { connectPlatformFor, needsPairingCode } from '@/lib/zernio/connect-platform'
 import { selectionPlatformFor } from '@/lib/zernio/selection'
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
@@ -181,13 +181,29 @@ export async function POST(request: Request): Promise<Response> {
     // happen to be the same string. See lib/zernio/connect-platform.ts: this is
     // the FOURTH platform vocabulary in this integration and the only one nobody
     // had mapped.
+    /**
+     * ── THE RAIL IS CHOSEN BEFORE THE NAME IS LOOKED UP ──────────────────────
+     * Telegram has a name Zernio understands and no consent screen to send
+     * anybody to. Reaching `connectUrl` for it would ask for an `authUrl` that
+     * the endpoint does not return, and the client would throw MISSING_FIELDS —
+     * which is how this platform used to answer "Couldn't start the connection.
+     * Try again." on every press, a retry that could never succeed.
+     *
+     * Refused here, by name, with the flow that DOES work named in the sentence.
+     * `no-impossible-remedy.spec.ts` is the standing rule: a remedy that cannot
+     * work is worse than saying plainly what to do instead.
+     */
+    if (needsPairingCode(platform)) {
+      return fail('Telegram links from inside Telegram. Use the code on its card.', 400)
+    }
+
     const connectName = connectPlatformFor(platform)
     if (connectName === null) {
       // Telegram. `GET /v1/connect/telegram` returns an access CODE for a bot,
       // not an authUrl, so there is no consent screen to open. Refused here
       // rather than discovered downstream when `connectUrl` throws for want of a
       // field — which is exactly how it was found.
-      return fail('This channel is connected a different way, and that flow isn’t built yet.', 400)
+      return fail('Telegram links from inside Telegram. Use the code on its card.', 400)
     }
 
     /**

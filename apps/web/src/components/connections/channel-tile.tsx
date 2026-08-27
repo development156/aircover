@@ -4,6 +4,8 @@ import { ChannelAccounts } from '@/components/connections/channel-accounts'
 import { ChannelDetails } from '@/components/connections/channel-details'
 import { ChannelLogo } from '@/components/connections/channel-logo'
 import { ConnectButton } from '@/components/connections/connect-button'
+import { TelegramConnect } from '@/components/connections/telegram-connect'
+import { needsPairingCode } from '@/lib/zernio/connect-platform'
 import { XRationMeter, type XRationMeterProps } from '@/components/connections/x-ration-meter'
 import {
   READINESS_CLASS,
@@ -321,13 +323,31 @@ export function ChannelTile({
             plan's answer, so a full plan says so here rather than starting a
             flow that the start route would refuse with a 403 after the customer
             had gone to the consent screen. */}
-        <ConnectButton
-          platform={platform}
-          label={entry.short}
-          addingAnother={linked}
-          disabled={disabled}
-          disabledReason={disabledReason}
-        />
+        {/* ── ONE CHANNEL DOES NOT OPEN A WINDOW, AND IT IS NOT AN EXCEPTION
+            TO HIDE ────────────────────────────────────────────────────────
+            MEASURED: `GET /v1/connect/telegram` returns no `authUrl` at all,
+            only a pairing code the customer messages to a bot. There is no
+            consent screen to pop up and no return trip to wait for, so
+            `ConnectButton` — which is entirely about opening a window and
+            listening for it to come home — cannot serve it. It answered
+            "Couldn't start the connection. Try again." on every press until
+            this branch existed.
+
+            A branch on the platform id rather than a prop, because the two
+            controls have different SHAPES: one is a button, the other is a
+            code and a set of steps that stays on screen while the customer
+            goes to another app. */}
+        {needsPairingCode(platform) ? (
+          <TelegramConnect disabled={disabled} disabledReason={disabledReason} />
+        ) : (
+          <ConnectButton
+            platform={platform}
+            label={entry.short}
+            addingAnother={linked}
+            disabled={disabled}
+            disabledReason={disabledReason}
+          />
+        )}
       </div>
     </article>
   )

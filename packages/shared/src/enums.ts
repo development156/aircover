@@ -390,6 +390,22 @@ export const ZERNIO_PLATFORMS = [
   'tiktok',
   'whatsapp',
   'youtube',
+  /**
+   * ── TELEGRAM WAS ABSENT, AND ITS ABSENCE WAS ABOUT THE WRONG QUESTION ─────
+   * It was left out because `GET /v1/connect/telegram` returns no `authUrl` —
+   * it returns a pairing CODE, so putting it on the OAuth rail gave a button
+   * that answered "Couldn't start the connection" on every press.
+   *
+   * That is a fact about ONE flow, not about whether a workspace may hold a
+   * Telegram connection, and this list answers the second question. Membership
+   * here is what lets the return route's reconcile sweep find a Telegram account
+   * under our profile at all — without it, a link completed inside Telegram is
+   * invisible to us for ever.
+   *
+   * The OAuth start route refuses it explicitly and by name now, pointing at the
+   * code-and-poll surface instead. See lib/zernio/connect-platform.ts.
+   */
+  'telegram',
 ] as const
 export type ZernioPlatform = (typeof ZERNIO_PLATFORMS)[number]
 

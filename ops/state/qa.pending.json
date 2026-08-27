@@ -689,6 +689,19 @@
       "summary_plain": "The unit checks ran (5135 passed), but 13 tests did NOT run — this does not prove the suite passes.",
       "details": "ff90086d81f80fb55675c5209e52e33d703aa309\n@sahoda/web:test: \n@sahoda/web:test: stdout | src/components/ui/button.disabled-contrast.test.tsx > a disabled primary is legible AND looks inert, in both themes > dark: the disabled label clears AA against its own fill\n@sahoda/web:test: [disabled primary] dark --ink-mute on --surface-2 = 5.51:1\n@sahoda/web:test: \n@sahoda/web:test: stdout | src/components/ui/button.disabled-contrast.test.tsx > a disabled primary is legible AND looks inert, in both themes > the OLD recipe still measures as the defect it was, so this test can fail\n@sahoda/web:test: [disabled primary] the OLD light pair, white on --line = 1.21:1\n@sahoda/web:test: \n@sahoda/web:test: stdout | src/components/ui/button.disabled-contrast.test.tsx > a disabled primary is legible AND looks inert, in both themes > dark does not make the refusal look pressable\n@sahoda/web:test: [disabled primary] dark: shipped 5.51:1 vs white 16.10:1\n@sahoda/web:test: \n@sahoda/web:test:  ✓  ui  src/components/ui/button.disabled-contrast.test.tsx (5 tests) 10ms\n@sahoda/web:test:  ✓  ui  src/components/posts/variant-state.test.tsx (5 tests) 5ms\n@sahoda/web:test:  ✓  ui  src/components/knowledge/add-document.test.tsx (2 tests) 5ms\n@sahoda/web:test:  ✓  ui  src/app/layout.test.tsx (3 tests) 4ms\n@sahoda/web:test: \n@sahoda/web:test:  Test Files  402 passed | 3 skipped (405)\n@sahoda/web:test:       Tests  5135 passed | 13 skipped (5148)\n@sahoda/web:test:    Start at  07:54:33\n@sahoda/web:test:    Duration  111.81s (transform 17.42s, setup 18.73s, import 89.46s, tests 78.96s, environment 84.26s)\n@sahoda/web:test: \n\n Tasks:    18 successful, 18 total\nCached:    18 cached, 18 total\n  Time:    178ms >>> FULL TURBO\n\nTURBO_EXIT=0",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtbbf2cu-58fc0f10",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-27T09:23:24.460Z",
+      "finished_at": "2026-08-27T09:23:24.460Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks ran and everything passed (473 passed).",
+      "details": "Checking formatting...\nAll matched files use Prettier code style!\n      Tests  473 passed (473)",
+      "duration_ms": null
     }
   ]
 }

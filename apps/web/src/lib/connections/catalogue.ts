@@ -264,14 +264,19 @@ export const CATALOGUE: readonly CatalogueEntry[] = [
      * lands. No consent screen, no popup, no return trip — the entire shape every
      * other channel on this screen uses.
      *
-     * Shipping it on the OAuth rail anyway gave a button that answered "Couldn't
-     * start the connection. Try again." on every press: a retry that can never
-     * succeed, which is the impossible remedy `no-impossible-remedy.spec` forbids.
-     * So `ZERNIO_PLATFORMS` drops it and the button disables with a reason,
-     * rather than the readiness rung being bent to carry a fact about connecting.
+     * Shipping it on the OAuth rail gave a button that answered "Couldn't start
+     * the connection. Try again." on every press: a retry that can never succeed,
+     * which is the impossible remedy `no-impossible-remedy.spec` forbids. So
+     * `ZERNIO_PLATFORMS` dropped it and the button disabled with a reason.
      *
-     * What building it needs, so nobody rediscovers this: a code-and-poll surface
-     * of its own.
+     * ── BUILT 2026-08-27 ─────────────────────────────────────────────────────
+     * The note here used to end "what building it needs: a code-and-poll surface
+     * of its own", and that is now `api/oauth/zernio/telegram` plus
+     * `components/connections/telegram-connect.tsx`. Telegram is back in
+     * `ZERNIO_PLATFORMS` — which was always the wrong list to express "no
+     * authUrl", since it governs whether a workspace may HOLD the connection and
+     * the reconcile sweep needs membership to find the account at all. The OAuth
+     * start route refuses it by name instead, via `needsPairingCode`.
      */
     readiness: 'built-not-proven',
   },

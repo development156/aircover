@@ -60,7 +60,16 @@ export const CONNECT_PLATFORM: Readonly<Record<ConnectionPlatform, string | null
    * found, as a "Couldn't start the connection" under a button that could never
    * have started one.
    */
-  telegram: null,
+  /**
+   * Zernio's own name, and the identity holds. It was `null` here, which is what
+   * made the OAuth start route refuse the platform — but `null` was carrying two
+   * different claims at once: "there is no authUrl" and "we cannot name this
+   * platform to Zernio". Only the first is true, and the second broke the
+   * reconcile sweep, which needs a name to filter `listAccounts` by.
+   *
+   * The refusal moved to `needsPairingCode` below, where it says what it means.
+   */
+  telegram: 'telegram',
 
   /**
    * ── THE EIGHT WHOSE NAME IS SIMPLY THEIR NAME ──────────────────────────────
@@ -87,4 +96,25 @@ export const CONNECT_PLATFORM: Readonly<Record<ConnectionPlatform, string | null
 /** Zernio's connect name, or null where this platform has no OAuth flow. */
 export function connectPlatformFor(platform: ConnectionPlatform): string | null {
   return CONNECT_PLATFORM[platform]
+}
+
+/**
+ * PLATFORMS THAT ARE LINKED WITHOUT A CONSENT SCREEN.
+ *
+ * MEASURED against the live API: `GET /v1/connect/telegram` answers 200 with
+ * `{ code, botUsername, expiresAt, expiresIn, instructions }` and no `authUrl`
+ * anywhere in it. There is nothing to open a popup onto. The customer adds
+ * Zernio's bot as an administrator of their channel and messages it the code,
+ * and the app polls until it lands.
+ *
+ * A set rather than a boolean on the map above, because the two questions are
+ * different and conflating them is what this file already exists to stop: the
+ * map answers "what does Zernio call this", and this answers "which rail does it
+ * travel on". A platform can need both answers and they do not imply each other.
+ */
+const PAIRING_CODE: ReadonlySet<string> = new Set(['telegram'])
+
+/** True when connecting happens inside the platform, not on a consent screen. */
+export function needsPairingCode(platform: string): boolean {
+  return PAIRING_CODE.has(platform)
 }

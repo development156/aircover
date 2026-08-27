@@ -354,6 +354,19 @@ describe('the connect endpoint is asked for ZERNIO’s name for the channel', ()
     // And it must not leave a cookie authorising a create for a trip that cannot
     // happen.
     expect(res.headers.get('set-cookie')).toBeNull()
+
+    /**
+     * ── AND THE SENTENCE HAS TO NAME THE FLOW THAT DOES WORK ────────────────
+     * It used to read "This channel is connected a different way, and that flow
+     * isn't built yet." Both halves have since gone false: the flow IS built
+     * (api/oauth/zernio/telegram plus the code panel on the card), and a
+     * customer told a thing is unbuilt does not go looking for the control that
+     * would connect it. A refusal that leaves somebody with nowhere to go is the
+     * same defect `no-impossible-remedy.spec.ts` exists for.
+     */
+    const body = (await res.json()) as { message?: string }
+    expect(body.message).toMatch(/code on its card/i)
+    expect(body.message).not.toMatch(/isn.t built|not built|try again/i)
   })
 })
 

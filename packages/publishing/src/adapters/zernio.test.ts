@@ -44,6 +44,8 @@ function stubClient(post: ZernioPost): ZernioClient {
     connectUrl: unexpected('connectUrl') as never,
     listAccounts: unexpected('listAccounts') as never,
     listConnectChoices: unexpected('listConnectChoices') as never,
+    telegramCode: unexpected('telegramCode') as never,
+    telegramStatus: unexpected('telegramStatus') as never,
     selectConnectChoice: unexpected('selectConnectChoice') as never,
     // Wired to THROW, like the recovery surface below and for the same reason: a
     // publish must never disconnect an account, and this makes that an assertion

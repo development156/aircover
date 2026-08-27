@@ -269,3 +269,44 @@ describe('a connection Zernio holds shows no countdown', () => {
     expect(container.textContent).toMatch(/16d left/)
   })
 })
+
+/**
+ * TELEGRAM'S CARD DOES NOT OFFER A WINDOW TO OPEN.
+ *
+ * ── THE DEFECT THIS CLOSES ───────────────────────────────────────────────────
+ * MEASURED against the live API: `GET /v1/connect/telegram` returns no `authUrl`
+ * at all, only a pairing code the customer messages to a bot. On the OAuth rail
+ * the card's button answered "Couldn't start the connection. Try again." on
+ * every press — a remedy that could never work, which is exactly what
+ * `no-impossible-remedy.spec.ts` forbids. Before that it was hidden under
+ * "Not available yet" and could not be connected at all.
+ *
+ * Asserted at the CARD, not only at the route, because the whole failure was
+ * that the card offered the wrong control. A route-level guard cannot see that.
+ */
+describe('the channel that links from inside Telegram', () => {
+  it('offers a code, not a Connect button', () => {
+    render(<ChannelTile entry={ENTRY.telegram} connections={[]} now={NOW} />)
+
+    expect(screen.getByRole('button', { name: /connect telegram/i })).toBeInTheDocument()
+    // The words are the tell: this control fetches a code, it does not open a
+    // consent screen. `ConnectButton`'s busy words are "Opening Telegram…".
+    expect(screen.queryByText(/opening telegram/i)).toBeNull()
+  })
+
+  it('still opens a window for a channel that HAS a consent screen', () => {
+    // The other half. Without this the fix reads as "give every card the code
+    // panel", and nothing would notice if it did.
+    const { container } = render(<ChannelTile entry={ENTRY.instagram} connections={[]} now={NOW} />)
+    expect(container.querySelector('[data-telegram-code]')).toBeNull()
+    expect(screen.getByRole('button', { name: /connect instagram/i })).toBeInTheDocument()
+  })
+
+  it('is no longer sitting in the unbuilt pile', () => {
+    // It rendered as a `ComingSoonTile` with no control while `ZERNIO_PLATFORMS`
+    // dropped it — that list governs whether a workspace may HOLD the connection,
+    // which was never the thing that was missing.
+    const { container } = render(<ChannelTile entry={ENTRY.telegram} connections={[]} now={NOW} />)
+    expect(container.querySelector('[data-channel="telegram"]')).not.toBeNull()
+  })
+})
