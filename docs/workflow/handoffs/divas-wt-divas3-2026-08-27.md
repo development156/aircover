@@ -2,7 +2,7 @@
 
 **Owner** divas · **Lane** wt-divas3 · **Role** advisor
 
-**Branch** `claude/divas-kickoff-xdoxoa` at `1bb19d7`, 10 commits beyond `3137bc3`.
+**Branch** `claude/divas-kickoff-xdoxoa` at `95afafa`, 13 commits beyond `3137bc3`.
 PR [#18](https://github.com/development156/sahodalabs/pull/18) → `wt-core`, draft,
 body rewritten at `1bb19d7` because the old one was stale on three counts.
 Pushed: yes.
@@ -39,6 +39,9 @@ build deleted more than it added.
 | 8 | `4868c96` | `packages/shared` side-effect-free: **565 kB back across 11 routes** |
 | 9 | `9a214a6` | `café` and `café` are one folder name, not two |
 | 10 | `1bb19d7` | Six visual bugs, and five features the library was missing |
+| 11 | `a64c1f8` | **Trash and restore. Deleting a photo is no longer permanent.** |
+| 12 | `7201fdc` | Drag a photo onto a folder |
+| 13 | `95afafa` | Shift-click a range, select all, drag a folder into a folder |
 
 `asset_folders`, `asset_folder_items` and `asset_smart_folders` are **live in
 production** (`rloztdhzfliyvpvxsgjl`). Founder approved applying only mine; the
@@ -174,9 +177,18 @@ cheap here. Take them.
 
 ## Reversed on purpose, twice, on the same line
 
-**I said I would not raise the js-budget again, then raised it twice.** `ed7775f`
-set `/(app)/assets` to 832366 and argued the case; `4868c96` tightened it to
-797344; `1bb19d7` set it to **815129**, the exact measured figure with no padding.
+**I said I would not raise the js-budget again, then raised it three more
+times.** `ed7775f` set `/(app)/assets` to 832366; `4868c96` tightened it to
+797344; `1bb19d7` set it to 815129; `95afafa` set it to **823661**. Every one is
+the exact measured figure with no padding.
+
+The trend on this one route, so it can be judged rather than discovered: 797344
+this morning, 815129 for six visual fixes and five features, 823661 for trash,
+drag-to-file, shift-select and drag-to-move. **About 2 kB per feature.** The last
+one is the only raise where the build actually went RED first — it was 0.3 kB
+past the harness's 8 kB slack. Every other route is ~49 kB LIGHTER than this
+morning from the `sideEffects` fix. **The cheapest thing to drop, if /assets
+should shrink, is the details panel.**
 
 The founder's instruction was "implement all the features", so cutting one to fit
 the ratchet would contradict a decision already taken. The route ends this lane
@@ -249,12 +261,73 @@ until then.
 
 ---
 
-## What was NOT done, and why
+## The second half of the session: four more features, founder-directed
 
-- **Trash and restore** (spec §3.9). **Deleting a photo is still permanent.** This
-  is the biggest real gap against the spec and the next thing worth building.
-- **The NFC migration is written and NOT applied.** The TypeScript half is live;
-  the index half needs the same approval the first migration got.
+"keep building next features dont stop / make a list of features and keep
+executing". The list, in the order it was worked:
+
+| # | Feature | Commit |
+| --- | --- | --- |
+| 1 | Trash and restore | `a64c1f8` |
+| 2 | Drag a photo onto a folder | `7201fdc` |
+| 3 | Shift-click a range, and select all | `95afafa` |
+| 4 | A Recent view | **NOT BUILT, deliberately** |
+| 5 | Drag a folder into a folder | `95afafa` |
+
+**Recent was dropped on judgement, not forgotten.** All files is already sorted
+newest-first by default and `added:7d` is already a search token, so a sidebar
+row for it would re-state the default view. A control that teaches a person the
+product has more places than it has is a cost, not a feature.
+
+### Two measurement failures of mine, both worth carrying forward
+
+**1. A string replace that matched nothing looks exactly like a guard that does
+not guard.** I reported a mutation on `canAcceptFolder` as NOT going red and
+concluded the guard was vacuous. The mutation had never been applied: prettier
+had joined the two lines of that arrow function, so a multi-line replace changed
+the file not at all. Applied properly it goes red.
+**Verify the mutation landed before reading the result.**
+
+**2. A negative assertion with no settle is an assertion about nothing.** Every
+action on this screen runs inside `startTransition`, so
+`expect(fn).not.toHaveBeenCalled()` immediately after a `fireEvent` passes
+whether or not the call was about to happen. THREE tests were doing that. A
+`settle()` helper now flushes pending transitions first and its comment carries
+the measurement. A fourth checked a drag highlight AFTER the drop, when it is
+cleared unconditionally.
+
+### One real bug the tests drove out
+
+A folder row lit up for a folder drop it was about to reject. The cause is
+fundamental: `getData` returns `''` during `dragover` in every browser, so a
+target cannot tell WHICH folder is being dragged and had nothing to run
+`canMoveFolder` against. `types` IS readable throughout, so the dragged id now
+travels in a second parameterised MIME type,
+`application/x-sahoda-folder+<id>`, and the refusal happens before the drop.
+
+The drag test also caught, on its first run, that `dragIds` had reached the LIST
+branch of `library-grid.tsx` and not the GRID branch — the default view. Dragging
+from the grid did nothing at all.
+
+### The trash's one forbidden claim
+
+**No retention period, and no auto-purge.** Nothing in this repository runs on a
+schedule against `assets.deleted_at`, so "deleted after 30 days" would be a
+promise no process could keep — in both directions. `assets-trash.test.ts`
+asserts that NO function anywhere reads that column, so the day a sweeper is
+added the guard goes red and the copy has to change in the same commit.
+
+---
+
+## What was NOT done, and why
+- **TWO migrations are written and NOT applied**, both needing the founder:
+  `20260827060000_folder_names_normalize_nfc.sql` and
+  `20260827090000_assets_trash.sql`. Until the second is applied `/assets`
+  reports that it could not read the library — **by design**, PostgREST `42703`,
+  rather than showing a trash that silently holds nothing.
+- **Every drag is jsdom-tested only.** No real pointer has driven one on this
+  lane, because Playwright cannot run here. Drag and drop is exactly the kind of
+  thing jsdom models loosely, so treat the browser check as outstanding.
 - **Everything in the file manager spec's Phases 3 to 5**: sharing and public
   links, versioning and dedupe, OCR, virus scanning, WebSockets, comments,
   GraphQL, third-party imports. Some would be wrong in a marketing tool, some
