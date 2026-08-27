@@ -199,6 +199,15 @@ async function cleanupSupabase(clerkUserId: string): Promise<void> {
 async function signIn(page: Page, user: SeededUser): Promise<void> {
   await setupClerkTestingToken({ page })
 
+  // ORDER MATTERS. setupClerkTestingToken registers a context route over
+  // `https://<fapi>/v1/*` and serves it with `route.fetch()`, which uses the
+  // BROWSER's network — the thing that does not work in a constrained sandbox.
+  // Playwright runs the last-registered matching handler and Clerk's never
+  // calls fallback(), so re-installing here takes FAPI back. The transport
+  // carries `__clerk_testing_token` itself for exactly this reason.
+  // No-op unless SAHODA_BROWSER_VIA_NODE=1.
+  await installNodeTransport(page.context())
+
   // A sign-in TICKET, minted server-side for this user and redeemed by the
   // <SignIn/> component on our own /sign-in route.
   //
