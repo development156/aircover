@@ -2,7 +2,10 @@ import { Link2 } from 'lucide-react'
 import type { Connection, ConnectionPlatform } from '@sahoda/shared'
 
 import { ChannelTile } from '@/components/connections/channel-tile'
-import { Stagger } from '@/components/motion/stagger'
+import {
+  ConnectionMarketplace,
+  type MarketplaceSection,
+} from '@/components/connections/connection-marketplace'
 import { ConnectionHealthBanner } from '@/components/connections/connection-health-banner'
 import { ConnectOutcomeNotice } from '@/components/connections/connect-outcome-notice'
 import type { XRationMeterProps } from '@/components/connections/x-ration-meter'
@@ -41,6 +44,19 @@ export const metadata = { title: 'Connections' }
  * is answered better on the tile itself, where each channel states its `kind`
  * — *Feed*, *Local listing*, *Short video*, *Broadcast* — beside its own name,
  * rather than by a heading the reader has to scroll back to.
+ *
+ * ── THE BROWSE LAYER, AND WHY IT DID NOT REPLACE THE GROUPING ────────────────
+ * A category rail and a search field sit above the same two groups
+ * (`ConnectionMarketplace`). The rail filters by the catalogue's own `kind` and
+ * counts every facet from the entries rather than storing a number, so a fifth
+ * channel appears in the sidebar the day its catalogue row lands and nothing here
+ * has to be told about it.
+ *
+ * It is a FILTER and not a set of headings, which is the §3.4 lesson above
+ * applied rather than forgotten: four of the five kinds hold exactly one channel,
+ * so heading by kind would put four paperweights on the page. Filtering down to
+ * one card is a result a person asked for; a heading over one card is a layout
+ * mistake.
  *
  * ── ONE PRIMARY PER VIEW, AND USUALLY ZERO ───────────────────────────────────
  * Run 17 found four full-width solid-orange primaries on this one screen. There
@@ -210,99 +226,56 @@ export default async function ConnectionsPage({
             </p>
           ) : null}
 
-          <ChannelGroup
-            name="Connect your channels"
-            lead="Each card says what Sahoda can do there, and whether this workspace has linked it."
-            /* The count moved into the header card. Printing it here as well
-               would put one number in two places, which is how they drift. */
-            guide="connections.connect_now"
-          >
-            {CONNECTABLE.map((entry) => (
-              <ChannelTile
-                key={entry.id}
-                entry={entry}
-                connection={byChannel.get(entry.id)}
-                ration={entry.id === 'x' ? ration : undefined}
-                disabled={!(LIVE_VIA_ZERNIO.has(entry.id) && railReady && !planFull)}
-                disabledReason={
-                  planFull
-                    ? 'Your plan has no room for another channel.'
-                    : LIVE_VIA_ZERNIO.has(entry.id)
-                      ? railReady
-                        ? undefined
-                        : 'Publishing key isn’t set in this environment.'
-                      : 'Secure token flow still being wired.'
-                }
-              />
-            ))}
-          </ChannelGroup>
-
-          <ChannelGroup
-            name="More channels"
-            lead="Sahoda can't post to these yet. Each one says so on its own card."
-            /* No count. "0 of 4 connected" on a group nothing can connect to
-               would be a fraction whose numerator can never move — a number
-               that looks like progress and is a constant. */
-            guide="connections.coming_soon"
-          >
-            {PLANNED.map((entry) => (
-              <ChannelTile key={entry.id} entry={entry} />
-            ))}
-          </ChannelGroup>
+          <ConnectionMarketplace
+            sections={
+              [
+                {
+                  key: 'connectable',
+                  name: 'Connect your channels',
+                  lead: 'Each card says what Sahoda can do there, and whether this workspace has linked it.',
+                  guide: 'connections.connect_now',
+                  items: CONNECTABLE.map((entry) => ({
+                    id: entry.id,
+                    label: entry.label,
+                    kind: entry.kind,
+                    blurb: entry.blurb,
+                    tile: (
+                      <ChannelTile
+                        entry={entry}
+                        connection={byChannel.get(entry.id)}
+                        ration={entry.id === 'x' ? ration : undefined}
+                        disabled={!(LIVE_VIA_ZERNIO.has(entry.id) && railReady && !planFull)}
+                        disabledReason={
+                          planFull
+                            ? 'Your plan has no room for another channel.'
+                            : LIVE_VIA_ZERNIO.has(entry.id)
+                              ? railReady
+                                ? undefined
+                                : 'Publishing key isn’t set in this environment.'
+                              : 'Secure token flow still being wired.'
+                        }
+                      />
+                    ),
+                  })),
+                },
+                {
+                  key: 'planned',
+                  name: 'More channels',
+                  lead: "Sahoda can't post to these yet. Each one says so on its own card.",
+                  guide: 'connections.coming_soon',
+                  items: PLANNED.map((entry) => ({
+                    id: entry.id,
+                    label: entry.label,
+                    kind: entry.kind,
+                    blurb: entry.blurb,
+                    tile: <ChannelTile entry={entry} />,
+                  })),
+                },
+              ] satisfies MarketplaceSection[]
+            }
+          />
         </>
       )}
     </div>
-  )
-}
-
-/**
- * One heading, one grid.
- *
- * `items-stretch` is the default and is load-bearing here: tiles carry different
- * amounts of content — X alone carries the spend meter — and a grid of eight
- * cards with eight different heights is exactly the loose rhythm §3.4 measures
- * inside this app's otherwise tight chrome. The tiles are `h-full` and push their
- * controls to the floor with `mt-auto`, so the row's tallest tile sets the height
- * and every control still lines up.
- */
-function ChannelGroup({
-  name,
-  lead,
-  count,
-  guide,
-  children,
-}: {
-  name: string
-  /** One line saying what the group IS, when the heading alone cannot. */
-  lead?: string
-  count?: string
-  guide: string
-  children: React.ReactNode
-}) {
-  return (
-    <section className="space-y-3" data-guide={guide}>
-      <div className="space-y-1">
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <h2 className="type-h2">{name}</h2>
-          {/* Words, not a pill. The old `2/4` badge was a hand-rolled chip that
-              existed nowhere else in the system, and a bare fraction beside a
-              heading reads as a score. "2 of 4 connected" says which two things
-              are being compared. */}
-          {count ? <span className="type-sm num text-muted">{count}</span> : null}
-        </div>
-        {lead ? <p className="type-sm text-muted">{lead}</p> : null}
-      </div>
-      {/* `.enter-step` is this product's ONE entrance (docs/37 §12) and it is
-          already reduced-motion safe in tokens.css, which zeroes delay as well
-          as duration — without that, `fill: both` left staggered rows invisible
-          for the length of their delay. Using the primitive rather than a new
-          animation is also why no dependency was added for this. */}
-      <Stagger
-        className="grid items-stretch gap-4 wide:grid-cols-4 max-wide:grid-cols-2 max-narrow:grid-cols-1"
-        itemClassName="h-full"
-      >
-        {children}
-      </Stagger>
-    </section>
   )
 }
