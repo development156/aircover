@@ -1,6 +1,6 @@
 {
   "_": "Debt register for the ratcheted rules. Counts may only go DOWN — see design-lint.mjs.",
-  "spacing_total": 134,
+  "spacing_total": 132,
   "spacing": {
     "app/(app)/brain/page.tsx": 1,
     "app/(app)/campaigns/[id]/page.tsx": 1,
@@ -40,7 +40,6 @@
     "components/design-system/certainty-ladder.tsx": 1,
     "components/design-system/coming-soon-chip.tsx": 2,
     "components/embed/beta-form.tsx": 2,
-    "components/home/activity-feed.tsx": 2,
     "components/home/first-run.tsx": 1,
     "components/home/needs-attention.tsx": 1,
     "components/inbox/comment-card.tsx": 2,
@@ -85,7 +84,7 @@
   },
   "breakpoint_total": 0,
   "breakpoint": {},
-  "typesize_total": 732,
+  "typesize_total": 731,
   "typesize": {
     "app/(app)/approvals/page.tsx": 2,
     "app/(app)/assets/page.tsx": 1,
@@ -270,7 +269,7 @@
     "components/ui/tile.tsx": 1,
     "components/wallet/balance-hero.tsx": 4,
     "components/wallet/ledger-table.tsx": 13,
-    "components/wallet/top-up-panel.tsx": 6,
+    "components/wallet/top-up-panel.tsx": 5,
     "components/workspace/create-workspace-button.tsx": 3
   }
 }
