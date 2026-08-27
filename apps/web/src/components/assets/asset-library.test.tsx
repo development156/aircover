@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import type { AssetFolder } from '@sahoda/shared'
@@ -27,9 +27,13 @@ vi.mock('@/app/actions/asset-smart-folders', () => ({
   deleteSmartFolder: vi.fn(),
 }))
 
+const trashAsset = vi.fn()
+const restoreAsset = vi.fn()
 vi.mock('@/app/actions/assets', () => ({
   updateAsset: vi.fn(),
   deleteAsset: vi.fn(),
+  trashAsset: (...args: unknown[]) => trashAsset(...args),
+  restoreAsset: (...args: unknown[]) => restoreAsset(...args),
 }))
 
 const toastState = {
@@ -360,5 +364,142 @@ describe('the trash view', () => {
     const body = document.body.textContent ?? ''
     expect(body).not.toMatch(/\b\d+\s*days?\b(?![^.]*ago)/i)
     expect(body).toMatch(/until you delete them for good/i)
+  })
+})
+
+// ── DRAG A PHOTO ONTO A FOLDER ──────────────────────────────────────────────
+/**
+ * jsdom implements neither `DataTransfer` nor drag-and-drop, so the events are
+ * fired by hand with a stub that behaves like the real one in the two ways this
+ * code depends on: `types` lists what was set, and `getData` returns it. A stub
+ * that got either wrong would make these tests agree with themselves and with
+ * nothing else, so both are exercised through the real `isAssetDrag` and
+ * `decodeAssetDrag` rather than being asserted directly.
+ */
+function stubDataTransfer() {
+  const store = new Map<string, string>()
+  return {
+    get types() {
+      return [...store.keys()]
+    },
+    setData: (type: string, value: string) => void store.set(type, value),
+    getData: (type: string) => store.get(type) ?? '',
+    effectAllowed: '',
+    dropEffect: '',
+  }
+}
+
+describe('dragging a file onto a folder files it', () => {
+  it('files the dragged photo through the same action the menu uses', async () => {
+    fileAssets.mockResolvedValue({ ok: true, added: 1, alreadyThere: 0 })
+
+    render(
+      <AssetLibrary
+        cards={[card('shopfront')]}
+        capped={false}
+        folders={[folder('f1', 'Diwali')]}
+        smart={[]}
+        trashed={[]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    // Located by its NAME on screen, then walked up to the button that
+    // actually carries the drag — the same element a person grabs.
+    const label = await screen.findByText('shopfront.jpg')
+    const tile = label.closest('button')
+    expect(tile).not.toBeNull()
+    const target = screen.getByRole('button', { name: /^Diwali/ })
+    const dataTransfer = stubDataTransfer()
+
+    fireEvent.dragStart(tile as HTMLElement, { dataTransfer })
+    fireEvent.dragEnter(target, { dataTransfer })
+    fireEvent.drop(target, { dataTransfer })
+
+    await waitFor(() => expect(fileAssets).toHaveBeenCalled())
+    // The FOLDER id and the FILE id, in that order — the action's own shape.
+    expect(fileAssets).toHaveBeenCalledWith('f1', ['shopfront'])
+  })
+
+  it('a foreign drag never reaches fileAssets', async () => {
+    // A desktop file drop, or text dragged from another page. Both reach the
+    // same handler and neither may file anything.
+    //
+    // ── WHAT THIS DOES AND DOES NOT PROVE ────────────────────────────────────
+    // MEASURED: removing the `isAssetDrag` check from `onDrop` leaves this test
+    // GREEN, because `getData` for our MIME returns '' on a foreign drag, that
+    // decodes to [], and the length check stops it. So this asserts the OUTCOME
+    // and there are two independent mechanisms behind it — which is a fine
+    // thing to have, but it means this test is not evidence that the type check
+    // works. The test below is; it covers the half only the type check can do.
+    fileAssets.mockClear()
+
+    render(
+      <AssetLibrary
+        cards={[card('shopfront')]}
+        capped={false}
+        folders={[folder('f1', 'Diwali')]}
+        smart={[]}
+        trashed={[]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    const target = await screen.findByRole('button', { name: /^Diwali/ })
+    const dataTransfer = stubDataTransfer()
+    dataTransfer.setData('text/plain', 'some text from elsewhere')
+
+    fireEvent.dragEnter(target, { dataTransfer })
+    fireEvent.drop(target, { dataTransfer })
+
+    expect(fileAssets).not.toHaveBeenCalled()
+  })
+})
+
+describe('the type check is what makes a refusal VISIBLE', () => {
+  /**
+   * The half `onDrop`'s length check cannot do.
+   *
+   * A folder must not light up for a drag it cannot accept. `isAssetDrag` in
+   * `onDragEnter` / `onDragOver` is the only thing deciding that: the payload is
+   * unreadable during a drag in every browser (`getData` returns '' until
+   * `drop`), so nothing downstream can tell. Without it, dragging a desktop
+   * file across the sidebar highlights every folder it passes and then files
+   * nothing — which reads as a broken product rather than a refused gesture.
+   */
+  it('a folder does NOT highlight for a drag it cannot accept', async () => {
+    render(
+      <AssetLibrary
+        cards={[card('shopfront')]}
+        capped={false}
+        folders={[folder('f1', 'Diwali')]}
+        smart={[]}
+        trashed={[]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    const target = await screen.findByRole('button', { name: /^Diwali/ })
+    const row = target.parentElement as HTMLElement
+
+    const foreign = stubDataTransfer()
+    foreign.setData('text/plain', 'text from elsewhere')
+    fireEvent.dragEnter(target, { dataTransfer: foreign })
+    expect(row.querySelector('.ring-accent')).toBeNull()
+
+    // And the premise: a drag it CAN accept does highlight. Without this the
+    // guard above would pass just as well on a row that never highlights at
+    // all, which is a different bug wearing the same green tick.
+    const ours = stubDataTransfer()
+    const tile = (await screen.findByText('shopfront.jpg')).closest('button') as HTMLElement
+    fireEvent.dragStart(tile, { dataTransfer: ours })
+    fireEvent.dragEnter(target, { dataTransfer: ours })
+    expect(row.querySelector('.ring-accent')).not.toBeNull()
   })
 })

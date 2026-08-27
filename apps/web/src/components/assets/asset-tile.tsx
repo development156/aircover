@@ -6,6 +6,7 @@ import type { AssetFolder } from '@sahoda/shared'
 import { AssetThumb } from '@/components/assets/asset-thumb'
 import { FileMenuBody } from '@/components/assets/file-menu-body'
 import { DELETE_ITEM_KEY, RENAME_ITEM_KEY } from '@/components/assets/library-shortcuts'
+import { useAssetDragSource } from '@/components/assets/use-asset-drag'
 import {
   isContextMenuKey,
   useContextMenuTrigger,
@@ -47,6 +48,7 @@ export function AssetTile({
   onRemoveFromFolder,
   onDeleted,
   onTrash,
+  dragIds,
 }: {
   card: AssetCard
   onOpen: () => void
@@ -62,10 +64,18 @@ export function AssetTile({
   onRemoveFromFolder?: () => void
   onDeleted?: () => void
   onTrash?: () => void
+  /**
+   * The ids this tile's drag carries — the whole selection when this file is
+   * part of it, otherwise just this file (`idsForDrag`). A function so the
+   * selection is read at PICK-UP time: a value captured at render would carry
+   * whatever was selected when the tile last painted.
+   */
+  dragIds?: () => readonly string[]
 }) {
   const locked = lockedSites(card).length > 0
   const size = formatBytes(card.bytes)
   const trigger = useContextMenuTrigger()
+  const drag = useAssetDragSource(dragIds ?? (() => []))
   const menuEnabled =
     !selectable &&
     onFileInto !== undefined &&
@@ -76,6 +86,10 @@ export function AssetTile({
     <div className="group relative">
       <button
         type="button"
+        // Spread on the BUTTON, not the wrapper: the wrapper also holds the
+        // "..." trigger, and making that draggable would mean grabbing the
+        // menu button started a drag of the file instead of opening the menu.
+        {...(dragIds !== undefined ? drag : {})}
         onClick={selectable ? onToggleSelect : onOpen}
         onKeyDown={(event) => {
           if (event.key === ' ' || event.code === 'Space') {

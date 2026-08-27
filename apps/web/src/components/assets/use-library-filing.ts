@@ -75,6 +75,20 @@ export function useLibraryFiling({
    * no title is "Untitled photo", and a menu that sent a raw title would print
    * an empty string into the sentence.
    */
+  /**
+   * Files dropped onto a folder in the sidebar.
+   *
+   * Goes through the SAME `fileIntoRaw` the menu and the bulk bar use, so a
+   * drop reports the same counted outcome and the same Undo. A drag with its
+   * own quieter path would be the one way of filing that says nothing when it
+   * half-worked — and filing is where "9 selected, 7 added, 2 already there"
+   * actually happens.
+   */
+  function dropIntoFolder(folderId: string, ids: string[]) {
+    if (ids.length === 0) return
+    fileIntoRaw(folderId, folderName(folderId), ids)
+  }
+
   function trashSingle(id: string) {
     const card = cards.find((entry) => entry.id === id)
     trashOne(id, card === undefined ? 'that file' : displayName(card))
@@ -99,6 +113,7 @@ export function useLibraryFiling({
     fileSingleInto,
     removeFromCurrentFolder,
     removeSingleFromCurrentFolder,
+    dropIntoFolder,
     trashSingle,
     onFileDeleted,
   }

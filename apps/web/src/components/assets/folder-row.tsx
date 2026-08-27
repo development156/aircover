@@ -4,6 +4,7 @@ import { FolderOpen } from 'lucide-react'
 import type { AssetFolder } from '@sahoda/shared'
 
 import { SidebarRow } from '@/components/assets/library-sidebar-row'
+import { useFolderDropTarget } from '@/components/assets/use-asset-drag'
 import { DELETE_ITEM_KEY, RENAME_ITEM_KEY } from '@/components/assets/library-shortcuts'
 import {
   isContextMenuKey,
@@ -30,6 +31,7 @@ export function FolderRow({
   active,
   collapsed,
   onGoTo,
+  onDropFiles,
   renderMenu,
 }: {
   folder: AssetFolder
@@ -38,9 +40,12 @@ export function FolderRow({
   active: boolean
   collapsed: boolean
   onGoTo: (next: LibraryLocation) => void
+  /** Files dropped onto this folder. Absent means this row takes no drops. */
+  onDropFiles?: (folderId: string, ids: string[]) => void
   renderMenu?: (folder: AssetFolder, trigger: ContextMenuTrigger) => React.ReactNode
 }) {
   const trigger = useContextMenuTrigger()
+  const { isOver, dropProps } = useFolderDropTarget((ids) => onDropFiles?.(folder.id, ids))
   return (
     <SidebarRow
       icon={FolderOpen}
@@ -75,6 +80,8 @@ export function FolderRow({
           : undefined
       }
       menu={renderMenu ? renderMenu(folder, trigger) : undefined}
+      dropProps={onDropFiles ? dropProps : undefined}
+      isDropTarget={onDropFiles ? isOver : false}
     />
   )
 }

@@ -6,6 +6,7 @@ import type { AssetFolder } from '@sahoda/shared'
 import { AssetRow } from '@/components/assets/asset-row'
 import { AssetTile } from '@/components/assets/asset-tile'
 import type { LibraryView } from '@/components/assets/library-view-storage'
+import { idsForDrag } from '@/lib/assets/drag-payload'
 import type { AssetCard } from '@/lib/assets/view'
 
 /** The grid or the list, whichever view is active, and the one "nothing here" message both share. */
@@ -101,6 +102,7 @@ export function LibraryGrid({
               onRemoveFromFolder={() => onRemoveFromFolder(card.id)}
               onDeleted={() => onDeleted(card.id)}
               onTrash={() => onTrash(card.id)}
+              dragIds={() => idsForDrag(card.id, selected)}
             />
           </li>
         ))}
@@ -125,6 +127,7 @@ export function LibraryGrid({
             onRemoveFromFolder={() => onRemoveFromFolder(card.id)}
             onDeleted={() => onDeleted(card.id)}
             onTrash={() => onTrash(card.id)}
+            dragIds={() => idsForDrag(card.id, selected)}
           />
         </li>
       ))}
