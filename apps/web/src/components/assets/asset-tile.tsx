@@ -26,12 +26,15 @@ export function AssetTile({
   selectable = false,
   selected = false,
   onToggleSelect,
+  onQuickLook,
 }: {
   card: AssetCard
   onOpen: () => void
   selectable?: boolean
   selected?: boolean
   onToggleSelect?: () => void
+  /** Space toggles Quick Look; a click still opens the detail drawer. */
+  onQuickLook?: () => void
 }) {
   const locked = lockedSites(card).length > 0
   const size = formatBytes(card.bytes)
@@ -40,6 +43,12 @@ export function AssetTile({
     <button
       type="button"
       onClick={selectable ? onToggleSelect : onOpen}
+      onKeyDown={(event) => {
+        if (event.key === ' ' || event.code === 'Space') {
+          event.preventDefault()
+          onQuickLook?.()
+        }
+      }}
       aria-pressed={selectable ? selected : undefined}
       className={cn(
         'surface-ring flex w-full flex-col overflow-hidden rounded-card bg-surface text-left transition-micro hover:bg-s1',
