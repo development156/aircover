@@ -679,6 +679,30 @@ answer 200**. Every platform in this lane was probed individually instead.
 4. **Refresh the PR body** before requesting review.
 5. **`/post/new`** — owed since the second message of the session.
 
+## Round seventeen: the budget line that only ever goes red in CI
+
+PR #20's first Vercel build failed:
+
+```
+js-budget FAILED — /(app)/connections  683.9 kB > 675.4 kB budget +8 kB slack
+```
+
+Not this PR's code. `/connections` grew in #14, which is merged, and the budget
+line for it was never regenerated. Regenerated here from a real build with
+`PERF_BUDGET_WRITE=1`: **691660 -> 699797**, MEASURED.
+
+`PERF_BUDGET_WRITE=1` rewrites **all 81 routes**, not one. Every other route
+moved +120 bytes on a shared chunk, and taking that whole file would raise 80
+budgets nobody measured a need for. The slack is 8 kB, so 120 bytes needs none.
+Only the connections line is committed.
+
+**The mutation did not go red, and that is the finding.** Restoring 691660
+locally still PASSES: this box builds the route 516 bytes smaller than Vercel
+does, so the old ceiling clears it by 55 bytes and misses Vercel's by 461. The
+guard fires correctly when given a figure it can fail on (691000 -> red, same
+message shape), so it works; it simply cannot reproduce a CI-only overage from
+here. **A local js-budget pass is not evidence the Vercel build will pass.**
+
 ## Gate
 
 Re-run on `302308c0` after the container restarted, `--force --concurrency=1`,
