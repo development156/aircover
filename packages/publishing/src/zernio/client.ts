@@ -293,6 +293,38 @@ interface RawGbpLocation {
   category?: string
 }
 
+/**
+ * TELEGRAM DOES NOT HAVE A CONSENT SCREEN, AND THAT IS THE WHOLE PROBLEM.
+ *
+ * Every other platform on this screen is OAuth: send the customer to a consent
+ * page, they approve, the browser comes back. MEASURED against the live API,
+ * `GET /v1/connect/telegram` returns no `authUrl` at all. It returns a PAIRING
+ * CODE valid fifteen minutes, and the customer completes the link inside
+ * Telegram itself — add Zernio's bot as an administrator of the channel, message
+ * the bot the code, and the account appears.
+ *
+ * So there is no popup, no redirect and no return trip. The app issues a code,
+ * shows it, and POLLS. `packages/.../catalogue.ts` has carried the note "what
+ * building it needs: a code-and-poll surface of its own" since the platform was
+ * first refused; this is that surface.
+ */
+export interface ZernioTelegramCode {
+  /** What the customer types to the bot. Short-lived, and not a credential. */
+  code: string
+  /** The bot they must add as an admin, without the leading @. */
+  botUsername: string
+  /** ISO instant the code stops working. */
+  expiresAt: string
+  /** Seconds remaining when it was issued. */
+  expiresIn: number
+  /** Zernio's own step list. Passed through, never rewritten — see the route. */
+  instructions: string[]
+}
+
+/** Where a pairing attempt has got to. `expired` needs a NEW code, not a retry. */
+export type ZernioTelegramStatus =
+  { status: 'pending'; expiresAt: string | null } | { status: 'connected' } | { status: 'expired' }
+
 export type ZernioSelectionPlatform = 'facebook' | 'googlebusiness'
 
 /** One thing the customer can pick. Flattened, so the picker renders one shape. */
@@ -340,6 +372,22 @@ export interface ZernioClient {
     options?: { headless?: boolean | undefined },
   ): Promise<string>
   listAccounts(profileId: string): Promise<ZernioAccount[]>
+  /**
+   * `GET /connect/telegram` — issue a pairing code. No authUrl exists for this
+   * platform; see ZernioTelegramCode.
+   */
+  telegramCode(profileId: string): Promise<ZernioTelegramCode>
+  /**
+   * `PATCH /connect/telegram?code=` — has the customer finished in Telegram yet.
+   *
+   * Returns the STATUS and nothing else. The response also carries an `account`
+   * object once it lands, and that is deliberately dropped: doc 13 §3 records
+   * that Zernio validates an accountId against the whole TEAM, so an id obtained
+   * by polling a code is an id we have no business trusting. The caller
+   * re-derives the account the way every other path does, by asking for the
+   * accounts under a profile read from our own table.
+   */
+  telegramStatus(code: string): Promise<ZernioTelegramStatus>
   /**
    * The choices behind a half-finished connect — Facebook Pages, GBP locations.
    *
@@ -551,6 +599,47 @@ export function createZernioClient(deps: ZernioClientDeps): ZernioClient {
         // that we considered a platform and chose none.
       )
       return data.post ?? (data as ZernioPost)
+    },
+
+    async telegramCode(profileId) {
+      const { data } = await json<Partial<ZernioTelegramCode>>(
+        'GET',
+        `/connect/telegram?profileId=${encodeURIComponent(profileId)}`,
+        'telegramCode',
+      )
+      // Checked for the two fields the screen cannot work without, in the same
+      // shape every other method here uses: a 200 that carries the wrong body is
+      // not a success, and this API has been measured answering 200 with HTML.
+      if (!data.code || !data.botUsername) {
+        throw new ZernioError({
+          message: 'telegramCode: response carried no code or bot username.',
+          status: 200,
+          code: 'MISSING_FIELDS',
+          type: 'contract_error',
+          rateLimit: { limit: null, remaining: null, reset: null },
+        })
+      }
+      return {
+        code: data.code,
+        botUsername: data.botUsername.replace(/^@/, ''),
+        expiresAt: data.expiresAt ?? '',
+        expiresIn: typeof data.expiresIn === 'number' ? data.expiresIn : 0,
+        instructions: Array.isArray(data.instructions) ? data.instructions : [],
+      }
+    },
+
+    async telegramStatus(code) {
+      const { data } = await json<{ status?: string; expiresAt?: string }>(
+        'PATCH',
+        `/connect/telegram?code=${encodeURIComponent(code)}`,
+        'telegramStatus',
+      )
+      // An unrecognised status is `pending`, not `connected`. Fail-closed in the
+      // direction that costs a customer a few more seconds of waiting rather
+      // than the direction that reports a link nobody made.
+      if (data.status === 'connected') return { status: 'connected' }
+      if (data.status === 'expired') return { status: 'expired' }
+      return { status: 'pending', expiresAt: data.expiresAt ?? null }
     },
 
     async listConnectChoices(platform, state) {
