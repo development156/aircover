@@ -42,6 +42,11 @@ build deleted more than it added.
 | 11 | `a64c1f8` | **Trash and restore. Deleting a photo is no longer permanent.** |
 | 12 | `7201fdc` | Drag a photo onto a folder |
 | 13 | `95afafa` | Shift-click a range, select all, drag a folder into a folder |
+| 14 | `76bc0c6` | Details panel dropped; **both migrations APPLIED to production** |
+| 15 | `3a58912` | docs/38: what the trash means for a copy and for erasure |
+| 16 | `0238fe5` | Delete a selection, and empty the trash |
+| 17 | `6fb2796` | Arrow keys across the grid, one tab stop instead of 200 |
+| 18 | `08793aa` | Ctrl/Cmd+A, Shift+Arrow, and the shortcut sheet stops under-claiming |
 | 14 | `906fa59` | Handoff for the second half |
 | 15 | `76bc0c6` | **Both migrations APPLIED.** Details panel dropped. |
 
@@ -275,6 +280,9 @@ executing". The list, in the order it was worked:
 | 3 | Shift-click a range, and select all | `95afafa` |
 | 4 | A Recent view | **NOT BUILT, deliberately** |
 | 5 | Drag a folder into a folder | `95afafa` |
+| 6 | Delete a selection, and empty the trash | `0238fe5` |
+| 7 | Arrow keys + roving tabindex | `6fb2796` |
+| 8 | Ctrl/Cmd+A and Shift+Arrow | `08793aa` |
 
 **Recent was dropped on judgement, not forgotten.** All files is already sorted
 newest-first by default and `added:7d` is already a search token, so a sidebar
