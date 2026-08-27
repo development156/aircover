@@ -1,6 +1,11 @@
 # Handoffs
 
-One file per role per day, written by `/handoff` and read by `/kickoff`.
+One file per lane per day, written by `/handoff` and read by `/kickoff`.
+
+**`/handoff` is the only thing that writes these.** A Stop hook used to write a
+skeleton automatically; it was removed on 26 August because it fired mid-merge
+and created conflicts inside other people's work. If nobody runs `/handoff`,
+the session leaves no record — that is the trade.
 
     <role>-<YYYY-MM-DD>.md      role is: advisor | design | research
 
