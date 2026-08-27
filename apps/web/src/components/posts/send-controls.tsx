@@ -101,19 +101,33 @@ export function SendControls({
           Save as draft
         </Button>
 
-        {live.length > 0 ? (
-          <Button
-            data-send-now
-            disabled={busy || confirming}
-            onClick={() => {
-              setSaveResult(null)
-              setConfirming(true)
-            }}
-          >
-            <Send size={14} aria-hidden />
-            Send now
-          </Button>
-        ) : null}
+        {/* ── ALWAYS RENDERED, SOMETIMES REFUSED ───────────────────────────
+            This was hidden outright when no channel could receive the post, on
+            the principle that a button which cannot work is worse than no
+            button. MEASURED on the live preview with four unconnected channels:
+            what the reader actually got was a lone "Save as draft" and a gap
+            where the point of the screen should be, with no way to tell whether
+            sending was missing, broken, or somewhere else entirely. Founder's
+            ruling, REQUESTS §33: the send button is the shape of this panel and
+            it stays.
+
+            Disabled, not hidden, and the reason is directly above it — the warn
+            block naming every unconnected channel with a link to connect one.
+            That is the difference between a refusal and a dead end. It is also
+            why `disabled` is honest here rather than the coming-soon pattern
+            `design-lint` rule 3 forbids: nothing is unfinished, the account is
+            simply not connected yet, and the remedy is one link away. */}
+        <Button
+          data-send-now
+          disabled={live.length === 0 || busy || confirming}
+          onClick={() => {
+            setSaveResult(null)
+            setConfirming(true)
+          }}
+        >
+          <Send size={14} aria-hidden />
+          Send now
+        </Button>
       </div>
 
       {/* ── BELOW THE BUTTONS, NOT ABOVE THEM ───────────────────────────────
