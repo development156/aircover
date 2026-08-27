@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronRight, Link2, Plus } from 'lucide-react'
+import { ChevronRight, Link2, Loader2, Plus } from 'lucide-react'
 
 import type { ConnectionPlatform } from '@sahoda/shared'
 
@@ -69,12 +69,35 @@ export function ConnectButton({
            labels. */
         className="w-full justify-between"
         disabled={disabled || pending}
+        /* \u2500\u2500 WHY `aria-busy` IS SET HERE RATHER THAN VIA `loading` \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+           `Button`'s own `loading` prop renders its spinner as a SIBLING of
+           children, which on a `justify-between` control makes three flex
+           children instead of two \u2014 the spinner and the leading mark would
+           push apart and the chevron would stop sitting at the right edge.
+           So the spin is swapped in for the leading mark below, in place,
+           and the one thing `loading` does that a caller cannot see is set
+           explicitly. Without it a screen reader is told nothing at all
+           happened for as long as the round trip takes. */
+        aria-busy={pending || undefined}
         onClick={start}
         data-adding-another={addingAnother ? 'true' : 'false'}
         data-guide={disabled ? undefined : `connections.connect_${platform}`}
       >
         <span className="inline-flex min-w-0 items-center gap-2">
-          {addingAnother ? (
+          {/* The mark BECOMES the spinner rather than sitting beside one, so
+              the control's width and the label's start never move. A button
+              that reflows on click reads as a mis-click.
+
+              INTEGRATION NOTE: wt-jiban wrote the spinner swap against a
+              `Connect ${label}` literal; wt-divas had already made both the
+              mark and the words depend on `addingAnother`, because a plan
+              sells SLOTS and the second press is a different act from the
+              first. Taking either side whole would have dropped the other's
+              work, so both are kept: the spinner replaces WHICHEVER mark
+              this instance would otherwise show. */}
+          {pending ? (
+            <Loader2 aria-hidden className="size-3.5 shrink-0 animate-spin" />
+          ) : addingAnother ? (
             <Plus aria-hidden className="size-3.5 shrink-0" />
           ) : (
             <Link2 aria-hidden className="size-3.5 shrink-0" />

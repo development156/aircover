@@ -429,10 +429,14 @@ be read:
 
 1. **`regions` is comparable within a theme, not across them.** The same route, the
    same width, the same data state and therefore the same DOM measures 15 regions
-   in light and 30 in dark (/home 1440 empty) for 1392 against 1758 pixels. `--acc`
-   is `#bd4b00` in light and `#ff6600` in dark and the two antialias across the
-   `s>0.30` floor differently against their own grounds. A light-to-dark delta is an
-   artefact; a same-theme before-to-after delta is a measurement.
+   in light and 30 in dark (/home 1440 empty) for 1392 against 1758 pixels. **The
+   cause this note used to give is void:** it read "`--acc` is `#bd4b00` in light
+   and `#ff6600` in dark and the two antialias across the `s>0.30` floor
+   differently against their own grounds", and the 2026-08-26 ruling made `--acc`
+   `#f60` in BOTH themes. The 15-against-30 figure stands — it was measured — but
+   nothing has re-measured it since, and the surfaces still differ, so a delta may
+   or may not survive. A light-to-dark delta is still not a finding without a
+   fresh measurement; a same-theme before-to-after delta is a measurement.
 2. **The fill count sees actions, not elements.** A decorative solid-orange `<div>`
    passes it. That is the price of reconciling §16 with §9, and the pixel ceiling
    is what covers it.

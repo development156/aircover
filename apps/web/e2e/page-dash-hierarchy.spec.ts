@@ -356,9 +356,11 @@ test.describe('hierarchy on the two screens people judge this product on @smoke'
  *    certainty mark that grew to the size of a button, both pass. That is the
  *    price of the §9 reconciliation above, and the pixel budget is what covers it.
  * 2. A SECOND fill that is not `--p`. It matches one colour string, so a button
- *    painted `--acc` (#bd4b00 light) or a customer theme's own brand is invisible
- *    to it. Brand Skin is cut, so no such theme exists today; if one ships, this
- *    reads the wrong colour and passes.
+ *    painted with a customer theme's own brand is invisible to it. `--acc` is no
+ *    longer such a case: the 2026-08-26 ruling made it #f60 in both themes, the
+ *    same string as `--p`, so a button painted `--acc` is now SEEN. It was
+ *    #bd4b00 in light before that and was missed. Brand Skin is cut, so no such
+ *    theme exists today; if one ships, this reads the wrong colour and passes.
  * 3. ANYTHING BELOW 400px². The count badge (18x18) and a caret are deliberately
  *    exempt, and so is a 19x19 fill that should not be there.
  * 4. THE SHELL, except for its count. Anything `#main` does not contain is
