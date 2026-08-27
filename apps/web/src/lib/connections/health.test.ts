@@ -57,9 +57,14 @@ const AFTER_THE_TWO_HOURS = new Date('2026-08-27T08:00:00.000Z')
 describe('a token Zernio holds is not the customer’s deadline', () => {
   it('does not call a freshly connected X account expired', () => {
     // THE REGRESSION. Before the fix this was { kind: 'expired' }.
-    // `daysLeft` is -1, not 0: `daysUntil` floors, so 25 minutes past the deadline
-    // round down to a whole day. Asserted as measured rather than tidied.
-    expect(connectionHealth(X_ROW, AFTER_THE_TWO_HOURS)).toEqual({ kind: 'ok', daysLeft: -1 })
+    // `daysLeft` is null, and that is the second half of the same fix. The first
+    // version of it carried the real number through — `-1` here — on the argument
+    // that a true number is worth showing. `channel-accounts.tsx` renders
+    // `{daysLeft}d left` for this exact verdict, so the founder's next screenshot
+    // showed **"0d left"** beside "Connected" on a working X account: the same
+    // false claim, in fewer words. We do not know when a connection Zernio holds
+    // ends. `null` says that.
+    expect(connectionHealth(X_ROW, AFTER_THE_TWO_HOURS)).toEqual({ kind: 'ok', daysLeft: null })
   })
 
   it('says nothing to the customer about it', () => {
@@ -70,6 +75,13 @@ describe('a token Zernio holds is not the customer’s deadline', () => {
 
   it('keeps it out of the attention list, so no banner claims an outage', () => {
     expect(needsAttention([X_ROW], AFTER_THE_TWO_HOURS)).toEqual([])
+  })
+
+  it('offers no countdown at all, because there is no deadline to count to', () => {
+    // THE SECOND REGRESSION, and the one the founder saw AFTER the first fix.
+    // `channel-accounts.tsx` renders this number and nothing else gates it.
+    const health = connectionHealth(X_ROW, AFTER_THE_TWO_HOURS)
+    expect(health.kind === 'ok' ? health.daysLeft : 'not-ok').toBeNull()
   })
 
   it('is still quiet a week later, because the rotation never lands in our row', () => {
