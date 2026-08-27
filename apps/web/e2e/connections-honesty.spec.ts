@@ -75,9 +75,32 @@ test.describe('connections is honest about every channel @smoke', () => {
           await tile.evaluate((el) => el.tagName),
           `width ${width}: a coming-soon tile must be a div`,
         ).toBe('DIV')
+        /**
+         * ── NO CONTROL THAT *ACTS*. THE DETAILS DISCLOSURE IS EXEMPT ────────
+         * This selector had no exemption until 2026-08-27, and on that day it
+         * went red for a reason that is not a defect: `ChannelHeader` is shared
+         * between the connectable and the coming-soon shapes on purpose, and it
+         * carries the details disclosure on every tile, "connectable or not"
+         * (channel-tile.tsx). One control, counted, expected zero.
+         *
+         * The rule this guard exists for is narrower than the selector was. A
+         * disabled Connect button is announced as a control, offers an action,
+         * does nothing, and reads as a broken app rather than an unbuilt
+         * feature (docs/26 §10.2). The details disclosure fails none of that:
+         * it is not disabled, and pressing it does exactly what it says.
+         *
+         * So the exemption is by the hook the disclosure sets on ITSELF, not by
+         * tag or by position. A Connect button, a reconnect link, an
+         * aria-disabled anything still counts, which is what makes this a guard
+         * and not a formality.
+         */
         expect(
-          await tile.locator('button, a, [role="button"], [aria-disabled]').count(),
-          `width ${width}: a coming-soon tile must offer no control`,
+          await tile
+            .locator(
+              'button:not([data-channel-details]), a, [role="button"]:not([data-channel-details]), [aria-disabled]',
+            )
+            .count(),
+          `width ${width}: a coming-soon tile must offer no control that acts`,
         ).toBe(0)
       }
 
@@ -126,16 +149,38 @@ test.describe('connections is honest about every channel @smoke', () => {
         expect(text, `width ${width}: ${name} is named`).toContain(name)
       }
 
-      // ── 5 · THE X METER IS A REAL FRACTION ────────────────────────────────
-      // A numerator, the word "of", and a denominator that exists — the shape
-      // `100 of —` failed. The count is whatever the database says; the
-      // denominator is Sahoda's declared ration.
+      // ── 5 · THE X METER IS A REAL NUMBER, AND IT IS ATTRIBUTED ────────────
+      /**
+       * This read `X posts this month \d+ of \d+` until 2026-08-27. The meter
+       * was redesigned on wt-core (741418ef) and now counts DOWN — "12 posts
+       * remaining this month" — because down is the number a person acts on.
+       * The used-of-total pair is gone, so the old pattern could never match
+       * again. It went unnoticed because the smoke suite has been unrunnable in
+       * the sandbox, which is the same reason this whole spec is being repaired
+       * in one sitting.
+       *
+       * BOTH CLAIMS SURVIVE THE REWRITE, which is why this is a retarget and
+       * not a deletion. The first is that the figure is a real measurement: the
+       * shape `100 of —` is what this guard was written against, so `\d+` is
+       * the load-bearing part and an em dash still fails.
+       */
       expect(text, `width ${width}: the X allowance is rendered`).toMatch(
-        /X posts this month \d+ of \d+/i,
+        /\d+ posts remaining this month/i,
       )
-      // And it is attributed. X imposes no monthly write allowance, so a meter
-      // that read as X's would be inventing a limit X does not have.
-      expect(text).toMatch(/allowance is ours rather than X/)
+      /**
+       * The second is attribution, and it now matters MORE than before. X
+       * imposes no monthly write allowance — the API is pay-per-use — so a bare
+       * countdown invents a limit X does not have. The sentence that says whose
+       * ration it is used to be `allowance is ours rather than X`, which has
+       * moved INSIDE the pricing disclosure and is therefore not in the page's
+       * text while it is closed. The visible attribution is the meter's second
+       * line, and x-ration-meter.tsx is explicit that dropping it makes the line
+       * above it a false claim. So that is the line this guard now reads.
+       *
+       * Curly apostrophe: the component renders `&rsquo;` and CLAUDE.md's copy
+       * ruling keeps it. Matched either way rather than pinned to the glyph.
+       */
+      expect(text).toMatch(/From Sahoda['\u2019]s ration/i)
 
       // ── 6 · NOTHING IS TRUNCATED TO NONSENSE ──────────────────────────────
       // "S Sah" was every number being right and the pixels being wrong.
