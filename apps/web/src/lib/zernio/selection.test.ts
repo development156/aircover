@@ -110,7 +110,7 @@ describe('the diagnostic reports names and never values', () => {
 
 describe('the two vocabularies stay paired', () => {
   it('round-trips every platform that has a picker', () => {
-    for (const ours of ['facebook', 'gbp'] as const) {
+    for (const ours of ['facebook', 'gbp', 'pinterest'] as const) {
       const theirs = selectionPlatformFor(ours)
       expect(theirs).not.toBeNull()
       expect(ourPlatformFor(theirs as string)).toBe(ours)
@@ -121,5 +121,18 @@ describe('the two vocabularies stay paired', () => {
     for (const ours of ['instagram', 'linkedin', 'x', 'discord'] as const) {
       expect(selectionPlatformFor(ours)).toBeNull()
     }
+  })
+
+  it('hosts the Pinterest board picker too', () => {
+    // MEASURED: the founder photographed Zernio's own "Pick a default board"
+    // screen mid-connect — its wordmark, its domain, asking a Sahoda customer
+    // which board to pin to. That screen is what this removes.
+    expect(selectionPlatformFor('pinterest')).toBe('pinterest')
+    expect(ourPlatformFor('pinterest')).toBe('pinterest')
+    expect(
+      readSelectionRedirect(
+        new URLSearchParams({ step: 'select_board', profileId: FB.profileId, tempToken: 'pina_x' }),
+      )?.platform,
+    ).toBe('pinterest')
   })
 })

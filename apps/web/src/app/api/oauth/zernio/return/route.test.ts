@@ -1343,3 +1343,113 @@ describe('a pick that never reached us is not the same as an empty account list'
     expect(res.headers.get('location')).toContain('zernio=nothing')
   })
 })
+
+/**
+ * THE REFUSAL WE WERE HANDED AND THREW AWAY.
+ *
+ * ── WHAT HAPPENED ────────────────────────────────────────────────────────────
+ * The founder connected several channels, got nothing useful from our screen,
+ * and went to ZERNIO'S OWN DASHBOARD to find out why. It told them at once:
+ *
+ *   Google Business Profile token exchange failed: 400
+ *   { "error": "invalid_grant", "error_description": "Bad Request" }
+ *
+ * We had that fact. Zernio's spec says "On failure every platform appends error
+ * details, starting with `error` and `platform`", and this route ignores every
+ * query parameter — a rule that is right about IDS and wrong about this one.
+ * The customer read a third party's dashboard to use our product.
+ */
+describe('when the platform refuses, the customer is told', () => {
+  const refusal = (query: Record<string, string>) => {
+    const url = new URL('https://app.sahodalabs.com/api/oauth/zernio/return')
+    for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v)
+    return GET(new Request(url.toString()))
+  }
+
+  it('says what happened instead of "nothing found"', async () => {
+    // THE REGRESSION, in the exact shape Zernio sends.
+    state.pending = { platform: 'gbp', mode: 'popup' }
+
+    const res = await refusal({
+      error: 'invalid_grant',
+      error_description: 'Google Business Profile token exchange failed: 400 Bad Request',
+    })
+    const body = await res.text()
+
+    // A 502: the customer's request was fine and so was ours. Visible to the
+    // 4xx/5xx log filter this route was rebuilt around.
+    expect(res.status).toBe(502)
+    expect(body).toContain('didn’t finish signing in')
+    expect(body).not.toMatch(/nothing was found|zernio=nothing/)
+  })
+
+  it('names the remedy that works for this refusal, and only for this one', async () => {
+    state.pending = { platform: 'gbp', mode: 'popup' }
+    const body = await (await refusal({ error: 'invalid_grant' })).text()
+
+    expect(body).toContain('without going back a step')
+  })
+
+  it('offers NO remedy for a refusal nobody has read', async () => {
+    // Guessing at a cause for an unknown code is what no-impossible-remedy
+    // forbids. The provider's own words go underneath instead.
+    state.pending = { platform: 'gbp', mode: 'popup' }
+    const body = await (
+      await refusal({ error: 'wat_is_this', error_description: 'something specific' })
+    ).text()
+
+    expect(body).toContain('refused the connection')
+    expect(body).toContain('something specific')
+    expect(body).not.toMatch(/try again|connect again/i)
+  })
+
+  it('escapes the provider’s words, which are third-party text', async () => {
+    // `error_description` arrives through the customer's browser and is written
+    // by somebody else. Same escaper as a Facebook Page name, same reason.
+    state.pending = { platform: 'gbp', mode: 'popup' }
+    const body = await (
+      await refusal({ error: 'x', error_description: '<script>alert(1)</script>' })
+    ).text()
+
+    expect(body).not.toContain('<script>alert')
+    expect(body).toContain('&lt;script&gt;')
+  })
+
+  it('lets the Connect button stop waiting', async () => {
+    state.pending = { platform: 'gbp', mode: 'popup' }
+    expect(await (await refusal({ error: 'invalid_grant' })).text()).toContain(
+      'sahoda:connect-outcome',
+    )
+  })
+
+  it('says a cancelled sign-in was cancelled, and offers no remedy for it', async () => {
+    // Not a failure of anything. Telling somebody who changed their mind to
+    // "try again" is putting correct behaviour in the failure channel.
+    state.pending = { platform: 'gbp', mode: 'popup' }
+    const body = await (await refusal({ error: 'access_denied' })).text()
+
+    expect(body).toContain('wasn’t connected')
+    expect(body).toContain('cancelled')
+  })
+
+  it('does NOT treat our own `reason` parameter as an upstream refusal', async () => {
+    // `reason` is a status this route sets itself. Reading it as a provider
+    // error would report our own notices as theirs.
+    state.pending = { platform: 'instagram', mode: 'redirect' }
+    state.accounts = []
+
+    const res = await refusal({ reason: 'no-profile' })
+
+    expect(res.status).toBe(303)
+    expect(res.headers.get('location')).toContain('zernio=nothing')
+  })
+
+  it('still connects normally when no error came back', async () => {
+    // The branch has to be narrow. Every working connect passes through here.
+    state.pending = { platform: 'instagram', mode: 'redirect' }
+    const res = await refusal({})
+
+    expect(res.status).toBe(303)
+    expect(state.rpcCalls).toEqual(['instagram:6a75caf7d0fe733d1afcc1f4'])
+  })
+})

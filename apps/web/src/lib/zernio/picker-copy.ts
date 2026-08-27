@@ -29,6 +29,17 @@ const COPY: Readonly<Record<ZernioSelectionPlatform, PickerCopy & { empty: strin
       'Create one at facebook.com/pages/create, then connect again.',
     empty: 'no-pages',
   },
+  pinterest: {
+    channel: 'Pinterest',
+    noun: 'board',
+    // A board is free and instant to make, and Pinterest requires one before
+    // anything can be pinned — so "create one" is a remedy that genuinely works
+    // here, unlike on Google Business.
+    extra:
+      'Pins have to go somewhere, so a board has to exist first. Create one in ' +
+      'Pinterest, then connect again.',
+    empty: 'no-boards',
+  },
   googlebusiness: {
     channel: 'Google Business Profile',
     noun: 'location',
