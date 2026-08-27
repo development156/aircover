@@ -88,6 +88,7 @@ export function AssetLibrary({
     removeSingleFromCurrentFolder,
     onFileDeleted,
     trashSingle,
+    dropIntoFolder,
   } = useLibraryFiling({
     cards,
     folders,
@@ -206,6 +207,7 @@ export function AssetLibrary({
     onGoTo: goTo,
     onGoUnfiled: goUnfiled,
     trashedCount: trashed.length,
+    onDropFiles: dropIntoFolder,
     onOpenSmart: openSmartSearch,
     foldersUnreadable,
     droppedFolders,

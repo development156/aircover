@@ -54,6 +54,7 @@ export function LibrarySidebar({
   onGoUnfiled,
   onOpenSmart,
   trashedCount,
+  onDropFiles,
   foldersUnreadable,
   droppedFolders,
   droppedSmart,
@@ -80,6 +81,12 @@ export function LibrarySidebar({
    * over `cards` could ever produce this number.
    */
   trashedCount: number
+  /**
+   * Files dragged onto a real folder in this list. Optional so a caller that
+   * has no filing action (a preview, a test) renders rows that visibly take no
+   * drops, rather than rows that light up and then do nothing.
+   */
+  onDropFiles?: (folderId: string, ids: string[]) => void
   foldersUnreadable: boolean
   droppedFolders: number
   droppedSmart: number
@@ -114,6 +121,7 @@ export function LibrarySidebar({
           active={active}
           collapsed={collapsed}
           onGoTo={onGoTo}
+          onDropFiles={onDropFiles}
           renderMenu={renderFolderMenu}
         />,
         ...folderRows(folder.id, depth + 1),

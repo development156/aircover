@@ -32,6 +32,8 @@ export function SidebarRow({
   onContextMenu,
   onKeyDown,
   menu,
+  dropProps,
+  isDropTarget = false,
 }: {
   icon: LucideIcon
   label: string
@@ -49,9 +51,34 @@ export function SidebarRow({
    *  row has focus. */
   onKeyDown?: (event: React.KeyboardEvent<HTMLButtonElement>) => void
   menu?: React.ReactNode
+  /**
+   * Drag-and-drop handlers from `useFolderDropTarget`, for rows that can
+   * receive files. Spread onto the WRAPPER rather than the button: a drop on
+   * the "..." trigger at the row's right edge is still a drop on the folder,
+   * and a target with a hole in it is worse than no target.
+   */
+  dropProps?: {
+    onDragEnter: (event: React.DragEvent) => void
+    onDragOver: (event: React.DragEvent) => void
+    onDragLeave: (event: React.DragEvent) => void
+    onDrop: (event: React.DragEvent) => void
+  }
+  /** Whether files are hovering over this row right now. */
+  isDropTarget?: boolean
 }) {
   return (
-    <div className="group relative">
+    <div className="group relative" {...dropProps}>
+      {/* A ring rather than a fill, and INSIDE the row rather than around it,
+          so the list does not reflow by a pixel as a drag crosses it — a tree
+          that shifts under the cursor is a tree you cannot aim at.
+          `pointer-events-none` because a drop must land on the row, and an
+          overlay that swallowed the event would make the target inert. */}
+      {isDropTarget ? (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 rounded-sm ring-2 ring-accent ring-inset"
+        />
+      ) : null}
       <button
         type="button"
         onClick={onClick}
