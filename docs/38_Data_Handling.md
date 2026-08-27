@@ -101,7 +101,7 @@ the table belongs to one identified workspace.
 | `asset_folders` | the folders you made, and their names | `name` `created_by` | removed |
 | `asset_smart_folders` | the saved searches you named, and their rules | `name` `query` `created_by` | removed |
 | `asset_usages` | where each picture is used | no direct identifiers | removed |
-| `assets` | your picture library | `title` `created_by` | removed |
+| `assets` | your picture library, including anything in its trash | `title` `created_by` | removed |
 | `audience_snapshots` | who follows you | no direct identifiers | removed |
 | `audit_logs` | a record of admin actions | `actor` | removed |
 | `billing_profiles` | who your invoices are made out to | `legal_name` `address` `billing_email` | removed |
@@ -168,6 +168,25 @@ for this table and it has no read policy at all, so the application has no permi
 for anybody. A database queried this way answers with an empty list rather than an error — which is
 indistinguishable from "you have none". The export therefore **names it, with the reason**, and never
 renders it as an empty section. It is deleted with everything else.
+
+**`assets` — "deleted" now has two meanings, and only the second removes anything.** Since
+2026-08-27 a customer deleting a picture moves it to a trash: `assets.deleted_at` is set, the row
+stays, its folders and its post attachments stay, and **the file itself stays in storage**. Only
+"Delete for good" removes the row and the bytes.
+
+Three consequences worth stating plainly, because a reader would otherwise assume the first meaning
+covers everything:
+
+- **A copy of the data (§4.1) includes trashed pictures.** The export queries the table directly and
+  does not filter on `deleted_at`, so nothing a customer deleted-but-not-permanently is missing from
+  the copy they are given. That is correct: those files are still theirs and still held.
+- **Deleting everything (§4.2) removes trashed pictures too.** Erasure is scoped by workspace and
+  never consults `deleted_at`, so the trash is emptied with the rest. There is no residue.
+- **Nothing expires on its own.** No scheduled process reads `deleted_at`, so a trashed picture is
+  held until a person empties the trash. Sahoda therefore does **not** promise anywhere that deleted
+  files disappear after any number of days, because nothing would make that true.
+  `packages/db/tests/assets-trash.test.ts` asserts that no database function reads that column, so
+  the day a sweeper is added the guard fails and this paragraph has to be rewritten with it.
 
 ### Tables that exist and are NOT a customer's data
 
