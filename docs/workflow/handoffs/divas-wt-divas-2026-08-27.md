@@ -1,7 +1,7 @@
 # Handoff — divas — wt-divas — 2026-08-27
 
-**Branch** `claude/advisor-qvz5wn` at `7f101c39`. Lane `wt-divas`. Pushed: yes.
-Base `wt-core` at `bf46eaa4`. **PR #14 MERGED** mid-session (verified from the
+**Branch** `claude/advisor-qvz5wn` at `fe361cce`. Lane `wt-divas`. Pushed: yes.
+Base `wt-core` at `923f08b2`, taken by `lane-sync push` after the handoff commit. **PR #14 MERGED** mid-session (verified from the
 detail endpoint: `merged: true`, merged_by `IDIVASM`, at `93a01789`). Everything
 after it is follow-up work and rides **PR #20**, open and draft.
 
@@ -805,18 +805,22 @@ I published, but of one I nearly did: the list endpoint returned
 
 ## Gate
 
-Run on `7f101c39` — the merge that resolved the `wt-core` conflict — with
-`--force --concurrency=1`, nothing else running, not piped.
+Run on `fe361cce`, the pushed head, with `--force --concurrency=1`, nothing else
+running, not piped. `lane-sync push` merged `wt-core` again AFTER the handoff
+commit, so the gate was re-run rather than reporting the pre-sync figures.
 
 | Leg | Result |
 |---|---|
-| `turbo run typecheck lint test` | **PASS** — 27/27 tasks, `Cached: 0`, 9m45s, exit 0 |
+| `turbo run typecheck lint test` | **PASS** — 27/27 tasks, `Cached: 0`, 7m21s, exit 0 |
 | `pnpm format:check` | **PASS** — exit 0 |
-| `js-budget` | **PASS** — 81 routes within budget |
-| `connections-honesty.spec.ts --grep @smoke` | **PASS** — 3 passed, exit 0. Run on `be6dd631`, one commit back; the only change since is a budget figure |
+| `js-budget` | **PASS** — 81 routes within budget (run on `7f101c39`; no route changed since) |
+| `connections-honesty.spec.ts --grep @smoke` | **PASS** — 3 passed, exit 0. Run on `be6dd631`, three commits back. The changes since are a budget figure, this file, and a lane doc |
 | `turbo run test:smoke` (all 118) | **UNRUN.** One spec of 37 files is proved. The suite is not |
-| GitHub Actions `typecheck · lint · test · format` | **PASS** — on `be6dd631`, 13m10s, `success`. A real run |
-| Vercel | **PASS** — `success`, "Deployment has completed", on `be6dd631` |
+| GitHub Actions `typecheck · lint · test · format` | **PASS** — on `be6dd631`, 13m10s, `success`. A real run. Re-running on `fe361cce` and UNRESOLVED at the time this was written |
+| Vercel | **PASS** — `Ready` on `fe361cce`, and `success` on `be6dd631` before it |
+
+The same tree was gated three times today at 5m48s, 9m46s and 7m21s, all 27/27
+with `Cached: 0`. The spread is load on the box, not the diff.
 
 A full-tree count for the record, from the same run: `@sahoda/web` 452 files
 (3 skipped), `sites` 53, `db` 36 (12 skipped), `jobs` 34, `billing` 30 (1
