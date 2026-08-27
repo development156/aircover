@@ -42,6 +42,10 @@ export interface FinishPanelProps {
   flush: () => Promise<boolean>
   /** Write one channel's variant and wait for it. */
   saveVariantNow: (channel: Channel) => Promise<boolean>
+  /** Write the post and every dirty variant, and report whether all of it landed. */
+  saveAllVersions: () => Promise<boolean>
+  /** How many versions are not in their row yet. */
+  unsavedVersions: number
 }
 
 /** The two things that can happen to a finished post. */
@@ -60,15 +64,16 @@ interface RouteTileProps {
  *
  * ── WHY NEITHER OF THESE IS PAINTED IN THE BRAND FILL ────────────────────────
  * They are the loudest pair on the screen and the temptation is obvious. docs/37
- * §2.3 rations the solid brand fill to ONE element per view, and this screen
- * already spends it: `GeneratePanel`'s "Adapt for N channels" carries it, and
- * `PublishNow` renders one filled button per connected channel below.
+ * §2.3 rationed the solid brand fill to ONE element per view. That is overruled
+ * for this panel (REQUESTS §31) and the fill now marks the acts: Save, Send now
+ * and Confirm schedule all carry it.
  *
- * So these wear the treatment `ScheduleField`'s own time chips already use for
- * "this is the one selected" — the ink fill, deliberately, so the choice reads
- * as a choice rather than as a fifth thing shouting. Two sibling controls that
- * both looked like the single most important action on the page would tell the
- * reader nothing about which to press.
+ * These two are not acts, they are a QUESTION — which ending did you come for.
+ * So they wear the treatment `ScheduleField`'s time chips already use for "this
+ * is the one selected": the ink fill. Two sibling tiles painted like the most
+ * important action on the page would tell the reader nothing about which to
+ * press, and the button that actually sends is four inches below them.
+ *
  */
 function RouteTile({ icon, title, detail, on, onClick }: RouteTileProps) {
   return (
@@ -117,14 +122,19 @@ function RouteTile({ icon, title, detail, on, onClick }: RouteTileProps) {
  * closed would hide the only control that can move or clear that time, and the
  * reader would have no way to see a commitment their post is already under.
  *
- * ── WHY THERE IS NO SINGLE "POST NOW" BUTTON ─────────────────────────────────
- * Because publishing is per channel and always has been. One post can be live on
- * Instagram and failed on X in the same second, and `PublishNow` renders one
- * button per connected channel precisely so each success and each failure
- * belongs to a channel. A single button over the top would have to report one
- * verdict for four different outcomes, which is the false certainty this whole
- * surface exists to prevent. The tile below opens that rail; it does not
- * replace it.
+ * ── THERE IS NOW A SINGLE "SEND NOW", AND THE OLD ARGUMENT AGAINST IT ────────
+ * This comment used to say a single button was impossible, because one post can
+ * be live on Instagram and failed on X in the same second and one verdict cannot
+ * cover both. That was right about the REPORT and wrong about the BUTTON. The
+ * per-channel truth moved to `send-outcomes.tsx`, which renders one row per
+ * channel with its own verdict and its own link and never sums them. So the
+ * reader makes one decision and still gets four answers.
+ *
+ * ── AND BOTH ENDINGS NOW SIT TOGETHER, UNDER THE DRY RUN ─────────────────────
+ * Saving used to live in a sticky bar pinned to the window while sending lived
+ * here, so the two endings to the same piece of work were in different places
+ * and one floated over the other. `SendControls` holds both, below
+ * `PublishPreview`, with the channel list above them.
  *
  * ── AND THE DRY RUN STAYS BEFORE THE LIVE ONE ────────────────────────────────
  * The rehearsal comes before the performance, and the two are never merged:
@@ -142,6 +152,8 @@ export function FinishPanel({
   statusRows,
   flush,
   saveVariantNow,
+  saveAllVersions,
+  unsavedVersions,
 }: FinishPanelProps) {
   const [chosen, setChosen] = useState<Route | null>(null)
   const route = chosen ?? (scheduledAt === null ? null : 'schedule')
@@ -171,9 +183,9 @@ export function FinishPanel({
         <RouteTile
           icon={<Send size={18} strokeWidth={1.8} aria-hidden />}
           title="Post now"
-          // Says the shape of the thing before the reader meets it: four buttons
-          // rather than one is a surprise unless it was described first.
-          detail="Send it to one channel right away."
+          // "Send it to one channel right away" was here and is no longer true:
+          // one press reaches every connected channel and reports on each.
+          detail="Send it to every connected channel right away."
           on={route === 'now'}
           onClick={() => setChosen('now')}
         />
@@ -202,6 +214,8 @@ export function FinishPanel({
           statusRows={statusRows}
           flush={flush}
           saveVariantNow={saveVariantNow}
+          saveAllVersions={saveAllVersions}
+          unsavedVersions={unsavedVersions}
         />
       ) : null}
     </section>

@@ -303,13 +303,13 @@ export function Composer({
         statusRows={statusRows}
         flush={actions.flush}
         saveVariantNow={actions.saveVersion}
+        saveAllVersions={actions.saveAllAndWait}
+        unsavedVersions={actions.unsaved.length}
       />
 
       <CommitBar
         status={autosave.status}
         unsavedVersions={actions.unsaved.length}
-        savingVersions={actions.savingAll}
-        onSaveAll={actions.saveAll}
         canFinish={draft.channels.length > 0}
       />
     </div>

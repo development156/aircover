@@ -2129,3 +2129,55 @@ demoting Save.
 `e2e/page-dash-hierarchy.spec.ts` still asserts the one-per-view budget on
 `/home` and `/analytics`, and is untouched: the ruling was made about the
 composer, and those two screens have no committing buttons on them.
+
+---
+
+## §32 — One Send now, and the argument it overturns
+
+**Founder's ruling, 2026-08-27**, given with three screenshots of the live
+preview:
+
+> "the send and ..... bring it below preview publish and here also show
+> connected platform where it is going just like schedule and also there should
+> be two buttons save as draft ( which saves all the versions automatically ) and
+> send now ( which also saves all the versions and sends it directly )"
+
+### What it overturns, stated plainly
+
+`finish-panel.tsx` carried a comment headed **"WHY THERE IS NO SINGLE POST NOW
+BUTTON"**. Its argument: publishing is per channel, one post can be live on
+Instagram and failed on X in the same second, and a single button would have to
+report one verdict for four outcomes.
+
+**That argument was right about the REPORT and wrong about the BUTTON.** One
+press with N results says exactly the same true thing as N presses, and asks the
+reader for one decision instead of four. The per-channel truth moved into
+`send-outcomes.tsx`: one row per channel, each with its own verdict and its own
+link, and `send-outcomes.test.tsx` asserts that no sentence anywhere adds them
+up — including a guard against the banner returning as "1 of 2 published", which
+is the same lie in a smaller font.
+
+### The three moves
+
+| Was                                                    | Is                                                              |
+| ------------------------------------------------------ | --------------------------------------------------------------- |
+| Save floating in a sticky bar, send four screens below | Both in `SendControls`, under the dry run                       |
+| A chip rail: pick a channel, confirm, repeat           | Save as draft · Send now, with one confirm naming every channel |
+| The channel list on the schedule route only            | `ChannelReadout` on both routes                                 |
+
+**Both buttons save everything first.** The old bar asked for that separately
+("Save all versions"), so a reader could press Save, believe their work was safe,
+and lose four channel variants. `saveAllAndWait` ANDs every per-channel verdict,
+attempts every channel even after one refuses, and both buttons act on the
+answer: "Save as draft" prints a refusal rather than "Saved", and "Send now"
+does not publish at all.
+
+### What did NOT change
+
+Every refusal in the publish path. `publishOne` still declines a `fixture`
+response, still refuses to call a permalink-less 201 a publish, and still reads
+the body rather than the HTTP status for the verdict. Those three branches lived
+inside a React transition and had **no test of any kind**; they are now in
+`lib/posts/publish-one.ts` with thirteen.
+
+The confirm step also stays, and it names the channels rather than counting them.

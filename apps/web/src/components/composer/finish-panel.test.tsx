@@ -42,6 +42,8 @@ function panel(overrides: Partial<Parameters<typeof FinishPanel>[0]> = {}) {
       statusRows={[]}
       flush={vi.fn(async () => true)}
       saveVariantNow={vi.fn(async (_channel: Channel) => true)}
+      saveAllVersions={vi.fn(async () => true)}
+      unsavedVersions={0}
       {...overrides}
     />,
   ).container
@@ -88,6 +90,8 @@ async function afterChunksArrive() {
       statusRows={[]}
       flush={vi.fn(async () => true)}
       saveVariantNow={vi.fn(async (_channel: Channel) => true)}
+      saveAllVersions={vi.fn(async () => true)}
+      unsavedVersions={0}
     />,
   ).container
   fireEvent.click(within(probe).getByRole('button', { name: /^Post now/ }))

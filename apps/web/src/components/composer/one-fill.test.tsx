@@ -124,7 +124,17 @@ async function afterChunksArrive(): Promise<void> {
 }
 
 describe('the brand fill marks what commits, and only that', () => {
-  test('at rest it is Adapt, one Save per channel, and Save all versions', async () => {
+  /**
+   * "Save all versions" WAS the fifth entry here and it is deliberately gone.
+   *
+   * The sticky bar no longer carries a save button: both endings moved into
+   * `SendControls`, under the dry run, and that half is behind the "Post now"
+   * tile so it is not on screen at rest. The list is still asserted EXACTLY
+   * rather than loosened to a count — the whole value of this guard is that a
+   * new fill has to be argued for, and `toHaveLength(4)` would let any fourth
+   * one through as long as one left.
+   */
+  test('at rest it is Adapt and one Save per channel, and nothing else', async () => {
     const root = composer()
     await afterChunksArrive()
     const found = solidFills(root)
@@ -134,7 +144,6 @@ describe('the brand fill marks what commits, and only that', () => {
       'Save',
       'Save',
       'Save',
-      'Save all versions',
     ])
   })
 
