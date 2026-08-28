@@ -47,8 +47,19 @@ export const LOOP_FACTS_SQL = `select w.id as workspace_id,
                 (select coalesce(json_agg(json_build_object('platform', k.platform, 'status', k.status)), '[]')
                    from connections k where k.workspace_id = w.id) as connections,
                 (select coalesce(json_agg(json_build_object('channel', d.channel, 'level', d.level)), '[]')
-                   from loop_channel_autonomy d where d.workspace_id = w.id) as dial
+                   from loop_channel_autonomy d where d.workspace_id = w.id) as dial,
+                bm.payload as brain_payload
            from workspaces w
+           -- The ACTIVE brain only, and at most one of them: the partial unique
+           -- index brand_memory_one_active guarantees there is never a second,
+           -- and a superseded row would describe a business as it was described
+           -- before somebody corrected it.
+           left join lateral (
+             select b.payload
+               from brand_memory b
+              where b.workspace_id = w.id and b.status = 'active'
+              limit 1
+           ) bm on true
            left join loop_settings  s on s.workspace_id = w.id
            left join credit_balances b on b.workspace_id = w.id
            left join loop_cycles    c on c.workspace_id = w.id

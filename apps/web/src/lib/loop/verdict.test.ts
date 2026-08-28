@@ -28,6 +28,7 @@ function snapshot(over: Partial<LoopSnapshot> = {}): LoopSnapshot {
     paused: false,
     weeklyBudgetCredits: 150,
     availableCredits: 500,
+    brain: { resolved: true, confirmed: 15, total: 15 },
     dial: new Map(),
     connected: toChannelSet(['x']),
     lapsed: toChannelSet([]),
@@ -79,6 +80,46 @@ describe('loopVerdict — what the screen tells a workspace', () => {
     expect(explain(v)).toContain('reconnect')
     expect(explain(v)).not.toContain('Connect a channel first')
     expect(remedy(v)).toEqual({ href: '/connections', label: 'Reconnect it' })
+  })
+
+  /**
+   * The blocking half of the brain. `packages/mesh` injects the brand prefix
+   * from the active `brand_memory` row and returns null without one, so a
+   * workspace with no brain is planned for at the full price with a generic
+   * prompt: a week of posts about a business Sahoda knows nothing about.
+   */
+  it('tells a workspace with no Brand Brain to build one, before mentioning channels', () => {
+    const v = loopVerdict(
+      snapshot({
+        brain: { resolved: false, confirmed: 0, total: 15 },
+        connected: toChannelSet([]),
+      }),
+      NOW,
+    )
+    expect(explain(v)).toBe(
+      'Sahoda does not know your business yet. Build your Brand Brain and it can plan a week that sounds like you.',
+    )
+    expect(remedy(v)).toEqual({ href: '/brain', label: 'Build your Brand Brain' })
+  })
+
+  /**
+   * The ADVISORY half, and it must not become a refusal. MEASURED 2026-08-28:
+   * four of the five production workspaces that have opened the Loop have a
+   * resolved brain with zero confirmed fields. Refusing them would refuse
+   * almost the whole fleet for a state that is legitimate at L1, where a person
+   * reads every draft before it reaches anyone.
+   */
+  it('plans for a workspace whose brain is unconfirmed, and says so on the same sentence', () => {
+    const v = loopVerdict(snapshot({ brain: { resolved: true, confirmed: 0, total: 15 } }), NOW)
+    expect(v.eligible).toBe(true)
+    expect(explain(v)).toBe(
+      'Sahoda will plan your week for X. Nothing in your Brand Brain is confirmed yet, so it will write in a voice it guessed at.',
+    )
+  })
+
+  it('says nothing about the brain once a single field is confirmed', () => {
+    const v = loopVerdict(snapshot({ brain: { resolved: true, confirmed: 1, total: 15 } }), NOW)
+    expect(explain(v)).toBe('Sahoda will plan your week for X.')
   })
 
   it('tells a workspace short of credits what a week costs and what it holds', () => {

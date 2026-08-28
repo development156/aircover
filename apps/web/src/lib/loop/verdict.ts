@@ -70,6 +70,7 @@ export function loopVerdict(snapshot: LoopSnapshot, now: Date): LoopVerdict {
       channel,
       level: level as AutonomyLevel,
     })),
+    brain: snapshot.brain,
   }
 
   return assess(facts)

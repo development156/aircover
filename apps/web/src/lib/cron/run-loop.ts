@@ -5,6 +5,8 @@ import { createMesh, planWeekTask } from '@sahoda/mesh'
 import { MESH_TASK_ACTION, toChannelSet, type AutonomyLevel, type Channel } from '@sahoda/shared'
 
 import { previewCost, priceBrief, cycleCost } from '@/lib/loop/cost'
+import { countConfirmedFields } from '@/lib/brand/confirmed-count'
+import { RING_DENOMINATOR } from '@/lib/brand/fields'
 import { LOOP_FACTS_SQL } from '@/lib/cron/loop-facts-sql'
 import { assess, explain, type LoopFacts, type LoopRefusalReason } from '@/lib/loop/eligibility'
 import { planningWeekFor, reflectionWindow } from '@/lib/loop/iso-week'
@@ -115,6 +117,7 @@ export async function runScheduledLoopCycles(
         open_cycle_status: string | null
         connections: { platform: string; status: string }[] | null
         dial: { channel: Channel; level: AutonomyLevel }[] | null
+        brain_payload: unknown
       }>(LOOP_FACTS_SQL, [week.isoYear, week.isoWeek, MAX_WORKSPACES_PER_TICK + 1])
     ).rows
 
@@ -155,6 +158,15 @@ export async function runScheduledLoopCycles(
           ? { id: row.open_cycle_id, status: row.open_cycle_status ?? 'unknown' }
           : null,
         dial: row.dial ?? [],
+        // `brain_payload` is null when no ACTIVE brand_memory row exists, which
+        // is exactly what `brain_not_resolved` means. The confirmed count uses
+        // the same function /brain's ring uses, so the cron and the screen
+        // cannot report different fractions of one brain.
+        brain: {
+          resolved: row.brain_payload !== null && row.brain_payload !== undefined,
+          confirmed: countConfirmedFields(row.brain_payload),
+          total: RING_DENOMINATOR,
+        },
       }
 
       const verdict = assess(facts)

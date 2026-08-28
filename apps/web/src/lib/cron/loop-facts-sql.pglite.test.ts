@@ -57,6 +57,10 @@ describe('LOOP_FACTS_SQL against the real schema', () => {
         values ('${WS}', 'x', 'active', '{}'::jsonb, '${USER}');
       insert into loop_channel_autonomy (workspace_id, channel, level, created_by)
         values ('${WS}', 'x', 2, '${USER}');
+      insert into brand_memory (workspace_id, version, status, payload, source)
+        values ('${WS}', 1, 'superseded', '{"field_meta":{"identity.name":{"confirmed":true}}}'::jsonb, 'resolved');
+      insert into brand_memory (workspace_id, version, status, payload, source)
+        values ('${WS}', 2, 'active', '{"field_meta":{"identity.name":{"confirmed":true}}}'::jsonb, 'resolved');
     `)
   }, 120_000)
 
@@ -93,6 +97,38 @@ describe('LOOP_FACTS_SQL against the real schema', () => {
     expect(Number(row?.available_credits)).toBe(375)
     expect(row?.connections).toEqual([{ platform: 'x', status: 'active' }])
     expect(row?.dial).toEqual([{ channel: 'x', level: 2 }])
+  })
+
+  /**
+   * The brain the lateral join must return is the ACTIVE one, and exactly one
+   * of them. A workspace here has a superseded version 1 as well; returning it,
+   * or returning both, would describe a business the way it was described
+   * before somebody corrected it.
+   */
+  it('returns the ACTIVE brain payload, not a superseded one, and never two rows', async () => {
+    const r = await db.query<{ workspace_id: string; brain_payload: unknown }>(
+      LOOP_FACTS_SQL,
+      [2026, 35, 40],
+    )
+    const mine = r.rows.filter((x) => x.workspace_id === WS)
+    // One row per workspace. A plain join against two brand_memory rows would
+    // duplicate the workspace and the tick would plan its week twice.
+    expect(mine).toHaveLength(1)
+    expect(mine[0]?.brain_payload).toEqual({
+      field_meta: { 'identity.name': { confirmed: true } },
+    })
+  })
+
+  /** No brain at all is null, which is what `brain_not_resolved` is read from. */
+  it('returns a null brain payload for a workspace with no active brain', async () => {
+    const bare = '2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e'
+    await db.exec(`insert into workspaces (id, name, slug, created_by)
+                     values ('${bare}', 'No brain', 'no-brain-loop', '${USER}')`)
+    const r = await db.query<{ workspace_id: string; brain_payload: unknown }>(
+      LOOP_FACTS_SQL,
+      [2026, 35, 40],
+    )
+    expect(r.rows.find((x) => x.workspace_id === bare)?.brain_payload).toBeNull()
   })
 
   /**
