@@ -42,6 +42,14 @@ const GbpOfferSchema = z.object({
 export const VariantExtrasSchema = z
   .object({
     hashtags: z.array(z.string()).optional(),
+    /**
+     * Whether the published keyword tail wears its brackets (REQUESTS §34/§35).
+     *
+     * ABSENT MEANS TRUE. Brackets are what shipped and what every row written
+     * since publishes; making absence mean `false` would silently change what
+     * those posts put out. Unticking the box writes `false` explicitly.
+     */
+    keywordBrackets: z.boolean().optional(),
     gbpCta: z.string().optional(),
     ctaUrl: z.string().optional(),
     offer: z.string().optional(),
@@ -73,6 +81,12 @@ const FIELD_SCHEMAS = {
   firstComment: z.string(),
   collaborators: z.array(z.string()),
   aiGenerated: z.boolean(),
+  // MISSED ON THE FIRST PASS, and its own test caught it: declaring a field in
+  // `VariantExtrasSchema` alone is not enough. The salvage path below reads THIS
+  // map, so a field absent here is passed through unchecked — a stored
+  // `"false"` string would have survived and read as `!== false`, turning the
+  // brackets back ON for a writer who had switched them off.
+  keywordBrackets: z.boolean(),
   gbpTopic: z.enum(['EVENT', 'OFFER']),
   gbpEvent: GbpEventSchema,
   gbpOffer: GbpOfferSchema,
@@ -141,4 +155,22 @@ export function gbpCtaTypes(): string[] {
  */
 export function isValidGbpCta(cta: string): boolean {
   return gbpCtaTypes().includes(cta)
+}
+
+/**
+ * Does this variant publish its keywords in brackets?
+ *
+ * ── ONE LINE, AND IT IS THE MOST DANGEROUS ONE IN THE FEATURE ────────────────
+ * `keywordBrackets` is absent on every row written before the tick box existed,
+ * and all of those publish WITH brackets (REQUESTS §34). So absence must read as
+ * true. Reading it as `=== true` instead would silently strip the brackets from
+ * every existing post, with nothing on any screen to show it had happened —
+ * exactly the class of change this codebase refuses.
+ *
+ * It lives here rather than inline in `version-card.tsx` because a mutation
+ * proved the inline version untestable: flipping it to `=== true` left every
+ * suite green. A named function has somewhere to put a test.
+ */
+export function keywordBracketsOn(extras: VariantExtras): boolean {
+  return extras.keywordBrackets !== false
 }

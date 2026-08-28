@@ -6,6 +6,7 @@ import {
 import type { BrandMemoryPayload, MeshContext, MeshTaskDef, ResolveInput } from '@sahoda/shared'
 import type { ChatMessage } from '../providers/types'
 import type { MeshTaskSpec } from '../engine'
+import { PROSE_RULES } from '../prose-rules'
 
 /** 4096: measured single-pass need 2,750 x 1.4 headroom (token-budget.ts). Was 2048 — under it. */
 const MAX_TOKENS = 4096
@@ -71,7 +72,7 @@ const def: MeshTaskDef<ResolveInput, BrandMemoryPayload> = {
  */
 function buildMessages(input: ResolveInput, _ctx: MeshContext): ChatMessage[] {
   return [
-    { role: 'system', content: SYSTEM },
+    { role: 'system', content: `${SYSTEM}\n${PROSE_RULES}` },
     { role: 'user', content: JSON.stringify(input) },
   ]
 }

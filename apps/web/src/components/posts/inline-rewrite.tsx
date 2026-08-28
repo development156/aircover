@@ -142,8 +142,8 @@ export function InlineRewrite({ body, selection, onReplace }: InlineRewriteProps
           className="space-y-1.5 rounded-input border border-warn bg-warn-bg px-3 py-2.5 text-[13px] text-warn"
         >
           <p>
-            Your post changed while I was rewriting, so I didn&rsquo;t replace anything. The rewrite
-            was still charged. Here it is to place yourself.
+            Your post changed while Sahoda was rewriting, so nothing was replaced. The rewrite was
+            still charged. Here it is to place yourself.
           </p>
           <p className="rounded-input bg-s1 px-2.5 py-2 text-ink">{stranded}</p>
           {/* Stays until it is dismissed on purpose. It disappeared on its own

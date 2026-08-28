@@ -134,6 +134,27 @@ export function GeneratePanel({
         </Button>
       )}
 
+      {/* ── WHAT THE RUN DOES, AND THE HALF THAT DENIES A PROMISE ─────────────
+          One sentence for each, and the second is not optional. "The words a
+          customer would search for" implies research on its own, and this
+          product has none: `docs/50` established that there is no keyword-volume
+          source, no trend feed and no competitor data anywhere in it, and
+          nothing since has changed that. A line that named a search term
+          WITHOUT saying where it came from would be the same defect as printing
+          a figure no query produced.
+
+          Deliberately two short sentences rather than a paragraph. The last
+          time this screen grew an explanation it became the largest block of
+          prose in the writing column, and that block was removed. Hidden with
+          the button when there is nothing to adapt: a description of an action
+          nobody can take is furniture. */}
+      {!pending && channels.length > 0 ? (
+        <p className="type-meta text-muted">
+          Written for each channel, with the words a customer would search for. Taken from your own
+          post, not from what is popular elsewhere.
+        </p>
+      ) : null}
+
       {outcome?.kind === 'missing' ? (
         <div className="space-y-1.5 rounded-input bg-warn-bg px-3 py-2.5 text-[13px] text-warn">
           <p>These channels came back empty. You were charged for the run that did return copy.</p>

@@ -49,9 +49,10 @@ export const BRAND_HUE = 24
 /**
  * How far from the brand hue still counts as the brand.
  *
- * `--acc` light is #bd4b00, which is h≈24° as well — the accent ramp is the same
- * hue at a different lightness, by construction (§2.2), so a narrow window holds
- * the whole ramp. Widened to 18 rather than kept tight because the browser
+ * `--acc` is #f60 in BOTH themes as of the 2026-08-26 ruling, so it is h 24°
+ * exactly — the same value as `--p`, not merely the same hue. It was #bd4b00 in
+ * light until then, also h≈24°, so this window held the whole ramp before the
+ * ruling and holds a narrower one now. Widened to 18 rather than kept tight because the browser
  * composites the 6% and 24% tints over surfaces and antialiases every edge, and
  * a blend of orange over a warm-grey surface drifts a few degrees.
  *
@@ -287,9 +288,14 @@ function findRegions(mask: Uint8Array, cols: number, rows: number): Omit<Region,
  *    window and this file does not know that.
  * 5. A LIGHT-TO-DARK `regions` DELTA IS AN ARTEFACT, NOT A FINDING. MEASURED on
  *    /home 1440 empty, where the DOM is identical in both themes: 15 regions in
- *    light against 30 in dark, for 1392 against 1758 sampled pixels. `--acc` is
- *    #bd4b00 in light and #ff6600 in dark and the two antialias across the s>0.30
- *    floor differently against their own grounds. Compare a theme against itself.
+ *    light against 30 in dark, for 1392 against 1758 sampled pixels. THE CAUSE
+ *    THIS NOTE USED TO GIVE IS NO LONGER TRUE: it read "`--acc` is #bd4b00 in
+ *    light and #ff6600 in dark and the two antialias across the s>0.30 floor
+ *    differently against their own grounds". The 2026-08-26 ruling made `--acc`
+ *    #f60 in BOTH themes, so that explanation is void. The 15-against-30
+ *    measurement stands — it was measured — but nothing here has re-measured it
+ *    since, and the surfaces still differ, so a delta may or may not survive.
+ *    Compare a theme against itself, and re-measure before explaining a delta.
  * 6. Text antialiasing. Orange TEXT at 13px contributes a few dozen sampled
  *    pixels with soft edges; a solid fill of the same visual weight contributes
  *    hundreds. That is the correct bias for a budget about visual dominance, but

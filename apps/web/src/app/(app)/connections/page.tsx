@@ -1,5 +1,5 @@
 import { Link2 } from 'lucide-react'
-import type { Connection, ConnectionPlatform } from '@sahoda/shared'
+import { ZERNIO_PLATFORMS } from '@sahoda/shared'
 
 import { ChannelTile } from '@/components/connections/channel-tile'
 import { Stagger } from '@/components/motion/stagger'
@@ -12,6 +12,7 @@ import { PageTitle } from '@/components/page-title'
 import { checkCountableLimit } from '@/lib/billing/entitlements'
 import { CONNECTABLE, PLANNED } from '@/lib/connections/catalogue'
 import { readConnections, readConnectionSlots } from '@/lib/connections/read'
+import { groupByPlatform, hasHeadroom, slotSentence, type SlotUsage } from '@/lib/connections/slots'
 import { readXUsage } from '@/lib/connections/x-usage'
 import { getActiveWorkspace } from '@/lib/workspaces'
 import { zernioAvailable } from '@/lib/zernio/server'
@@ -35,8 +36,11 @@ export const metadata = { title: 'Connections' }
  * four-column grid." A group of one is not a group; it is a heading with a
  * paperweight under it.
  *
- * The grouping is now **by readiness**, which is both the honest cut and an even
- * one — four connectable channels, four that are named and unbuilt. The question
+ * The grouping is now **by readiness**, which is both the honest cut and the one
+ * that keeps moving on its own: six channels can be connected today and two are
+ * named and unbuilt, and those counts changed on 2026-08-26 without this file
+ * being edited, because both groups are filtered from the catalogue rather than
+ * counted by hand. The question
  * the old grouping answered ("why is Google Business Profile in with Instagram?")
  * is answered better on the tile itself, where each channel states its `kind`
  * — *Feed*, *Local listing*, *Short video*, *Broadcast* — beside its own name,
@@ -57,32 +61,52 @@ export const metadata = { title: 'Connections' }
  * unbuilt; routing them through Zernio removes that dependency entirely — Zernio
  * holds the credential, exactly as it does for instagram — so the buttons do what
  * they say.
+ *
+ * ── DERIVED FROM THE SHARED ALLOWLIST, NOT RESTATED ─────────────────────────
+ *
+ * This was a hand-written set of four. It is the same list `ZERNIO_PLATFORMS`
+ * already holds — the one both OAuth routes validate against — so keeping a
+ * second copy here meant a channel could be connectable at the route and
+ * disabled on the screen, or the reverse, with nothing failing. When facebook
+ * and telegram were added the literal would have silently kept both buttons
+ * dead while the routes happily accepted them.
  */
-const LIVE_VIA_ZERNIO: ReadonlySet<string> = new Set<ConnectionPlatform>([
-  'instagram',
-  'x',
-  'gbp',
-  'linkedin',
-])
+const LIVE_VIA_ZERNIO: ReadonlySet<string> = new Set<string>(ZERNIO_PLATFORMS)
 
 /**
- * The plan sentence when this workspace has no room for another channel, else null.
+ * How many slots this workspace has used, and how many the plan allows.
+ *
+ * ── ONE READ, TWO NUMBERS, AND BOTH ARE ABOUT THE CUSTOMER ───────────────────
+ * This used to return a SENTENCE and nothing else, which was all the screen
+ * needed while the only thing it drew was a banner. A meter needs the
+ * denominator, and parsing it back out of English is the sort of thing that
+ * works until the copy is rewritten — so `checkCountableLimit` now carries the
+ * limit on `blocked` as well as on `allowed`.
  *
  * Read from the DATABASE, never from the query string — the same rule
  * `ConnectOutcomeNotice` follows when it refuses to render counts off the address
- * bar. Null on every "could not tell" case: the return route fails closed
- * regardless, so nothing is admitted by this being null; what it avoids is telling
- * someone their plan is full when the truth is we could not read it.
+ * bar. `limit: null` on every "could not tell" case, and `hasHeadroom` treats
+ * that as no room: the two OAuth routes fail closed regardless, so nothing is
+ * admitted by this being unknown; what it avoids is telling someone their plan is
+ * full when the truth is we could not read it.
  */
-async function channelLimitNotice(): Promise<string | null> {
+async function readSlotUsage(): Promise<SlotUsage & { blockedSentence: string | null }> {
+  const unknown = { used: 0, limit: null, blockedSentence: null }
+
   const workspace = await getActiveWorkspace()
-  if (!workspace) return null
+  if (!workspace) return unknown
 
   const slots = await readConnectionSlots(workspace.id)
-  if (slots === null) return null
+  if (slots === null) return unknown
 
   const verdict = await checkCountableLimit(workspace.id, 'channels', slots.count)
-  return verdict.kind === 'blocked' ? verdict.sentence : null
+  if (verdict.kind === 'unknown') return { ...unknown, used: slots.count }
+
+  return {
+    used: slots.count,
+    limit: verdict.limit,
+    blockedSentence: verdict.kind === 'blocked' ? verdict.sentence : null,
+  }
 }
 
 /**
@@ -116,23 +140,76 @@ export default async function ConnectionsPage({
    */
   searchParams: Promise<{ zernio?: string | string[] }>
 }) {
-  const [connections, { zernio }, channelLimit, ration] = await Promise.all([
+  const [connections, { zernio }, slots, ration] = await Promise.all([
     readConnections(),
     searchParams,
-    channelLimitNotice(),
+    readSlotUsage(),
     xRation(),
   ])
   const railReady = zernioAvailable()
-  const planFull = channelLimit !== null
+  // `hasHeadroom` is the single question every control on this page asks, and an
+  // UNKNOWN limit answers it "no" — the same direction both OAuth routes fail in.
+  const roomLeft = hasHeadroom(slots)
+  const planFull = slots.blockedSentence !== null
 
   // One lookup, so a channel appears exactly once whether or not it is linked.
   const rows = connections.status === 'ok' ? connections.connections : []
+  // ── EVERY ACCOUNT, NOT THE LAST ONE WRITTEN ───────────────────────────────
+  // This was `new Map(rows.map((c) => [c.platform, c]))`. A Map keeps the LAST
+  // value for a key and the rows arrive oldest first, so a workspace with two
+  // Instagram accounts rendered the newer one and the older one appeared nowhere
+  // on this screen, while still holding a slot and still publishing.
+  //
   // Keyed by STRING, not by `ConnectionPlatform`. A catalogue id is the wider
   // union, and casting it narrow at four call sites to satisfy the map would be
   // asserting the very thing `asChannel` exists to check. A planned channel
   // simply never matches a row, because the database cannot hold one.
-  const byChannel = new Map<string, Connection>(rows.map((c) => [c.platform, c]))
-  const live = CONNECTABLE.filter((entry) => byChannel.get(entry.id)?.status === 'active').length
+  const byChannel = groupByPlatform(rows)
+
+  /**
+   * ── THREE GROUPS, EACH ANSWERING A DIFFERENT QUESTION ────────────────────
+   * Derived, never hand-listed. `LIVE_VIA_ZERNIO` is `ZERNIO_PLATFORMS` and
+   * `byChannel` is the customer's own rows, so both cuts move on their own the
+   * day either changes — which is the property the old two literal groups
+   * lacked, and how a channel once ended up connectable at the route and
+   * disabled on the screen with nothing failing.
+   *
+   *   linked    an account exists            → what is live
+   *   open      connectable, none linked yet → what you can add
+   *   stalled   named, and we cannot link it → why not
+   */
+  const linkedEntries = CONNECTABLE.filter(
+    (entry) => LIVE_VIA_ZERNIO.has(entry.id) && (byChannel.get(entry.id)?.length ?? 0) > 0,
+  )
+  const openEntries = CONNECTABLE.filter(
+    (entry) => LIVE_VIA_ZERNIO.has(entry.id) && (byChannel.get(entry.id)?.length ?? 0) === 0,
+  )
+  const stalledEntries = CONNECTABLE.filter((entry) => !LIVE_VIA_ZERNIO.has(entry.id))
+
+  /**
+   * Why Connect is unavailable on this tile, or `undefined` when it is not.
+   *
+   * ── ONE FUNCTION BECAUSE THE ORDER OF THESE IS LOAD-BEARING ──────────────
+   * It was a nested ternary inlined at one call site and there are now three, so
+   * copying it would be three places for the precedence to drift. The order:
+   * the plan first, because a full plan blocks every tile and saying anything
+   * else would be answering a question the customer did not reach yet; then the
+   * environment; then the platform's own reason last, because it is the only one
+   * that differs per tile.
+   */
+  function connectBlocker(id: string): string | undefined {
+    if (planFull) return 'Every slot on your plan is in use.'
+    if (slots.limit === null) return 'Sahoda couldn’t check how many slots your plan includes.'
+    if (!railReady) return 'Publishing key isn’t set in this environment.'
+    if (LIVE_VIA_ZERNIO.has(id)) return undefined
+    // NOT "secure token flow still being wired", which was written for a
+    // different cause and is now false. A platform outside ZERNIO_PLATFORMS is
+    // one whose connect is not an OAuth handoff at all — MEASURED, Telegram's
+    // returns a bot code and a fifteen-minute expiry instead of an authUrl.
+    // Naming the real reason is what stops this reading as a fault someone could
+    // wait out by pressing again.
+    return 'This channel connects with a bot code instead, and that isn’t built yet.'
+  }
 
   return (
     <div className="space-y-6">
@@ -155,18 +232,33 @@ export default async function ConnectionsPage({
               <Link2 aria-hidden className="size-4" />
             </span>
             <div className="min-w-0">
+              {/* ── SLOTS USED, NOT CHANNELS CONNECTED ──────────────────────
+                  This read "2 of 4 connected", where the 4 was the number of
+                  channels SAHODA has built. It moved when we shipped an adapter
+                  and never when the customer changed plan: on Studio (12 slots)
+                  it still said "of 4", and on Free (2 slots) it said "of 4" too,
+                  two paragraphs above a banner that said "Your Free plan includes
+                  2 channels". One screen, two denominators, and the small grey
+                  one was the true one.
+
+                  The number that decides whether Connect works is the ACCOUNT
+                  count against the plan's allowance, so that is the number here.
+                  A slot holds one account: four Instagram accounts are four
+                  slots, one channel. */}
               <p className="type-h3">
-                <span className="num">{live}</span> of{' '}
-                <span className="num">{CONNECTABLE.length}</span> connected
+                {slots.limit === null ? (
+                  <>
+                    <span className="num">{slots.used}</span> {slots.used === 1 ? 'slot' : 'slots'}{' '}
+                    used
+                  </>
+                ) : (
+                  <>
+                    <span className="num">{slots.used}</span> of{' '}
+                    <span className="num">{slots.limit}</span> slots used
+                  </>
+                )}
               </p>
-              {/* NOT "4 channels available" as the reference words it. Available
-                  is what the other four are NOT — they have no adapter — and a
-                  reader who counts eight cards and reads "4 available" has been
-                  told the wrong thing about the four below. This says which four
-                  the fraction is about. */}
-              <p className="type-sm mt-label-gap text-muted">
-                <span className="num">{CONNECTABLE.length}</span> channels Sahoda can post to
-              </p>
+              <p className="type-sm mt-label-gap text-muted">{slotSentence(slots)}</p>
             </div>
           </div>
         ) : null}
@@ -201,54 +293,109 @@ export default async function ConnectionsPage({
               further down. It also owns this screen's single primary action. */}
           <ConnectionHealthBanner connections={rows} />
 
-          {planFull ? (
+          {slots.blockedSentence ? (
             <p
               className="surface-ring rounded-card bg-s2 px-3 py-2.5 type-body text-muted"
               role="status"
             >
-              {channelLimit}
+              {slots.blockedSentence}{' '}
+              {/* The sentence from the gate names the plan and the count. This
+                  half names what a slot IS, because "channels" and "slots" are
+                  different counts on this screen and the reader is owed the
+                  difference: two Instagram accounts and a LinkedIn page is three
+                  slots and two channels. */}
+              Each connected account uses one slot.
             </p>
           ) : null}
 
+          {/* ── LINKED FIRST, AND ONLY WHEN THERE IS SOMETHING TO SHOW ───────
+              The grid went from eight tiles to twenty on 2026-08-26, and at
+              twenty the old single grid stopped answering the screen's first
+              question. "Which of my channels is live" was a hunt through four
+              rows of mostly-identical cards for the two carrying an account.
+
+              Rendered only when at least one account exists. An empty "Your
+              channels" heading over nothing is a section that exists to say the
+              customer has done nothing, which is a worse first line than simply
+              starting at "Add a channel". */}
+          {linkedEntries.length > 0 ? (
+            <ChannelGroup
+              name="Your channels"
+              lead="Linked accounts Sahoda can reach. Open Details on any card for what it can do."
+              guide="connections.linked"
+            >
+              {linkedEntries.map((entry) => (
+                <ChannelTile
+                  key={entry.id}
+                  entry={entry}
+                  connections={byChannel.get(entry.id) ?? []}
+                  ration={entry.id === 'x' ? ration : undefined}
+                  disabled={!(railReady && roomLeft)}
+                  disabledReason={connectBlocker(entry.id)}
+                />
+              ))}
+            </ChannelGroup>
+          ) : null}
+
           <ChannelGroup
-            name="Connect your channels"
-            lead="Each card says what Sahoda can do there, and whether this workspace has linked it."
+            name={linkedEntries.length > 0 ? 'Add a channel' : 'Connect your channels'}
+            lead="Every one of these opens a sign-in window and comes straight back."
             /* The count moved into the header card. Printing it here as well
                would put one number in two places, which is how they drift. */
             guide="connections.connect_now"
           >
-            {CONNECTABLE.map((entry) => (
+            {openEntries.map((entry) => (
               <ChannelTile
                 key={entry.id}
                 entry={entry}
-                connection={byChannel.get(entry.id)}
+                connections={[]}
                 ration={entry.id === 'x' ? ration : undefined}
-                disabled={!(LIVE_VIA_ZERNIO.has(entry.id) && railReady && !planFull)}
-                disabledReason={
-                  planFull
-                    ? 'Your plan has no room for another channel.'
-                    : LIVE_VIA_ZERNIO.has(entry.id)
-                      ? railReady
-                        ? undefined
-                        : 'Publishing key isn’t set in this environment.'
-                      : 'Secure token flow still being wired.'
-                }
+                disabled={!(railReady && roomLeft)}
+                disabledReason={connectBlocker(entry.id)}
               />
             ))}
           </ChannelGroup>
 
-          <ChannelGroup
-            name="More channels"
-            lead="Sahoda can't post to these yet. Each one says so on its own card."
-            /* No count. "0 of 4 connected" on a group nothing can connect to
-               would be a fraction whose numerator can never move — a number
-               that looks like progress and is a constant. */
-            guide="connections.coming_soon"
-          >
-            {PLANNED.map((entry) => (
-              <ChannelTile key={entry.id} entry={entry} />
-            ))}
-          </ChannelGroup>
+          {/* ── ONE GROUP FOR EVERY KIND OF "NO", AND EACH CARD SAYS WHICH ────
+              Telegram and Snapchat are both unconnectable and for completely
+              different reasons: Telegram's connect endpoint answers 200 with a
+              bot CODE rather than an authUrl, so the OAuth rail cannot carry it
+              and the surface it needs is unbuilt; Snapchat answers 403
+              `PLATFORM_BETA_RESTRICTED`, so nothing we build would help. Both
+              MEASURED 2026-08-26.
+
+              They share a heading because what the reader can do about them is
+              the same — nothing, today — and they carry different sentences
+              because "we never built it" and "they will not let us" are
+              different claims and this product does not blur those. */}
+          {stalledEntries.length > 0 || PLANNED.length > 0 ? (
+            <ChannelGroup
+              name="Not available yet"
+              lead="Sahoda can't link these today. Each card says why, and they are different reasons."
+              /* No count. A fraction on a group nothing can connect to would have
+                 a numerator that can never move — a number that looks like
+                 progress and is a constant. */
+              guide="connections.coming_soon"
+            >
+              {stalledEntries.map((entry) => (
+                <ChannelTile
+                  key={entry.id}
+                  entry={entry}
+                  connections={byChannel.get(entry.id) ?? []}
+                  disabled
+                  disabledReason={connectBlocker(entry.id)}
+                />
+              ))}
+              {/* `connections` is required and explicitly EMPTY, not optional. A
+                  planned channel cannot hold a row — the CHECK constraint sees to
+                  it — and making the prop required means the type system asks
+                  every call site the question rather than defaulting one of them
+                  to a silent `undefined`. */}
+              {PLANNED.map((entry) => (
+                <ChannelTile key={entry.id} entry={entry} connections={[]} />
+              ))}
+            </ChannelGroup>
+          ) : null}
         </>
       )}
     </div>
