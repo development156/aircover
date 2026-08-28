@@ -70,8 +70,24 @@ say(`\n  environment: ${cap.verdict}   (measured ${cap.measuredAt.slice(0, 16)})
 
 // ── LOCAL ───────────────────────────────────────────────────────────────────
 if (!REMOTE) {
-  if (cap.verdict === 'FULL') {
-    say('  Chromium reaches https here. Running the suite locally.\n')
+  // LOCAL_ONLY RUNS TOO, and that is the point of the Node transport.
+  //
+  // This used to demand FULL and refuse everything else, which was right when
+  // it was written and stopped being right the moment
+  // `apps/web/e2e/helpers/node-transport.ts` landed: on a LOCAL_ONLY box the
+  // probe writes SAHODA_BROWSER_VIA_NODE=1 and every browser request is then
+  // fetched by Node, which the sandbox allows. Refusing here left the suite
+  // UNRUN on exactly the boxes the transport was built for.
+  //
+  // NO_BROWSER and NO_NETWORK still refuse: there is nothing to drive, and a
+  // transport cannot invent a browser.
+  if (cap.verdict === 'FULL' || cap.verdict === 'LOCAL_ONLY') {
+    say(
+      cap.verdict === 'FULL'
+        ? '  Chromium reaches https here. Running the suite locally.\n'
+        : '  Chromium cannot reach https, so every request goes over Node instead\n' +
+            '  (SAHODA_BROWSER_VIA_NODE=1). Running the suite locally.\n',
+    )
     try {
       execFileSync(
         'pnpm',
