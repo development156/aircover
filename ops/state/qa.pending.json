@@ -855,7 +855,7 @@
       "finished_at": "2026-08-27T16:15:57.461Z",
       "suite": "typecheck",
       "status": "pass",
-      "summary_plain": "The typecheck checks passed for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The typecheck checks passed for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": "ok\n--- typecheck via turbo ---\n Tasks:    9 successful, 9 total\nCached:    8 cached, 9 total\n  Time:    33.579s",
       "duration_ms": null
     },
@@ -869,7 +869,7 @@
       "suite": "smoke",
       "status": "fail",
       "summary_plain": "The smoke, unit checks ran together and something failed.",
-      "details": "PW_EXIT=1\n      57 |\n      58 |       for (let i = 0; i < comingSoonCount; i += 1) {\n      59 |         const tile = comingSoon.nth(i)\n        at /home/user/sahodalabs/apps/web/e2e/connections-honesty.spec.ts:56:76\n\n    attachment #1: screenshot (image/png) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n    test-results/connections-honesty-connec-9878c-y-rule-holds-at-four-widths-chromium-retry1/test-failed-1.png\n    \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n    Error Context: test-results/connections-honesty-connec-9878c-y-rule-holds-at-four-widths-chromium-retry1/error-context.md\n\n    attachment #3: trace (application/zip) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n    test-results/connections-honesty-connec-9878c-y-rule-holds-at-four-widths-chromium-retry1/trace.zip\n    Usage:\n\n        pnpm exec playwright show-trace test-results/connections-honesty-connec-9878c-y-rule-holds-at-four-widths-chromium-retry1/trace.zip\n\n    \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n  1 failed\n    [chromium] \u203a e2e/connections-honesty.spec.ts:31:3 \u203a connections is honest about every channel @smoke \u203a every rule holds, at four widths \n  2 passed (2.4m)\nundefined\n/home/user/sahodalabs/apps/web:\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: playwright test connections-honesty.spec.ts --grep '@smoke' '--workers=1' '--reporter=list'",
+      "details": "PW_EXIT=1\n      57 |\n      58 |       for (let i = 0; i < comingSoonCount; i += 1) {\n      59 |         const tile = comingSoon.nth(i)\n        at /home/user/sahodalabs/apps/web/e2e/connections-honesty.spec.ts:56:76\n\n    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────\n    test-results/connections-honesty-connec-9878c-y-rule-holds-at-four-widths-chromium-retry1/test-failed-1.png\n    ────────────────────────────────────────────────────────────────────────────────────────────────\n\n    Error Context: test-results/connections-honesty-connec-9878c-y-rule-holds-at-four-widths-chromium-retry1/error-context.md\n\n    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────\n    test-results/connections-honesty-connec-9878c-y-rule-holds-at-four-widths-chromium-retry1/trace.zip\n    Usage:\n\n        pnpm exec playwright show-trace test-results/connections-honesty-connec-9878c-y-rule-holds-at-four-widths-chromium-retry1/trace.zip\n\n    ────────────────────────────────────────────────────────────────────────────────────────────────\n\n  1 failed\n    [chromium] › e2e/connections-honesty.spec.ts:31:3 › connections is honest about every channel @smoke › every rule holds, at four widths \n  2 passed (2.4m)\nundefined\n/home/user/sahodalabs/apps/web:\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: playwright test connections-honesty.spec.ts --grep '@smoke' '--workers=1' '--reporter=list'",
       "duration_ms": null
     },
     {
@@ -882,7 +882,7 @@
       "suite": "smoke",
       "status": "fail",
       "summary_plain": "The smoke, unit checks ran together and something failed.",
-      "details": "PW_EXIT=1\n    Usage:\n\n        pnpm exec playwright show-trace test-results/connections-honesty-connec-9878c-y-rule-holds-at-four-widths-chromium-retry1/trace.zip\n\n    \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n  1 failed\n    [chromium] \u203a e2e/connections-honesty.spec.ts:31:3 \u203a connections is honest about every channel @smoke \u203a every rule holds, at four widths \n  2 passed (2.1m)\nundefined\n/home/user/sahodalabs/apps/web:\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: playwright test connections-honesty.spec.ts --grep '@smoke' '--workers=1' '--reporter=list'",
+      "details": "PW_EXIT=1\n    Usage:\n\n        pnpm exec playwright show-trace test-results/connections-honesty-connec-9878c-y-rule-holds-at-four-widths-chromium-retry1/trace.zip\n\n    ────────────────────────────────────────────────────────────────────────────────────────────────\n\n  1 failed\n    [chromium] › e2e/connections-honesty.spec.ts:31:3 › connections is honest about every channel @smoke › every rule holds, at four widths \n  2 passed (2.1m)\nundefined\n/home/user/sahodalabs/apps/web:\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: playwright test connections-honesty.spec.ts --grep '@smoke' '--workers=1' '--reporter=list'",
       "duration_ms": null
     },
     {
@@ -895,7 +895,7 @@
       "suite": "smoke",
       "status": "fail",
       "summary_plain": "The smoke, unit checks ran together and something failed.",
-      "details": "PW_EXIT=1\n25:  \u2718  1 [chromium] \u203a e2e/connections-honesty.spec.ts:31:3 \u203a connections is honest about every channel @smoke \u203a every rule holds, at four widths (25.6s)\n36:  \u2718  2 [chromium] \u203a e2e/connections-honesty.spec.ts:31:3 \u203a connections is honest about every channel @smoke \u203a every rule holds, at four widths (retry #1) (25.0s)\n47:  \u2713  3 [chromium] \u203a e2e/connections-honesty.spec.ts:169:3 \u203a connections is honest about every channel @smoke \u203a the two quiet readiness rungs stay apart IN DARK @smoke (23.6s)\n48:  \u2713  4 [chromium] \u203a e2e/connections-honesty.spec.ts:223:3 \u203a connections is honest about every channel @smoke \u203a every interactive control on the screen has an accessible name @smoke (22.2s)\n53:    Error: width 1440: the X allowance is rendered\n60:      154 |       // `100 of \u2014` failed. The count is whatever the database says; the\n70:    test-results/connections-honesty-connec-9878c-y-rule-holds-at-four-widths-chromium/test-failed-1.png\n85:    Error: width 1440: the X allowance is rendered\n92:      154 |       // `100 of \u2014` failed. The count is whatever the database says; the\n102:    test-results/connections-honesty-connec-9878c-y-rule-holds-at-four-widths-chromium-retry1/test-failed-1.png\n115:  1 failed\n117:  2 passed (1.8m)\n120:[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: playwright test connections-honesty.spec.ts --grep '@smoke' '--workers=1' '--reporter=list'",
+      "details": "PW_EXIT=1\n25:  ✘  1 [chromium] › e2e/connections-honesty.spec.ts:31:3 › connections is honest about every channel @smoke › every rule holds, at four widths (25.6s)\n36:  ✘  2 [chromium] › e2e/connections-honesty.spec.ts:31:3 › connections is honest about every channel @smoke › every rule holds, at four widths (retry #1) (25.0s)\n47:  ✓  3 [chromium] › e2e/connections-honesty.spec.ts:169:3 › connections is honest about every channel @smoke › the two quiet readiness rungs stay apart IN DARK @smoke (23.6s)\n48:  ✓  4 [chromium] › e2e/connections-honesty.spec.ts:223:3 › connections is honest about every channel @smoke › every interactive control on the screen has an accessible name @smoke (22.2s)\n53:    Error: width 1440: the X allowance is rendered\n60:      154 |       // `100 of —` failed. The count is whatever the database says; the\n70:    test-results/connections-honesty-connec-9878c-y-rule-holds-at-four-widths-chromium/test-failed-1.png\n85:    Error: width 1440: the X allowance is rendered\n92:      154 |       // `100 of —` failed. The count is whatever the database says; the\n102:    test-results/connections-honesty-connec-9878c-y-rule-holds-at-four-widths-chromium-retry1/test-failed-1.png\n115:  1 failed\n117:  2 passed (1.8m)\n120:[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: playwright test connections-honesty.spec.ts --grep '@smoke' '--workers=1' '--reporter=list'",
       "duration_ms": null
     },
     {
@@ -907,8 +907,8 @@
       "finished_at": "2026-08-27T17:05:06.154Z",
       "suite": "smoke",
       "status": "pass",
-      "summary_plain": "The smoke checks passed for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
-      "details": "PW_EXIT=0\n25:  \u2713  1 [chromium] \u203a e2e/connections-honesty.spec.ts:31:3 \u203a connections is honest about every channel @smoke \u203a every rule holds, at four widths (33.4s)\n26:  \u2713  2 [chromium] \u203a e2e/connections-honesty.spec.ts:191:3 \u203a connections is honest about every channel @smoke \u203a the two quiet readiness rungs stay apart IN DARK @smoke (21.0s)\n27:  \u2713  3 [chromium] \u203a e2e/connections-honesty.spec.ts:245:3 \u203a connections is honest about every channel @smoke \u203a every interactive control on the screen has an accessible name @smoke (21.8s)\n29:  3 passed (1.3m)",
+      "summary_plain": "The smoke checks passed for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
+      "details": "PW_EXIT=0\n25:  ✓  1 [chromium] › e2e/connections-honesty.spec.ts:31:3 › connections is honest about every channel @smoke › every rule holds, at four widths (33.4s)\n26:  ✓  2 [chromium] › e2e/connections-honesty.spec.ts:191:3 › connections is honest about every channel @smoke › the two quiet readiness rungs stay apart IN DARK @smoke (21.0s)\n27:  ✓  3 [chromium] › e2e/connections-honesty.spec.ts:245:3 › connections is honest about every channel @smoke › every interactive control on the screen has an accessible name @smoke (21.8s)\n29:  3 passed (1.3m)",
       "duration_ms": null
     },
     {
@@ -920,8 +920,8 @@
       "finished_at": "2026-08-27T17:05:06.154Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
-      "details": "PW_EXIT=0\n25:  \u2713  1 [chromium] \u203a e2e/connections-honesty.spec.ts:31:3 \u203a connections is honest about every channel @smoke \u203a every rule holds, at four widths (33.4s)\n26:  \u2713  2 [chromium] \u203a e2e/connections-honesty.spec.ts:191:3 \u203a connections is honest about every channel @smoke \u203a the two quiet readiness rungs stay apart IN DARK @smoke (21.0s)\n27:  \u2713  3 [chromium] \u203a e2e/connections-honesty.spec.ts:245:3 \u203a connections is honest about every channel @smoke \u203a every interactive control on the screen has an accessible name @smoke (21.8s)\n29:  3 passed (1.3m)",
+      "summary_plain": "The unit checks passed for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
+      "details": "PW_EXIT=0\n25:  ✓  1 [chromium] › e2e/connections-honesty.spec.ts:31:3 › connections is honest about every channel @smoke › every rule holds, at four widths (33.4s)\n26:  ✓  2 [chromium] › e2e/connections-honesty.spec.ts:191:3 › connections is honest about every channel @smoke › the two quiet readiness rungs stay apart IN DARK @smoke (21.0s)\n27:  ✓  3 [chromium] › e2e/connections-honesty.spec.ts:245:3 › connections is honest about every channel @smoke › every interactive control on the screen has an accessible name @smoke (21.8s)\n29:  3 passed (1.3m)",
       "duration_ms": null
     },
     {
@@ -986,7 +986,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The typecheck, lint, unit checks ran together and something failed.",
-      "details": "@sahoda/billing:test:      39|     await ledger.close()\n@sahoda/billing:test:        |                  ^\n@sahoda/billing:test:      40|     await db.close()\n@sahoda/billing:test:      41|   })\n@sahoda/billing:test: \n@sahoda/billing:test: \u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af[7/7]\u23af\n@sahoda/billing:test: \n@sahoda/billing:test: [ELIFECYCLE] Test failed. See above for more details.\n@sahoda/jobs:test: [ELIFECYCLE] Test failed. See above for more details.\n@sahoda/db:test: [ELIFECYCLE] Test failed. See above for more details.\n@sahoda/web:typecheck: [ELIFECYCLE] Command failed.\n@sahoda/web:test: [ELIFECYCLE] Test failed. See above for more details.\n@sahoda/billing#test:  ERROR  command (/home/user/sahodalabs/packages/billing) /root/.local/share/pnpm/.tools/pnpm/11.3.0/bin/pnpm run test exited (1)\n\n Tasks:    22 successful, 27 total\nCached:    0 cached, 27 total\n  Time:    3m32.825s \nFailed:    @sahoda/billing#test\n\n ERROR  run failed: command  exited (1)",
+      "details": "@sahoda/billing:test:      39|     await ledger.close()\n@sahoda/billing:test:        |                  ^\n@sahoda/billing:test:      40|     await db.close()\n@sahoda/billing:test:      41|   })\n@sahoda/billing:test: \n@sahoda/billing:test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯\n@sahoda/billing:test: \n@sahoda/billing:test: [ELIFECYCLE] Test failed. See above for more details.\n@sahoda/jobs:test: [ELIFECYCLE] Test failed. See above for more details.\n@sahoda/db:test: [ELIFECYCLE] Test failed. See above for more details.\n@sahoda/web:typecheck: [ELIFECYCLE] Command failed.\n@sahoda/web:test: [ELIFECYCLE] Test failed. See above for more details.\n@sahoda/billing#test:  ERROR  command (/home/user/sahodalabs/packages/billing) /root/.local/share/pnpm/.tools/pnpm/11.3.0/bin/pnpm run test exited (1)\n\n Tasks:    22 successful, 27 total\nCached:    0 cached, 27 total\n  Time:    3m32.825s \nFailed:    @sahoda/billing#test\n\n ERROR  run failed: command  exited (1)",
       "duration_ms": null
     },
     {
@@ -998,7 +998,7 @@
       "finished_at": "2026-08-27T17:13:47.262Z",
       "suite": "typecheck",
       "status": "pass",
-      "summary_plain": "The typecheck checks passed for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The typecheck checks passed for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": " Tasks:    9 successful, 9 total",
       "duration_ms": null
     },
@@ -1011,7 +1011,7 @@
       "finished_at": "2026-08-27T17:36:08.619Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed for @sahoda/jobs ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed for @sahoda/jobs ONLY — this run was filtered and does not cover the workspace.",
       "details": "JOBS_EXIT=0\n@sahoda/jobs:test:  Test Files  34 passed (34)",
       "duration_ms": null
     },
@@ -1037,7 +1037,7 @@
       "finished_at": "2026-08-28T09:05:43.925Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": "WEB_EXIT=0\n@sahoda/web:test:  Test Files  452 passed | 3 skipped (455)",
       "duration_ms": null
     },
@@ -1102,7 +1102,7 @@
       "finished_at": "2026-08-28T10:09:49.612Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks ran (3 passed), but 16 tests did NOT run \u2014 this does not prove the suite passes.",
+      "summary_plain": "The unit checks ran (3 passed), but 16 tests did NOT run — this does not prove the suite passes.",
       "details": " RUN  v4.1.10 /home/user/sahodalabs/apps/jobs\n\n\n Test Files  1 passed (1)\n      Tests  3 passed | 16 skipped (19)\n   Start at  10:09:40\n   Duration  9.27s (transform 149ms, setup 0ms, import 193ms, tests 8.85s, environment 0ms)",
       "duration_ms": null
     },
@@ -1116,7 +1116,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The typecheck, lint, unit checks ran together and something failed (5335 passed, 2 failed).",
-      "details": "{\n  \"ok\": false,\n  \"allPassed\": false,\n  \"ranAt\": \"2026-08-27T06:04:28.714Z\",\n  \"stages\": [\n    {\n      \"name\": \"turbo-typecheck-lint-test\",\n      \"code\": 0,\n      \"signal\": null,\n      \"ms\": 670\n    },\n    {\n      \"name\": \"vitest-root\",\n      \"code\": 1,\n      \"signal\": null,\n      \"ms\": 3600\n    }\n  ],\n  \"skipped\": [\n    \"turbo-smoke\",\n    \"prettier-check\",\n    \"turbo-build\"\n  ],\n  \"notSelected\": [],\n  \"failedStage\": \"vitest-root\"\n}\n=== tail of stage 1 log ===\n@sahoda/web:test: [disabled primary] dark --ink-mute on --surface-2 = 5.51:1\n@sahoda/web:test: \n@sahoda/web:test: stdout | src/components/ui/button.disabled-contrast.test.tsx > a disabled primary is legible AND looks inert, in both themes > the OLD recipe still measures as the defect it was, so this test can fail\n@sahoda/web:test: [disabled primary] the OLD light pair, white on --line = 1.21:1\n@sahoda/web:test: \n@sahoda/web:test: stdout | src/components/ui/button.disabled-contrast.test.tsx > a disabled primary is legible AND looks inert, in both themes > dark does not make the refusal look pressable\n@sahoda/web:test: [disabled primary] dark: shipped 5.51:1 vs white 16.10:1\n@sahoda/web:test: \n@sahoda/web:test:  \u2713  ui  src/components/ui/button.disabled-contrast.test.tsx (5 tests) 9ms\n@sahoda/web:test:  \u2713  ui  src/components/onboarding/intake-recovery.test.tsx (12 tests) 9ms\n@sahoda/web:test:  \u2713  ui  src/components/onboarding/stage/persistence.test.tsx (13 tests) 10ms\n@sahoda/web:test:  \u2713  ui  src/components/posts/variant-state.test.tsx (5 tests) 6ms\n@sahoda/web:test:  \u2713  ui  src/components/knowledge/add-document.test.tsx (2 tests) 4ms\n@sahoda/web:test:  \u2713  ui  src/app/layout.test.tsx (3 tests) 5ms\n@sahoda/web:test: \n@sahoda/web:test:  Test Files  401 passed | 3 skipped (404)\n@sahoda/web:test:       Tests  5106 passed | 13 skipped (5119)\n@sahoda/web:test:    Start at  06:02:03\n@sahoda/web:test:    Duration  111.81s (transform 17.68s, setup 18.43s, import 90.75s, tests 78.71s, environment 83.36s)\n@sahoda/web:test: \n\n Tasks:    27 successful, 27 total\nCached:    27 cached, 27 total\n  Time:    111ms >>> FULL TURBO\n\n=== tail of stage 2 log ===\n+   \"results\": [\n+     {\n+       \"killed\": true,\n+       \"name\": \"answer\",\n+       \"summary\": \"\",\n+     },\n+   ],\n  }\n\n \u276f scripts/lib/mutation-harness.test.mjs:247:8\n    245|           runTests: async () => ({ killed: true, summary: '' }),\n    246|         }),\n    247|       ).rejects.toThrow(MutationHarnessError)\n       |        ^\n    248|\n    249|       // And crucially, the source was never touched.\n\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af[2/2]\u23af\n\n\n Test Files  1 failed | 15 passed (16)\n      Tests  2 failed | 229 passed (231)\n   Start at  06:04:25\n   Duration  2.79s (transform 416ms, setup 0ms, import 694ms, tests 4.31s, environment 1ms)",
+      "details": "{\n  \"ok\": false,\n  \"allPassed\": false,\n  \"ranAt\": \"2026-08-27T06:04:28.714Z\",\n  \"stages\": [\n    {\n      \"name\": \"turbo-typecheck-lint-test\",\n      \"code\": 0,\n      \"signal\": null,\n      \"ms\": 670\n    },\n    {\n      \"name\": \"vitest-root\",\n      \"code\": 1,\n      \"signal\": null,\n      \"ms\": 3600\n    }\n  ],\n  \"skipped\": [\n    \"turbo-smoke\",\n    \"prettier-check\",\n    \"turbo-build\"\n  ],\n  \"notSelected\": [],\n  \"failedStage\": \"vitest-root\"\n}\n=== tail of stage 1 log ===\n@sahoda/web:test: [disabled primary] dark --ink-mute on --surface-2 = 5.51:1\n@sahoda/web:test: \n@sahoda/web:test: stdout | src/components/ui/button.disabled-contrast.test.tsx > a disabled primary is legible AND looks inert, in both themes > the OLD recipe still measures as the defect it was, so this test can fail\n@sahoda/web:test: [disabled primary] the OLD light pair, white on --line = 1.21:1\n@sahoda/web:test: \n@sahoda/web:test: stdout | src/components/ui/button.disabled-contrast.test.tsx > a disabled primary is legible AND looks inert, in both themes > dark does not make the refusal look pressable\n@sahoda/web:test: [disabled primary] dark: shipped 5.51:1 vs white 16.10:1\n@sahoda/web:test: \n@sahoda/web:test:  ✓  ui  src/components/ui/button.disabled-contrast.test.tsx (5 tests) 9ms\n@sahoda/web:test:  ✓  ui  src/components/onboarding/intake-recovery.test.tsx (12 tests) 9ms\n@sahoda/web:test:  ✓  ui  src/components/onboarding/stage/persistence.test.tsx (13 tests) 10ms\n@sahoda/web:test:  ✓  ui  src/components/posts/variant-state.test.tsx (5 tests) 6ms\n@sahoda/web:test:  ✓  ui  src/components/knowledge/add-document.test.tsx (2 tests) 4ms\n@sahoda/web:test:  ✓  ui  src/app/layout.test.tsx (3 tests) 5ms\n@sahoda/web:test: \n@sahoda/web:test:  Test Files  401 passed | 3 skipped (404)\n@sahoda/web:test:       Tests  5106 passed | 13 skipped (5119)\n@sahoda/web:test:    Start at  06:02:03\n@sahoda/web:test:    Duration  111.81s (transform 17.68s, setup 18.43s, import 90.75s, tests 78.71s, environment 83.36s)\n@sahoda/web:test: \n\n Tasks:    27 successful, 27 total\nCached:    27 cached, 27 total\n  Time:    111ms >>> FULL TURBO\n\n=== tail of stage 2 log ===\n+   \"results\": [\n+     {\n+       \"killed\": true,\n+       \"name\": \"answer\",\n+       \"summary\": \"\",\n+     },\n+   ],\n  }\n\n ❯ scripts/lib/mutation-harness.test.mjs:247:8\n    245|           runTests: async () => ({ killed: true, summary: '' }),\n    246|         }),\n    247|       ).rejects.toThrow(MutationHarnessError)\n       |        ^\n    248|\n    249|       // And crucially, the source was never touched.\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n\n Test Files  1 failed | 15 passed (16)\n      Tests  2 failed | 229 passed (231)\n   Start at  06:04:25\n   Duration  2.79s (transform 416ms, setup 0ms, import 694ms, tests 4.31s, environment 1ms)",
       "duration_ms": null
     },
     {
@@ -1128,7 +1128,7 @@
       "finished_at": "2026-08-28T10:28:22.301Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed (3 passed) for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed (3 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": " RUN  v4.1.10 /home/user/sahodalabs/apps/web\n\n\n Test Files  1 passed (1)\n      Tests  3 passed (3)\n   Start at  10:28:12\n   Duration  9.60s (transform 219ms, setup 0ms, import 332ms, tests 8.86s, environment 0ms)",
       "duration_ms": null
     },
@@ -1142,7 +1142,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (3 failed).",
-      "details": "1\n     \u00d7 parses and executes \u2014 every relation it names exists 6ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 3 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n FAIL  |lib| src/lib/cron/loop-facts-sql.pglite.test.ts > LOOP_FACTS_SQL against the real schema > parses and executes \u2014 every relation it names exists\n FAIL  |lib| src/lib/cron/loop-facts-sql.pglite.test.ts > LOOP_FACTS_SQL against the real schema > returns the settings, balance, connections and dial for a workspace\n FAIL  |lib| src/lib/cron/loop-facts-sql.pglite.test.ts > LOOP_FACTS_SQL against the real schema > includes a workspace with no loop_settings row, as a null paused\nerror: relation \"loop_autonomy\" does not exist\n      Tests  3 failed (3)\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run src/lib/cron/loop-facts-sql.pglite.test.ts",
+      "details": "1\n     × parses and executes — every relation it names exists 6ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯\n FAIL  |lib| src/lib/cron/loop-facts-sql.pglite.test.ts > LOOP_FACTS_SQL against the real schema > parses and executes — every relation it names exists\n FAIL  |lib| src/lib/cron/loop-facts-sql.pglite.test.ts > LOOP_FACTS_SQL against the real schema > returns the settings, balance, connections and dial for a workspace\n FAIL  |lib| src/lib/cron/loop-facts-sql.pglite.test.ts > LOOP_FACTS_SQL against the real schema > includes a workspace with no loop_settings row, as a null paused\nerror: relation \"loop_autonomy\" does not exist\n      Tests  3 failed (3)\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run src/lib/cron/loop-facts-sql.pglite.test.ts",
       "duration_ms": null
     },
     {
@@ -1154,7 +1154,7 @@
       "finished_at": "2026-08-28T10:28:58.510Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed (19 passed) for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed (19 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": " RUN  v4.1.10 /home/user/sahodalabs/apps/web\n\n\n Test Files  3 passed (3)\n      Tests  19 passed (19)\n   Start at  10:28:49\n   Duration  9.10s (transform 1.93s, setup 0ms, import 2.83s, tests 8.68s, environment 0ms)",
       "duration_ms": null
     },
@@ -1180,7 +1180,7 @@
       "finished_at": "2026-08-28T10:32:53.885Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed (10 passed) for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed (10 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": " RUN  v4.1.10 /home/user/sahodalabs/apps/web\n\n\n Test Files  1 passed (1)\n      Tests  10 passed (10)\n   Start at  10:32:52\n   Duration  1.19s (transform 796ms, setup 0ms, import 1.01s, tests 9ms, environment 0ms)",
       "duration_ms": null
     },
@@ -1194,7 +1194,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (9 passed, 1 failed).",
-      "details": "--- MUTATION 1: week comparison removed\n     \u00d7 does not call this week planned because LAST week was 6ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  1 failed | 9 passed (10)",
+      "details": "--- MUTATION 1: week comparison removed\n     × does not call this week planned because LAST week was 6ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 9 passed (10)",
       "duration_ms": null
     },
     {
@@ -1207,7 +1207,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (9 passed, 1 failed).",
-      "details": "--- MUTATION 2: lapsed connections dropped from the facts\n     \u00d7 tells a workspace whose channel lapsed to RECONNECT, never to connect 6ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  1 failed | 9 passed (10)",
+      "details": "--- MUTATION 2: lapsed connections dropped from the facts\n     × tells a workspace whose channel lapsed to RECONNECT, never to connect 6ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 9 passed (10)",
       "duration_ms": null
     },
     {
@@ -1219,7 +1219,7 @@
       "finished_at": "2026-08-28T10:33:49.242Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed (4 passed) for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed (4 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": " RUN  v4.1.10 /home/user/sahodalabs/apps/web\n\n\n Test Files  1 passed (1)\n      Tests  4 passed (4)\n   Start at  10:33:46\n   Duration  2.59s (transform 918ms, setup 206ms, import 1.22s, tests 214ms, environment 780ms)",
       "duration_ms": null
     },
@@ -1233,7 +1233,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (2 passed, 2 failed).",
-      "details": "--- MUTATION: remedy link never rendered\n     \u00d7 renders the sentence and a link that can fix it 242ms\n     \u00d7 renders an in-page remedy as a followable link 45ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 2 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  2 failed | 2 passed (4)",
+      "details": "--- MUTATION: remedy link never rendered\n     × renders the sentence and a link that can fix it 242ms\n     × renders an in-page remedy as a followable link 45ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  2 failed | 2 passed (4)",
       "duration_ms": null
     },
     {
@@ -1245,7 +1245,7 @@
       "finished_at": "2026-08-28T10:34:21.856Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed (182 passed) for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed (182 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": " RUN  v4.1.10 /home/user/sahodalabs/apps/web\n\n\n Test Files  20 passed (20)\n      Tests  182 passed (182)\n   Start at  10:34:13\n   Duration  7.82s (transform 5.55s, setup 785ms, import 10.97s, tests 8.02s, environment 5.60s)",
       "duration_ms": null
     },
@@ -1258,7 +1258,7 @@
       "finished_at": "2026-08-28T10:35:08.104Z",
       "suite": "typecheck",
       "status": "pass",
-      "summary_plain": "The typecheck checks passed (10 passed) for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The typecheck checks passed (10 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": "TSC_DONE\n      Tests  10 passed (10)",
       "duration_ms": null
     },
@@ -1271,7 +1271,7 @@
       "finished_at": "2026-08-28T10:35:08.104Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed (10 passed) for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed (10 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": "TSC_DONE\n      Tests  10 passed (10)",
       "duration_ms": null
     },
@@ -1336,7 +1336,7 @@
       "finished_at": "2026-08-28T10:41:33.079Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed (13 passed) for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed (13 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": " RUN  v4.1.10 /home/user/sahodalabs/apps/web\n\n\n Test Files  1 passed (1)\n      Tests  13 passed (13)\n   Start at  10:41:31\n   Duration  985ms (transform 601ms, setup 0ms, import 808ms, tests 9ms, environment 0ms)",
       "duration_ms": null
     },
@@ -1349,7 +1349,7 @@
       "finished_at": "2026-08-28T10:41:57.111Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed (5 passed) for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed (5 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": " RUN  v4.1.10 /home/user/sahodalabs/apps/web\n\n\n Test Files  1 passed (1)\n      Tests  5 passed (5)\n   Start at  10:41:52\n   Duration  4.94s (transform 136ms, setup 0ms, import 189ms, tests 4.59s, environment 0ms)",
       "duration_ms": null
     },
@@ -1363,7 +1363,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (4 passed, 1 failed).",
-      "details": "--- MUTATION: plain join over every brand_memory row\n     \u00d7 returns the ACTIVE brain payload, not a superseded one, and never two rows 12ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  1 failed | 4 passed (5)",
+      "details": "--- MUTATION: plain join over every brand_memory row\n     × returns the ACTIVE brain payload, not a superseded one, and never two rows 12ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 4 passed (5)",
       "duration_ms": null
     },
     {
@@ -1375,7 +1375,7 @@
       "finished_at": "2026-08-28T10:42:34.933Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed (5 passed) for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed (5 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": " RUN  v4.1.10 /home/user/sahodalabs/apps/web\n\n\n Test Files  1 passed (1)\n      Tests  5 passed (5)\n   Start at  10:42:34\n   Duration  265ms (transform 78ms, setup 0ms, import 95ms, tests 5ms, environment 0ms)",
       "duration_ms": null
     },
@@ -1389,7 +1389,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (3 passed, 2 failed).",
-      "details": "--- MUTATION: count every field_meta entry, not only the ring's\n     \u00d7 ignores confirmed entries for paths the ring does not count 7ms\n     \u00d7 never exceeds the ring denominator, even for a fully confirmed brain 1ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 2 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  2 failed | 3 passed (5)\n1",
+      "details": "--- MUTATION: count every field_meta entry, not only the ring's\n     × ignores confirmed entries for paths the ring does not count 7ms\n     × never exceeds the ring denominator, even for a fully confirmed brain 1ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  2 failed | 3 passed (5)\n1",
       "duration_ms": null
     },
     {
@@ -1415,7 +1415,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed.",
-      "details": "     \u00d7 opens ONE pool for twenty workspaces that are all PLANNED 9ms\n FAIL  |lib| src/lib/cron/run-loop-resources.test.ts > one scheduled tick, at a scale this product will reach > opens ONE pool for twenty workspaces that are all PLANNED\nAssertionError: expected +0 to be 20 // Object.is equality\n- Expected\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run src/lib/loop src/components/loop src/lib/cron src/lib/brand",
+      "details": "     × opens ONE pool for twenty workspaces that are all PLANNED 9ms\n FAIL  |lib| src/lib/cron/run-loop-resources.test.ts > one scheduled tick, at a scale this product will reach > opens ONE pool for twenty workspaces that are all PLANNED\nAssertionError: expected +0 to be 20 // Object.is equality\n- Expected\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run src/lib/loop src/components/loop src/lib/cron src/lib/brand",
       "duration_ms": null
     },
     {
@@ -1427,7 +1427,7 @@
       "finished_at": "2026-08-28T10:43:51.795Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed (391 passed) for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed (391 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": " Test Files  40 passed (40)\n      Tests  391 passed (391)\n   Start at  10:43:43\n   Duration  7.79s (transform 5.19s, setup 566ms, import 12.31s, tests 5.54s, environment 2.53s)",
       "duration_ms": null
     },
@@ -1441,7 +1441,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (13 passed, 6 failed).",
-      "details": "    190|   })\n    191| })\n\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af[6/6]\u23af\n\n\n Test Files  1 failed (1)\n      Tests  6 failed | 13 passed (19)\n   Start at  10:45:49\n   Duration  370ms (transform 118ms, setup 0ms, import 135ms, tests 27ms, environment 0ms)\n\nundefined\n/home/user/sahodalabs/apps/web:\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run src/lib/loop/reflect.test.ts",
+      "details": "    190|   })\n    191| })\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯\n\n\n Test Files  1 failed (1)\n      Tests  6 failed | 13 passed (19)\n   Start at  10:45:49\n   Duration  370ms (transform 118ms, setup 0ms, import 135ms, tests 27ms, environment 0ms)\n\nundefined\n/home/user/sahodalabs/apps/web:\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run src/lib/loop/reflect.test.ts",
       "duration_ms": null
     },
     {
@@ -1454,7 +1454,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed.",
-      "details": "     \u00d7 REFUSES a lift between numbers too small to mean anything 7ms\n     \u00d7 REFUSES a difference inside the noise 1ms\n     \u00d7 emits a learning when all four gates clear, carrying its own evidence 2ms\n     \u00d7 emits at most one learning \u2014 it does not fill a quota 1ms\n     \u00d7 averages a post's own daily readings before comparing 1ms\n     \u00d7 does not divide by zero when the runner-up measured nothing 1ms\nAssertionError: expected 'too_few_days' to be 'numbers_too_small' // Object.is equality\nAssertionError: expected 'too_few_days' to be 'difference_too_small' // Object.is equality\nAssertionError: expected [] to have a length of 1 but got +0\nAssertionError: expected [] to have a length of 1 but got +0\nAssertionError: expected 'too_few_days' to be 'difference_too_small' // Object.is equality",
+      "details": "     × REFUSES a lift between numbers too small to mean anything 7ms\n     × REFUSES a difference inside the noise 1ms\n     × emits a learning when all four gates clear, carrying its own evidence 2ms\n     × emits at most one learning — it does not fill a quota 1ms\n     × averages a post's own daily readings before comparing 1ms\n     × does not divide by zero when the runner-up measured nothing 1ms\nAssertionError: expected 'too_few_days' to be 'numbers_too_small' // Object.is equality\nAssertionError: expected 'too_few_days' to be 'difference_too_small' // Object.is equality\nAssertionError: expected [] to have a length of 1 but got +0\nAssertionError: expected [] to have a length of 1 but got +0\nAssertionError: expected 'too_few_days' to be 'difference_too_small' // Object.is equality",
       "duration_ms": null
     },
     {
@@ -1467,7 +1467,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (18 passed, 1 failed).",
-      "details": "     \u00d7 emits a learning when all four gates clear, carrying its own evidence 8ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\nAssertionError: expected [] to have a length of 1 but got +0\n      Tests  1 failed | 18 passed (19)",
+      "details": "     × emits a learning when all four gates clear, carrying its own evidence 8ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\nAssertionError: expected [] to have a length of 1 but got +0\n      Tests  1 failed | 18 passed (19)",
       "duration_ms": null
     },
     {
@@ -1479,7 +1479,7 @@
       "finished_at": "2026-08-28T10:46:46.265Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed (19 passed) for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed (19 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": " Test Files  1 passed (1)\n      Tests  19 passed (19)\n   Start at  10:46:45\n   Duration  326ms (transform 119ms, setup 0ms, import 136ms, tests 11ms, environment 0ms)",
       "duration_ms": null
     },
@@ -1493,7 +1493,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (16 passed, 3 failed).",
-      "details": "--- MUTATION: the days floor never fires\n     \u00d7 refuses a comparison whose evidence is all from one day 7ms\n     \u00d7 still refuses at two days 1ms\n     \u00d7 counts distinct days, not measurements 1ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 3 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  3 failed | 16 passed (19)",
+      "details": "--- MUTATION: the days floor never fires\n     × refuses a comparison whose evidence is all from one day 7ms\n     × still refuses at two days 1ms\n     × counts distinct days, not measurements 1ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  3 failed | 16 passed (19)",
       "duration_ms": null
     },
     {
@@ -1505,7 +1505,7 @@
       "finished_at": "2026-08-28T10:49:11.196Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed (118 passed) for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed (118 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": " RUN  v4.1.10 /home/user/sahodalabs/apps/web\n\n\n Test Files  10 passed (10)\n      Tests  118 passed (118)\n   Start at  10:49:09\n   Duration  1.75s (transform 2.97s, setup 0ms, import 4.42s, tests 113ms, environment 1ms)",
       "duration_ms": null
     },
@@ -1518,7 +1518,7 @@
       "finished_at": "2026-08-28T10:49:51.511Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed (4 passed) for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed (4 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": " RUN  v4.1.10 /home/user/sahodalabs/apps/web\n\n\n Test Files  1 passed (1)\n      Tests  4 passed (4)\n   Start at  10:49:50\n   Duration  1.07s (transform 701ms, setup 0ms, import 902ms, tests 7ms, environment 0ms)",
       "duration_ms": null
     },
@@ -1532,7 +1532,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (3 passed, 1 failed).",
-      "details": "--- MUTATION: catch-all instead of the narrow 42703 match\n     \u00d7 does not swallow any other database error 6ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  1 failed | 3 passed (4)",
+      "details": "--- MUTATION: catch-all instead of the narrow 42703 match\n     × does not swallow any other database error 6ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 3 passed (4)",
       "duration_ms": null
     },
     {
@@ -1544,7 +1544,7 @@
       "finished_at": "2026-08-28T10:50:30.160Z",
       "suite": "typecheck",
       "status": "pass",
-      "summary_plain": "The typecheck checks passed (405 passed) for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The typecheck checks passed (405 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": " Test Files  41 passed (41)\n      Tests  405 passed (405)\n   Start at  10:50:12\n   Duration  8.29s (transform 5.46s, setup 610ms, import 13.05s, tests 6.18s, environment 2.58s)\n\nTSC_OK\nCached:    7 cached, 9 total\n  Time:    2.101s",
       "duration_ms": null
     },
@@ -1557,7 +1557,7 @@
       "finished_at": "2026-08-28T10:50:30.160Z",
       "suite": "lint",
       "status": "pass",
-      "summary_plain": "The lint checks passed (405 passed) for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The lint checks passed (405 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": " Test Files  41 passed (41)\n      Tests  405 passed (405)\n   Start at  10:50:12\n   Duration  8.29s (transform 5.46s, setup 610ms, import 13.05s, tests 6.18s, environment 2.58s)\n\nTSC_OK\nCached:    7 cached, 9 total\n  Time:    2.101s",
       "duration_ms": null
     },
@@ -1570,7 +1570,7 @@
       "finished_at": "2026-08-28T10:50:30.160Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed (405 passed) for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed (405 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": " Test Files  41 passed (41)\n      Tests  405 passed (405)\n   Start at  10:50:12\n   Duration  8.29s (transform 5.46s, setup 610ms, import 13.05s, tests 6.18s, environment 2.58s)\n\nTSC_OK\nCached:    7 cached, 9 total\n  Time:    2.101s",
       "duration_ms": null
     },
@@ -1584,7 +1584,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (19 passed, 6 failed).",
-      "details": "\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af[6/6]\u23af\n\n\n Test Files  1 failed (1)\n      Tests  6 failed | 19 passed (25)\n   Start at  10:51:23\n   Duration  244ms (transform 26ms, setup 0ms, import 41ms, tests 15ms, environment 0ms)\n\nundefined\n/home/user/sahodalabs/apps/web:\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run src/lib/cron/route-shape.test.ts",
+      "details": "⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯\n\n\n Test Files  1 failed (1)\n      Tests  6 failed | 19 passed (25)\n   Start at  10:51:23\n   Duration  244ms (transform 26ms, setup 0ms, import 41ms, tests 15ms, environment 0ms)\n\nundefined\n/home/user/sahodalabs/apps/web:\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run src/lib/cron/route-shape.test.ts",
       "duration_ms": null
     },
     {
@@ -1596,7 +1596,7 @@
       "finished_at": "2026-08-28T10:51:49.831Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed (25 passed) for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed (25 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": "      Tests  25 passed (25)",
       "duration_ms": null
     },
@@ -1610,7 +1610,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (49 passed, 2 failed).",
-      "details": "--- MUTATION A: radar loses maxDuration\n     \u00d7 'radar' declares a maxDuration 4ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  1 failed | 24 passed (25)\n--- MUTATION B: the sweep finds no routes\n     \u00d7 finds the routes at all, so an empty sweep cannot pass 4ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  1 failed (1)\n      Tests  25 passed (25)",
+      "details": "--- MUTATION A: radar loses maxDuration\n     × 'radar' declares a maxDuration 4ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 24 passed (25)\n--- MUTATION B: the sweep finds no routes\n     × finds the routes at all, so an empty sweep cannot pass 4ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed (1)\n      Tests  25 passed (25)",
       "duration_ms": null
     },
     {
@@ -1622,7 +1622,7 @@
       "finished_at": "2026-08-28T10:53:50.152Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed (8 passed) for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed (8 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": " RUN  v4.1.10 /home/user/sahodalabs/apps/web\n\n\n Test Files  1 passed (1)\n      Tests  8 passed (8)\n   Start at  10:53:49\n   Duration  348ms (transform 121ms, setup 0ms, import 141ms, tests 7ms, environment 0ms)",
       "duration_ms": null
     },
@@ -1636,7 +1636,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (29 passed, 3 failed).",
-      "details": "--- MUTATION A: back to filtering after the limit\n     \u00d7 asks the database for this cycle, rather than filtering after a limit 8ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  1 failed | 7 passed (8)\n--- MUTATION B: a ranking of one is allowed\n     \u00d7 withholds a ranking of one post, because one post is not a ranking 7ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  1 failed | 7 passed (8)\n--- MUTATION C: sum a post's dailies instead of its best\n     \u00d7 takes a post best reading, never the sum of its daily ones 7ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  1 failed | 7 passed (8)\n      Tests  8 passed (8)",
+      "details": "--- MUTATION A: back to filtering after the limit\n     × asks the database for this cycle, rather than filtering after a limit 8ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 7 passed (8)\n--- MUTATION B: a ranking of one is allowed\n     × withholds a ranking of one post, because one post is not a ranking 7ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 7 passed (8)\n--- MUTATION C: sum a post's dailies instead of its best\n     × takes a post best reading, never the sum of its daily ones 7ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 7 passed (8)\n      Tests  8 passed (8)",
       "duration_ms": null
     },
     {
@@ -1649,7 +1649,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed.",
-      "details": "     \u00d7 tells a workspace with no channel to connect one 15ms\n     \u00d7 tells a workspace whose channel lapsed to RECONNECT, never to connect 3ms\n     \u00d7 distinguishes paused from never enabled 10ms\n     \u00d7 says connect when a workspace never had a channel 2ms\n     \u00d7 says RECONNECT, naming the channel, when one lapsed 5ms\n     \u00d7 names every lapsed channel, and pluralises 2ms\n     \u00d7 says the week is already planned rather than repeating the charge 3ms\n     \u00d7 says how many credits are short, with both numbers 2ms\n     \u00d7 still plans when every channel is at L0, and says the week will only suggest 3ms\n     \u00d7 explains both production workspaces measured on 2026-08-23 2ms\n     \u00d7 ignores a connected platform that is not one of the four 3ms\n\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 11 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\nAssertionError: expected 'The Loop is paused. Resume it and Sah\u2026' to be 'The Loop is paused \u2014 resume it and Sa\u2026' // Object.is equality\nAssertionError: expected 'Connect a channel first. Sahoda has n\u2026' to be 'Connect a channel first \u2014 Sahoda has \u2026' // Object.is equality",
+      "details": "     × tells a workspace with no channel to connect one 15ms\n     × tells a workspace whose channel lapsed to RECONNECT, never to connect 3ms\n     × distinguishes paused from never enabled 10ms\n     × says connect when a workspace never had a channel 2ms\n     × says RECONNECT, naming the channel, when one lapsed 5ms\n     × names every lapsed channel, and pluralises 2ms\n     × says the week is already planned rather than repeating the charge 3ms\n     × says how many credits are short, with both numbers 2ms\n     × still plans when every channel is at L0, and says the week will only suggest 3ms\n     × explains both production workspaces measured on 2026-08-23 2ms\n     × ignores a connected platform that is not one of the four 3ms\n⎯⎯⎯⎯⎯⎯ Failed Tests 11 ⎯⎯⎯⎯⎯⎯⎯\nAssertionError: expected 'The Loop is paused. Resume it and Sah…' to be 'The Loop is paused — resume it and Sa…' // Object.is equality\nAssertionError: expected 'Connect a channel first. Sahoda has n…' to be 'Connect a channel first — Sahoda has …' // Object.is equality",
       "duration_ms": null
     },
     {
@@ -1662,7 +1662,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (233 passed, 1 failed).",
-      "details": "updated apps/web/src/lib/loop/eligibility.test.ts\nupdated apps/web/src/lib/loop/verdict.test.ts\n     \u00d7 tells a workspace whose channel lapsed to RECONNECT, never to connect 14ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\nAssertionError: expected 'Your Instagram connection has lapsed.\u2026' to contain 'reconnect'\n      Tests  1 failed | 233 passed (234)",
+      "details": "updated apps/web/src/lib/loop/eligibility.test.ts\nupdated apps/web/src/lib/loop/verdict.test.ts\n     × tells a workspace whose channel lapsed to RECONNECT, never to connect 14ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\nAssertionError: expected 'Your Instagram connection has lapsed.…' to contain 'reconnect'\n      Tests  1 failed | 233 passed (234)",
       "duration_ms": null
     },
     {
@@ -1674,7 +1674,7 @@
       "finished_at": "2026-08-28T10:57:48.313Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed (438 passed) for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed (438 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": "      Tests  438 passed (438)",
       "duration_ms": null
     },
@@ -1688,7 +1688,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed.",
-      "details": "AssertionError: These read source but never say what they cannot see. Add a sentence \u2014 \"WHAT IT CANNOT SEE: \u2026\" \u2014 naming the access pattern the scan would miss (raw SQL, an RPC, a dynamic import, a commented entry, a template literal).: expected [ Array(1) ] to deeply equal []\n\n- Expected\n+ Received\n\n- []\n+ [\n=== what it scans:\n  const unseen = undeclared.filter((f) => !known.has(f))\n\n  if (unseen.length > 0 && !absorbNew) {\n    console.error(`  baseline NOT written \u2014 ${unseen.length} scanner(s) new to the register:`)\n    for (const f of unseen) console.error(`  REFUSED  ${f} (need --absorb-new)`)\n    process.exit(1)\n  }\n  for (const f of unseen) console.log(`  absorbing  ${f}`)\n  writeFileSync(BASELINE, `${JSON.stringify({ undeclared }, null, 2)}\\n`)\n  console.log(`baseline: ${baseline.undeclared.length} \u2192 ${undeclared.length}`)\n  process.exit(0)\n}\n\ndescribe('every scanner declares what it is blind to', () => {\n  it('finds the scanners by git grep, not by a list \u2014 a new one cannot hide', () => {\n    // If this ever drops to a handful, the enumeration broke and every\n    // assertion below became vacuously true.\n    expect(scanners.length).toBeGreaterThan(40)\n  })\n\n  it('no NEW scanner arrives without declaring its blind spot', () => {\n    const undeclared = scanners.filter((s) => !s.declaresLimit).map((s) => s.file)\n    const added = undeclared.filter((f) => !baseline.undeclared.includes(f))\n\n    expect(\n      added,\n      `These read source but never say what they cannot see. Add a sentence \u2014 ` +\n        `\"WHAT IT CANNOT SEE: \u2026\" \u2014 naming the access pattern the scan would miss ` +\n        `(raw SQL, an RPC, a dynamic import, a commented entry, a template literal).`,\n    ).toEqual([])\n  })",
+      "details": "AssertionError: These read source but never say what they cannot see. Add a sentence — \"WHAT IT CANNOT SEE: …\" — naming the access pattern the scan would miss (raw SQL, an RPC, a dynamic import, a commented entry, a template literal).: expected [ Array(1) ] to deeply equal []\n\n- Expected\n+ Received\n\n- []\n+ [\n=== what it scans:\n  const unseen = undeclared.filter((f) => !known.has(f))\n\n  if (unseen.length > 0 && !absorbNew) {\n    console.error(`  baseline NOT written — ${unseen.length} scanner(s) new to the register:`)\n    for (const f of unseen) console.error(`  REFUSED  ${f} (need --absorb-new)`)\n    process.exit(1)\n  }\n  for (const f of unseen) console.log(`  absorbing  ${f}`)\n  writeFileSync(BASELINE, `${JSON.stringify({ undeclared }, null, 2)}\\n`)\n  console.log(`baseline: ${baseline.undeclared.length} → ${undeclared.length}`)\n  process.exit(0)\n}\n\ndescribe('every scanner declares what it is blind to', () => {\n  it('finds the scanners by git grep, not by a list — a new one cannot hide', () => {\n    // If this ever drops to a handful, the enumeration broke and every\n    // assertion below became vacuously true.\n    expect(scanners.length).toBeGreaterThan(40)\n  })\n\n  it('no NEW scanner arrives without declaring its blind spot', () => {\n    const undeclared = scanners.filter((s) => !s.declaresLimit).map((s) => s.file)\n    const added = undeclared.filter((f) => !baseline.undeclared.includes(f))\n\n    expect(\n      added,\n      `These read source but never say what they cannot see. Add a sentence — ` +\n        `\"WHAT IT CANNOT SEE: …\" — naming the access pattern the scan would miss ` +\n        `(raw SQL, an RPC, a dynamic import, a commented entry, a template literal).`,\n    ).toEqual([])\n  })",
       "duration_ms": null
     },
     {
@@ -1714,7 +1714,7 @@
       "suite": "smoke",
       "status": "fail",
       "summary_plain": "The smoke, unit checks ran together and something failed.",
-      "details": "    Error Context: test-results/every-section-loads-every--04bbb-pens-and-shows-its-own-name-chromium-retry1/error-context.md\n\n    attachment #3: trace (application/zip) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n    test-results/every-section-loads-every--04bbb-pens-and-shows-its-own-name-chromium-retry1/trace.zip\n    Usage:\n\n        pnpm exec playwright show-trace test-results/every-section-loads-every--04bbb-pens-and-shows-its-own-name-chromium-retry1/trace.zip\n\n    \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n  9 failed\n    [chromium] \u203a e2e/auth-contrast.spec.ts:67:5 \u203a /sign-in \u00b7 the primary action clears the UI floor \u00b7 light @smoke \n    [chromium] \u203a e2e/auth-contrast.spec.ts:67:5 \u203a /sign-up \u00b7 the primary action clears the UI floor \u00b7 light @smoke \n    [chromium] \u203a e2e/auth-contrast.spec.ts:67:5 \u203a /sign-in \u00b7 the primary action clears the UI floor \u00b7 dark @smoke \n    [chromium] \u203a e2e/auth-contrast.spec.ts:67:5 \u203a /sign-up \u00b7 the primary action clears the UI floor \u00b7 dark @smoke \n    [chromium] \u203a e2e/design-system.spec.ts:22:5 \u203a design system gallery @smoke \u203a renders and survives greyscale \u2014 light \n    [chromium] \u203a e2e/design-system.spec.ts:22:5 \u203a design system gallery @smoke \u203a renders and survives greyscale \u2014 dark \n    [chromium] \u203a e2e/design-system.spec.ts:132:3 \u203a design system gallery @smoke \u203a text on a brand fill is ink, and clears AA \n    [chromium] \u203a e2e/design-system.spec.ts:166:3 \u203a design system gallery @smoke \u203a coming-soon is not a button \n    [chromium] \u203a e2e/every-section-loads.spec.ts:101:3 \u203a every section loads @smoke \u203a each of the twenty-one sections opens and shows its own name \n  2 passed (7.2m)\nundefined\n/home/user/sahodalabs/apps/web:\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: playwright test --grep '@smoke' e2e/every-section-loads.spec.ts e2e/auth-contrast.spec.ts e2e/design-system.spec.ts",
+      "details": "    Error Context: test-results/every-section-loads-every--04bbb-pens-and-shows-its-own-name-chromium-retry1/error-context.md\n\n    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────\n    test-results/every-section-loads-every--04bbb-pens-and-shows-its-own-name-chromium-retry1/trace.zip\n    Usage:\n\n        pnpm exec playwright show-trace test-results/every-section-loads-every--04bbb-pens-and-shows-its-own-name-chromium-retry1/trace.zip\n\n    ────────────────────────────────────────────────────────────────────────────────────────────────\n\n  9 failed\n    [chromium] › e2e/auth-contrast.spec.ts:67:5 › /sign-in · the primary action clears the UI floor · light @smoke \n    [chromium] › e2e/auth-contrast.spec.ts:67:5 › /sign-up · the primary action clears the UI floor · light @smoke \n    [chromium] › e2e/auth-contrast.spec.ts:67:5 › /sign-in · the primary action clears the UI floor · dark @smoke \n    [chromium] › e2e/auth-contrast.spec.ts:67:5 › /sign-up · the primary action clears the UI floor · dark @smoke \n    [chromium] › e2e/design-system.spec.ts:22:5 › design system gallery @smoke › renders and survives greyscale — light \n    [chromium] › e2e/design-system.spec.ts:22:5 › design system gallery @smoke › renders and survives greyscale — dark \n    [chromium] › e2e/design-system.spec.ts:132:3 › design system gallery @smoke › text on a brand fill is ink, and clears AA \n    [chromium] › e2e/design-system.spec.ts:166:3 › design system gallery @smoke › coming-soon is not a button \n    [chromium] › e2e/every-section-loads.spec.ts:101:3 › every section loads @smoke › each of the twenty-one sections opens and shows its own name \n  2 passed (7.2m)\nundefined\n/home/user/sahodalabs/apps/web:\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: playwright test --grep '@smoke' e2e/every-section-loads.spec.ts e2e/auth-contrast.spec.ts e2e/design-system.spec.ts",
       "duration_ms": null
     },
     {
@@ -1726,8 +1726,8 @@
       "finished_at": "2026-08-28T11:52:44.001Z",
       "suite": "smoke",
       "status": "pass",
-      "summary_plain": "The smoke checks passed for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
-      "details": "  \u2713  16 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /assets offers no remedy it cannot fulfil (5.6s)\n  \u2713  17 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /campaigns offers no remedy it cannot fulfil (5.6s)\n  \u2713  18 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /settings offers no remedy it cannot fulfil (5.5s)\n  \u2713  19 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /settings/plan offers no remedy it cannot fulfil (5.5s)\n  \u2713  20 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /settings/integrations offers no remedy it cannot fulfil (5.6s)\n  \u2713  21 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /settings/profile offers no remedy it cannot fulfil (5.5s)\n  \u2713  22 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /loop offers no remedy it cannot fulfil (5.6s)\n  \u2713  23 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /report offers no remedy it cannot fulfil (5.7s)\n  \u2713  24 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /brain offers no remedy it cannot fulfil (5.5s)\n  \u2713  25 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /brain/resolve offers no remedy it cannot fulfil (5.5s)\n  \u2713  26 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /playbooks offers no remedy it cannot fulfil (5.7s)\n  \u2713  27 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /radar offers no remedy it cannot fulfil (5.8s)\n  \u2713  28 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /remix offers no remedy it cannot fulfil (5.7s)\n  \u2713  29 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /leads offers no remedy it cannot fulfil (5.5s)\n  \u2713  30 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /brain/knowledge offers no remedy it cannot fulfil (5.5s)\n  \u2713  31 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /studio offers no remedy it cannot fulfil (5.6s)\n  \u2713  32 [chromium] \u203a e2e/roadmap-honesty.spec.ts:212:1 \u203a @smoke the number in the header is the length of the list below it (2ms)\n  \u2713  33 [chromium] \u203a e2e/roadmap-honesty.spec.ts:224:3 \u203a the roadmap sections invent nothing @smoke \u203a no number appears that is not a price or an ordinal (13.0s)\n\n  33 passed (3.2m)",
+      "summary_plain": "The smoke checks passed for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
+      "details": "  ✓  16 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /assets offers no remedy it cannot fulfil (5.6s)\n  ✓  17 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /campaigns offers no remedy it cannot fulfil (5.6s)\n  ✓  18 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /settings offers no remedy it cannot fulfil (5.5s)\n  ✓  19 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /settings/plan offers no remedy it cannot fulfil (5.5s)\n  ✓  20 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /settings/integrations offers no remedy it cannot fulfil (5.6s)\n  ✓  21 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /settings/profile offers no remedy it cannot fulfil (5.5s)\n  ✓  22 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /loop offers no remedy it cannot fulfil (5.6s)\n  ✓  23 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /report offers no remedy it cannot fulfil (5.7s)\n  ✓  24 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /brain offers no remedy it cannot fulfil (5.5s)\n  ✓  25 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /brain/resolve offers no remedy it cannot fulfil (5.5s)\n  ✓  26 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /playbooks offers no remedy it cannot fulfil (5.7s)\n  ✓  27 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /radar offers no remedy it cannot fulfil (5.8s)\n  ✓  28 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /remix offers no remedy it cannot fulfil (5.7s)\n  ✓  29 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /leads offers no remedy it cannot fulfil (5.5s)\n  ✓  30 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /brain/knowledge offers no remedy it cannot fulfil (5.5s)\n  ✓  31 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /studio offers no remedy it cannot fulfil (5.6s)\n  ✓  32 [chromium] › e2e/roadmap-honesty.spec.ts:212:1 › @smoke the number in the header is the length of the list below it (2ms)\n  ✓  33 [chromium] › e2e/roadmap-honesty.spec.ts:224:3 › the roadmap sections invent nothing @smoke › no number appears that is not a price or an ordinal (13.0s)\n\n  33 passed (3.2m)",
       "duration_ms": null
     },
     {
@@ -1739,8 +1739,8 @@
       "finished_at": "2026-08-28T11:52:44.001Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
-      "details": "  \u2713  16 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /assets offers no remedy it cannot fulfil (5.6s)\n  \u2713  17 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /campaigns offers no remedy it cannot fulfil (5.6s)\n  \u2713  18 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /settings offers no remedy it cannot fulfil (5.5s)\n  \u2713  19 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /settings/plan offers no remedy it cannot fulfil (5.5s)\n  \u2713  20 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /settings/integrations offers no remedy it cannot fulfil (5.6s)\n  \u2713  21 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /settings/profile offers no remedy it cannot fulfil (5.5s)\n  \u2713  22 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /loop offers no remedy it cannot fulfil (5.6s)\n  \u2713  23 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /report offers no remedy it cannot fulfil (5.7s)\n  \u2713  24 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /brain offers no remedy it cannot fulfil (5.5s)\n  \u2713  25 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /brain/resolve offers no remedy it cannot fulfil (5.5s)\n  \u2713  26 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /playbooks offers no remedy it cannot fulfil (5.7s)\n  \u2713  27 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /radar offers no remedy it cannot fulfil (5.8s)\n  \u2713  28 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /remix offers no remedy it cannot fulfil (5.7s)\n  \u2713  29 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /leads offers no remedy it cannot fulfil (5.5s)\n  \u2713  30 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /brain/knowledge offers no remedy it cannot fulfil (5.5s)\n  \u2713  31 [chromium] \u203a e2e/no-impossible-remedy.spec.ts:167:5 \u203a no impossible remedy on a healthy new account @smoke \u203a /studio offers no remedy it cannot fulfil (5.6s)\n  \u2713  32 [chromium] \u203a e2e/roadmap-honesty.spec.ts:212:1 \u203a @smoke the number in the header is the length of the list below it (2ms)\n  \u2713  33 [chromium] \u203a e2e/roadmap-honesty.spec.ts:224:3 \u203a the roadmap sections invent nothing @smoke \u203a no number appears that is not a price or an ordinal (13.0s)\n\n  33 passed (3.2m)",
+      "summary_plain": "The unit checks passed for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
+      "details": "  ✓  16 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /assets offers no remedy it cannot fulfil (5.6s)\n  ✓  17 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /campaigns offers no remedy it cannot fulfil (5.6s)\n  ✓  18 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /settings offers no remedy it cannot fulfil (5.5s)\n  ✓  19 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /settings/plan offers no remedy it cannot fulfil (5.5s)\n  ✓  20 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /settings/integrations offers no remedy it cannot fulfil (5.6s)\n  ✓  21 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /settings/profile offers no remedy it cannot fulfil (5.5s)\n  ✓  22 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /loop offers no remedy it cannot fulfil (5.6s)\n  ✓  23 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /report offers no remedy it cannot fulfil (5.7s)\n  ✓  24 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /brain offers no remedy it cannot fulfil (5.5s)\n  ✓  25 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /brain/resolve offers no remedy it cannot fulfil (5.5s)\n  ✓  26 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /playbooks offers no remedy it cannot fulfil (5.7s)\n  ✓  27 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /radar offers no remedy it cannot fulfil (5.8s)\n  ✓  28 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /remix offers no remedy it cannot fulfil (5.7s)\n  ✓  29 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /leads offers no remedy it cannot fulfil (5.5s)\n  ✓  30 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /brain/knowledge offers no remedy it cannot fulfil (5.5s)\n  ✓  31 [chromium] › e2e/no-impossible-remedy.spec.ts:167:5 › no impossible remedy on a healthy new account @smoke › /studio offers no remedy it cannot fulfil (5.6s)\n  ✓  32 [chromium] › e2e/roadmap-honesty.spec.ts:212:1 › @smoke the number in the header is the length of the list below it (2ms)\n  ✓  33 [chromium] › e2e/roadmap-honesty.spec.ts:224:3 › the roadmap sections invent nothing @smoke › no number appears that is not a price or an ordinal (13.0s)\n\n  33 passed (3.2m)",
       "duration_ms": null
     },
     {
@@ -1752,7 +1752,7 @@
       "finished_at": "2026-08-28T11:54:29.805Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed (438 passed) for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed (438 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": "=== commits:\n10\n=== files changed:\n 27 files changed, 2652 insertions(+), 127 deletions(-)\n=== new test files:\napps/web/src/components/loop/controls.test.tsx\napps/web/src/lib/brand/confirmed-count.test.ts\napps/web/src/lib/cron/loop-facts-sql.pglite.test.ts\napps/web/src/lib/cron/route-shape.test.ts\napps/web/src/lib/loop/report.test.ts\napps/web/src/lib/loop/store-reflect-reason.test.ts\napps/web/src/lib/loop/verdict.test.ts\n=== loop+cron+brand test tally:\n Test Files  43 passed (43)\n      Tests  438 passed (438)",
       "duration_ms": null
     },
@@ -1766,7 +1766,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (9 passed, 9 failed).",
-      "details": " \u276f pe.parse ../../node_modules/.pnpm/@electric-sql+pglite@0.5.4/node_modules/@electric-sql/pg-protocol/src/parser.ts:102:24\n \u276f O.qe ../../node_modules/.pnpm/@electric-sql+pglite@0.5.4/node_modules/@electric-sql/pglite/src/pglite.ts:753:25\n \u276f ../../node_modules/.pnpm/@electric-sql+pglite@0.5.4/node_modules/@electric-sql/pglite/src/pglite.ts:706:13\n \u276f null.<anonymous> wasm:/wasm/0267b22e:1:5921403\n \u276f null.<anonymous> wasm:/wasm/0267b22e:1:2615913\n \u276f null.<anonymous> wasm:/wasm/0267b22e:1:2648399\n \u276f null.<anonymous> wasm:/wasm/0267b22e:1:2649003\n \u276f null.<anonymous> wasm:/wasm/0267b22e:1:5569736\n\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af[2/9]\u23af\n\n\n Test Files  1 failed (1)\n      Tests  9 failed | 9 passed (18)\n   Start at  14:10:38\n   Duration  4.03s (transform 111ms, setup 0ms, import 169ms, tests 3.39s, environment 0ms)\n\nundefined\n/home/user/sahodalabs/packages/db:\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run tests/loop_autopilot_l3.pglite.test.ts",
+      "details": " ❯ pe.parse ../../node_modules/.pnpm/@electric-sql+pglite@0.5.4/node_modules/@electric-sql/pg-protocol/src/parser.ts:102:24\n ❯ O.qe ../../node_modules/.pnpm/@electric-sql+pglite@0.5.4/node_modules/@electric-sql/pglite/src/pglite.ts:753:25\n ❯ ../../node_modules/.pnpm/@electric-sql+pglite@0.5.4/node_modules/@electric-sql/pglite/src/pglite.ts:706:13\n ❯ null.<anonymous> wasm:/wasm/0267b22e:1:5921403\n ❯ null.<anonymous> wasm:/wasm/0267b22e:1:2615913\n ❯ null.<anonymous> wasm:/wasm/0267b22e:1:2648399\n ❯ null.<anonymous> wasm:/wasm/0267b22e:1:2649003\n ❯ null.<anonymous> wasm:/wasm/0267b22e:1:5569736\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/9]⎯\n\n\n Test Files  1 failed (1)\n      Tests  9 failed | 9 passed (18)\n   Start at  14:10:38\n   Duration  4.03s (transform 111ms, setup 0ms, import 169ms, tests 3.39s, environment 0ms)\n\nundefined\n/home/user/sahodalabs/packages/db:\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run tests/loop_autopilot_l3.pglite.test.ts",
       "duration_ms": null
     },
     {
@@ -1778,7 +1778,7 @@
       "finished_at": "2026-08-28T14:11:24.113Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed (18 passed) for @sahoda/db ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed (18 passed) for @sahoda/db ONLY — this run was filtered and does not cover the workspace.",
       "details": "      Tests  18 passed (18)",
       "duration_ms": null
     },
@@ -1792,7 +1792,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (17 passed, 1 failed).",
-      "details": "--- MUTATION A: a count floor (3 of 4) instead of the named set\n     \u00d7 REFUSES L3 when only the red lines are unconfirmed, and NAMES that field 14ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  1 failed | 17 passed (18)",
+      "details": "--- MUTATION A: a count floor (3 of 4) instead of the named set\n     × REFUSES L3 when only the red lines are unconfirmed, and NAMES that field 14ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 17 passed (18)",
       "duration_ms": null
     },
     {
@@ -1805,7 +1805,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (52 passed, 2 failed).",
-      "details": "--- MUTATION B: supervision read as 'a cycle finished', dropping the human\n     \u00d7 REFUSES L3 when a cycle finished but no person approved its cost 17ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  1 failed | 17 passed (18)\n--- MUTATION C: the guard fires on INSERT only\n     \u00d7 REFUSES an UPDATE to L3 as firmly as an INSERT 11ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  1 failed | 17 passed (18)\n      Tests  18 passed (18)",
+      "details": "--- MUTATION B: supervision read as 'a cycle finished', dropping the human\n     × REFUSES L3 when a cycle finished but no person approved its cost 17ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 17 passed (18)\n--- MUTATION C: the guard fires on INSERT only\n     × REFUSES an UPDATE to L3 as firmly as an INSERT 11ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 17 passed (18)\n      Tests  18 passed (18)",
       "duration_ms": null
     },
     {
@@ -1817,7 +1817,7 @@
       "finished_at": "2026-08-28T14:12:41.126Z",
       "suite": "typecheck",
       "status": "pass",
-      "summary_plain": "The typecheck checks passed for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The typecheck checks passed for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": "TSC done\n Tasks:    9 successful, 9 total\nCached:    7 cached, 9 total\n  Time:    2.006s",
       "duration_ms": null
     },
@@ -1830,7 +1830,7 @@
       "finished_at": "2026-08-28T14:12:41.126Z",
       "suite": "lint",
       "status": "pass",
-      "summary_plain": "The lint checks passed for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The lint checks passed for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": "TSC done\n Tasks:    9 successful, 9 total\nCached:    7 cached, 9 total\n  Time:    2.006s",
       "duration_ms": null
     },
@@ -1843,7 +1843,7 @@
       "finished_at": "2026-08-28T15:08:40.407Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed (12 passed) for @sahoda/db ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed (12 passed) for @sahoda/db ONLY — this run was filtered and does not cover the workspace.",
       "details": "      Tests  12 passed (12)",
       "duration_ms": null
     },
@@ -1857,7 +1857,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (33 passed, 3 failed).",
-      "details": "--- MUTATION A: account_id defaulted to '' (the ops_audit_log shape)\n     \u00d7 REFUSES an empty account id, which is how the other audit log became useless 33ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  1 failed | 11 passed (12)\n--- MUTATION B: no append-only trigger\n     \u00d7 REFUSES an UPDATE, so a cancellation cannot overwrite the announcement 10ms\n     \u00d7 REFUSES a DELETE, even the tidy-up kind 5ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 2 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  2 failed | 10 passed (12)\n      Tests  12 passed (12)",
+      "details": "--- MUTATION A: account_id defaulted to '' (the ops_audit_log shape)\n     × REFUSES an empty account id, which is how the other audit log became useless 33ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 11 passed (12)\n--- MUTATION B: no append-only trigger\n     × REFUSES an UPDATE, so a cancellation cannot overwrite the announcement 10ms\n     × REFUSES a DELETE, even the tidy-up kind 5ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  2 failed | 10 passed (12)\n      Tests  12 passed (12)",
       "duration_ms": null
     },
     {
@@ -1883,7 +1883,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (2 passed, 1 failed).",
-      "details": "     \u00d7 does not read the repo-root .env while the flag is absent 5ms\nAssertionError: expected 'postgresql://postgres:**REDACTED**@db\u2026' to be '' // Object.is equality\n=== is live-guard mine? check on a clean tree:\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  1 failed | 2 passed | 1 skipped (4)\nrestored",
+      "details": "     × does not read the repo-root .env while the flag is absent 5ms\nAssertionError: expected 'postgresql://postgres:**REDACTED**@db…' to be '' // Object.is equality\n=== is live-guard mine? check on a clean tree:\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 2 passed | 1 skipped (4)\nrestored",
       "duration_ms": null
     },
     {
@@ -1896,7 +1896,7 @@
       "suite": "rls",
       "status": "fail",
       "summary_plain": "The rls checks ran and something failed.",
-      "details": " FAIL  tests/rls_tenant_isolation.pglite.test.ts > every append-only table refuses a direct mutation > finds every guarded table, and none has quietly dropped out\nAssertionError: A table missing from the left-hand side has LOST app.block_mutations() and silently left this suite\u2019s coverage. One appearing on the right has gained it \u2014 add it above, deliberately.: expected [ 'ai_provider_logs', \u2026(12) ] to deeply equal [ 'ai_provider_logs', \u2026(11) ]\n- Expected\n+ Received\n@@ -5,10 +5,11 @@\n+   \"loop_autopilot_log\",",
+      "details": " FAIL  tests/rls_tenant_isolation.pglite.test.ts > every append-only table refuses a direct mutation > finds every guarded table, and none has quietly dropped out\nAssertionError: A table missing from the left-hand side has LOST app.block_mutations() and silently left this suite’s coverage. One appearing on the right has gained it — add it above, deliberately.: expected [ 'ai_provider_logs', …(12) ] to deeply equal [ 'ai_provider_logs', …(11) ]\n- Expected\n+ Received\n@@ -5,10 +5,11 @@\n+   \"loop_autopilot_log\",",
       "duration_ms": null
     },
     {
@@ -1908,7 +1908,7 @@
       "finished_at": "2026-08-28T15:15:01.334Z",
       "suite": "rls",
       "status": "pass",
-      "summary_plain": "The rls checks passed (13 passed) for @sahoda/db ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The rls checks passed (13 passed) for @sahoda/db ONLY — this run was filtered and does not cover the workspace.",
       "details": "      Tests  13 passed (13)",
       "duration_ms": null
     },
@@ -1922,7 +1922,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed.",
-      "details": "AssertionError: these tables carry workspace_id and are NOT in the export manifest, so they are missing from every export: loop_autopilot_log: expected [ 'loop_autopilot_log' ] to deeply equal []\n+ Received\n+ [\n+   \"loop_autopilot_log\",\n+ ]\n=== manifest file:\n26: *   audience_snapshots \u00b7 billing_profiles \u00b7 invoices \u00b7 loop_briefs \u00b7\n27: *   loop_channel_autonomy \u00b7 loop_cycles \u00b7 loop_settings\n165:  { table: 'loop_briefs', readability: 'readable', describes: 'what the Loop planned each week' },\n171:  { table: 'loop_cycles', readability: 'readable', describes: 'every week the Loop ran' },",
+      "details": "AssertionError: these tables carry workspace_id and are NOT in the export manifest, so they are missing from every export: loop_autopilot_log: expected [ 'loop_autopilot_log' ] to deeply equal []\n+ Received\n+ [\n+   \"loop_autopilot_log\",\n+ ]\n=== manifest file:\n26: *   audience_snapshots · billing_profiles · invoices · loop_briefs ·\n27: *   loop_channel_autonomy · loop_cycles · loop_settings\n165:  { table: 'loop_briefs', readability: 'readable', describes: 'what the Loop planned each week' },\n171:  { table: 'loop_cycles', readability: 'readable', describes: 'every week the Loop ran' },",
       "duration_ms": null
     },
     {
@@ -1934,7 +1934,7 @@
       "finished_at": "2026-08-28T15:15:33.734Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed (4 passed) for @sahoda/db ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed (4 passed) for @sahoda/db ONLY — this run was filtered and does not cover the workspace.",
       "details": "      Tests  4 passed (4)",
       "duration_ms": null
     },
@@ -1960,7 +1960,7 @@
       "finished_at": "2026-08-28T17:16:16.939Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed (6 passed) for @sahoda/db ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed (6 passed) for @sahoda/db ONLY — this run was filtered and does not cover the workspace.",
       "details": "      Tests  6 passed (6)",
       "duration_ms": null
     },
@@ -1974,7 +1974,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (697 passed, 1 failed).",
-      "details": "     \u00d7 does not read the repo-root .env while the flag is absent 5ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n Test Files  1 failed | 37 passed | 12 skipped (50)\n      Tests  1 failed | 697 passed | 207 skipped (905)",
+      "details": "     × does not read the repo-root .env while the flag is absent 5ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n Test Files  1 failed | 37 passed | 12 skipped (50)\n      Tests  1 failed | 697 passed | 207 skipped (905)",
       "duration_ms": null
     },
     {
@@ -1987,7 +1987,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The typecheck, unit checks ran together and something failed (41 passed, 2 failed).",
-      "details": "TSC_OK\n     \u00d7 knows about every workspace-owned table, and invents none 53ms\n     \u00d7 classifies readability the way the policies actually do 19ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 2 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  2 failed | 41 passed (43)",
+      "details": "TSC_OK\n     × knows about every workspace-owned table, and invents none 53ms\n     × classifies readability the way the policies actually do 19ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  2 failed | 41 passed (43)",
       "duration_ms": null
     },
     {
@@ -2000,7 +2000,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (2 failed).",
-      "details": " RUN  v4.1.10 /home/user/sahodalabs/apps/web\n \u276f |lib| src/lib/privacy/export-drift.test.ts (2 tests | 2 failed) 74ms\n     \u00d7 knows about every workspace-owned table, and invents none 67ms\n     \u00d7 classifies readability the way the policies actually do 5ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 2 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n FAIL  |lib| src/lib/privacy/export-drift.test.ts > the export manifest against the live schema > knows about every workspace-owned table, and invents none\n FAIL  |lib| src/lib/privacy/export-drift.test.ts > the export manifest against the live schema > classifies readability the way the policies actually do\nError: getaddrinfo ENOTFOUND db.rloztdhzfliyvpvxsgjl.supabase.co\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af[1/2]\u23af\n Test Files  1 failed (1)\n      Tests  2 failed (2)\n   Start at  17:19:08\n   Duration  389ms (transform 102ms, setup 0ms, import 126ms, tests 74ms, environment 0ms)\nundefined\n/home/user/sahodalabs/apps/web:\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run src/lib/privacy/export-drift.test.ts",
+      "details": " RUN  v4.1.10 /home/user/sahodalabs/apps/web\n ❯ |lib| src/lib/privacy/export-drift.test.ts (2 tests | 2 failed) 74ms\n     × knows about every workspace-owned table, and invents none 67ms\n     × classifies readability the way the policies actually do 5ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n FAIL  |lib| src/lib/privacy/export-drift.test.ts > the export manifest against the live schema > knows about every workspace-owned table, and invents none\n FAIL  |lib| src/lib/privacy/export-drift.test.ts > the export manifest against the live schema > classifies readability the way the policies actually do\nError: getaddrinfo ENOTFOUND db.rloztdhzfliyvpvxsgjl.supabase.co\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n Test Files  1 failed (1)\n      Tests  2 failed (2)\n   Start at  17:19:08\n   Duration  389ms (transform 102ms, setup 0ms, import 126ms, tests 74ms, environment 0ms)\nundefined\n/home/user/sahodalabs/apps/web:\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run src/lib/privacy/export-drift.test.ts",
       "duration_ms": null
     },
     {
@@ -2013,7 +2013,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The typecheck, unit checks ran together and something failed.",
-      "details": "/**\n * Does the export manifest still match the database?\n *\n * ## Why this test exists and why it is allowed to skip\n *\n * The manifest is a hand-written file describing a fact about the schema. Facts\n * about the schema change. A table added next month is silently missing from\n * every export, and the export still says \"everything you own\" \u2014 which is the\n * one claim it must never make falsely, because the person reading it cannot\n * check.\n *\n * So this asks the live database the same question the manifest was built from,\nsrc/lib/privacy/export-drift.test.ts(156,33): error TS2304: Cannot find name 'MIGRATIONS_DIR'.\nTSC_DONE",
+      "details": "/**\n * Does the export manifest still match the database?\n *\n * ## Why this test exists and why it is allowed to skip\n *\n * The manifest is a hand-written file describing a fact about the schema. Facts\n * about the schema change. A table added next month is silently missing from\n * every export, and the export still says \"everything you own\" — which is the\n * one claim it must never make falsely, because the person reading it cannot\n * check.\n *\n * So this asks the live database the same question the manifest was built from,\nsrc/lib/privacy/export-drift.test.ts(156,33): error TS2304: Cannot find name 'MIGRATIONS_DIR'.\nTSC_DONE",
       "duration_ms": null
     },
     {
@@ -2025,7 +2025,7 @@
       "finished_at": "2026-08-28T17:21:17.501Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed (8 passed) for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed (8 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": "      Tests  8 passed (8)",
       "duration_ms": null
     },
@@ -2039,7 +2039,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (19 passed, 5 failed).",
-      "details": "--- MUTATION A: everything absent is excused as pending\n     \u00d7 calls a table with NO migration invented, which is still a failure 8ms\n     \u00d7 separates the two when both are present in one manifest 1ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 2 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  2 failed | 6 passed (8)\n--- MUTATION B: the migration scan matches no files\n     \u00d7 finds the migrations at all, so an empty scan cannot excuse everything 5ms\n     \u00d7 finds tables written plainly and with IF NOT EXISTS 4ms\n     \u00d7 every export-manifest table is created by some migration on this branch 3ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 3 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  3 failed | 5 passed (8)\n      Tests  8 passed (8)",
+      "details": "--- MUTATION A: everything absent is excused as pending\n     × calls a table with NO migration invented, which is still a failure 8ms\n     × separates the two when both are present in one manifest 1ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  2 failed | 6 passed (8)\n--- MUTATION B: the migration scan matches no files\n     × finds the migrations at all, so an empty scan cannot excuse everything 5ms\n     × finds tables written plainly and with IF NOT EXISTS 4ms\n     × every export-manifest table is created by some migration on this branch 3ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  3 failed | 5 passed (8)\n      Tests  8 passed (8)",
       "duration_ms": null
     },
     {
@@ -2064,7 +2064,7 @@
       "finished_at": "2026-08-28T18:38:36.506Z",
       "suite": "rls",
       "status": "pass",
-      "summary_plain": "The rls checks passed (23 passed) for @sahoda/db ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The rls checks passed (23 passed) for @sahoda/db ONLY — this run was filtered and does not cover the workspace.",
       "details": "      Tests  23 passed (23)",
       "duration_ms": null
     },
@@ -2078,7 +2078,20 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The typecheck, lint, unit checks ran together and something failed (5150 passed, 1 failed).",
-      "details": "EXIT=1\n@sahoda/web:test:               viewBox=\"0 0 24 24\"\n@sahoda/web:test:  ...\n@sahoda/web:test:  \u276f src/components/assets/asset-library.test.tsx:233:46\n@sahoda/web:test:     231|     // action added (\"a\"), never the filing that already existed.\n@sahoda/web:test:     232|     await user.click(screen.getByRole('button', { name: 'Undo' }))\n@sahoda/web:test:     233|     await waitFor(() => expect(unfileAssets).toHaveBeenCalledWith('f1'\u2026\n@sahoda/web:test:        |                                              ^\n@sahoda/web:test:     234|   })\n@sahoda/web:test:     235|\n@sahoda/web:test:  \u276f runWithExpensiveErrorDiagnosticsDisabled ../../node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/config.js:47:12\n@sahoda/web:test:  \u276f checkCallback ../../node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/wait-for.js:124:77\n@sahoda/web:test:  \u276f Timeout.checkRealTimersCallback ../../node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/wait-for.js:118:16\n@sahoda/web:test: \n@sahoda/web:test: \u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af[1/1]\u23af\n@sahoda/web:test: \n@sahoda/web:test: \n@sahoda/web:test:  Test Files  1 failed | 407 passed | 3 skipped (411)\n@sahoda/web:test:       Tests  1 failed | 5150 passed | 13 skipped (5164)\n@sahoda/web:test:    Start at  20:35:28\n@sahoda/web:test:    Duration  224.85s (transform 31.21s, setup 29.40s, import 180.24s, tests 196.00s, environment 131.28s)\n@sahoda/web:test: \n@sahoda/web:test: [ELIFECYCLE] Test failed. See above for more details.\n@sahoda/web#test:  ERROR  command (/home/user/sahodalabs/apps/web) /opt/node22/bin/pnpm run test exited (1)\n\n Tasks:    26 successful, 27 total\nCached:    0 cached, 27 total\n  Time:    4m38.411s \nFailed:    @sahoda/web#test\n\n ERROR  run failed: command  exited (1)",
+      "details": "EXIT=1\n@sahoda/web:test:               viewBox=\"0 0 24 24\"\n@sahoda/web:test:  ...\n@sahoda/web:test:  ❯ src/components/assets/asset-library.test.tsx:233:46\n@sahoda/web:test:     231|     // action added (\"a\"), never the filing that already existed.\n@sahoda/web:test:     232|     await user.click(screen.getByRole('button', { name: 'Undo' }))\n@sahoda/web:test:     233|     await waitFor(() => expect(unfileAssets).toHaveBeenCalledWith('f1'…\n@sahoda/web:test:        |                                              ^\n@sahoda/web:test:     234|   })\n@sahoda/web:test:     235|\n@sahoda/web:test:  ❯ runWithExpensiveErrorDiagnosticsDisabled ../../node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/config.js:47:12\n@sahoda/web:test:  ❯ checkCallback ../../node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/wait-for.js:124:77\n@sahoda/web:test:  ❯ Timeout.checkRealTimersCallback ../../node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/wait-for.js:118:16\n@sahoda/web:test: \n@sahoda/web:test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n@sahoda/web:test: \n@sahoda/web:test: \n@sahoda/web:test:  Test Files  1 failed | 407 passed | 3 skipped (411)\n@sahoda/web:test:       Tests  1 failed | 5150 passed | 13 skipped (5164)\n@sahoda/web:test:    Start at  20:35:28\n@sahoda/web:test:    Duration  224.85s (transform 31.21s, setup 29.40s, import 180.24s, tests 196.00s, environment 131.28s)\n@sahoda/web:test: \n@sahoda/web:test: [ELIFECYCLE] Test failed. See above for more details.\n@sahoda/web#test:  ERROR  command (/home/user/sahodalabs/apps/web) /opt/node22/bin/pnpm run test exited (1)\n\n Tasks:    26 successful, 27 total\nCached:    0 cached, 27 total\n  Time:    4m38.411s \nFailed:    @sahoda/web#test\n\n ERROR  run failed: command  exited (1)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtdb6ntt-208d0229",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T18:52:24.736Z",
+      "finished_at": "2026-08-28T18:52:24.736Z",
+      "suite": "rls",
+      "status": "pass",
+      "summary_plain": "The rls checks passed (23 passed) for @sahoda/db ONLY — this run was filtered and does not cover the workspace.",
+      "details": "      Tests  23 passed (23)",
       "duration_ms": null
     }
   ]
