@@ -10,10 +10,20 @@
  * check.
  *
  * So this asks the live database the same question the manifest was built from,
- * and PRINTS the difference rather than merely failing. Without a database URL
- * it SKIPS, loudly — the sandbox has no `.env` and a test that failed there
- * would be red for a reason that is not a defect, which is how a suite gets
- * ignored. A skip is honest; a green pass without a connection would not be.
+ * and PRINTS the difference rather than merely failing. Without a database it
+ * SKIPS, loudly — a test that failed there would be red for a reason that is
+ * not a defect, which is how a suite gets ignored. A skip is honest; a green
+ * pass without a connection would not be.
+ *
+ * ── "WITHOUT A DATABASE" MEANS TWO THINGS, AND USED TO MEAN ONE ─────────────
+ * Until 2026-08-28 the only condition was an empty `SUPABASE_DB_URL`, which was
+ * right when the sandbox had no `.env`. `scripts/cloud-setup.sh` changed that on
+ * 2026-08-24: the sandbox now HAS the credential and still has no route to the
+ * host, so this file was hard red on `wt-core` for a reason no code could fix.
+ * It now also skips when the connection is never established — and ONLY then.
+ * Anything the server answers with, including a rejected password or a denied
+ * `select`, stays red. `lib/testing/db-reachability.ts` draws that line and is
+ * itself checked on every gate run; read its header before widening it.
  *
  * It is read-only: one `select` against `information_schema` and `pg_policies`,
  * inside a `begin read only` — see the note on that below, which is the reason
@@ -50,7 +60,9 @@
 import { createRequire } from 'node:module'
 
 import { describe, it, expect } from 'vitest'
+import type { TestContext } from 'vitest'
 
+import { unreachableCode } from '../testing/db-reachability'
 import { EXPORT_TABLES } from './export-manifest'
 
 const DB_URL = process.env.SUPABASE_DB_URL ?? ''
@@ -129,8 +141,41 @@ describeWithDb('the export manifest against the live schema', () => {
     }
   }
 
-  it('knows about every workspace-owned table, and invents none', async () => {
-    const rows = await readSchema()
+  /**
+   * The live schema, or a loud skip if this machine cannot reach the database.
+   *
+   * The skip happens ONLY around the connection. Once rows come back, every
+   * failure below is a real finding and is allowed to be red — which is the
+   * whole point of the file. Never widen this to wrap the assertions.
+   */
+  async function readSchemaOrSkip(
+    skip: TestContext['skip'],
+  ): Promise<Array<{ table_name: string; has_read_policy: boolean }>> {
+    try {
+      return await readSchema()
+    } catch (error) {
+      const code = unreachableCode(error)
+      if (code === null) throw error
+      // The host, never the URL: `DB_URL` carries the production password.
+      let host = 'the database'
+      try {
+        host = new URL(DB_URL).hostname
+      } catch {
+        // An unparseable URL is not worth failing over inside a skip note.
+      }
+      const note =
+        `could not reach ${host} (${code}), so the export manifest is UNCHECKED ` +
+        `against production on this machine. ` +
+        `packages/db/tests/export_manifest.pglite.test.ts still checked it against the migration files.`
+      // Louder than the skip marker alone. A reporter that collapses skips is
+      // exactly how this file went four days without ever running.
+      console.warn(`SKIPPED · export drift vs the live schema: ${note}`)
+      skip(note)
+    }
+  }
+
+  it('knows about every workspace-owned table, and invents none', async ({ skip }) => {
+    const rows = await readSchemaOrSkip(skip)
     const inDb = rows.map((r) => r.table_name).sort()
     const inManifest = EXPORT_TABLES.map((t) => t.table).sort()
 
@@ -149,8 +194,8 @@ describeWithDb('the export manifest against the live schema', () => {
     ).toEqual([])
   }, 30_000)
 
-  it('classifies readability the way the policies actually do', async () => {
-    const rows = await readSchema()
+  it('classifies readability the way the policies actually do', async ({ skip }) => {
+    const rows = await readSchemaOrSkip(skip)
     const wrong: string[] = []
 
     for (const row of rows) {
