@@ -68,8 +68,27 @@ const PLANNABLE: readonly string[] = ['x', 'gbp', 'linkedin', 'instagram']
  */
 
 export interface LoopSnapshot {
+  /**
+   * Whether a `loop_settings` ROW EXISTS — i.e. whether anybody has ever turned
+   * the Loop on here.
+   *
+   * `paused` could not carry this. A missing row read as `paused: false`, which
+   * is the same value as "switched on and running", so the screen could not
+   * tell a customer who has never opened the Loop from one whose week is about
+   * to be planned. `never_enabled` is the reason most of this fleet is in:
+   * MEASURED 2026-08-28, 5 of 33 production workspaces have a row at all.
+   */
+  enabled: boolean
   paused: boolean
   weeklyBudgetCredits: number
+  /**
+   * Credits this workspace can actually spend — total minus held.
+   *
+   * Read here rather than inferred, because the alternative is a screen that
+   * offers to plan a week the workspace cannot pay for and discovers it only
+   * after the cycle has opened and the ledger has taken a hold.
+   */
+  availableCredits: number
   /** Only the levels a person actually chose. A missing channel is not L1 — it is unset. */
   dial: Map<Channel, AutonomyLevel>
   connected: ChannelSet
@@ -127,6 +146,11 @@ export interface PendingLearning {
 
 /** The default a workspace that has never opened this screen is running at. */
 export const UNSET_SNAPSHOT: Omit<LoopSnapshot, 'dial' | 'connected' | 'lapsed'> = {
+  // Never turned on, and no credits read. Both are the honest default for a
+  // workspace this snapshot was never built for — and `enabled: false` is what
+  // makes `never_enabled` the reason rather than a silently un-paused Loop.
+  enabled: false,
+  availableCredits: 0,
   paused: false,
   weeklyBudgetCredits: DEFAULT_WEEKLY_BUDGET_CREDITS,
   cycle: null,
@@ -173,7 +197,7 @@ export async function readLoop(): Promise<LoopRead> {
 export async function readLoopSnapshot(workspaceId: string): Promise<LoopSnapshot | null> {
   const supabase = createServerSupabase()
 
-  const [settingsRes, dialRes, connRes, cycleRes, learnRes] = await Promise.all([
+  const [settingsRes, dialRes, connRes, cycleRes, balanceRes, learnRes] = await Promise.all([
     supabase
       .from('loop_settings')
       .select('paused, weekly_budget_credits')
@@ -210,6 +234,11 @@ export async function readLoopSnapshot(workspaceId: string): Promise<LoopSnapsho
       .limit(1)
       .maybeSingle(),
     supabase
+      .from('credit_balances')
+      .select('balance_total, balance_held')
+      .eq('workspace_id', workspaceId)
+      .maybeSingle(),
+    supabase
       .from('memory_events')
       .select('id, diff, created_at')
       .eq('workspace_id', workspaceId)
@@ -236,7 +265,11 @@ export async function readLoopSnapshot(workspaceId: string): Promise<LoopSnapsho
   //
   // `maybeSingle` reports a missing row as `data: null, error: null`, so this
   // catches transport and RLS faults without mistaking an empty table for one.
-  for (const res of [settingsRes, dialRes, connRes, cycleRes]) {
+  // `credit_balances` joins the four: the number it carries is printed as the
+  // customer's own balance and is compared against a price before a spend. A
+  // failed read defaulting to zero would tell somebody with 1,196 credits to
+  // top up, which is both false and a dead end.
+  for (const res of [settingsRes, dialRes, connRes, cycleRes, balanceRes]) {
     if (res.error) return null
   }
 
@@ -310,7 +343,13 @@ export async function readLoopSnapshot(workspaceId: string): Promise<LoopSnapsho
   }
 
   return {
+    enabled: settingsRes.data !== null,
     paused: Boolean(settingsRes.data?.paused),
+    availableCredits: Math.max(
+      0,
+      ((balanceRes.data?.balance_total as number | undefined) ?? 0) -
+        ((balanceRes.data?.balance_held as number | undefined) ?? 0),
+    ),
     weeklyBudgetCredits:
       (settingsRes.data?.weekly_budget_credits as number | undefined) ??
       DEFAULT_WEEKLY_BUDGET_CREDITS,
