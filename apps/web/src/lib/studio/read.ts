@@ -92,17 +92,3 @@ export async function readDesign(id: string): Promise<DesignRead> {
     return { status: 'unreadable' }
   }
 }
-
-/**
- * The sentence for a gallery with rows it could not read.
- *
- * Null in the ordinary case. This never says "you have no designs" — that is a
- * different claim, made by the empty state, and blurring the two is how a person
- * concludes their work is gone.
- */
-export function describeUnreadable(count: number): string | null {
-  if (count <= 0) return null
-  return count === 1
-    ? '1 design could not be opened and is not shown here. Nothing was deleted.'
-    : `${count} designs could not be opened and are not shown here. Nothing was deleted.`
-}
