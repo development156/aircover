@@ -251,3 +251,35 @@ export function explain(verdict: LoopVerdict): string {
       return `Planning a week costs ${credits(verdict.required)} and you have ${credits(verdict.available)} — top up and Sahoda will plan your next week.`
   }
 }
+
+/**
+ * WHERE A PERSON GOES TO FIX IT, and never anywhere that cannot fix it.
+ *
+ * Every remedy here is a route that exists and an action that can succeed from
+ * the state the reason describes. `no-impossible-remedy.spec.ts` walks the app
+ * as a fresh account and fails on the other kind — a reload offered for a
+ * missing workspace, a "connect" offered to somebody whose connection lapsed.
+ *
+ * The two in-page anchors are remedies too: the Loop's own controls and the
+ * cycle already on the screen. `already_planned` is the reason that most needs
+ * one, because its sentence says "open it" and the thing to open is further
+ * down the same page — a link to nowhere would make that sentence false.
+ *
+ * Null for an eligible verdict. There is nothing to remedy.
+ */
+export function remedy(verdict: LoopVerdict): { href: string; label: string } | null {
+  if (verdict.eligible) return null
+  switch (verdict.reason) {
+    case 'never_enabled':
+    case 'paused':
+      return { href: '#loop-controls', label: 'Turn the Loop on' }
+    case 'no_channel':
+      return { href: '/connections', label: 'Connect a channel' }
+    case 'channel_lapsed':
+      return { href: '/connections', label: 'Reconnect it' }
+    case 'already_planned':
+      return { href: '#loop-current', label: 'Review this week' }
+    case 'insufficient_credits':
+      return { href: '/wallet', label: 'Top up' }
+  }
+}
