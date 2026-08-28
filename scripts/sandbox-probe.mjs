@@ -82,53 +82,85 @@ try {
   if (!chromium) throw new Error('module resolved but exports no chromium')
 
   /**
-   * ── ASK THREE PLACES, NOT ONE ─────────────────────────────────────────────
-   * `chromium.executablePath()` is where Playwright EXPECTS the binary, which
-   * is not the same question as where one IS.
+   * ── ASK THREE PLACES, THEN INSTALL, THEN ASK AGAIN ────────────────────────
+   * Two lanes fixed this independently and neither fix subsumes the other, so
+   * both are here.
    *
-   * MEASURED 2026-08-28 in this sandbox: it returns
+   * WHERE ONE IS. `chromium.executablePath()` is where Playwright EXPECTS the
+   * binary, which is a different question from where one IS. MEASURED
+   * 2026-08-28 in this sandbox: it returns
    * `/opt/pw-browsers/chromium-1228/chrome-linux64/chrome`, and what exists is
    * `.../chromium-1228/chrome-linux/chrome` — same build, different directory
-   * name between Playwright versions. Builds 1194 and 1228 were both installed
-   * and 1194 drives the suite fine. This probe reported NO_BROWSER anyway,
-   * skipped all three network probes (leaving them `null` rather than `false`,
-   * which is the tell), and `browser-run.mjs` inherited that and told sessions
-   * the suite could never run here. It ran, 3 of 3, in the same hour.
-   *
-   * Worse, the probe never read `PLAYWRIGHT_CHROMIUM_PATH` — the opt-in the
+   * name between Playwright versions. This probe reported NO_BROWSER anyway,
+   * skipped all three network probes, and `browser-run.mjs` inherited that and
+   * told sessions the suite could never run here. It ran, 3 of 3, in the same
+   * hour. The probe also never read `PLAYWRIGHT_CHROMIUM_PATH`, the opt-in the
    * playwright config itself honours (`playwright.config.ts:168`) and the
-   * variable that makes those passing runs work. The tool that answers "can
-   * this box drive a browser" could not see the browser the repo had already
-   * been told about.
+   * variable that makes those passing runs work.
    *
-   * So: an explicit override wins, then Playwright's own guess, then a scan of
-   * PLAYWRIGHT_BROWSERS_PATH for any chromium build with a real binary. The
-   * path that won is recorded, because "which browser answered" is the first
-   * thing the next session will want and it was never written down.
+   * WHEN THERE IS NONE. Playwright ships a downloader, not a browser.
+   * `scripts/cloud-setup.sh` installs one, but a session started before that
+   * landed — or any box where setup was skipped — has an empty cache, and
+   * NO_BROWSER then reads as a verdict about the environment when it is really
+   * a missing one-off step.
+   *
+   * ORDER MATTERS AND IS THE WHOLE POINT OF MERGING THEM THIS WAY. The search
+   * runs FIRST: installing before looking would download a browser onto a box
+   * that already has two, for a minute, every run, because the only reason it
+   * looked absent was a directory name. The install runs only when all three
+   * places came back empty, and the search then runs AGAIN so the freshly
+   * installed binary is found by the same rules — including the scan, since a
+   * new install is exactly as likely to land beside `executablePath()` rather
+   * than on it.
    */
-  const candidates = []
-  for (const env of ['PLAYWRIGHT_CHROMIUM_PATH', 'SAHODA_CHROMIUM_PATH']) {
-    if (process.env[env]) candidates.push({ how: env, path: process.env[env] })
-  }
-  try {
-    candidates.push({ how: 'playwright default', path: chromium.executablePath() })
-  } catch {}
-  const root = process.env.PLAYWRIGHT_BROWSERS_PATH
-  if (root && existsSync(root)) {
-    const { readdirSync } = await import('node:fs')
-    const { join } = await import('node:path')
-    // Newest build first: a directory sorts numerically after its prefix.
-    const builds = readdirSync(root)
-      .filter((d) => d.startsWith('chromium-'))
-      .sort((a, b) => Number(b.slice(9)) - Number(a.slice(9)))
-    for (const b of builds) {
-      for (const dir of ['chrome-linux', 'chrome-linux64']) {
-        candidates.push({ how: `scan ${b}/${dir}`, path: join(root, b, dir, 'chrome') })
+  const { readdirSync } = await import('node:fs')
+  const { join } = await import('node:path')
+
+  const findChromium = () => {
+    const candidates = []
+    for (const env of ['PLAYWRIGHT_CHROMIUM_PATH', 'SAHODA_CHROMIUM_PATH']) {
+      if (process.env[env]) candidates.push({ how: env, path: process.env[env] })
+    }
+    try {
+      candidates.push({ how: 'playwright default', path: chromium.executablePath() })
+    } catch {}
+    const root = process.env.PLAYWRIGHT_BROWSERS_PATH
+    if (root && existsSync(root)) {
+      // Newest build first: a directory sorts numerically after its prefix.
+      const builds = readdirSync(root)
+        .filter((d) => d.startsWith('chromium-'))
+        .sort((a, b) => Number(b.slice(9)) - Number(a.slice(9)))
+      for (const b of builds) {
+        for (const dir of ['chrome-linux', 'chrome-linux64']) {
+          candidates.push({ how: `scan ${b}/${dir}`, path: join(root, b, dir, 'chrome') })
+        }
       }
+    }
+    return { found: candidates.find((c) => c.path && existsSync(c.path)), tried: candidates.length }
+  }
+
+  let { found, tried } = findChromium()
+
+  if (!found) {
+    dim('browser binary absent — installing chromium (one-off, ~1 min)')
+    try {
+      execFileSync(
+        'pnpm',
+        ['--filter', '@sahoda/web', 'exec', 'playwright', 'install', 'chromium'],
+        { stdio: 'ignore', timeout: 300_000 },
+      )
+      result.notes.push('chromium was missing and was installed by this probe.')
+      ;({ found, tried } = findChromium())
+    } catch {
+      result.notes.push(
+        'chromium is missing and the install FAILED. Run it by hand and read the ' +
+          'error: pnpm --filter @sahoda/web exec playwright install chromium',
+      )
     }
   }
 
-  const found = candidates.find((c) => c.path && existsSync(c.path))
+  // The path that won is recorded, because "which browser answered" is the
+  // first thing the next session will want and it was never written down.
   result.chromium.present = Boolean(found)
   result.chromium.executablePath = found ? found.path : null
   result.chromium.foundBy = found ? found.how : null
@@ -137,7 +169,7 @@ try {
     dim(found.path)
   } else {
     no(`browser binary NOT installed`)
-    dim(`looked in ${candidates.length} place(s); none existed`)
+    dim(`looked in ${tried} place(s); none existed`)
   }
 } catch (e) {
   result.chromium.present = false

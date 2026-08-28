@@ -80,14 +80,27 @@ if (!REMOTE) {
    * paragraph printed: `connections-honesty.spec.ts --grep @smoke` passed 3 of
    * 3 on this box, Clerk sign-in included. Two separate faults stacked up —
    * the probe could not find an installed browser (fixed in
-   * `sandbox-probe.mjs`), and this file ignored `browserViaNode`, which the
-   * probe has been setting all along.
+   * `sandbox-probe.mjs`), and this file ignored the Node transport, which the
+   * probe has been arming all along.
    *
    * `LOCAL_ONLY` + the Node transport is a REAL run: every browser request
    * travels over Node's socket, which this sandbox permits. It is not as good
-   * as `FULL` and the difference is named below rather than hidden.
+   * as `FULL` and the difference is named after the run rather than hidden.
+   *
+   * ── THE TRANSPORT IS ARMED HERE, NOT ONLY INHERITED ───────────────────────
+   * Two lanes fixed this file independently. One keyed the LOCAL_ONLY branch on
+   * `cap.browserViaNode`, which is only true when the PROBE happened to write
+   * the env files; the other ran on LOCAL_ONLY unconditionally but left the
+   * variable to whatever was already set. Either alone has a hole: the first
+   * refuses a runnable box whose probe result predates that write, and the
+   * second runs a suite on a box where Chromium cannot do https with no
+   * transport in front of it, which fails at the first Clerk sign-in and looks
+   * like a broken selector.
+   *
+   * So LOCAL_ONLY runs, and this file SETS the variable rather than hoping.
+   * NO_BROWSER and NO_NETWORK still refuse: a transport cannot invent a browser.
    */
-  const viaNode = cap.verdict === 'LOCAL_ONLY' && cap.browserViaNode === true
+  const viaNode = cap.verdict === 'LOCAL_ONLY'
   if (cap.verdict === 'FULL' || viaNode) {
     say(
       viaNode
