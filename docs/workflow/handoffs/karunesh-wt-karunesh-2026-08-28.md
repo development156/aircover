@@ -183,7 +183,7 @@ one from three runs that happened not to have the variable set.
 | `pnpm install --frozen-lockfile` | **PASS** |
 | `turbo run test --force` (this sandbox, ambient DB URL present) | **FAIL** — `@sahoda/db` live-guard only, diagnosed above |
 | `test:smoke` (Playwright) | **UNRUN** |
-| CI `typecheck · lint · test · format` | **FAIL** — 3 attempts, 3-4s each, no log, no step run |
+| CI `typecheck · lint · test · format` | **FAIL** — every attempt, 2-4s each, no log, no step run, no runner ever assigned (`runner_id: 0`, `runner_name: ""`). Four more on this lane's later commits, same shape. The count is deliberately not written as a figure: every push adds two, so a number here is stale before it is read. **The shape is the finding, not the tally.** |
 
 ## In plain terms
 
