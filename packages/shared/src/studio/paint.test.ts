@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { hexOf, paintFrom, paintOf } from './paint'
+import { hexOf, isPaint, paintFrom, paintOf } from './paint'
 
 /**
  * THE COLOUR STRINGS THAT RASTERISE TO PURE BLACK.
@@ -37,12 +37,33 @@ describe('paintFrom refuses every colour string that would silently render black
     expect(paintFrom('rgb(228,87,46)')).toBeNull()
   })
 
-  it('refuses a non-string, an empty string and an over-long one', () => {
+  it('refuses a non-string', () => {
     expect(paintFrom(undefined)).toBeNull()
     expect(paintFrom(null)).toBeNull()
     expect(paintFrom(0x112233)).toBeNull()
+    expect(paintFrom({ r: 1, g: 2, b: 3 })).toBeNull()
+  })
+
+  /**
+   * These two used to sit under a name claiming they proved a LENGTH guard.
+   * They never did: the patterns are anchored and match at most nine
+   * characters, so both inputs were already refused by the regex and the guard
+   * they were credited to could not be shown to fail. Caught by an adversarial
+   * review; the guard is gone and the name now says what is actually proven.
+   */
+  it('refuses an empty string and an over-long one, by the anchoring', () => {
     expect(paintFrom('')).toBeNull()
     expect(paintFrom(`#${'a'.repeat(64)}`)).toBeNull()
+  })
+
+  it('refuses hex with anything appended, which is what the anchoring is for', () => {
+    expect(paintFrom('#e4572e;}body{display:none')).toBeNull()
+    expect(paintFrom('#e4572e #000000')).toBeNull()
+    // A trailing newline is TRIMMED, not refused, which is why it is asserted
+    // as accepted rather than left to look like it was covered above.
+    expect(paintFrom('#e4572e\n')).toEqual({ r: 228, g: 87, b: 46, a: 1 })
+    // But an interior newline is not whitespace the trim can reach.
+    expect(paintFrom('#e4572e\n#000000')).toBeNull()
   })
 
   it('refuses hex that is the wrong length or not hex at all', () => {
@@ -113,5 +134,42 @@ describe('hexOf emits six-digit lowercase hex and nothing else', () => {
     expect(out).toMatch(/^#[0-9a-f]{6}$/)
     expect(out).not.toContain('oklch')
     expect(out).not.toContain('color-mix')
+  })
+})
+
+describe('hexOf refuses a paint that is not one, rather than painting it black', () => {
+  it('returns null for a channel that is not a real number', () => {
+    // MEASURED against the first commit: this returned the string "#NaN0000",
+    // which the renderer emitted and the rasteriser painted pure black.
+    expect(hexOf({ r: Number.NaN, g: 0, b: 0, a: 1 })).toBeNull()
+    expect(hexOf({ r: Number.POSITIVE_INFINITY, g: 0, b: 0, a: 1 })).toBeNull()
+  })
+
+  it('returns null for a channel out of range, and does NOT clamp it', () => {
+    // Clamping would invent a colour nobody chose and hide the caller's bug.
+    expect(hexOf({ r: 300, g: 0, b: 0, a: 1 })).toBeNull()
+    expect(hexOf({ r: -5, g: 0, b: 0, a: 1 })).toBeNull()
+  })
+
+  it('returns null for an alpha outside 0-1, and for a missing field', () => {
+    expect(hexOf({ r: 0, g: 0, b: 0, a: 2 })).toBeNull()
+    expect(hexOf({ r: 0, g: 0 } as never)).toBeNull()
+  })
+
+  it('accepts every paint that paintFrom and paintOf can produce', () => {
+    for (const raw of ['#000000', '#ffffff', '#f80', '#12345678']) {
+      expect(hexOf(paintFrom(raw)!), raw).toMatch(/^#[0-9a-f]{6}$/)
+    }
+    expect(hexOf(paintOf(0, 128, 255)!)).toBe('#0080ff')
+  })
+})
+
+describe('isPaint', () => {
+  it('accepts what paintOf makes and rejects the shapes that reached hexOf', () => {
+    expect(isPaint(paintOf(1, 2, 3))).toBe(true)
+    expect(isPaint({ r: Number.NaN, g: 0, b: 0, a: 1 })).toBe(false)
+    expect(isPaint(null)).toBe(false)
+    expect(isPaint('#000000')).toBe(false)
+    expect(isPaint(undefined)).toBe(false)
   })
 })

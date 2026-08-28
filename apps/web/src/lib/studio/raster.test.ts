@@ -1,7 +1,14 @@
 import { createHash } from 'node:crypto'
 import sharp from 'sharp'
 import { describe, expect, test } from 'vitest'
-import { fitDesignToChannels, paintFrom, paintOf, renderSvg, type SvgScene } from '@sahoda/shared'
+import {
+  fitDesignToChannels,
+  paintFrom,
+  paintOf,
+  renderSvg,
+  type SvgScene,
+  type TextNode,
+} from '@sahoda/shared'
 
 /**
  * THE ONE TEST THAT PUTS THE RENDERER THROUGH THE REAL RASTERISER.
@@ -110,12 +117,44 @@ describe('a design rendered by renderSvg and rasterised by sharp', () => {
     expect(paintFrom('oklch(0.63 0.17 33)')).toBeNull()
   })
 
-  test('text draws ink, so a missing typeface cannot pass as a blank canvas', async () => {
+  /**
+   * ── WHAT THIS DOES AND DOES NOT PROVE. THE NAME USED TO OVERCLAIM ──────────
+   * It was called "a missing typeface cannot pass as a blank canvas". It cannot
+   * catch a missing typeface, and an adversarial review proved it: pointing
+   * `fontFamily` at a family installed nowhere leaves all seven tests green,
+   * because fontconfig SUBSTITUTES silently and ink still appears.
+   *
+   * MEASURED in this sandbox: an installed family and an invented one produce
+   * indistinguishable ink. So this asserts only that text produces ink at all,
+   * which catches a renderer that drops text entirely and nothing finer.
+   *
+   * Catching substitution needs a fingerprint: committed ink-width constants
+   * for known strings in the font this product actually SHIPS, which cannot be
+   * written until a font is chosen and bundled. That is the feature's largest
+   * unproven assumption and it is recorded in svg.ts's header too.
+   */
+  test('text produces ink, which catches a renderer that drops text but NOT a substituted font', async () => {
     const withText = renderSvg(poster()) as string
     const withoutText = renderSvg({ ...poster(), nodes: [poster().nodes[0]!] }) as string
     const inked = await sharp(Buffer.from(withText)).greyscale().stats()
     const blank = await sharp(Buffer.from(withoutText)).greyscale().stats()
     expect(inked.channels[0]!.mean).not.toBeCloseTo(blank.channels[0]!.mean, 3)
+  })
+
+  test('and the substitution really is invisible here, which is why the name above is narrow', async () => {
+    const real = renderSvg(poster()) as string
+    const invented = renderSvg({
+      ...poster(),
+      nodes: [
+        poster().nodes[0]!,
+        { ...(poster().nodes[1] as TextNode), fontFamily: 'ThisFamilyIsInstalledNowhere' },
+      ],
+    }) as string
+    const a = await sharp(Buffer.from(real)).greyscale().stats()
+    const b = await sharp(Buffer.from(invented)).greyscale().stats()
+    // Identical ink from two different families. If this ever STOPS being true,
+    // a fingerprint guard has become possible and should be written.
+    expect(b.channels[0]!.mean).toBeCloseTo(a.channels[0]!.mean, 5)
   })
 
   /**
