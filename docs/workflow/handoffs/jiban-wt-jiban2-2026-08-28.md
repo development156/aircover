@@ -37,12 +37,42 @@ it is 34 lines shorter.
 
 ## What was NOT done, and why
 
-- **Playwright is UNRUN. It is NOT passed.** The workflow skips `@smoke` by
-  design — it writes the one production database — and this sandbox has no
-  Playwright browser. **This matters more than usual on this lane**: the
-  retargeted `connections-honesty` assertions have never run against the real
-  page, only against a local render harness I built. Dispatch the `smoke` job by
-  hand before merging.
+- **Playwright is UNRUN. It is NOT passed.** The retargeted
+  `connections-honesty` assertions have never run against the real page, only
+  against a local render harness I built. Dispatch the `smoke` job by hand
+  before merging. **The reason is no longer "no browser" — see the next section,
+  which supersedes what an earlier draft of this file said.**
+- **THE BROWSER LANDED AND THE SUITE STILL CANNOT RUN. MEASURED, four ways.**
+  `wt-core`'s `127b29c4` ("the cloud lanes had no browser") arrived in the merge
+  at the end of this session. Its own closing line says the one thing still
+  unproven is whether a cloud lane goes green end to end, and that only a cloud
+  lane can answer. **This is that answer, and it is no.**
+
+  | step | result |
+  | --- | --- |
+  | `sandbox-probe.mjs` | installed chromium, verdict **LOCAL_ONLY**, wrote `SAHODA_BROWSER_VIA_NODE=1`, said "the suite CAN run here" |
+  | `connections-honesty.spec.ts` | **3 failed** — all in the sign-in fixture, my assertions never reached |
+  | `unauthenticated.spec.ts` (never signs in) | **5 failed**, identically |
+  | 20 failures, grouped by message | **ONE message**: `net::ERR_CONNECTION_RESET` on `page.goto` to `http://127.0.0.1:3100/...` |
+
+  Plain http, loopback, no Clerk, no HTTPS. Per this project's own rule — one
+  message across twenty failures is an environment, not a diff.
+
+  **Two hypotheses raised and BOTH REFUTED, rather than reported as causes:**
+  (a) the Node transport — `SAHODA_BROWSER_VIA_NODE=0` on the same single test
+  fails identically, so the transport is not it; (b) the proxy — `NO_PROXY`
+  already contains `127.0.0.1` and `127.0.0.0/8`. **I do not know the root cause
+  and am not claiming one.** The dev server is healthy: Next reports
+  `Ready in 4.8s` on 3100 in the same run.
+
+  **What I DO know, and it is the finding worth carrying:** the probe's loopback
+  check binds its OWN ephemeral listener (`srv.listen(0, '127.0.0.1')`,
+  `sandbox-probe.mjs:138`) and navigates to that. It never touches the app's
+  port. So it proves Chromium can reach a socket the probe opened, and reports
+  "the suite CAN run here" on that basis — while `page.goto` to the actual dev
+  server is reset. **A check that passes without testing the thing it licenses.**
+  `scripts/` is not this lane's file, so this is reported rather than fixed.
+
 - **The `impeccable` skill's `NO_PRODUCT_MD` blocker was ignored.** It told me to
   stop and write `PRODUCT.md` first. I did not: this project's design canon is
   docs/37 and CLAUDE.md, which outrank a generic skill's scaffolding, and
