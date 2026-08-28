@@ -6,6 +6,11 @@
 Supersedes nothing. Depends on `docs/51`, `docs/52`, `docs/53`, `docs/54` and on
 `apps/web/REQUESTS.md` §22, §25, §29.
 
+**`docs/56` is the companion:** what the store can already do, the four
+properties that make it reusable, and the filing rule for deciding whether a
+proposed feature routes through it. Read that one before designing a feature;
+this one before building a step.
+
 ---
 
 ## The founder's model, which this plan is organised around
