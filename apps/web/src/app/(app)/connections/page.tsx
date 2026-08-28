@@ -445,7 +445,18 @@ function ChannelGroup({
           for the length of their delay. Using the primitive rather than a new
           animation is also why no dependency was added for this. */}
       <Stagger
-        className="grid items-stretch gap-4 wide:grid-cols-4 max-wide:grid-cols-2 max-narrow:grid-cols-1"
+        className /* ── THREE ACROSS AT WIDE, NOT FOUR ────────────────────────────────
+             The reference the founder sent is a 3-up grid and the difference is
+             not taste: at four columns a card is ~270px at 1440, and a
+             full-width primary inside 270px minus padding is a strip. Three
+             gives the card ~370px, which is what lets the CTA read as a button
+             and the name sit on one line.
+
+             It costs a row — 15 tiles is 5 rows instead of 4 — and that is the
+             trade the "premium, minimal" half of the brief asks for. The
+             narrower bands are untouched: `connections-widths.spec.ts` checks
+             seven widths for a clipped name, and this change only ever makes a
+             card WIDER, which is the safe direction for that guard. */="grid items-stretch gap-4 wide:grid-cols-3 max-wide:grid-cols-2 max-narrow:grid-cols-1"
         itemClassName="h-full"
       >
         {children}
