@@ -114,15 +114,13 @@ async function afterChunksArrive() {
 }
 
 describe('the panel on its own', () => {
-  test('names itself when nothing else does', () => {
+  test('names itself', () => {
     const root = panel()
 
-    // ── WHY THIS IS NOT REDUNDANT WITH THE COMPOSER'S OWN TEST ──────────────
-    // Inside the composer this panel is step three and takes the id of the
-    // numbered heading above it, dropping its own so one section is not
-    // announced twice. Rendered anywhere else there is no such heading, and a
-    // panel that skipped its own would be a nameless region. The two cases are
-    // opposite defects and each needs its own guard.
+    // A region whose `aria-labelledby` points at nothing is a region with NO
+    // name, on every screen reader, with the page looking identical to everyone
+    // else. Both halves are asserted here — the pointer and what it resolves
+    // to — because either one alone passes while the pair is broken.
     const section = root.querySelector('section#finish')
     const labelledBy = section?.getAttribute('aria-labelledby')
     expect(labelledBy).toBe('finish-heading')
