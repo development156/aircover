@@ -804,9 +804,22 @@ describe('the bulk bar can move a selection to the trash', () => {
     await user.click(screen.getByRole('button', { name: /Move to trash/i }))
 
     await user.click(await screen.findByRole('button', { name: 'Undo' }))
-    await waitFor(() => expect(restoreAssets).toHaveBeenCalled())
+    // A LOAD tolerance, not a weaker assertion: `restoreAssets` must still be
+    // called or this fails. MEASURED 2026-08-27: red once in three full runs of
+    // the 5,734-test suite and green every time this file ran alone, which is
+    // the signature of waitFor's 1s default expiring on a busy machine rather
+    // than of a broken handler. A gate that is randomly red is a gate people
+    // learn to skip.
+    await waitFor(() => expect(restoreAssets).toHaveBeenCalled(), { timeout: 5000 })
     expect(await screen.findByText(/Put 2 files back/)).toBeInTheDocument()
-  })
+    // 20s for the TEST, because the waitFor inside it may take up to 5s.
+    //
+    // MY OWN BUG, recorded so it is not repeated: this waitFor was raised to
+    // 5000ms while the test kept vitest's 5000ms default, so the test could
+    // never outlive its own wait — it died at the test boundary instead of the
+    // waitFor, and the "fix" made the failure strictly more likely. An inner
+    // budget must always be smaller than the budget containing it.
+  }, 20_000)
 
   it('warns when the trashed files are still on posts', async () => {
     // The trap the trash exists around: files vanish from the library and a

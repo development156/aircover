@@ -30,6 +30,10 @@ const state = vi.hoisted(() => ({
   profileEnsured: 0,
   rpcCalls: 0,
   connectUrlCalls: 0,
+  /** The platform string actually sent to Zernio's connect endpoint, in order. */
+  connectUrlPlatforms: [] as string[],
+  /** `platform:headless` for every connect start, so the flag cannot be assumed. */
+  connectUrlHeadless: [] as string[],
 }))
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -40,8 +44,15 @@ vi.mock('@/lib/zernio/server', () => ({
   zernioClient: () =>
     state.clientPresent
       ? {
-          connectUrl: () => {
+          connectUrl: (
+            platform: string,
+            _profileId: string,
+            _redirectUrl: string,
+            options?: { headless?: boolean },
+          ) => {
             state.connectUrlCalls += 1
+            state.connectUrlPlatforms.push(platform)
+            state.connectUrlHeadless.push(`${platform}:${options?.headless === true}`)
             return Promise.resolve('https://zernio.example/consent')
           },
         }
@@ -97,11 +108,14 @@ vi.mock('@/lib/supabase/server', () => ({
 
 const { POST } = await import('./route')
 
-const call = () =>
+const call = () => post({ platform: 'instagram' })
+
+/** One press, with whatever body the test wants to send. */
+const post = (body: Record<string, unknown>) =>
   POST(
     new Request('https://app.sahodalabs.com/api/oauth/zernio/start', {
       method: 'POST',
-      body: JSON.stringify({ platform: 'instagram' }),
+      body: JSON.stringify(body),
     }),
   )
 
@@ -115,6 +129,8 @@ beforeEach(() => {
   state.profileEnsured = 0
   state.rpcCalls = 0
   state.connectUrlCalls = 0
+  state.connectUrlPlatforms = []
+  state.connectUrlHeadless = []
 })
 
 describe('the channels plan limit is enforced before the consent screen', () => {
@@ -232,5 +248,174 @@ describe('the workspace read tells "none" apart from "could not tell"', () => {
     // that failed would leave an orphan for a workspace we never identified.
     expect(state.profileEnsured).toBe(0)
     expect(state.connectUrlCalls).toBe(0)
+  })
+})
+
+/**
+ * WHAT THE CUSTOMER PRESSED, RECORDED BEFORE THEY LEAVE.
+ *
+ * ── ASSERTED ON THE REAL `Set-Cookie` HEADER, AND THAT IS THE POINT ──────────
+ * These tests used to mock `setPendingConnect` and assert it had been CALLED.
+ * It was called. It just did nothing: the old implementation went through
+ * `cookies().set()`, and this route answers with a `Response.json(...)` it builds
+ * itself, so the mutation never became a header. A seam that records the call
+ * cannot tell "we asked for a cookie" from "a cookie was sent", and the whole
+ * failure lived in that gap.
+ *
+ * Two reported bugs came out of it — the popup showed the app instead of closing,
+ * and a genuine connect wrote no row — and this file was green throughout.
+ *
+ * So nothing is mocked now. `setPendingConnectHeader` is a pure function and the
+ * assertion reads what actually leaves the route.
+ */
+describe('the pending connect is recorded, and only for a connect that happens', () => {
+  it('SENDS a Set-Cookie header, not merely a call to a cookie helper', async () => {
+    const res = await post({ platform: 'linkedin' })
+
+    expect(res.status).toBe(200)
+    const cookie = res.headers.get('set-cookie') ?? ''
+    expect(cookie).toContain('sahoda_connect=linkedin.redirect')
+    // The attributes the return trip depends on. `SameSite=Lax` in particular is
+    // load-bearing: the trip home is a cross-site top-level navigation, which
+    // `Lax` allows and `Strict` would drop.
+    expect(cookie).toContain('HttpOnly')
+    expect(cookie).toContain('SameSite=Lax')
+    expect(cookie).toContain('Path=/')
+  })
+
+  it('records the mode, so the return trip knows how to answer', async () => {
+    const res = await post({ platform: 'instagram', mode: 'popup' })
+    expect(res.headers.get('set-cookie')).toContain('sahoda_connect=instagram.popup')
+  })
+
+  it('treats anything that is not the literal "popup" as a redirect', async () => {
+    // The older path is the fallback for a blocked popup, so an absent or unknown
+    // mode must never select the newer one.
+    const odd = await post({ platform: 'instagram', mode: 'iframe' })
+    const bare = await post({ platform: 'instagram' })
+    expect(odd.headers.get('set-cookie')).toContain('instagram.redirect')
+    expect(bare.headers.get('set-cookie')).toContain('instagram.redirect')
+  })
+
+  it('sends NO cookie when the plan refuses the connect', async () => {
+    // A cookie written before a refusal would authorise a create for a connect
+    // that never happened, and it would still be there on the next trip back.
+    state.slots = { count: 2, keys: new Set() }
+    state.limitVerdict = { kind: 'blocked', sentence: 'Your Free plan includes 2 channels.' }
+
+    const res = await post({ platform: 'instagram' })
+
+    expect(res.status).toBe(403)
+    expect(res.headers.get('set-cookie')).toBeNull()
+  })
+
+  it('sends NO cookie when there is no workspace to connect into', async () => {
+    state.workspace = null
+
+    const res = await post({ platform: 'instagram' })
+
+    expect(res.status).toBe(400)
+    expect(res.headers.get('set-cookie')).toBeNull()
+  })
+})
+
+/**
+ * OUR NAME FOR A CHANNEL IS NOT ZERNIO'S, AND THREE BUTTONS DIED OF IT.
+ *
+ * X and Google Business answered "Couldn't start the connection. Try again." on
+ * every press while Instagram, LinkedIn and Facebook worked — because for those
+ * three our id and Zernio's happen to be the same string. `/connect/x` and
+ * `/connect/gbp` are not platforms Zernio has ever had.
+ */
+describe('the connect endpoint is asked for ZERNIO’s name for the channel', () => {
+  it('sends twitter for x and googlebusiness for gbp', async () => {
+    await post({ platform: 'x' })
+    expect(state.connectUrlPlatforms).toEqual(['twitter'])
+
+    state.connectUrlPlatforms = []
+    await post({ platform: 'gbp' })
+    expect(state.connectUrlPlatforms).toEqual(['googlebusiness'])
+  })
+
+  it('sends our own name where the two agree', async () => {
+    await post({ platform: 'instagram' })
+    await post({ platform: 'linkedin' })
+    await post({ platform: 'facebook' })
+    expect(state.connectUrlPlatforms).toEqual(['instagram', 'linkedin', 'facebook'])
+  })
+
+  it('refuses Telegram before calling Zernio, because it has no OAuth flow', async () => {
+    // `GET /v1/connect/telegram` returns an access CODE for a bot, not an
+    // authUrl. Sending a customer there is sending them nowhere.
+    const res = await post({ platform: 'telegram' })
+
+    expect(res.status).toBe(400)
+    expect(state.connectUrlPlatforms).toEqual([])
+    // And it must not leave a cookie authorising a create for a trip that cannot
+    // happen.
+    expect(res.headers.get('set-cookie')).toBeNull()
+
+    /**
+     * ── AND THE SENTENCE HAS TO NAME THE FLOW THAT DOES WORK ────────────────
+     * It used to read "This channel is connected a different way, and that flow
+     * isn't built yet." Both halves have since gone false: the flow IS built
+     * (api/oauth/zernio/telegram plus the code panel on the card), and a
+     * customer told a thing is unbuilt does not go looking for the control that
+     * would connect it. A refusal that leaves somebody with nowhere to go is the
+     * same defect `no-impossible-remedy.spec.ts` exists for.
+     */
+    const body = (await res.json()) as { message?: string }
+    expect(body.message).toMatch(/code on its card/i)
+    expect(body.message).not.toMatch(/isn.t built|not built|try again/i)
+  })
+})
+
+/**
+ * WHOSE SCREEN THE CUSTOMER PICKS A FACEBOOK PAGE ON.
+ *
+ * ── WHY THIS FLAG EXISTS ─────────────────────────────────────────────────────
+ * Facebook resolves to every Page the customer administers and Google Business to
+ * every location, and Zernio creates NO ACCOUNT until one is chosen. Left alone it
+ * hosts that choice on zernio.com — which is the screen the founder reported
+ * without knowing what it was: "it opens another new website ... change from
+ * social media connector to Sahodalabs". MEASURED 2026-08-27, it also ended with
+ * zero facebook accounts on this key.
+ *
+ * `headless=true` suppresses it and returns the browser to our own return route
+ * with the OAuth state, so the picker is ours.
+ *
+ * ── AND WHY IT IS NOT ON FOR EVERYTHING ──────────────────────────────────────
+ * Instagram and LinkedIn connect end to end today — they are the two accounts this
+ * workspace actually holds. Zernio publishes selection endpoints for LinkedIn
+ * organizations, Pinterest boards and more, and switching those on would move a
+ * working flow onto a second half nobody has written. The narrowness IS the
+ * safety argument, so it is asserted rather than assumed.
+ */
+describe('Zernio hosts the picker for nobody we have built one for', () => {
+  it('turns Zernio’s own screen off for Facebook', async () => {
+    await post({ platform: 'facebook' })
+    expect(state.connectUrlHeadless).toEqual(['facebook:true'])
+  })
+
+  it('turns it off for Google Business too, asked for by ZERNIO’s name', async () => {
+    // Two facts in one assertion, both load-bearing: the flag is set, and the
+    // platform reaching Zernio is `googlebusiness` rather than our `gbp`. Passing
+    // our own id here is what made every X and GBP connect answer "Couldn't start
+    // the connection" for a week.
+    await post({ platform: 'gbp' })
+    expect(state.connectUrlHeadless).toEqual(['googlebusiness:true'])
+  })
+
+  it('leaves it ON for Instagram, which needs no choice and works today', async () => {
+    await post({ platform: 'instagram' })
+    expect(state.connectUrlHeadless).toEqual(['instagram:false'])
+  })
+
+  it('leaves it on for LinkedIn, even though Zernio offers a selection endpoint', async () => {
+    // Deliberate. LinkedIn has `/connect/linkedin/select-organization` and we have
+    // not built that picker; asking for headless here would return a customer to a
+    // return route that cannot finish, i.e. a working platform broken for tidiness.
+    await post({ platform: 'linkedin' })
+    expect(state.connectUrlHeadless).toEqual(['linkedin:false'])
   })
 })

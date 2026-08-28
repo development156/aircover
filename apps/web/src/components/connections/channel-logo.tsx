@@ -1,7 +1,15 @@
 import Image from 'next/image'
 import { CircleSlash } from 'lucide-react'
 
-import { GoogleBusinessMark, PinterestMark } from '@/components/connections/drawn-marks'
+import {
+  DiscordMark,
+  GoogleBusinessMark,
+  PinterestMark,
+  RedditMark,
+  SlackMark,
+  SnapchatMark,
+  ThreadsMark,
+} from '@/components/connections/drawn-marks'
 import type { CatalogueChannel } from '@/lib/connections/catalogue'
 import { cn } from '@/lib/utils'
 
@@ -42,12 +50,23 @@ const MARK: Partial<Record<CatalogueChannel, string>> = {
   facebook: '/channels/facebook.png',
   youtube: '/channels/youtube.png',
   telegram: '/channels/telegram.png',
+  // Shipped in `public/channels/` and unused until the connect-only platforms
+  // landed. `google-ads.png` and `shopify.png` are still unused and are NOT
+  // wired to anything: google-ads is a different Google product from `gbp` and
+  // pointing at it would mislabel the channel.
+  tiktok: '/channels/tiktok.png',
+  whatsapp: '/channels/whatsapp.png',
 }
 
 /** Marks with no shipped asset, drawn to scale instead of falling back. */
 const DRAWN: Partial<Record<CatalogueChannel, typeof GoogleBusinessMark>> = {
   gbp: GoogleBusinessMark,
   pinterest: PinterestMark,
+  discord: DiscordMark,
+  reddit: RedditMark,
+  slack: SlackMark,
+  threads: ThreadsMark,
+  snapchat: SnapchatMark,
 }
 
 export function ChannelLogo({

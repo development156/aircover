@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import type { VariantExtras } from '@/lib/posts/variant-extras'
 
 import { ChannelExtras } from './channel-extras'
+import { ChannelSettings } from './channel-settings'
 import { GbpOptions } from './gbp-options'
 import { GbpTopicOptions } from './gbp-topic-options'
 import { NotBuiltYet } from './not-built-yet'
@@ -119,32 +120,42 @@ export function VersionOptions({
         )}
       </div>
 
-      {spec.gbp !== undefined ? (
-        <>
-          <GbpOptions extras={extras} onExtrasChange={onExtrasChange} />
-          <GbpTopicOptions extras={extras} onExtrasChange={onExtrasChange} />
-        </>
-      ) : null}
+      {/* ── EVERYTHING A WRITER SETS ONCE, FOLDED AWAY UNTIL THEY WANT IT ─────
+          The kind of post stays above, because changing it changes THIS card's
+          media rules and a control has to be visible where its consequences
+          are. These six are different: Google's button and topic, the poll, the
+          first comment, the co-author and the AI label are set rarely and never
+          in the first pass. Open whenever any of them carries a value, and named
+          in the summary even when shut, so the fold cannot swallow state.
 
-      {/* ── ONLY WHERE THE CHANNEL REALLY HAS IT ──────────────────────────────
+          ── ONLY WHERE THE CHANNEL REALLY HAS IT ──────────────────────────────
           Someone posting one caption to two channels must never meet seven
           option panels, so each of these renders on exactly the channels that
           carry it — and each returns null rather than an empty box elsewhere. */}
-      {channel === 'x' || channel === 'linkedin' ? (
-        <PollOptions
+      <ChannelSettings channel={channel} format={format} extras={extras}>
+        {spec.gbp !== undefined ? (
+          <>
+            <GbpOptions extras={extras} onExtrasChange={onExtrasChange} />
+            <GbpTopicOptions extras={extras} onExtrasChange={onExtrasChange} />
+          </>
+        ) : null}
+
+        {channel === 'x' || channel === 'linkedin' ? (
+          <PollOptions
+            channel={channel}
+            extras={extras}
+            onExtrasChange={onExtrasChange}
+            mediaCount={mediaCount}
+          />
+        ) : null}
+
+        <ChannelExtras
           channel={channel}
+          format={format}
           extras={extras}
           onExtrasChange={onExtrasChange}
-          mediaCount={mediaCount}
         />
-      ) : null}
-
-      <ChannelExtras
-        channel={channel}
-        format={format}
-        extras={extras}
-        onExtrasChange={onExtrasChange}
-      />
+      </ChannelSettings>
 
       {/* ── WHAT A THREAD DOES NOT CARRY, SAID ON THE CARD THAT OFFERS IT ─────
           Threads publish now. One capability behind them does not, and saying so

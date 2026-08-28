@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -21,6 +21,31 @@ import {
  */
 
 const SOURCE = 'export const answer = 42\n'
+
+/**
+ * MAKE THE SCRATCH DIRECTORY UNUSABLE IN A WAY ROOT CANNOT WALK THROUGH.
+ *
+ * These two cases used to do it with `chmodSync(scratch, 0o500)`, and that is
+ * correct on a developer's laptop and MEANINGLESS in a container that runs as
+ * uid 0 — root ignores the permission bits, the probe write succeeds, and both
+ * guards fail. Not "pass without checking anything", which is this repository's
+ * usual trap: they go RED, on every run, for a defect that is not there. A
+ * permanently red gate is switched off just as fast as a permanently green one.
+ *
+ * So the block is structural instead. `ensureScratchDir` proves the directory by
+ * writing a probe file at `.probe-<pid>`; a DIRECTORY already sitting on that
+ * exact path makes the write fail with EISDIR for every user alive, root
+ * included. The mechanism under test is unchanged — the probe write is still
+ * what must refuse — and the refusal no longer depends on who is running it.
+ *
+ * It does couple the test to the probe's name. That is deliberate and it is the
+ * cheaper of the two couplings: rename the probe and this goes red, which is a
+ * one-line fix by someone already in the file, and until then the guard is real
+ * everywhere rather than real on half the machines.
+ */
+function blockProbe(dir) {
+  mkdirSync(resolve(dir, `.probe-${process.pid}`), { recursive: true })
+}
 let root
 let scratch
 let file
@@ -60,12 +85,9 @@ describe('the scratch directory is proven writable before anything is mutated', 
     // `existsSync` alone would have passed this. A directory you cannot write
     // to fails exactly like one that is not there.
     ensureScratchDir(scratch)
-    chmodSync(scratch, 0o500)
-    try {
-      expect(() => ensureScratchDir(scratch)).toThrow(/not writable|cannot create/i)
-    } finally {
-      chmodSync(scratch, 0o700)
-    }
+    blockProbe(scratch)
+
+    expect(() => ensureScratchDir(scratch)).toThrow(/not writable|cannot create/i)
   })
 })
 
@@ -236,21 +258,18 @@ describe('runMutants end to end', () => {
   it('refuses the whole run when the scratch directory cannot be used', async () => {
     // The incident, end to end: no scratch directory, so nothing may proceed.
     ensureScratchDir(scratch)
-    chmodSync(scratch, 0o500)
-    try {
-      await expect(
-        runMutants({
-          scratchDir: scratch,
-          mutants: [{ name: 'answer', file, find: '42', replace: '43' }],
-          runTests: async () => ({ killed: true, summary: '' }),
-        }),
-      ).rejects.toThrow(MutationHarnessError)
+    blockProbe(scratch)
 
-      // And crucially, the source was never touched.
-      expect(readFileSync(file, 'utf8')).toBe(SOURCE)
-    } finally {
-      chmodSync(scratch, 0o700)
-    }
+    await expect(
+      runMutants({
+        scratchDir: scratch,
+        mutants: [{ name: 'answer', file, find: '42', replace: '43' }],
+        runTests: async () => ({ killed: true, summary: '' }),
+      }),
+    ).rejects.toThrow(MutationHarnessError)
+
+    // And crucially, the source was never touched.
+    expect(readFileSync(file, 'utf8')).toBe(SOURCE)
   })
 
   it('does not report a mutant that never applied as killed', async () => {
