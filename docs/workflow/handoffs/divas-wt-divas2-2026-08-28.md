@@ -186,9 +186,15 @@ Also corrected: a boundary test whose name stated a false measurement ("accepts
   signatures (`parseOklch` returns null in one and throws in the other). Unifying
   them is a real refactor across two packages. `paint.ts` does no colour maths
   rather than becoming a third copy.
-- **`ops/state/qa.pending.json` is modified and NOT in my commits.** The QA logger
-  rewrote it while I ran gate legs, including re-encoding the escaped form of the em dash to the literal character across
-  the whole file. Not my authored work, left as found.
+- **`ops/state/qa.pending.json` is deliberately NOT committed, and I had the
+  reason wrong twice before getting it right.** The QA logger hook recorded this
+  session's own typecheck, lint and vitest runs there, so an earlier draft
+  calling it "not my authored work" was inaccurate. But committing it is still
+  wrong, and a pre-commit hook refuses it: the file is SCRATCH. Every gate run
+  rewrites it and attributes the run to whichever card happens to be open
+  (REQUESTS §18), so committing it drops one session's local run into every
+  other lane's tree. Reverted with `git checkout --`. Anyone changing its SHAPE
+  rather than its contents needs `ALLOW_QA_PENDING=1`.
 
 ## Gate
 
