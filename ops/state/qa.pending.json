@@ -1677,6 +1677,84 @@
       "summary_plain": "The unit checks passed (438 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": "=== commits:\n10\n=== files changed:\n 27 files changed, 2652 insertions(+), 127 deletions(-)\n=== new test files:\napps/web/src/components/loop/controls.test.tsx\napps/web/src/lib/brand/confirmed-count.test.ts\napps/web/src/lib/cron/loop-facts-sql.pglite.test.ts\napps/web/src/lib/cron/route-shape.test.ts\napps/web/src/lib/loop/report.test.ts\napps/web/src/lib/loop/store-reflect-reason.test.ts\napps/web/src/lib/loop/verdict.test.ts\n=== loop+cron+brand test tally:\n Test Files  43 passed (43)\n      Tests  438 passed (438)",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtd14e4p-7897c3d6",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T14:10:42.696Z",
+      "finished_at": "2026-08-28T14:10:42.696Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The unit checks ran and something failed (9 passed, 9 failed).",
+      "details": " ❯ pe.parse ../../node_modules/.pnpm/@electric-sql+pglite@0.5.4/node_modules/@electric-sql/pg-protocol/src/parser.ts:102:24\n ❯ O.qe ../../node_modules/.pnpm/@electric-sql+pglite@0.5.4/node_modules/@electric-sql/pglite/src/pglite.ts:753:25\n ❯ ../../node_modules/.pnpm/@electric-sql+pglite@0.5.4/node_modules/@electric-sql/pglite/src/pglite.ts:706:13\n ❯ null.<anonymous> wasm:/wasm/0267b22e:1:5921403\n ❯ null.<anonymous> wasm:/wasm/0267b22e:1:2615913\n ❯ null.<anonymous> wasm:/wasm/0267b22e:1:2648399\n ❯ null.<anonymous> wasm:/wasm/0267b22e:1:2649003\n ❯ null.<anonymous> wasm:/wasm/0267b22e:1:5569736\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/9]⎯\n\n\n Test Files  1 failed (1)\n      Tests  9 failed | 9 passed (18)\n   Start at  14:10:38\n   Duration  4.03s (transform 111ms, setup 0ms, import 169ms, tests 3.39s, environment 0ms)\n\nundefined\n/home/user/sahodalabs/packages/db:\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run tests/loop_autopilot_l3.pglite.test.ts",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtd15a36-191f178",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T14:11:24.113Z",
+      "finished_at": "2026-08-28T14:11:24.113Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks passed (18 passed) for @sahoda/db ONLY — this run was filtered and does not cover the workspace.",
+      "details": "      Tests  18 passed (18)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtd15sk4-2b8d63cc",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T14:11:48.050Z",
+      "finished_at": "2026-08-28T14:11:48.050Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The unit checks ran and something failed (17 passed, 1 failed).",
+      "details": "--- MUTATION A: a count floor (3 of 4) instead of the named set\n     × REFUSES L3 when only the red lines are unconfirmed, and NAMES that field 14ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 17 passed (18)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtd16fhu-e3c983eb",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T14:12:17.777Z",
+      "finished_at": "2026-08-28T14:12:17.777Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The unit checks ran and something failed (52 passed, 2 failed).",
+      "details": "--- MUTATION B: supervision read as 'a cycle finished', dropping the human\n     × REFUSES L3 when a cycle finished but no person approved its cost 17ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 17 passed (18)\n--- MUTATION C: the guard fires on INSERT only\n     × REFUSES an UPDATE to L3 as firmly as an INSERT 11ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 17 passed (18)\n      Tests  18 passed (18)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtd16xif-ff06937a",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T14:12:41.126Z",
+      "finished_at": "2026-08-28T14:12:41.126Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks passed for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
+      "details": "TSC done\n Tasks:    9 successful, 9 total\nCached:    7 cached, 9 total\n  Time:    2.006s",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtd16xif-6703b928",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T14:12:41.126Z",
+      "finished_at": "2026-08-28T14:12:41.126Z",
+      "suite": "lint",
+      "status": "pass",
+      "summary_plain": "The lint checks passed for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
+      "details": "TSC done\n Tasks:    9 successful, 9 total\nCached:    7 cached, 9 total\n  Time:    2.006s",
+      "duration_ms": null
     }
   ]
 }
