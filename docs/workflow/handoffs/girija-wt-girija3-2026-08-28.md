@@ -128,12 +128,14 @@ hunting; this sends them to the fix.
   Postgres would need a reachable server with a wrong password, and there is
   none here. What WAS proven end to end is the adjacent case: a listener that
   accepts and hangs up leaves the test red.
-- **`ops/state/qa.pending.json` is dirty in the working tree and was left
-  uncommitted.** It is not this session's file: the 58 added lines are other
-  lanes' QA records (zernio, wt-divas) plus a `—` → `—` re-encoding. It was
-  clean at kickoff, so something in this session's tooling rewrote it, and per
-  `/handoff` step 4 a file that is not mine stays where it is rather than riding
-  in under an unrelated message.
+- **`ops/state/qa.pending.json` was reverted, not committed** — the right
+  action, reached first for the wrong reason. It IS this session's file (I said
+  otherwise and retract it below), but it is **scratch**: `.githooks/pre-commit`
+  refuses any commit that stages it, because every gate run rewrites it and
+  attributes the run to whichever card is open. Its own header records that on
+  2026-08-25 a session committed it twice in three commits, once immediately
+  after reverting it. The rule is "revert it, never commit it", and the tree is
+  clean.
 
 ---
 
@@ -211,6 +213,41 @@ MEASURED in this session: `env | grep -c SUPABASE_DB_URL` returns 1, and
 had been protecting a skip condition that no longer fired. The corrected header
 states the date, the script, and what the condition is now, so nobody
 re-derives it.
+
+**Two, and the second one is mine, from this file, an hour after writing it.**
+
+I recorded that `ops/state/qa.pending.json` was "not this session's file" and
+left it uncommitted, citing `/handoff` step 4. **That was wrong, and the method
+that produced it was wrong.** I read the diff with `grep`, saw zernio and
+wt-divas text in the added lines, and concluded the records belonged to other
+lanes. What I had actually found was a `—` → `—` re-encoding of OLD records,
+which is what put other lanes' prose into the `+` side of a diff about my own
+runs.
+
+MEASURED properly, by comparing `client_id` sets between the working copy and
+`HEAD` rather than reading the diff text: **59 records at `HEAD`, 62 in the
+working tree, and all three new ones are this session's**, timestamped
+`2026-08-28T06:57`, `07:05` and `18:02` — the turbo run where `apps/jobs` went
+red, the second turbo run, and the final privacy-directory run. The last one
+reads "The unit checks ran (56 passed), but 2 tests did NOT run — this does not
+prove the suite passes", which is the QA logger correctly refusing to call my
+new skip a pass.
+
+**The lesson is the one this repository already has in a different costume:** a
+diff shows you the lines that moved, not the records that changed, and a
+reformatting commit makes those two things disagree completely. Comparing the
+identifiers took one command and would have been right the first time.
+
+**The action was right anyway, and that is the part worth not misreading.**
+Having established the records were mine, I staged the file — and
+`.githooks/pre-commit` refused the commit. The file is **scratch**: every gate
+run rewrites it and attributes the run to whichever card is open, so committing
+it puts one session's local run into everybody else's tree. The rule is "revert
+it, never commit it", and the hook exists because on 2026-08-25 a session
+committed it twice in three commits, once immediately after reverting it for
+this exact reason. So a wrong premise and a correct rule pointed at the same
+outcome, which is exactly the situation in which nobody notices the premise was
+wrong. It is reverted; the tree is clean.
 
 **Nothing else was retracted.** The 26 and 27 August files stand unaltered.
 
