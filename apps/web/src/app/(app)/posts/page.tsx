@@ -5,6 +5,7 @@ import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-b
 import { PageTitle } from '@/components/page-title'
 import { CreatePostButton } from '@/components/posts/create-post-button'
 import { PostCard } from '@/components/posts/post-card'
+import { PostGrid } from '@/components/posts/post-grid'
 import { listPostMetrics } from '@/lib/analytics/post-metrics'
 import { forDisplay } from '@/lib/posts/display-post'
 import { readPosts, listVariantStates, LIST_LIMIT } from '@/lib/posts/read'
@@ -123,24 +124,27 @@ export default async function PostsPage({
               />
             </div>
           ) : (
-            <ul className="space-y-grid" data-guide="posts.list">
+            /* The grid owns the <ul> and the fold; the page still owns which
+               posts are in it and in what order. `PostGrid` is a client island
+               only because the fold has state — the cards inside it are the
+               same server components as before and cost no JS. */
+            <PostGrid data-guide="posts.list">
               {shown.map((post, i) => (
-                <li key={post.id}>
-                  {/* One ladder down the list — the rows deal rather than
-                      flashing. Capped in CSS at --stagger-cap, so a full page
-                      of posts does not take a second and a half to arrive. */}
-                  <StaggerItem i={i}>
-                    <PostCard
-                      post={post}
-                      now={now}
-                      variantStates={variantStates.get(post.id) ?? []}
-                      metrics={metrics.get(post.id)}
-                      autoPublish={autoPublish}
-                    />
-                  </StaggerItem>
-                </li>
+                /* One ladder across the grid — the tiles deal rather than
+                   flashing. Capped in CSS at --stagger-cap, so a full page
+                   of posts does not take a second and a half to arrive. */
+                <StaggerItem key={post.id} i={i}>
+                  <PostCard
+                    compact
+                    post={post}
+                    now={now}
+                    variantStates={variantStates.get(post.id) ?? []}
+                    metrics={metrics.get(post.id)}
+                    autoPublish={autoPublish}
+                  />
+                </StaggerItem>
               ))}
-            </ul>
+            </PostGrid>
           )}
 
           <LivePhaseNote />
