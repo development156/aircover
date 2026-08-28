@@ -1,5 +1,5 @@
 import { adminClient, expect, test } from './fixtures/seeded-user'
-import { expectPostSaved } from './fixtures/compose'
+import { expectPostSaved, openPart } from './fixtures/compose'
 
 /**
  * ONE BODY PER CHANNEL, proved in a real browser against the real database.
@@ -96,6 +96,10 @@ test.describe('the composer keeps one body per channel @smoke', () => {
 
     // ── 4. Channels, picked in the same place they can be un-picked. Fast and
     //      reversible: this spec picks three and drops one.
+    //
+    //      Part two of the screen, reached through the rail down the side, and
+    //      refused until step 3 above put words in the post.
+    await openPart(page, 2)
     await page.locator('[data-channel-tile="x"]').click()
     await page.locator('[data-channel-tile="linkedin"]').click()
     await page.locator('[data-channel-tile="gbp"]').click()
@@ -116,6 +120,7 @@ test.describe('the composer keeps one body per channel @smoke', () => {
     // server. The defect this guards has not changed — a real post with no
     // channels on it — only the write that could produce it.
     await page.reload()
+    await openPart(page, 2)
     await expect(page.locator('[data-version-card="x"]')).toBeVisible({ timeout: 60_000 })
     await expect(page.locator('[data-version-card="linkedin"]')).toBeVisible()
 
@@ -148,8 +153,12 @@ test.describe('the composer keeps one body per channel @smoke', () => {
 
     await expect(xBody).toHaveValue(X_TEXT)
     await expect(linkedinBody).toHaveValue(LINKEDIN_TEXT)
-    // The source is untouched by either.
+    // The source is untouched by either. It is part one of the screen, so this
+    // goes and looks and then comes back — which is a stronger reading of the
+    // claim than before: the words survive being left and returned to.
+    await openPart(page, 1)
     await expect(page.getByLabel('Your post')).toHaveValue(SOURCE_BODY)
+    await openPart(page, 2)
 
     // Fixing X cleared X's objection and gave LinkedIn nothing to answer for.
     await expect(xCard.getByRole('alert')).toHaveCount(0)
@@ -173,8 +182,10 @@ test.describe('the composer keeps one body per channel @smoke', () => {
 
     // ── 9. RELOADED. The honest check: the rows, not the state just typed into.
     await page.reload()
+    await openPart(page, 2)
     await expect(page.locator('[data-variant-editor="x"]')).toHaveValue(X_TEXT)
     await expect(page.locator('[data-variant-editor="linkedin"]')).toHaveValue(LINKEDIN_TEXT)
+    await openPart(page, 1)
     await expect(page.getByLabel('Your post')).toHaveValue(SOURCE_BODY)
 
     // ── 10. READ BACK #1 — the rows themselves, with no app code in the path.
@@ -198,6 +209,10 @@ test.describe('the composer keeps one body per channel @smoke', () => {
     // ── 11. READ BACK #2 — a surface that did not write any of it. The dry run
     //       re-reads the rows on the server and reports per channel. It writes
     //       nothing and sends nothing; the live Publish button is never pressed.
+    // The dry run lives on part three, behind the choice between the two ways a
+    // post goes out — the panel asks before it offers either set of controls.
+    await openPart(page, 3)
+    await page.getByRole('button', { name: /^Post now/ }).click()
     const preview = page.locator('[data-guide="post-preview-publish"]')
     await preview.getByRole('button', { name: /^preview publish$/i }).click()
     // The dry run reports per channel. Both appear, and the X result reflects

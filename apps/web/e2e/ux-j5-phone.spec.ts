@@ -146,13 +146,6 @@ test.describe('ux j5 phone', () => {
     if (await body.isVisible().catch(() => false)) {
       await body.click()
       await body.type('Saturday cupping is open again.', { delay: 12 })
-      // The channel step opens only once something is written — the composer is
-      // a sequence now — so the tile is picked here rather than on arrival.
-      await page.waitForTimeout(2500)
-      await page
-        .locator('[data-channel-tile="instagram"]')
-        .click()
-        .catch(() => {})
       // An on-screen keyboard takes roughly half the height of a 390x844 phone.
       // The visual viewport shrinks; the layout viewport often does not, which is
       // exactly how a `fixed bottom-0` bar ends up under the keyboard.
@@ -167,6 +160,29 @@ test.describe('ux j5 phone', () => {
       })
       await page.setViewportSize(PHONE)
       await page.waitForTimeout(600)
+
+      // ── AND THE RAIL, ON A PHONE ────────────────────────────────────────────
+      // The three parts of a post stack above the panel at this width rather
+      // than sitting in a column beside it, and picking a platform is a real
+      // journey a person takes on a phone. Photographed after the keyboard
+      // frames, because moving to another part would take the writing box —
+      // the subject of those frames — off the screen.
+      await page
+        .locator('[data-rail-step="2"] button')
+        .click()
+        .catch(() => {})
+      await page.waitForTimeout(1500)
+      await page
+        .locator('[data-channel-tile="instagram"]')
+        .click()
+        .catch(() => {})
+      await page.waitForTimeout(1500)
+      await shot(page, {
+        journey: JOURNEY,
+        stop: 'P5-platform-part-phone',
+        width: 390,
+        theme: 'light',
+      })
     }
   })
 
