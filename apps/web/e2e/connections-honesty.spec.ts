@@ -14,8 +14,11 @@ import { leaveOnboarding } from './fixtures/compose'
  *  1. A channel with no adapter offers NO control. `docs/26` §10.2 — a disabled
  *     button is still announced as a button, so the user takes an action that
  *     does nothing and reads the result as a broken app.
- *  2. At most ONE primary. Run 17 found four full-width solid-orange primaries on
- *     this one screen; there are now eight tiles, so the rule matters more.
+ *  2. At most one primary PER CARD, and none on a connected one. Run 17 found
+ *     four full-width solid-orange primaries on a screen that had no primary at
+ *     all. The unit moved from the view to the card on the founder's 28 August
+ *     ruling — the reasoning is at the assertion, not here. (This line used to
+ *     say "there are now eight tiles"; the catalogue holds FIFTEEN.)
  *  3. Readiness and connection are stated SEPARATELY. `docs/27` §3.3 measured two
  *     vocabularies sharing one slot, with the stronger treatment on the less
  *     important status.
@@ -53,7 +56,20 @@ test.describe('connections is honest about every channel @smoke', () => {
       const comingSoon = main.locator('[data-coming-soon="true"]')
       await expect(comingSoon.first()).toBeVisible()
       const comingSoonCount = await comingSoon.count()
-      expect(comingSoonCount, `width ${width}: planned channels rendered`).toBe(4)
+      // ── THE FROZEN NUMBER IS GONE, AND IT HAD ALREADY ROTTED ──────────────
+      // This read `.toBe(4)`. MEASURED against `lib/connections/catalogue.ts:99`:
+      // `PLANNED_CHANNELS = ['snapchat']`, so the page renders exactly ONE
+      // coming-soon tile and has done since the catalogue was rewritten. The
+      // assertion could not pass, which means every property BELOW it — the
+      // primary count, the two vocabularies, the channel names — has not run
+      // either. A hard `expect` aborts the test at this line.
+      //
+      // The count was never this section's property. The heading says it: a
+      // coming-soon tile has NOTHING TO PRESS. That is checked by the loop
+      // underneath and does not care how many there are. Asserting presence
+      // keeps the guard honest against a page that renders none at all, without
+      // re-freezing a figure the catalogue is free to change.
+      expect(comingSoonCount, `width ${width}: planned channels rendered`).toBeGreaterThan(0)
 
       for (let i = 0; i < comingSoonCount; i += 1) {
         const tile = comingSoon.nth(i)
@@ -67,11 +83,39 @@ test.describe('connections is honest about every channel @smoke', () => {
         ).toBe(0)
       }
 
-      // ── 2 · ONE PRIMARY AT MOST ───────────────────────────────────────────
+      // ── 2 · ONE PRIMARY PER CARD, AND NONE ON A CONNECTED ONE ─────────────
       // Counted by RENDERED FILL, not by a class name: a class is a promise and
       // the pixel is the fact. `--brand` is the only solid accent fill in the
-      // system, so anything painted with it is claiming to be the primary.
-      const brandFilled = await main.evaluate((root) => {
+      // system, so anything painted with it is claiming to be a primary.
+      //
+      // ── WHAT THIS REPLACED, AND WHY ───────────────────────────────────────
+      // This asserted ONE brand fill in the whole view (§1.5, "one primary per
+      // view"). Founder's ruling, 28 August 2026: the first Connect on a channel
+      // is that channel's primary and is painted `--brand`. Fifteen cards means
+      // fifteen fills, so the old number could not survive the ruling.
+      //
+      // It is retargeted rather than deleted, because the DEFECT it was written
+      // for is still real — run 17 found four full-width orange primaries on a
+      // screen that had no primary at all. What changed is the unit. §1.5 is
+      // about a view where the reader must pick ONCE; this screen asks the
+      // reader to pick independently, per card, up to fifteen times. So the
+      // budget moves from the view to the card, and two new claims replace the
+      // one that went:
+      //
+      //   a. no card carries more than one brand fill — catches Details,
+      //      Disconnect or a chip being painted primary alongside Connect;
+      //   b. a CONNECTED card carries none — the founder's "connected accounts
+      //      use a subtle secondary" as a check rather than a preference. This
+      //      is the half that keeps the orange MEANINGFUL: it marks "not yet
+      //      connected", so it is information and not decoration;
+      //   c. the page furniture outside the cards keeps the old ceiling of one,
+      //      which is the connection-health banner's own primary.
+      //
+      // This is weaker than the original in one way and stronger in two, and
+      // saying so is the point: the total is no longer bounded, but per-card
+      // discipline and the connected/unconnected distinction were not checked
+      // by the old assertion at all.
+      const fills = await main.evaluate((root) => {
         const brand = getComputedStyle(document.documentElement).getPropertyValue('--brand').trim()
         // Resolve the token to the rgb() string the browser actually computes.
         const probe = document.createElement('span')
@@ -80,11 +124,56 @@ test.describe('connections is honest about every channel @smoke', () => {
         const resolved = getComputedStyle(probe).backgroundColor
         probe.remove()
 
-        return Array.from(root.querySelectorAll('button, a[href]')).filter(
-          (el) => getComputedStyle(el).backgroundColor === resolved,
-        ).length
+        const isBrand = (el: Element) => getComputedStyle(el).backgroundColor === resolved
+        const controls = (scope: Element) =>
+          Array.from(scope.querySelectorAll('button, a[href]')).filter(isBrand).length
+
+        // ── `[data-channel]` ALONE IS THE WRONG SET, AND IT WAS MEASURED ───
+        // `channel-logo.tsx:91,106` puts `data-channel` on the MARK as well as
+        // the tile, so the bare attribute matched 22 elements for 15 tiles when
+        // this was first run — the same attribute collision `channel-tile.tsx`
+        // records at :248 for `data-readiness`, one screen later. Every extra
+        // match reported zero fills, so the per-card ceiling passed by
+        // measuring things that were never going to carry a button, and the
+        // `outside` subtraction below double-counted their parents.
+        //
+        // Only the tile carries BOTH, which is why `connections-widths.spec.ts`
+        // already selects it this way.
+        const cards = Array.from(root.querySelectorAll('[data-channel][data-connected]'))
+        return {
+          cards: cards.length,
+          perCard: cards.map((c) => ({
+            channel: c.getAttribute('data-channel') ?? '?',
+            connected: c.getAttribute('data-connected') === 'true',
+            brandFills: controls(c),
+          })),
+          // Everything NOT inside a card. Counted by subtraction so a control
+          // that moves out of a card cannot escape the check by moving.
+          outside: controls(root) - cards.reduce((sum, c) => sum + controls(c), 0),
+        }
       })
-      expect(brandFilled, `width ${width}: one primary per view (§1.5)`).toBeLessThanOrEqual(1)
+
+      // A run that found no cards would satisfy every claim below by measuring
+      // nothing, which is the failure mode this whole file was written against.
+      expect(fills.cards, `width ${width}: cards were found to measure`).toBeGreaterThan(0)
+
+      for (const card of fills.perCard) {
+        expect(
+          card.brandFills,
+          `width ${width}: ${card.channel} carries more than one primary`,
+        ).toBeLessThanOrEqual(1)
+        if (card.connected) {
+          expect(
+            card.brandFills,
+            `width ${width}: ${card.channel} is connected, so its control is not a primary`,
+          ).toBe(0)
+        }
+      }
+
+      expect(
+        fills.outside,
+        `width ${width}: page furniture outside the cards spends at most one primary`,
+      ).toBeLessThanOrEqual(1)
 
       // ── 3 · TWO AXES, STATED SEPARATELY ───────────────────────────────────
       // Readiness is a claim about Sahoda; connection is a claim about the
