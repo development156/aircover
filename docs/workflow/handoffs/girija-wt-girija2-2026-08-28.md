@@ -1,8 +1,12 @@
 # Handoff — girija — wt-girija2 — 2026-08-28
 
-**Branch** `claude/lead-research-kickoff-qexr94` at `cd4548e1`. Lane `wt-girija2`.
+**Branch** `claude/lead-research-kickoff-qexr94` at `57ae8b22`. Lane `wt-girija2`.
 Pushed: **yes**. PR [#24](https://github.com/development156/sahodalabs/pull/24),
 draft, into `wt-core`.
+
+`cd4548e1` is the work; `57ae8b22` is `lane-sync push` taking `wt-core`'s three
+newer commits into the lane afterwards, plus this file. **`wt-core` was NOT
+pushed to** — see the Gate section for why.
 
 **The branch was restarted from `wt-core` at the start of this session.** PR #17
 from this same branch was merged on 2026-08-27 by IDIVASM, so the branch carried
@@ -240,3 +244,26 @@ Run from the repo root, unpiped, exit codes read from the command itself.
 **The smoke leg's refusal is new information this session** and is not the
 sandbox's Chromium problem. It refuses before launching a browser, because the
 acknowledgement is missing. Both walls are real; this is the first one.
+
+### The forced gate on the merged head `57ae8b22`
+
+`pnpm turbo run typecheck lint test --force`, 27 tasks, **4m57s, no cache**:
+**25 successful, 2 failed**, and neither failure is this diff's.
+
+| package | result |
+| --- | --- |
+| `@sahoda/web` | **1 file failed, 452 passed, 3 skipped. 5729 tests passed, 0 tests failed** — `src/lib/repo/workspace-timezone.pglite.test.ts` failed at SUITE level: `Error: Hook timed out in 10000ms` in `beforeAll` calling `bootFullSchema()`. **MEASURED alone: 15 tests pass in 6.86s.** Contention under a 27-way no-cache fan-out, the same shape REQUESTS §23 records for `crop-geometry` under `--force` |
+| `@sahoda/db` | **MEASURED alone: 1 failed, 675 passed, 207 skipped.** The one failure is `live-guard.test.ts`, the environment finding recorded above. The three table guards this session had to pay now pass |
+| every other package | pass |
+
+**A caveat I owe on the first one.** `bootFullSchema()` now creates one more
+table than it did, so this change makes that boot marginally slower and is a
+plausible contributor to a 10s hook timeout that was already close under load.
+It is not the cause — the file passes alone at 6.86s and passed in three
+non-forced gate runs today with the migration present — but "not the cause" and
+"contributed nothing" are different claims and only the first is MEASURED.
+
+**`wt-core` was deliberately not pushed to.** `lane-sync` prints the gate as the
+condition and the gate is not clean; both reds are explained and neither is this
+diff's, but "explained" is not "green", and PR #24 is the vehicle the founder is
+reviewing. Landing it directly would bypass that. Founder's call.
