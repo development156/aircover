@@ -15,6 +15,7 @@ import {
   readChannelOutcomes,
   readFeaturedPosts,
   readPublishedPosts,
+  savePassRun,
   saveObservation,
   workspacesWithAudience,
   workspacesWithCapturedDrafts,
@@ -103,12 +104,28 @@ export async function runMarketingBrainPass(today: Date): Promise<BrainPassResul
     failed: 0,
   }
 
+  /**
+   * This workspace's own verdict, rebuilt per workspace inside the loop.
+   *
+   * `result.declined` is the operator's tally across the whole run and cannot
+   * answer "what is MY workspace waiting for" — 31 `too_few_posts` is a fact
+   * about a population. This is the per-customer half, and it is what reaches a
+   * screen.
+   */
+  let perWorkspace: Record<string, string> = {}
+  let written = 0
+
   const decline = (
     kind: string,
     reason: NoDriftReason | NoDeltaReason | NoChannelReason | NoGrowthReason | NoFormatReason,
   ): void => {
     const key = `${kind}:${reason}`
     result.declined[key] = (result.declined[key] ?? 0) + 1
+    // Last reason per kind wins, and only `audience_growth` can reach here
+    // twice — once per channel. A workspace shrinking on one platform and
+    // waiting on another is waiting, which is the honest summary of the pair
+    // and the one a screen can act on.
+    perWorkspace[kind] = reason
   }
 
   const record = async (
@@ -130,11 +147,14 @@ export async function runMarketingBrainPass(today: Date): Promise<BrainPassResul
       return
     }
     const { inserted } = await saveObservation(workspaceId, outcome.observation)
+    written += 1
     if (inserted) result.inserted += 1
     else result.refreshed += 1
   }
 
   for (const workspaceId of workspaceIds) {
+    perWorkspace = {}
+    written = 0
     try {
       // Both computers run for every workspace in the union, and each declines
       // on its own population. A workspace with published posts and no captured
@@ -211,6 +231,20 @@ export async function runMarketingBrainPass(today: Date): Promise<BrainPassResul
           'no_audience_data',
         )
       }
+
+      /**
+       * ── LAST, AND INSIDE THE TRY, WHICH IS THE WHOLE GUARANTEE ─────────────
+       * A row here means "Sahoda examined this workspace and this is the
+       * complete account of what it found". A workspace whose reads threw
+       * reaches the catch below and writes NOTHING, so a missing row is "we
+       * could not look" and never "we looked and were waiting".
+       *
+       * Get that wrong and a broken reader renders on a customer's screen as
+       * patience, which is the failure this whole record exists to prevent —
+       * the same failure in the opposite direction from the one docs/55 §10
+       * describes.
+       */
+      await savePassRun(workspaceId, computedOn, perWorkspace, written)
     } catch (error) {
       // One workspace's failure must not end the pass for the rest. Counted
       // separately from `declined`, because "we could not look" and "we looked
