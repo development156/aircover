@@ -18,7 +18,19 @@ const RANGE_YEAR = new Intl.DateTimeFormat('en-IN', {
   year: 'numeric',
 })
 
-export function WeekNav({ days, offset, view }: { days: Date[]; offset: number; view: string }) {
+export function WeekNav({
+  days,
+  offset,
+  view,
+  filters = {},
+}: {
+  days: Date[]
+  offset: number
+  view: string
+  /** The reader's tab, search and picked date. Defaults to none so existing
+      call sites keep working; see `step` for why it must be carried. */
+  filters?: Record<string, string>
+}) {
   const first = days[0]
   const last = days[days.length - 1]
   const label =
@@ -30,7 +42,12 @@ export function WeekNav({ days, offset, view }: { days: Date[]; offset: number; 
     pathname: '/planner',
     // `week=0` is dropped so "this week" has one canonical URL rather than two
     // that render identically.
-    query: to === 0 ? { view } : { view, week: String(to) },
+    //
+    // `filters` rides along. Without it this control emitted `{ view, week }`
+    // and nothing else, so stepping a week silently cleared the tab and the
+    // search shown in the toolbar directly above it — the reader's own choice,
+    // discarded by a control that says nothing about filtering.
+    query: to === 0 ? { view, ...filters } : { view, week: String(to), ...filters },
   })
 
   return (
