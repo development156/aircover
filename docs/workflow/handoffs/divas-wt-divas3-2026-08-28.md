@@ -152,7 +152,33 @@ resolution.**
    `npx next typegen` added `"/studio/[id]"` and `tsc --noEmit` then exited **0**.
    Nothing was wrong with the studio code. Run `next typegen` (or a build) before
    trusting a red typecheck on a branch that added a dynamic route.
-9. **Never `git add -A`, and here is why this one file keeps conflicting.** The
+9. **`wt-core` CANNOT BUILD, and that is the most urgent thing in this file.**
+   `/(app)/studio/[id]` was added in `e17b3f8a` and never given a budget entry,
+   so `js-budget` fails the build by design (`js-budget.mjs:107`, a route with no
+   budget is a hard failure). MEASURED from the primary source, not inferred from
+   my branch: deployment `dpl_2ZrVqWH46DoEbZyLzDcRhN7U9jgN`,
+   `githubCommitRef: "wt-core"`, sha `f018625d`, **state `ERROR`**; the previous
+   trunk commit `7fb8cc85` is `ERROR` too. Every lane that merges `wt-core`
+   inherits it, and `wt-core` → `wt-web` is production. `wt-jiban` found it
+   independently and posted it on #21 at 713.4 kB against my 713.9 kB.
+
+   **Not fixed from here, and the reason is not squeamishness.** The value must
+   be written by `PERF_BUDGET_WRITE=1` on a build with the real environment. A
+   local build under-measures because this worktree has no `.env`, so
+   `NEXT_PUBLIC_*` is not inlined and the Sentry paths it enables tree-shake
+   away, which is the lesson `814b034` recorded for `/connections`. The `713.9 kB`
+   in the log is rounded, and the file stores exact bytes.
+10. **The typecheck error is NOT a trunk defect, and one lane has it recorded as
+   one.** `wt-jiban`'s handoff says "MEASURED on origin/wt-core at `f018625d`
+   itself: identical error" and proposes `` `/studio/${id}` as Route ``. It is a
+   stale generated-types cache, PROVEN twice: locally, `next typegen` then
+   `tsc --noEmit` exits 0 with no source file touched; and on Vercel, where
+   `next.config.ts` sets no `typescript.ignoreBuildErrors`, so `next build`
+   type-checks — and that build got PAST typecheck, printing the whole route
+   table including `/studio/[id] 7.04 kB`, before failing at js-budget. **`as Route`
+   would cast away an error that does not exist in a correct build.** Raised on
+   #26 with both measurements.
+11. **Never `git add -A`, and here is why this one file keeps conflicting.** The
    QA hook does not merely append a row to `ops/state/qa.pending.json` — **it
    rewrites the whole file unescaped.** MEASURED at the end of this session,
    after my own gate run: the working copy differs from `HEAD` by **+45/-32**,
