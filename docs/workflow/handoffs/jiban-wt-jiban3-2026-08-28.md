@@ -316,21 +316,28 @@ fifteen-hour outage with this exact signature, so it may be recurring.
 
 ## Gate
 
-Forced, clean tree, repo root, nothing piped. **Measured at 11:24 on the tree at
-`c1ce0cea` and NOT re-run at handoff time** — MEASURED, `git diff c1ce0cea HEAD`
-touches only `docs/`, so the code under test is byte-identical and a second run
-would be a cache replay reporting the same numbers. Re-running to produce a
-fresher timestamp would be theatre.
+Forced, clean tree, repo root, nothing piped. **Re-run at handoff time on
+`8cc78055`, and the reason is worth recording.** The first draft of this section
+said the gate need not re-run because the tree was byte-identical to the gated
+`c1ce0cea`. That was true when written and false ninety seconds later:
+`lane-sync push` takes `wt-core` FIRST, and it brought five files —
+`.claude/settings.json`, `scripts/browser-run.mjs`, `scripts/cloud-setup.sh`,
+`scripts/sandbox-probe.mjs` and a new `scripts/stop-gate.sh`, 198 insertions. A
+"nothing changed, so nothing to re-run" claim has a shelf life, and its shelf
+life here was one command.
+
+**These are local results. CI has never executed against this diff** — see the
+outage section. Local green is not CI green and is not offered as a substitute.
 
 **These are local results. CI has never executed against this diff** — see the
 outage section. Local green is not CI green and is not offered as a substitute.
 
 | leg | result | real output |
 |---|---|---|
-| `turbo run typecheck lint test --concurrency=1 --force` | **PASS** | `27 successful, 27 total` · `0 cached` |
+| `turbo run typecheck lint test --concurrency=1 --force` | **PASS** | `27 successful, 27 total` · `0 cached` — re-measured on `8cc78055` |
 | ↳ `@sahoda/web:test` | **PASS** | `455 passed \| 3 skipped (458)` files · `5804 passed \| 13 skipped (5817)` tests |
 | `prettier --check .` (root) | **PASS** | `All matched files use Prettier code style!` |
-| `scripts/design/design-lint.mjs` | **PASS** | exit 0 · typesize baseline `698 → 693` |
+| `scripts/design/design-lint.mjs` | **PASS** | exit 0 · typesize baseline `698 → 693`, re-checked on `8cc78055` |
 | `next build` | **PASS** | `✓ Compiled successfully in 38.0s` |
 | `scripts/perf/js-budget.mjs` | **PASS** | `js-budget ok: 81 routes within budget` |
 | Playwright | **UNRUN** | REQUESTS §25 — Chromium here cannot reach Clerk |
