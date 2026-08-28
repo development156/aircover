@@ -129,6 +129,12 @@ export interface LoopCycleView {
   spentCredits: number
   budgetCredits: number | null
   reflectSkippedNoHistory: boolean
+  /**
+   * Why Reflect produced no learning, or null when it produced one — or when
+   * the cycle predates the column. Those two nulls are the same value and the
+   * screen must not turn either into a claim.
+   */
+  reflectReason: string | null
   failureReason: string | null
   startedAt: string
   reportedAt: string | null
@@ -335,6 +341,7 @@ export async function readLoopSnapshot(workspaceId: string): Promise<LoopSnapsho
         spentCredits: (raw.spent_credits as number) ?? 0,
         budgetCredits: (raw.budget_credits as number | null) ?? null,
         reflectSkippedNoHistory: Boolean(raw.reflect_skipped_no_history),
+        reflectReason: (raw.reflect_reason as string | null) ?? null,
         failureReason: (raw.failure_reason as string | null) ?? null,
         startedAt: raw.started_at as string,
         reportedAt: (raw.reported_at as string | null) ?? null,

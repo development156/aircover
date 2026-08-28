@@ -287,6 +287,9 @@ async function planOneWorkspace(
   }
   await store.setCycleStatus(cycleId, workspaceId, 'planning', {
     reflectSkipped: reflection.skippedNoHistory,
+    // Null when a learning WAS produced. Storing a reason then would be a
+    // record of a refusal that did not happen.
+    reflectReason: reflection.reason,
   })
 
   // ── PLAN — the only paid step, and the last one this route reaches. ─────

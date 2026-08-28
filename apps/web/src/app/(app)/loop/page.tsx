@@ -15,6 +15,7 @@ import { LoopControls } from '@/components/loop/controls'
 import { PageTitle } from '@/components/page-title'
 import { explain, remedy } from '@/lib/loop/eligibility'
 import { readLoop, type LoopSnapshot } from '@/lib/loop/read'
+import { reflectSentence } from '@/lib/loop/reflect'
 import { loopVerdict } from '@/lib/loop/verdict'
 
 export const metadata = { title: 'The Loop' }
@@ -191,9 +192,17 @@ function CycleSummary({
 
       {!failed && !cancelled ? (
         <p className="type-sm mt-2 text-muted">
-          {cycle.reflectSkippedNoHistory
-            ? 'It had nothing to reflect on. No post of yours has been measured yet, so there was nothing to learn from.'
-            : 'It read last week’s numbers before planning.'}
+          {/*
+            The stored reason first, because it is the specific one. The
+            boolean is the fallback for cycles that ran before `reflect_reason`
+            existed, and the last sentence is for a cycle that DID produce a
+            learning — three different facts, and the screen used to have two
+            sentences for all three.
+          */}
+          {reflectSentence(cycle.reflectReason) ??
+            (cycle.reflectSkippedNoHistory
+              ? 'It had nothing to reflect on. No post of yours has been measured yet, so there was nothing to learn from.'
+              : 'It read last week’s numbers before planning.')}
         </p>
       ) : null}
 
