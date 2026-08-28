@@ -2,7 +2,7 @@ import { Link2 } from 'lucide-react'
 import { ZERNIO_PLATFORMS } from '@sahoda/shared'
 
 import { ChannelTile } from '@/components/connections/channel-tile'
-import { Stagger } from '@/components/motion/stagger'
+import { ChannelBrowser } from '@/components/connections/channel-browser'
 import { ConnectionHealthBanner } from '@/components/connections/connection-health-banner'
 import { ConnectOutcomeNotice } from '@/components/connections/connect-outcome-notice'
 import type { XRationMeterProps } from '@/components/connections/x-ration-meter'
@@ -308,159 +308,114 @@ export default async function ConnectionsPage({
             </p>
           ) : null}
 
-          {/* ── LINKED FIRST, AND ONLY WHEN THERE IS SOMETHING TO SHOW ───────
-              The grid went from eight tiles to twenty on 2026-08-26, and at
-              twenty the old single grid stopped answering the screen's first
-              question. "Which of my channels is live" was a hunt through four
-              rows of mostly-identical cards for the two carrying an account.
+          {/* ── THE BROWSE LAYER SITS OVER THE GROUPS, NOT INSTEAD OF THEM ───
+              Founder's instruction, 28 August 2026: keep the sections AND add a
+              category rail with search. So the same three groups render in the
+              same order with the same headings and the same `data-guide`
+              anchors; `ChannelBrowser` only decides which tiles go inside them.
 
-              Rendered only when at least one account exists. An empty "Your
-              channels" heading over nothing is a section that exists to say the
-              customer has done nothing, which is a worse first line than simply
-              starting at "Add a channel". */}
-          {linkedEntries.length > 0 ? (
-            <ChannelGroup
-              name="Your channels"
-              lead="Linked accounts Sahoda can reach. Open Details on any card for what it can do."
-              guide="connections.linked"
-            >
-              {linkedEntries.map((entry) => (
-                <ChannelTile
-                  key={entry.id}
-                  entry={entry}
-                  connections={byChannel.get(entry.id) ?? []}
-                  ration={entry.id === 'x' ? ration : undefined}
-                  disabled={!(railReady && roomLeft)}
-                  disabledReason={connectBlocker(entry.id)}
-                />
-              ))}
-            </ChannelGroup>
-          ) : null}
+              The tiles are built HERE, on the server, and handed over as nodes.
+              A connection row, the plan gate and the X ration meter are all
+              server concerns; the browse layer receives three strings per
+              channel — name, short name, category — and nothing else. */}
+          <ChannelBrowser
+            sections={[
+              ...(linkedEntries.length > 0
+                ? [
+                    {
+                      name: 'Your channels',
+                      lead: 'Linked accounts Sahoda can reach. Open Details on any card for what it can do.',
+                      guide: 'connections.linked',
+                      items: linkedEntries.map((entry) => ({
+                        id: entry.id,
+                        label: entry.label,
+                        short: entry.short,
+                        kind: entry.kind,
+                        tile: (
+                          <ChannelTile
+                            entry={entry}
+                            connections={byChannel.get(entry.id) ?? []}
+                            ration={entry.id === 'x' ? ration : undefined}
+                            disabled={!(railReady && roomLeft)}
+                            disabledReason={connectBlocker(entry.id)}
+                          />
+                        ),
+                      })),
+                    },
+                  ]
+                : []),
+              {
+                name: linkedEntries.length > 0 ? 'Add a channel' : 'Connect your channels',
+                lead: 'Every one of these opens a sign-in window and comes straight back.',
+                guide: 'connections.connect_now',
+                items: openEntries.map((entry) => ({
+                  id: entry.id,
+                  label: entry.label,
+                  short: entry.short,
+                  kind: entry.kind,
+                  tile: (
+                    <ChannelTile
+                      entry={entry}
+                      connections={[]}
+                      ration={entry.id === 'x' ? ration : undefined}
+                      disabled={!(railReady && roomLeft)}
+                      disabledReason={connectBlocker(entry.id)}
+                    />
+                  ),
+                })),
+              },
+              /* ── ONE GROUP FOR EVERY KIND OF "NO", AND EACH CARD SAYS WHICH ─
+                 Telegram and Snapchat are both unconnectable and for completely
+                 different reasons: Telegram's connect endpoint answers 200 with
+                 a bot CODE rather than an authUrl, so the OAuth rail cannot
+                 carry it; Snapchat answers 403 `PLATFORM_BETA_RESTRICTED`, so
+                 nothing we build would help. Both MEASURED 2026-08-26.
 
-          <ChannelGroup
-            name={linkedEntries.length > 0 ? 'Add a channel' : 'Connect your channels'}
-            lead="Every one of these opens a sign-in window and comes straight back."
-            /* The count moved into the header card. Printing it here as well
-               would put one number in two places, which is how they drift. */
-            guide="connections.connect_now"
-          >
-            {openEntries.map((entry) => (
-              <ChannelTile
-                key={entry.id}
-                entry={entry}
-                connections={[]}
-                ration={entry.id === 'x' ? ration : undefined}
-                disabled={!(railReady && roomLeft)}
-                disabledReason={connectBlocker(entry.id)}
-              />
-            ))}
-          </ChannelGroup>
-
-          {/* ── ONE GROUP FOR EVERY KIND OF "NO", AND EACH CARD SAYS WHICH ────
-              Telegram and Snapchat are both unconnectable and for completely
-              different reasons: Telegram's connect endpoint answers 200 with a
-              bot CODE rather than an authUrl, so the OAuth rail cannot carry it
-              and the surface it needs is unbuilt; Snapchat answers 403
-              `PLATFORM_BETA_RESTRICTED`, so nothing we build would help. Both
-              MEASURED 2026-08-26.
-
-              They share a heading because what the reader can do about them is
-              the same — nothing, today — and they carry different sentences
-              because "we never built it" and "they will not let us" are
-              different claims and this product does not blur those. */}
-          {stalledEntries.length > 0 || PLANNED.length > 0 ? (
-            <ChannelGroup
-              name="Not available yet"
-              lead="Sahoda can't link these today. Each card says why, and they are different reasons."
-              /* No count. A fraction on a group nothing can connect to would have
-                 a numerator that can never move — a number that looks like
-                 progress and is a constant. */
-              guide="connections.coming_soon"
-            >
-              {stalledEntries.map((entry) => (
-                <ChannelTile
-                  key={entry.id}
-                  entry={entry}
-                  connections={byChannel.get(entry.id) ?? []}
-                  disabled
-                  disabledReason={connectBlocker(entry.id)}
-                />
-              ))}
-              {/* `connections` is required and explicitly EMPTY, not optional. A
-                  planned channel cannot hold a row — the CHECK constraint sees to
-                  it — and making the prop required means the type system asks
-                  every call site the question rather than defaulting one of them
-                  to a silent `undefined`. */}
-              {PLANNED.map((entry) => (
-                <ChannelTile key={entry.id} entry={entry} connections={[]} />
-              ))}
-            </ChannelGroup>
-          ) : null}
+                 They share a heading because what the reader can do about them
+                 is the same — nothing, today — and they carry different
+                 sentences because "we never built it" and "they will not let
+                 us" are different claims and this product does not blur those. */
+              ...(stalledEntries.length > 0 || PLANNED.length > 0
+                ? [
+                    {
+                      name: 'Not available yet',
+                      lead: "Sahoda can't link these today. Each card says why, and they are different reasons.",
+                      guide: 'connections.coming_soon',
+                      items: [
+                        ...stalledEntries.map((entry) => ({
+                          id: entry.id,
+                          label: entry.label,
+                          short: entry.short,
+                          kind: entry.kind,
+                          tile: (
+                            <ChannelTile
+                              entry={entry}
+                              connections={byChannel.get(entry.id) ?? []}
+                              disabled
+                              disabledReason={connectBlocker(entry.id)}
+                            />
+                          ),
+                        })),
+                        /* `connections` is required and explicitly EMPTY, not
+                           optional. A planned channel cannot hold a row — the
+                           CHECK constraint sees to it — and a required prop asks
+                           every call site the question rather than defaulting one
+                           of them to a silent `undefined`. */
+                        ...PLANNED.map((entry) => ({
+                          id: entry.id,
+                          label: entry.label,
+                          short: entry.short,
+                          kind: entry.kind,
+                          tile: <ChannelTile entry={entry} connections={[]} />,
+                        })),
+                      ],
+                    },
+                  ]
+                : []),
+            ]}
+          />
         </>
       )}
     </div>
-  )
-}
-
-/**
- * One heading, one grid.
- *
- * `items-stretch` is the default and is load-bearing here: tiles carry different
- * amounts of content — X alone carries the spend meter — and a grid of eight
- * cards with eight different heights is exactly the loose rhythm §3.4 measures
- * inside this app's otherwise tight chrome. The tiles are `h-full` and push their
- * controls to the floor with `mt-auto`, so the row's tallest tile sets the height
- * and every control still lines up.
- */
-function ChannelGroup({
-  name,
-  lead,
-  count,
-  guide,
-  children,
-}: {
-  name: string
-  /** One line saying what the group IS, when the heading alone cannot. */
-  lead?: string
-  count?: string
-  guide: string
-  children: React.ReactNode
-}) {
-  return (
-    <section className="space-y-3" data-guide={guide}>
-      <div className="space-y-1">
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <h2 className="type-h2">{name}</h2>
-          {/* Words, not a pill. The old `2/4` badge was a hand-rolled chip that
-              existed nowhere else in the system, and a bare fraction beside a
-              heading reads as a score. "2 of 4 connected" says which two things
-              are being compared. */}
-          {count ? <span className="type-sm num text-muted">{count}</span> : null}
-        </div>
-        {lead ? <p className="type-sm text-muted">{lead}</p> : null}
-      </div>
-      {/* `.enter-step` is this product's ONE entrance (docs/37 §12) and it is
-          already reduced-motion safe in tokens.css, which zeroes delay as well
-          as duration — without that, `fill: both` left staggered rows invisible
-          for the length of their delay. Using the primitive rather than a new
-          animation is also why no dependency was added for this. */}
-      <Stagger
-        className /* ── THREE ACROSS AT WIDE, NOT FOUR ────────────────────────────────
-             The reference the founder sent is a 3-up grid and the difference is
-             not taste: at four columns a card is ~270px at 1440, and a
-             full-width primary inside 270px minus padding is a strip. Three
-             gives the card ~370px, which is what lets the CTA read as a button
-             and the name sit on one line.
-
-             It costs a row — 15 tiles is 5 rows instead of 4 — and that is the
-             trade the "premium, minimal" half of the brief asks for. The
-             narrower bands are untouched: `connections-widths.spec.ts` checks
-             seven widths for a clipped name, and this change only ever makes a
-             card WIDER, which is the safe direction for that guard. */="grid items-stretch gap-4 wide:grid-cols-3 max-wide:grid-cols-2 max-narrow:grid-cols-1"
-        itemClassName="h-full"
-      >
-        {children}
-      </Stagger>
-    </section>
   )
 }
