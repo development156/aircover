@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 
 import { expect, test } from './fixtures/seeded-user'
-import { leaveOnboarding } from './fixtures/compose'
+import { expectPostSaved, leaveOnboarding } from './fixtures/compose'
 
 /**
  * CAMPAIGNS, end to end, against the real app and the real database:
@@ -101,7 +101,11 @@ async function writePostOnTwoChannels(page: Page, body: string): Promise<string>
   // what asks the row.
   await expect(page.locator('[data-version-card="instagram"]')).toBeVisible()
   await expect(page.locator('[data-version-card="linkedin"]')).toBeVisible()
-  await expect(page.getByText('Post saved')).toBeVisible({ timeout: 60_000 })
+  // The PAIR, not a bare "Post saved": that phrase is already on screen from
+  // the save that created the row, so waiting for it alone would pass before
+  // the channels were written and the reload below would read a post without
+  // them.
+  await expectPostSaved(page)
 
   // ── THE GUARANTEE THIS HELPER CARRIES, RETARGETED AND NOT DROPPED ──────────
   // The previous version ended by reloading and finding a channel TAB per

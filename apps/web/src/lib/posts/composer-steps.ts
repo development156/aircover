@@ -68,7 +68,11 @@ export function composerSteps({ body, channels }: ComposerStepsInput): ComposerS
 
   // Open on its own prerequisite OR on what it already holds. See the header.
   const channelsOpen = written || picked
-  const sendOpen = channelsOpen && picked
+  // Just `picked`, and deliberately not `channelsOpen && picked`: a post with a
+  // channel on it has already opened step two by the line above, so the extra
+  // conjunct can never change the answer. A condition no input can falsify is a
+  // branch no test can cover, and it reads as a rule that is really a comment.
+  const sendOpen = picked
 
   return {
     write: { access: 'open', reason: null },

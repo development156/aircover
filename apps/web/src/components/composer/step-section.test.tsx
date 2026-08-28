@@ -47,14 +47,26 @@ describe('a locked step', () => {
       </StepSection>,
     )
 
-    // ── THE ASSERTION THAT MATTERS ──────────────────────────────────────────
+    // ── WHAT THIS PROVES, AND WHAT IT HONESTLY CANNOT ───────────────────────
     // `pointer-events-none` plus opacity is the tempting version and it is the
     // wrong one: a keyboard user tabs straight past the dimming into a control
-    // that looks unavailable and is not. `inert` is what actually refuses —
-    // no clicks, no focus, no typing — and it takes the subtree out of the
-    // accessibility tree, which is why the button is unreachable by ROLE here.
+    // that looks unavailable and is not. `inert` is what refuses in a browser —
+    // no clicks, no focus, no typing — and `aria-hidden` is what takes the
+    // subtree out of the accessibility tree.
+    //
+    // MEASURED, and worth stating plainly: **jsdom implements no `inert`
+    // behaviour at all.** A button inside an `inert` subtree still takes focus
+    // and still fires its handler here. So the role query below is passing
+    // because of `aria-hidden`, not because of `inert`, and the `inert`
+    // assertion is a spelling check on an attribute this runtime ignores.
+    //
+    // Both are asserted on the SAME element, which is the claim worth keeping
+    // in this file: whichever of the two a future edit drops, one of these two
+    // lines goes red. Whether a real browser honours `inert` on this markup is
+    // an end-to-end question and is not answered here.
     const inertWrapper = container.querySelector('[inert]')
     expect(inertWrapper).not.toBeNull()
+    expect(inertWrapper?.getAttribute('aria-hidden')).toBe('true')
     expect(inertWrapper?.contains(screen.getByText('Pick X'))).toBe(true)
     expect(screen.queryByRole('button', { name: 'Pick X' })).not.toBeInTheDocument()
   })
