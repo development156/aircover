@@ -1976,6 +1976,19 @@
       "summary_plain": "The unit checks ran and everything passed (8 passed).",
       "details": "      Tests  8 passed (8)",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtdaowrf-b7268278",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T18:38:36.506Z",
+      "finished_at": "2026-08-28T18:38:36.506Z",
+      "suite": "rls",
+      "status": "pass",
+      "summary_plain": "The rls checks passed (23 passed) for @sahoda/db ONLY — this run was filtered and does not cover the workspace.",
+      "details": "      Tests  23 passed (23)",
+      "duration_ms": null
     }
   ]
 }

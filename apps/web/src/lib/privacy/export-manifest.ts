@@ -212,6 +212,16 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { table: 'site_pages', readability: 'readable', describes: 'the pages of your sites' },
   { table: 'site_sections', readability: 'readable', describes: 'the sections on those pages' },
   { table: 'sites', readability: 'readable', describes: 'your websites' },
+  { table: 'studio_designs', readability: 'readable', describes: 'the designs you made in Studio' },
+  {
+    table: 'studio_exports',
+    readability: 'readable',
+    // NOT "your exported pictures". The pictures themselves are rows in
+    // `assets`, already covered above, with the bytes in the bucket. This table
+    // holds only the LINK between a design and the file it became, which is a
+    // different fact and would be a false claim under the other sentence.
+    describes: 'which picture each design became',
+  },
   { table: 'subscriptions', readability: 'readable', describes: 'your plan' },
   { table: 'templates', readability: 'readable', describes: 'your saved templates' },
   { table: 'tour_progress', readability: 'readable', describes: 'which tours you have seen' },
