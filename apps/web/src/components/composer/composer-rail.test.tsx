@@ -101,6 +101,52 @@ describe('a part nobody has earned yet', () => {
   })
 })
 
+describe('the rail as a whole', () => {
+  test('the rows are in the order the numbers claim', () => {
+    // ── ORDER IS THE RULING, AND THE NUMBERS ARE NOT THE ORDER ──────────────
+    // Every other assertion in this file finds a row by its `data-rail-step`
+    // attribute, so all of them stay green while the three rows render 2, 3, 1
+    // on screen. A reader trusts the position over the number and is wrong.
+    const container = rail({ body: 'Fresh bread.', channels: TWO })
+    const order = [...container.querySelectorAll('[data-rail-step]')].map((el) =>
+      el.getAttribute('data-rail-step'),
+    )
+
+    expect(order).toEqual(['1', '2', '3'])
+  })
+
+  test('each row says what its part is for, and says the right one', () => {
+    const container = rail({ body: 'Fresh bread.', channels: TWO })
+    const text = (index: number) =>
+      container.querySelector(`[data-rail-step="${index}"] button`)?.textContent ?? ''
+
+    // Swapping two of these leaves the titles right and tells a writer that
+    // part one is where a post gets scheduled.
+    expect(text(1)).toMatch(/the words/i)
+    expect(text(2)).toMatch(/one version per platform/i)
+    expect(text(3)).toMatch(/schedule it, or send it now/i)
+  })
+
+  test('it is a named list of three, not a heap of buttons', () => {
+    const container = rail({ body: 'Fresh bread.', channels: TWO })
+
+    // The name is what a screen reader reads out on arrival, and the list is
+    // what tells the reader there are three of these and which one they are on.
+    expect(container.querySelector('nav')?.getAttribute('aria-label')).toMatch(/three parts/i)
+    expect(container.querySelectorAll('ol > li')).toHaveLength(3)
+  })
+
+  test('every row says which panel it drives, and names it', () => {
+    const container = rail({ body: 'Fresh bread.', channels: TWO })
+
+    for (const index of [1, 2, 3]) {
+      const row = container.querySelector(`[data-rail-step="${index}"] button`)
+      expect(row?.getAttribute('id')).toBe(`rail-step-${index}`)
+      expect(row?.getAttribute('aria-controls')).toBe('composer-panel')
+    }
+  })
+})
+
 describe('a part that is open', () => {
   test('selects when pressed, and says which one', () => {
     const onSelect = vi.fn()
@@ -115,6 +161,20 @@ describe('a part that is open', () => {
 
     expect(screen.queryByText(/write your post first/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/pick at least one channel/i)).not.toBeInTheDocument()
+  })
+
+  test('does NOT look unavailable', () => {
+    // The other half of the dimming claim, and the one that went missing when
+    // the numbered sections were replaced by this rail: a working row that
+    // looks greyed out is the same defect as a refused one that looks fine,
+    // pointed the other way. Dimming every row would have satisfied every
+    // other test in this file.
+    const container = rail({ body: 'Fresh bread.', channels: TWO })
+
+    for (const index of [1, 2, 3]) {
+      const row = container.querySelector(`[data-rail-step="${index}"] button`) as HTMLElement
+      expect(row.className.split(/\s+/)).not.toContain('opacity-60')
+    }
   })
 
   test('the one filling the screen is the one marked current', () => {

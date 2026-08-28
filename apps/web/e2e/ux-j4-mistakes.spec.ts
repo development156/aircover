@@ -197,7 +197,11 @@ for (const { width, theme } of COMBOS) {
 
       // Now ask it to go out anyway. What the product says HERE is the whole test.
       await openPart(page, 3).catch(() => {})
-      const commit = page.getByRole('button', { name: /schedule|publish|send|approve/i }).first()
+      // Anchored to the two route tiles. The rail row for this part reads
+      // "3 Send it — Schedule it, or send it now", so a loose match takes the
+      // ROW and this frame photographs a panel with nothing pressed — which is
+      // the whole subject of this test.
+      const commit = page.getByRole('button', { name: /^Schedule it|^Post now/ }).first()
       if (await commit.isVisible().catch(() => false)) {
         await commit.click().catch(() => {})
         await page.waitForTimeout(2000)

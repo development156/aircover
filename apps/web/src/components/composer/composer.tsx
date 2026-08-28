@@ -245,14 +245,21 @@ export function Composer({
   const sendOpen = useRef(false)
   sendOpen.current = steps.send.access === 'open'
 
-  useEffect(() => {
-    const jump = () => {
-      if (window.location.hash === '#finish' && sendOpen.current) setActive(3)
-    }
-    jump()
-    window.addEventListener('hashchange', jump)
-    return () => window.removeEventListener('hashchange', jump)
+  const goToSend = useCallback(() => {
+    if (sendOpen.current) setActive(3)
   }, [])
+
+  useEffect(() => {
+    // ── ARRIVAL ONLY, AND NO `hashchange` LISTENER ────────────────────────────
+    // A link that carries `#finish` should land on the send panel, so the
+    // address is read once, here. What is deliberately NOT here is a listener:
+    // it looked like the mechanism and was not one. Assigning a hash that is
+    // already set fires no event, so the bar's second press saved the post and
+    // moved nothing — silently, for as long as the reader stayed on `#finish`.
+    // The bar now asks directly, which happens every press and can be tested;
+    // a listener would only put an untestable second path back beside it.
+    if (window.location.hash === '#finish') goToSend()
+  }, [goToSend])
 
   return (
     <div className="space-y-grid" data-composer data-guide="post-editor">
@@ -293,7 +300,19 @@ export function Composer({
           }}
         />
 
-        <div className="min-w-0 space-y-grid" data-composer-panel={active}>
+        {/* ── THE PANEL TAKES ITS NAME FROM THE ROW THAT OPENED IT ───────────
+            A region with no name is announced as nothing, so pressing a rail
+            row would tell a screen-reader user only that a button was pressed.
+            Labelled by the row itself, the region is "Each platform" and the
+            row says `aria-controls` back, so the pair is navigable in either
+            direction. */}
+        <div
+          id="composer-panel"
+          role="region"
+          aria-labelledby={`rail-step-${active}`}
+          className="min-w-0 space-y-grid"
+          data-composer-panel={active}
+        >
           {active === 1 ? (
             <>
               <WritingPane
@@ -385,6 +404,7 @@ export function Composer({
       </div>
 
       <CommitBar
+        onFinish={goToSend}
         status={autosave.status}
         unsavedVersions={actions.unsaved.length}
         canFinish={draft.channels.length > 0}

@@ -178,12 +178,17 @@ async function run(page: Page, width: number, theme: Theme): Promise<void> {
     await tap(c, 'Go to the send part', sendPart)
     await page.waitForTimeout(800)
   }
-  const schedule = page.getByRole('button', { name: /schedule/i }).first()
+  // ── ANCHORED, BECAUSE THE RAIL ROW ALSO CONTAINS THE WORD ──────────────────
+  // The row that opens this part reads "3 Send it — Schedule it, or send it now",
+  // so a loose /schedule/i matches the row FIRST and this journey would press
+  // the thing it just pressed and photograph a schedule that never opened.
+  // MEASURED: two matches, the rail row in front.
+  const schedule = page.getByRole('button', { name: /^Schedule it/ }).first()
   if (await present(schedule, 5000)) {
     await tap(c, 'Schedule', schedule)
     await page.waitForTimeout(1500)
     await frame('16-schedule-open')
-    const confirm = page.getByRole('button', { name: /schedule|confirm|set time/i }).last()
+    const confirm = page.getByRole('button', { name: /^confirm schedule|^set time/i }).last()
     if (await present(confirm, 4000)) {
       await tap(c, 'Confirm the schedule', confirm)
       await page.waitForTimeout(2500)
