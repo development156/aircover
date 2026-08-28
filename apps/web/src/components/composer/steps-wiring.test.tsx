@@ -170,6 +170,23 @@ describe('the composer’s steps, on the real screen', () => {
     await waitFor(() => expect(lockState(container)).toEqual(['false', 'false', 'false']))
   })
 
+  test('the send panel still has a name a screen reader can read out', () => {
+    const container = composer({ body: 'Fresh bread.', channels: ['x'] })
+
+    // ── THE HALF OF "ONE HEADING" THAT CAN GO WRONG SILENTLY ────────────────
+    // Dropping the panel's own heading inside the sequence is only safe while
+    // it is labelled by one that exists. Point `aria-labelledby` at a missing
+    // id and the section has NO name at all, on every screen reader, with the
+    // page looking exactly the same to everyone else.
+    const panel = container.querySelector('section#finish')
+    const labelledBy = panel?.getAttribute('aria-labelledby')
+    expect(labelledBy).toBeTruthy()
+
+    const label = container.querySelector(`#${labelledBy}`)
+    expect(label).not.toBeNull()
+    expect(label?.textContent).toMatch(/send it/i)
+  })
+
   test('the three sections are in the order the numbers claim', () => {
     const container = composer({ body: 'Fresh bread.', channels: ['x'] })
 

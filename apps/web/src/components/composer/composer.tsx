@@ -206,6 +206,19 @@ export function Composer({
    * body and then unticking the last channel would otherwise shut step two with
    * the pointer still inside it, mid-edit. A reload starts the rules again from
    * the post, which is right — at that point the post really does say nothing.
+   *
+   * ── TWO THINGS AN ADVERSARIAL PASS ASKED ABOUT, ANSWERED ────────────────────
+   * A ref written during render is not something React guarantees: a render it
+   * starts and discards still latches. That is survivable here and only here,
+   * because the latch is monotone — the worst a lost or repeated render can do
+   * is open a step marginally early, never shut one. MEASURED under StrictMode's
+   * double render: a blank post still reports its steps as open, locked, locked.
+   *
+   * And the latch does survive if this component is ever re-rendered in place
+   * with a DIFFERENT post. So do `postId`, `postIdRef` and
+   * `existingVariantChannels` — the composer has always required a remount on a
+   * post change, because without one its saves would target the previous row.
+   * The latch inherits that contract rather than adding a new one.
    */
   const rawSteps = composerSteps({ body: draft.body, channels: draft.channels })
   const steps = keepWhatWasReached(rawSteps, reached.current)

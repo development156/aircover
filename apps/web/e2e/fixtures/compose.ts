@@ -99,9 +99,16 @@ export async function startPost(page: Page, channel: string): Promise<string> {
   // The pick is now a SECOND save rather than part of the row's creation, so it
   // is waited on here: a caller that reloads straight after `startPost` would
   // otherwise race a write still in flight and find a post with no channel on
-  // it. The version card is the picker's answer; "Post saved" is the row's.
+  // it. The version card is the picker's answer; the pair below is the row's.
+  //
+  // The PAIR, not a bare "Post saved" — and this is the whole point. The
+  // composer only rewrites the address once the first save is confirmed, so
+  // "Post saved" is already on screen the moment `waitForURL` returns. A lone
+  // wait for it can be satisfied by that earlier save and finish without
+  // waiting for anything at all. Requiring the pending state first makes the
+  // "Post saved" that follows necessarily the one the tile click caused.
   await expect(page.locator(`[data-version-card="${channel}"]`)).toBeVisible({ timeout: 30_000 })
-  await expect(page.getByText('Post saved')).toBeVisible({ timeout: 60_000 })
+  await expectPostSaved(page)
 
   const postId = new URL(page.url()).pathname.split('/').pop() as string
   expect(postId).toMatch(/^[0-9a-f-]{36}$/)

@@ -1,4 +1,5 @@
 import { adminClient, expect, test } from './fixtures/seeded-user'
+import { expectPostSaved } from './fixtures/compose'
 
 /**
  * ONE BODY PER CHANNEL, proved in a real browser against the real database.
@@ -101,7 +102,11 @@ test.describe('the composer keeps one body per channel @smoke', () => {
     await expect(page.locator('[data-version-card="gbp"]')).toBeVisible()
     await page.locator('[data-channel-tile="gbp"]').click()
     await expect(page.locator('[data-version-card="gbp"]')).toHaveCount(0)
-    await expect(page.getByText('Post saved')).toBeVisible({ timeout: 60_000 })
+    // The PAIR, not a bare "Post saved": the address is only rewritten once the
+    // first save is confirmed, so that phrase is already on screen by the time
+    // step 3 above returned. Waiting for it alone would be satisfied by the
+    // earlier save and would guard nothing — and the very next line reloads.
+    await expectPostSaved(page)
 
     // ── 4b. THE PICKS ARE THE ROW'S, NOT THE SCREEN'S ──────────────────────
     // Reloaded immediately. Both channels survive, and that is now a claim

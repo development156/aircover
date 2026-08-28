@@ -62,8 +62,23 @@ function choose(name: 'Schedule it' | 'Post now') {
   fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${name}`) }))
 }
 
+/**
+ * Wait for a lazily imported half to paint.
+ *
+ * The timeout is raised well above the one-second default on purpose, and it is
+ * not papering over a race. What is being waited for is a real dynamic import
+ * resolving under a test runner sharing a machine with the rest of the suite;
+ * MEASURED before this line existed, `afterChunksArrive` blew the default in
+ * **2 runs out of 8** of this file alone, and each time it took down the two
+ * at-rest assertions it exists to calibrate. A flaky guard teaches people to
+ * re-run rather than to read, which is how a real failure gets waved through.
+ *
+ * Raising it costs nothing when the chunk arrives quickly, which is every
+ * healthy run. It changes no claim: `settled` still fails if the half never
+ * appears.
+ */
 const settled = async (root: HTMLElement, find: (r: HTMLElement) => Element | null) =>
-  waitFor(() => expect(find(root)).toBeTruthy())
+  waitFor(() => expect(find(root)).toBeTruthy(), { timeout: 15_000 })
 
 /**
  * A SECOND PANEL, OPENED, USED PURELY AS A CLOCK.
@@ -97,6 +112,23 @@ async function afterChunksArrive() {
   fireEvent.click(within(probe).getByRole('button', { name: /^Post now/ }))
   await settled(probe, publishRail)
 }
+
+describe('the panel on its own', () => {
+  test('names itself when nothing else does', () => {
+    const root = panel()
+
+    // ── WHY THIS IS NOT REDUNDANT WITH THE COMPOSER'S OWN TEST ──────────────
+    // Inside the composer this panel is step three and takes the id of the
+    // numbered heading above it, dropping its own so one section is not
+    // announced twice. Rendered anywhere else there is no such heading, and a
+    // panel that skipped its own would be a nameless region. The two cases are
+    // opposite defects and each needs its own guard.
+    const section = root.querySelector('section#finish')
+    const labelledBy = section?.getAttribute('aria-labelledby')
+    expect(labelledBy).toBe('finish-heading')
+    expect(root.querySelector('#finish-heading')?.textContent).toMatch(/send it/i)
+  })
+})
 
 describe('the panel asks before it offers', () => {
   test('opens with two choices and neither set of controls', async () => {

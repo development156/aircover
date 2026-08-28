@@ -59,7 +59,21 @@ test.describe('date fields follow the app theme', () => {
      * went unnoticed because this file carries no `@smoke` tag and `turbo test`
      * runs Vitest only, so nothing in the gate has ever executed it — the same
      * gap CLAUDE.md records for `golden-path`, found again.
+     *
+     * ── AND IT IS THREE STEPS AWAY NOW, NOT ONE ──────────────────────────────
+     * The composer became a numbered sequence, and this panel is step three:
+     * refused outright until something is written and a channel is picked. So
+     * the spec walks the sequence. That is not scaffolding around the subject —
+     * a schedule field nobody can reach is not a schedule field, and the route
+     * a person takes to it is the only route this spec is entitled to take. The
+     * same omission here as before, caught the same way: no `@smoke` tag, so
+     * nothing in the gate would have said a word.
      */
+    await page.getByLabel('Your post').fill('A post that needs a time on it.')
+    await page.waitForURL(/\/posts\/[0-9a-f-]{36}$/, { timeout: 90_000 })
+    await page.locator('[data-channel-tile="x"]').click()
+    await expect(page.locator('[data-version-card="x"]')).toBeVisible({ timeout: 30_000 })
+
     await page.getByRole('button', { name: /^Schedule it/ }).click()
     await expect(page.locator(FIELD)).toBeVisible()
 
