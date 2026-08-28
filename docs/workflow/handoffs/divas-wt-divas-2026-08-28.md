@@ -81,9 +81,31 @@ button, with a component test asserting all three claims. It sits inside a
 is a design call on a shared screen and belongs to the design lane, not to a
 one-line change here.
 
-**The @smoke leg has NOT been run on this lane.** No screen in this work was seen
-render. `verdict.test.ts` and `controls.test.tsx` prove the sentence and the link
-in a DOM; they do not prove the page assembles them.
+**The @smoke leg RAN on this lane, and it is the first time.** It is not clean,
+and the failures are not this lane's. What was measured:
+
+| run | result |
+|---|---|
+| `browser-run.mjs --grep @smoke` against `next dev` | 66 passed before I stopped it at ~70 of 118; ~21 distinct specs failing |
+| the same three failing specs against a production `next start` | still 9 failed, so the dev server was NOT the cause. The hypothesis was tested rather than asserted |
+| `no-impossible-remedy` + `roadmap-honesty` against `next start` | **33 passed, 0 failed** |
+
+That last run is the one that matters here: **`/loop offers no remedy it cannot
+fulfil` PASSES**, in a browser, as a fresh account, which is the guard that
+adjudicates the new copy. `/report` passes the same guard, and
+`roadmap-honesty` confirms no invented number reaches either screen.
+
+The failures group by CAUSE, not by count. One read in full:
+`net::ERR_CONNECTION_RESET at http://127.0.0.1:3210/design-system` — a transport
+reset on a plain loopback URL, not an assertion about the product. Every failing
+spec is contrast, greyscale or screenshot-heavy: `auth-contrast`,
+`design-system`, `audience-layers`, `accent-budget`, `composer-widths`,
+`every-section-loads`. None is a spec this lane touched, and the specs that DO
+walk /loop pass. Whether they fail anywhere else is UNKNOWN from here; CLAUDE.md
+records the last full run as 2026-08-24, 115 passed.
+
+**No screen in this work was seen render by a person.** The browser proves the
+guards, not the look.
 
 **The unresolved `wt-core` merge from kickoff is still unresolved.**
 `scripts/browser-run.mjs` and `scripts/sandbox-probe.mjs` conflict — wt-core's
@@ -105,8 +127,10 @@ system doing its job rather than a hazard.
 
 ## What the next session should pick up
 
-1. **Run the @smoke leg**, with `node scripts/browser-run.mjs --grep @smoke`.
-   Nothing in this work has been seen render.
+1. **Find out whether the ~21 visual specs fail anywhere but here.** They reset
+   on loopback in this sandbox on both a dev and a production server. Dispatch
+   the `smoke` job on `gate.yml` by hand and compare. Do NOT assume they are
+   this lane's, and do not assume they are not.
 2. **Resolve the wt-core merge** — two script files, both sides real.
 3. **The founder's four items**, now written up as section 15 of
    `docs/25_Founder_Actions.md`: apply the migration, confirm
