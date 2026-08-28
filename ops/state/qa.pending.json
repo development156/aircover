@@ -23,7 +23,7 @@
       "finished_at": "2026-08-26T12:02:15.160Z",
       "suite": "typecheck",
       "status": "pass",
-      "summary_plain": "The typecheck checks passed for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The typecheck checks passed for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": " Tasks:    9 successful, 9 total",
       "duration_ms": null
     },
@@ -36,7 +36,7 @@
       "finished_at": "2026-08-26T12:05:08.858Z",
       "suite": "typecheck",
       "status": "pass",
-      "summary_plain": "The typecheck checks passed for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The typecheck checks passed for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": "35\n Tasks:    10 successful, 10 total",
       "duration_ms": null
     },
@@ -49,7 +49,7 @@
       "finished_at": "2026-08-26T12:05:08.858Z",
       "suite": "lint",
       "status": "pass",
-      "summary_plain": "The lint checks passed for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The lint checks passed for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": "35\n Tasks:    10 successful, 10 total",
       "duration_ms": null
     },
@@ -75,7 +75,7 @@
       "finished_at": "2026-08-26T12:11:06.021Z",
       "suite": "typecheck",
       "status": "pass",
-      "summary_plain": "The typecheck checks passed for @sahoda/web ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The typecheck checks passed for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": "typed\n Tasks:    9 successful, 9 total",
       "duration_ms": null
     },
@@ -127,7 +127,7 @@
       "finished_at": "2026-08-26T13:17:29.445Z",
       "suite": "typecheck",
       "status": "pass",
-      "summary_plain": "The typecheck checks passed for @sahoda/shared ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The typecheck checks passed for @sahoda/shared ONLY — this run was filtered and does not cover the workspace.",
       "details": "constraints widened\n Tasks:    1 successful, 1 total",
       "duration_ms": null
     },
@@ -232,7 +232,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The typecheck, lint, unit checks ran together and something failed (242 passed, 1 failed).",
-      "details": "exit=1\n@sahoda/shared:test: \u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n@sahoda/shared:test:       Tests  1 failed | 242 passed (243)\n Tasks:    9 successful, 21 total\nFailed:    @sahoda/shared#test",
+      "details": "exit=1\n@sahoda/shared:test: ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n@sahoda/shared:test:       Tests  1 failed | 242 passed (243)\n Tasks:    9 successful, 21 total\nFailed:    @sahoda/shared#test",
       "duration_ms": null
     },
     {
@@ -244,7 +244,7 @@
       "finished_at": "2026-08-26T13:32:11.368Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed (243 passed) for @sahoda/shared ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed (243 passed) for @sahoda/shared ONLY — this run was filtered and does not cover the workspace.",
       "details": "retargeted\n@sahoda/shared:test:       Tests  243 passed (243)\n Tasks:    1 successful, 1 total",
       "duration_ms": null
     },
@@ -296,7 +296,7 @@
       "finished_at": "2026-08-26T13:33:44.093Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed (464 passed) for @sahoda/publishing ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed (464 passed) for @sahoda/publishing ONLY — this run was filtered and does not cover the workspace.",
       "details": "vocab retargeted\n@sahoda/publishing:test:       Tests  464 passed (464)\n Tasks:    2 successful, 2 total",
       "duration_ms": null
     },
@@ -348,7 +348,7 @@
       "finished_at": "2026-08-26T14:25:06.300Z",
       "suite": "lint",
       "status": "pass",
-      "summary_plain": "The lint checks passed for @sahoda/mesh ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The lint checks passed for @sahoda/mesh ONLY — this run was filtered and does not cover the workspace.",
       "details": "mesh_lint_exit=0\n Tasks:    1 successful, 1 total",
       "duration_ms": null
     },
@@ -440,7 +440,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (14 passed, 2 failed).",
-      "details": "     \u00d7 writes the platform, which is what makes a create possible at all 6ms\n     \u00d7 carries both at once 3ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 2 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n FAIL  |lib| src/lib/zernio/return-url.test.ts > the intent travels in the URL, because the cookie did not survive > writes the platform, which is what makes a create possible at all\n FAIL  |lib| src/lib/zernio/return-url.test.ts > the intent travels in the URL, because the cookie did not survive > carries both at once\n      Tests  2 failed | 14 passed (16)",
+      "details": "     × writes the platform, which is what makes a create possible at all 6ms\n     × carries both at once 3ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n FAIL  |lib| src/lib/zernio/return-url.test.ts > the intent travels in the URL, because the cookie did not survive > writes the platform, which is what makes a create possible at all\n FAIL  |lib| src/lib/zernio/return-url.test.ts > the intent travels in the URL, because the cookie did not survive > carries both at once\n      Tests  2 failed | 14 passed (16)",
       "duration_ms": null
     },
     {
@@ -453,7 +453,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (45 passed, 2 failed).",
-      "details": "     \u00d7 closes the popup on the URL alone 6ms\n     \u00d7 authorises the create on the URL alone 4ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 2 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  2 failed | 45 passed (47)",
+      "details": "     × closes the popup on the URL alone 6ms\n     × authorises the create on the URL alone 4ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  2 failed | 45 passed (47)",
       "duration_ms": null
     },
     {
@@ -466,7 +466,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (5 passed, 1 failed).",
-      "details": "     \u00d7 raises the window it opened, because a named window is reused unfocused 17ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  1 failed | 5 passed (6)",
+      "details": "     × raises the window it opened, because a named window is reused unfocused 17ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 5 passed (6)",
       "duration_ms": null
     },
     {
@@ -479,7 +479,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (47 passed, 2 failed).",
-      "details": "     \u00d7 is a page the browser will RENDER, not a redirect it will follow 5ms\n     \u00d7 sends no Location on a FAILED popup either, and keeps the 5xx 2ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 2 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  2 failed | 47 passed (49)",
+      "details": "     × is a page the browser will RENDER, not a redirect it will follow 5ms\n     × sends no Location on a FAILED popup either, and keeps the 5xx 2ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  2 failed | 47 passed (49)",
       "duration_ms": null
     },
     {
@@ -557,7 +557,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (2 failed).",
-      "details": "     \u00d7 renders no placeholder for any channel the screen names 94ms\n     \u00d7 gives each platform a DISTINCT mark, not the same one twice 31ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 2 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  2 failed (2)",
+      "details": "     × renders no placeholder for any channel the screen names 94ms\n     × gives each platform a DISTINCT mark, not the same one twice 31ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  2 failed (2)",
       "duration_ms": null
     },
     {
@@ -570,7 +570,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (3 passed, 2 failed).",
-      "details": "     \u00d7 still returns nothing for OUR id, which is what the caller must not pass 8ms\n     \u00d7 does not hand back another platform\u2019s account 1ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 2 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  2 failed | 3 passed (5)",
+      "details": "     × still returns nothing for OUR id, which is what the caller must not pass 8ms\n     × does not hand back another platform’s account 1ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  2 failed | 3 passed (5)",
       "duration_ms": null
     },
     {
@@ -596,7 +596,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (51 passed, 1 failed).",
-      "details": "     \u00d7 asks for \"twitter\", never for our \"x\" 7ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  1 failed | 51 passed (52)",
+      "details": "     × asks for \"twitter\", never for our \"x\" 7ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 51 passed (52)",
       "duration_ms": null
     },
     {
@@ -622,7 +622,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (14 passed, 2 failed).",
-      "details": "     \u00d7 refreshes when the tab gets focus back, not only when a message lands 17ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  1 failed | 7 passed (8)\n--- mutation B: never remove the listener ---\n     \u00d7 stops listening for focus once the wait is over 18ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  1 failed | 7 passed (8)",
+      "details": "     × refreshes when the tab gets focus back, not only when a message lands 17ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 7 passed (8)\n--- mutation B: never remove the listener ---\n     × stops listening for focus once the wait is over 18ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 7 passed (8)",
       "duration_ms": null
     },
     {
@@ -635,7 +635,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (8 passed, 2 failed).",
-      "details": "     \u00d7 names what happens BEFORE the destructive press, not after 73ms\n     \u00d7 never claims the account survives at the provider 33ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 2 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  2 failed | 8 passed (10)",
+      "details": "     × names what happens BEFORE the destructive press, not after 73ms\n     × never claims the account survives at the provider 33ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  2 failed | 8 passed (10)",
       "duration_ms": null
     },
     {
@@ -648,7 +648,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (50 passed, 2 failed).",
-      "details": "### MUTATION A \u2014 pass OUR channel id again (the shipped bug)\n     \u00d7 records the X account that Zernio stores as \"twitter\" 10ms\n     \u00d7 reaches every platform from ONE read 2ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 2 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  2 failed | 50 passed (52)\n### MUTATION B \u2014 a failed read reported as 'nothing'\n     \u00d7 a failed read is all-or-nothing now, and says so 8ms\n     \u00d7 every read failing is a real failure, not \"nothing\" 2ms\n     \u00d7 spends the pending-connect cookie on the way out, on success and on failure 1ms\n     \u00d7 tells the truth when the trip failed, and keeps the failing status 1ms\n     \u00d7 sends no Location on a FAILED popup either, and keeps the 5xx 1ms",
+      "details": "### MUTATION A — pass OUR channel id again (the shipped bug)\n     × records the X account that Zernio stores as \"twitter\" 10ms\n     × reaches every platform from ONE read 2ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  2 failed | 50 passed (52)\n### MUTATION B — a failed read reported as 'nothing'\n     × a failed read is all-or-nothing now, and says so 8ms\n     × every read failing is a real failure, not \"nothing\" 2ms\n     × spends the pending-connect cookie on the way out, on success and on failure 1ms\n     × tells the truth when the trip failed, and keeps the failing status 1ms\n     × sends no Location on a FAILED popup either, and keeps the 5xx 1ms",
       "duration_ms": null
     },
     {
@@ -661,7 +661,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (21 passed, 2 failed).",
-      "details": "0\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 2 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n FAIL  |scripts| scripts/lib/mutation-harness.test.mjs > the scratch directory is proven writable before anything is mutated > refuses a directory that exists but cannot be written to\n FAIL  |scripts| scripts/lib/mutation-harness.test.mjs > runMutants end to end > refuses the whole run when the scratch directory cannot be used\n      Tests  2 failed | 21 passed (23)\nrestored\n M LEARNINGS.md\n M apps/web/src/app/api/oauth/zernio/return/route.test.ts\n M apps/web/src/app/api/oauth/zernio/return/route.ts\n M apps/web/src/app/api/oauth/zernio/start/route.test.ts\n M apps/web/src/app/api/oauth/zernio/start/route.ts\n M apps/web/src/lib/connections/health.ts\n M docs/workflow/handoffs/divas-wt-divas-2026-08-27.md\n M packages/publishing/src/adapters/zernio.test.ts\n M packages/publishing/src/index.ts\n M packages/publishing/src/zernio/client.ts\n?? apps/web/src/app/api/oauth/zernio/select/\n?? apps/web/src/lib/connections/health.test.ts\n?? apps/web/src/lib/connections/pending-selection.test.ts\n?? apps/web/src/lib/connections/pending-selection.ts\n?? apps/web/src/lib/zernio/picker-copy.ts\n?? apps/web/src/lib/zernio/picker-page.test.ts\n?? apps/web/src/lib/zernio/picker-page.ts\n?? apps/web/src/lib/zernio/selection.ts",
+      "details": "0\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n FAIL  |scripts| scripts/lib/mutation-harness.test.mjs > the scratch directory is proven writable before anything is mutated > refuses a directory that exists but cannot be written to\n FAIL  |scripts| scripts/lib/mutation-harness.test.mjs > runMutants end to end > refuses the whole run when the scratch directory cannot be used\n      Tests  2 failed | 21 passed (23)\nrestored\n M LEARNINGS.md\n M apps/web/src/app/api/oauth/zernio/return/route.test.ts\n M apps/web/src/app/api/oauth/zernio/return/route.ts\n M apps/web/src/app/api/oauth/zernio/start/route.test.ts\n M apps/web/src/app/api/oauth/zernio/start/route.ts\n M apps/web/src/lib/connections/health.ts\n M docs/workflow/handoffs/divas-wt-divas-2026-08-27.md\n M packages/publishing/src/adapters/zernio.test.ts\n M packages/publishing/src/index.ts\n M packages/publishing/src/zernio/client.ts\n?? apps/web/src/app/api/oauth/zernio/select/\n?? apps/web/src/lib/connections/health.test.ts\n?? apps/web/src/lib/connections/pending-selection.test.ts\n?? apps/web/src/lib/connections/pending-selection.ts\n?? apps/web/src/lib/zernio/picker-copy.ts\n?? apps/web/src/lib/zernio/picker-page.test.ts\n?? apps/web/src/lib/zernio/picker-page.ts\n?? apps/web/src/lib/zernio/selection.ts",
       "duration_ms": null
     },
     {
@@ -674,7 +674,7 @@
       "suite": "unit",
       "status": "fail",
       "summary_plain": "The unit checks ran and something failed (5 passed, 3 failed).",
-      "details": "=== MUT: 'tidy' the publish map to match the others ===\n     \u00d7 spells X differently on publish than everywhere else 6ms\n     \u00d7 spells Google Business three different ways across two endpoints 1ms\n     \u00d7 refuses to let the publish map and the recovery map agree about X or GBP 1ms\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 3 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n      Tests  3 failed | 1 passed (4)\n      Tests  4 passed (4)",
+      "details": "=== MUT: 'tidy' the publish map to match the others ===\n     × spells X differently on publish than everywhere else 6ms\n     × spells Google Business three different ways across two endpoints 1ms\n     × refuses to let the publish map and the recovery map agree about X or GBP 1ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  3 failed | 1 passed (4)\n      Tests  4 passed (4)",
       "duration_ms": null
     },
     {
@@ -686,8 +686,8 @@
       "finished_at": "2026-08-27T07:58:04.840Z",
       "suite": "typecheck",
       "status": "pass",
-      "summary_plain": "The typecheck checks ran (5135 passed), but 13 tests did NOT run \u2014 this does not prove the suite passes.",
-      "details": "ff90086d81f80fb55675c5209e52e33d703aa309\n@sahoda/web:test: \n@sahoda/web:test: stdout | src/components/ui/button.disabled-contrast.test.tsx > a disabled primary is legible AND looks inert, in both themes > dark: the disabled label clears AA against its own fill\n@sahoda/web:test: [disabled primary] dark --ink-mute on --surface-2 = 5.51:1\n@sahoda/web:test: \n@sahoda/web:test: stdout | src/components/ui/button.disabled-contrast.test.tsx > a disabled primary is legible AND looks inert, in both themes > the OLD recipe still measures as the defect it was, so this test can fail\n@sahoda/web:test: [disabled primary] the OLD light pair, white on --line = 1.21:1\n@sahoda/web:test: \n@sahoda/web:test: stdout | src/components/ui/button.disabled-contrast.test.tsx > a disabled primary is legible AND looks inert, in both themes > dark does not make the refusal look pressable\n@sahoda/web:test: [disabled primary] dark: shipped 5.51:1 vs white 16.10:1\n@sahoda/web:test: \n@sahoda/web:test:  \u2713  ui  src/components/ui/button.disabled-contrast.test.tsx (5 tests) 10ms\n@sahoda/web:test:  \u2713  ui  src/components/posts/variant-state.test.tsx (5 tests) 5ms\n@sahoda/web:test:  \u2713  ui  src/components/knowledge/add-document.test.tsx (2 tests) 5ms\n@sahoda/web:test:  \u2713  ui  src/app/layout.test.tsx (3 tests) 4ms\n@sahoda/web:test: \n@sahoda/web:test:  Test Files  402 passed | 3 skipped (405)\n@sahoda/web:test:       Tests  5135 passed | 13 skipped (5148)\n@sahoda/web:test:    Start at  07:54:33\n@sahoda/web:test:    Duration  111.81s (transform 17.42s, setup 18.73s, import 89.46s, tests 78.96s, environment 84.26s)\n@sahoda/web:test: \n\n Tasks:    18 successful, 18 total\nCached:    18 cached, 18 total\n  Time:    178ms >>> FULL TURBO\n\nTURBO_EXIT=0",
+      "summary_plain": "The typecheck checks ran (5135 passed), but 13 tests did NOT run — this does not prove the suite passes.",
+      "details": "ff90086d81f80fb55675c5209e52e33d703aa309\n@sahoda/web:test: \n@sahoda/web:test: stdout | src/components/ui/button.disabled-contrast.test.tsx > a disabled primary is legible AND looks inert, in both themes > dark: the disabled label clears AA against its own fill\n@sahoda/web:test: [disabled primary] dark --ink-mute on --surface-2 = 5.51:1\n@sahoda/web:test: \n@sahoda/web:test: stdout | src/components/ui/button.disabled-contrast.test.tsx > a disabled primary is legible AND looks inert, in both themes > the OLD recipe still measures as the defect it was, so this test can fail\n@sahoda/web:test: [disabled primary] the OLD light pair, white on --line = 1.21:1\n@sahoda/web:test: \n@sahoda/web:test: stdout | src/components/ui/button.disabled-contrast.test.tsx > a disabled primary is legible AND looks inert, in both themes > dark does not make the refusal look pressable\n@sahoda/web:test: [disabled primary] dark: shipped 5.51:1 vs white 16.10:1\n@sahoda/web:test: \n@sahoda/web:test:  ✓  ui  src/components/ui/button.disabled-contrast.test.tsx (5 tests) 10ms\n@sahoda/web:test:  ✓  ui  src/components/posts/variant-state.test.tsx (5 tests) 5ms\n@sahoda/web:test:  ✓  ui  src/components/knowledge/add-document.test.tsx (2 tests) 5ms\n@sahoda/web:test:  ✓  ui  src/app/layout.test.tsx (3 tests) 4ms\n@sahoda/web:test: \n@sahoda/web:test:  Test Files  402 passed | 3 skipped (405)\n@sahoda/web:test:       Tests  5135 passed | 13 skipped (5148)\n@sahoda/web:test:    Start at  07:54:33\n@sahoda/web:test:    Duration  111.81s (transform 17.42s, setup 18.73s, import 89.46s, tests 78.96s, environment 84.26s)\n@sahoda/web:test: \n\n Tasks:    18 successful, 18 total\nCached:    18 cached, 18 total\n  Time:    178ms >>> FULL TURBO\n\nTURBO_EXIT=0",
       "duration_ms": null
     },
     {
@@ -699,8 +699,8 @@
       "finished_at": "2026-08-27T07:58:04.840Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks ran (5135 passed), but 13 tests did NOT run \u2014 this does not prove the suite passes.",
-      "details": "ff90086d81f80fb55675c5209e52e33d703aa309\n@sahoda/web:test: \n@sahoda/web:test: stdout | src/components/ui/button.disabled-contrast.test.tsx > a disabled primary is legible AND looks inert, in both themes > dark: the disabled label clears AA against its own fill\n@sahoda/web:test: [disabled primary] dark --ink-mute on --surface-2 = 5.51:1\n@sahoda/web:test: \n@sahoda/web:test: stdout | src/components/ui/button.disabled-contrast.test.tsx > a disabled primary is legible AND looks inert, in both themes > the OLD recipe still measures as the defect it was, so this test can fail\n@sahoda/web:test: [disabled primary] the OLD light pair, white on --line = 1.21:1\n@sahoda/web:test: \n@sahoda/web:test: stdout | src/components/ui/button.disabled-contrast.test.tsx > a disabled primary is legible AND looks inert, in both themes > dark does not make the refusal look pressable\n@sahoda/web:test: [disabled primary] dark: shipped 5.51:1 vs white 16.10:1\n@sahoda/web:test: \n@sahoda/web:test:  \u2713  ui  src/components/ui/button.disabled-contrast.test.tsx (5 tests) 10ms\n@sahoda/web:test:  \u2713  ui  src/components/posts/variant-state.test.tsx (5 tests) 5ms\n@sahoda/web:test:  \u2713  ui  src/components/knowledge/add-document.test.tsx (2 tests) 5ms\n@sahoda/web:test:  \u2713  ui  src/app/layout.test.tsx (3 tests) 4ms\n@sahoda/web:test: \n@sahoda/web:test:  Test Files  402 passed | 3 skipped (405)\n@sahoda/web:test:       Tests  5135 passed | 13 skipped (5148)\n@sahoda/web:test:    Start at  07:54:33\n@sahoda/web:test:    Duration  111.81s (transform 17.42s, setup 18.73s, import 89.46s, tests 78.96s, environment 84.26s)\n@sahoda/web:test: \n\n Tasks:    18 successful, 18 total\nCached:    18 cached, 18 total\n  Time:    178ms >>> FULL TURBO\n\nTURBO_EXIT=0",
+      "summary_plain": "The unit checks ran (5135 passed), but 13 tests did NOT run — this does not prove the suite passes.",
+      "details": "ff90086d81f80fb55675c5209e52e33d703aa309\n@sahoda/web:test: \n@sahoda/web:test: stdout | src/components/ui/button.disabled-contrast.test.tsx > a disabled primary is legible AND looks inert, in both themes > dark: the disabled label clears AA against its own fill\n@sahoda/web:test: [disabled primary] dark --ink-mute on --surface-2 = 5.51:1\n@sahoda/web:test: \n@sahoda/web:test: stdout | src/components/ui/button.disabled-contrast.test.tsx > a disabled primary is legible AND looks inert, in both themes > the OLD recipe still measures as the defect it was, so this test can fail\n@sahoda/web:test: [disabled primary] the OLD light pair, white on --line = 1.21:1\n@sahoda/web:test: \n@sahoda/web:test: stdout | src/components/ui/button.disabled-contrast.test.tsx > a disabled primary is legible AND looks inert, in both themes > dark does not make the refusal look pressable\n@sahoda/web:test: [disabled primary] dark: shipped 5.51:1 vs white 16.10:1\n@sahoda/web:test: \n@sahoda/web:test:  ✓  ui  src/components/ui/button.disabled-contrast.test.tsx (5 tests) 10ms\n@sahoda/web:test:  ✓  ui  src/components/posts/variant-state.test.tsx (5 tests) 5ms\n@sahoda/web:test:  ✓  ui  src/components/knowledge/add-document.test.tsx (2 tests) 5ms\n@sahoda/web:test:  ✓  ui  src/app/layout.test.tsx (3 tests) 4ms\n@sahoda/web:test: \n@sahoda/web:test:  Test Files  402 passed | 3 skipped (405)\n@sahoda/web:test:       Tests  5135 passed | 13 skipped (5148)\n@sahoda/web:test:    Start at  07:54:33\n@sahoda/web:test:    Duration  111.81s (transform 17.42s, setup 18.73s, import 89.46s, tests 78.96s, environment 84.26s)\n@sahoda/web:test: \n\n Tasks:    18 successful, 18 total\nCached:    18 cached, 18 total\n  Time:    178ms >>> FULL TURBO\n\nTURBO_EXIT=0",
       "duration_ms": null
     },
     {
@@ -725,7 +725,7 @@
       "finished_at": "2026-08-27T09:29:00.837Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed (396 passed) for @sahoda/jobs ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed (396 passed) for @sahoda/jobs ONLY — this run was filtered and does not cover the workspace.",
       "details": "EXIT=0\n@sahoda/jobs:test:   settlement after a crash: {\"reservationId\":\"res-2\",\"outcome\":\"could_not_check\",\"costMicros\":2600,\"costBasis\":\"measured\",\"detail\":{\"error\":\"Error: socket hang up\"}}\n@sahoda/jobs:test:       Tests  396 passed (396)",
       "duration_ms": null
     },
@@ -738,7 +738,7 @@
       "finished_at": "2026-08-27T09:35:44.957Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed (1188 passed) for @sahoda/jobs ONLY \u2014 this run was filtered and does not cover the workspace.",
+      "summary_plain": "The unit checks passed (1188 passed) for @sahoda/jobs ONLY — this run was filtered and does not cover the workspace.",
       "details": "run 1 EXIT=0 @sahoda/jobs:test:       Tests  396 passed (396)\nrun 2 EXIT=0 @sahoda/jobs:test:       Tests  396 passed (396)\nrun 3 EXIT=0 @sahoda/jobs:test:       Tests  396 passed (396)",
       "duration_ms": null
     },
@@ -751,8 +751,8 @@
       "finished_at": "2026-08-27T12:04:27.957Z",
       "suite": "typecheck",
       "status": "pass",
-      "summary_plain": "The typecheck checks passed for ...[origin/main] ONLY \u2014 this run was filtered and does not cover the workspace.",
-      "details": "TURBO_EXIT=0\nFMT_EXIT=0\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): MESH_ERROR\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): INSERT_FAILED\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): @sahoda/billing: missing required env \u2014 SUPABASE_DB_URL\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): MESH_ERROR\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): MESH_ERROR\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): @sahoda/billing: missing required env \u2014 SUPABASE_DB_URL\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n Tasks:    18 successful, 18 total\nCached:    18 cached, 18 total",
+      "summary_plain": "The typecheck checks passed for ...[origin/main] ONLY — this run was filtered and does not cover the workspace.",
+      "details": "TURBO_EXIT=0\nFMT_EXIT=0\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): MESH_ERROR\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): INSERT_FAILED\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): @sahoda/billing: missing required env — SUPABASE_DB_URL\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): MESH_ERROR\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): MESH_ERROR\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): @sahoda/billing: missing required env — SUPABASE_DB_URL\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n Tasks:    18 successful, 18 total\nCached:    18 cached, 18 total",
       "duration_ms": null
     },
     {
@@ -764,8 +764,21 @@
       "finished_at": "2026-08-27T12:04:27.957Z",
       "suite": "unit",
       "status": "pass",
-      "summary_plain": "The unit checks passed for ...[origin/main] ONLY \u2014 this run was filtered and does not cover the workspace.",
-      "details": "TURBO_EXIT=0\nFMT_EXIT=0\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): MESH_ERROR\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): INSERT_FAILED\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): @sahoda/billing: missing required env \u2014 SUPABASE_DB_URL\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): MESH_ERROR\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): MESH_ERROR\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): @sahoda/billing: missing required env \u2014 SUPABASE_DB_URL\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n Tasks:    18 successful, 18 total\nCached:    18 cached, 18 total",
+      "summary_plain": "The unit checks passed for ...[origin/main] ONLY — this run was filtered and does not cover the workspace.",
+      "details": "TURBO_EXIT=0\nFMT_EXIT=0\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): MESH_ERROR\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): INSERT_FAILED\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): @sahoda/billing: missing required env — SUPABASE_DB_URL\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): MESH_ERROR\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): MESH_ERROR\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): @sahoda/billing: missing required env — SUPABASE_DB_URL\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n Tasks:    18 successful, 18 total\nCached:    18 cached, 18 total",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtd51lcb-38b7a73e",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T16:00:30.536Z",
+      "finished_at": "2026-08-28T16:00:30.536Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks ran and everything passed (223 passed).",
+      "details": "To https://github.com/development156/sahodalabs\n   681fd7c1..43f27986  wt-karunesh -> wt-karunesh\nbranch 'wt-karunesh' set up to track 'origin/wt-karunesh'.\n=== root vitest:\n Test Files  15 passed (15)\n      Tests  223 passed (223)",
       "duration_ms": null
     }
   ]

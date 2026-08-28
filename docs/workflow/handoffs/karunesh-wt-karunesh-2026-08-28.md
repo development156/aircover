@@ -28,6 +28,8 @@ the runner's rather than this sandbox's — all forced, so none is a cache repla
 
 | leg | result |
 | --- | --- |
+| `vitest run` (apps/web, after the composer sequence) | **PASS** — 5805 passed, 13 skipped |
+| `next build` + `js-budget.mjs` (after the composer sequence) | **PASS** — 81 routes within budget |
 | `CI=1 turbo run typecheck lint test --concurrency=1 --force` | **27/27 tasks**; `@sahoda/web` 5746 passed, 13 skipped |
 | `pnpm exec vitest run` (root — the leg the gate runs separately) | **223 passed**, 15 files |
 | `prettier --check .` | clean |
@@ -90,6 +92,41 @@ I did not force-push a pushed commit to fix prose. Use `git commit -F <file>`.
 | `/connections` stops offering telegram, tiktok, slack — filtered at the offer, `CONNECTABLE` untouched so an existing connection still renders | `f3efa816` | `catalogue.test.ts` ×3 |
 | `/posts` list becomes a grid of square tiles, 8 before a fold, "Show N more" | `ae95b696` | `post-grid.test.tsx` ×7 |
 | Delete moves from an inline row that overflowed the tile to the shared `Modal` | `f096f68c` | `delete-post-button.test.tsx` ×11 |
+| Draft tiles show the photos attached to them, with a signed preview and an honest marker when signing fails | `9a4d0b0f` | `media-peek.test.tsx` |
+| Saved-time: relative under 24h, `DD/MM/YYYY, h:mm AM/PM IST` over it | `36ef29a4` | `saved-at.test.ts` |
+| Connection icons are each platform's own; the composer stops offering a channel nobody can connect, without withholding one a workspace already holds | `4e0b5b8e` | `channel-picker.test.tsx` |
+| "Improve this copy" becomes "Rewrite this" | `3f424f82` | `improve-copy.test.tsx` |
+| **The composer is a three-step sequence: write, choose where it goes, send it. A step nobody has earned is visible, dimmed, `inert`, and says why** | `681fd7c1` | `composer-steps.test.ts` ×11, `step-section.test.tsx` ×6, `steps-wiring.test.tsx` ×10 |
+| The adversarial pass on that: one missed spec, three waits that waited for nothing, an unguarded accessible name, a pre-existing flake | `43f27986` | same three files plus `finish-panel.test.tsx` |
+
+### The composer sequence, in more detail
+
+- **Rules live in `lib/posts/composer-steps.ts` and nowhere else**, so they are testable without a
+  screen. `step-section.tsx` refuses a step with `inert` **and** `aria-hidden` **and** dimming.
+  Pointer-events alone would let a keyboard user tab into a control that looks unavailable and is
+  not. **jsdom implements no `inert` behaviour at all** — MEASURED, a button inside an `inert`
+  subtree still focuses and still fires — so in this runtime `aria-hidden` is what makes the button
+  unreachable by role. Both attributes are asserted on the same element; whether a real browser
+  honours `inert` on this markup is an end-to-end question and is **not** answered by the suite.
+- **A step already reached does not shut under the cursor.** Emptying the body and then unticking
+  the last channel would otherwise trap someone mid-edit. That is a latch in `composer.tsx`, a ref
+  written during render — safe only because it is monotone: a discarded render can open a step
+  marginally early, never shut one. It survives a re-render with a different post, and so do
+  `postId`, `postIdRef` and `existingVariantChannels`: **the composer has always required a remount
+  on a post change.**
+- **The whole e2e composer surface had to be reordered.** Every journey ticked a channel and then
+  typed, into a step that is now inert, which fails as a bare 5s click timeout naming nothing.
+  Thirteen `@smoke` files, `golden-path` among them. The fixture and seven specs now write first.
+  The pick is a SECOND save rather than part of the row's creation, so it is waited on with
+  `expectPostSaved` — a lone "Post saved" is already true by then, because the composer only
+  rewrites the address once the first save is confirmed.
+- **`date-field-theme.spec.ts` was missed by the first pass** and pressed a step-three button on a
+  blank post. It carries no `@smoke` tag, so nothing in the gate would ever have reported it. Its
+  own header already records being unrunnable for a similar reason once before. **Same file, same
+  omission, twice.**
+- **`finish-panel.test.tsx` was flaky before this lane touched it**: its two lazily imported halves
+  blew testing-library's one-second default. MEASURED 2 failures in 8 runs, 0 in 10 after the
+  timeout was raised. While it fails, the two at-rest assertions it calibrates prove nothing.
 
 ## Shared surfaces touched
 
