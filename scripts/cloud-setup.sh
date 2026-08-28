@@ -235,6 +235,30 @@ else
   ok "All ${#ENV_REQUIRED[@]} required present; $SET_COUNT set in total."
   { echo "OK"; echo "set_count=$SET_COUNT"; } > "$STATUS" 2>/dev/null
 fi
+# ── THE BROWSER ──────────────────────────────────────────────────────────────
+# Playwright ships a browser DOWNLOADER, not a browser. Nothing here installed
+# one, so every cloud lane had an empty ~/.cache/ms-playwright and the sandbox
+# probe correctly reported NO_BROWSER — which is why "Playwright is UNRUN on all
+# nine lanes" was true for weeks and why it always worked on a laptop, where
+# somebody had installed it once by hand long ago.
+#
+# chromium only: the suite runs one project and the other engines are ~300MB of
+# download nobody uses. --with-deps needs root and cloud sandboxes rarely have
+# it, so it is TRIED and its failure tolerated: the system libraries are usually
+# already present in these images, and a missing one surfaces at launch with a
+# readable error rather than here.
+if command -v pnpm >/dev/null 2>&1; then
+  echo
+  echo "  Installing the browser Playwright needs (chromium only)…"
+  if pnpm --filter @sahoda/web exec playwright install --with-deps chromium >/dev/null 2>&1 \
+     || pnpm --filter @sahoda/web exec playwright install chromium >/dev/null 2>&1; then
+    echo "  Browser installed."
+  else
+    echo "  Browser install FAILED. The browser tests cannot run until this works:"
+    echo "    pnpm --filter @sahoda/web exec playwright install chromium"
+  fi
+fi
+
 # ── THE REPO'S GIT GUARDS ────────────────────────────────────────────────────
 # `.githooks/pre-commit` refuses a commit that stages `ops/state/qa.pending.json`,
 # which every gate run rewrites. Pointed at here rather than left to each person
