@@ -3,6 +3,13 @@
 **Branch** `claude/kickoff-jiban-r91o7w` at `c1ce0cea`. Lane `wt-jiban3`. Pushed: yes.
 PR [#25](https://github.com/development156/sahodalabs/pull/25) → `wt-core`, draft, subscribed.
 
+> **This file was EXTENDED in place, not appended to with a `## Session 2`.**
+> It is one continuous session: the planner work, then a rendered preview, then
+> five hours of watching a CI outage. Inventing a session boundary inside a
+> single session would be a false record, and the git diff on this file is the
+> honest account of what was added when. The `## Session n` rule exists so two
+> DIFFERENT sessions cannot overwrite each other; that is not what happened here.
+
 **First session in this lane.** No previous handoff exists under
 `jiban-wt-jiban3-*`. The harness pinned this session to a `claude/...` branch it
 cannot leave, so `sahoda.lane` stays `wt-jiban3` and this file is the only record
@@ -54,6 +61,25 @@ URL, which carries the production password.
 | 7 | Plan my week as a two-step card, weighted by ground not more orange | `plan-week-panel.tsx:83` | existing `plan-week-panel.test.tsx`, 8 assertions |
 | 8 | `OffGridNote` — what the chosen view structurally cannot draw, in every calendar branch | `off-grid-note.tsx` | reasoned; see NOT DONE |
 
+### 3 · A preview of the screen nobody in this sandbox can open
+
+| # | what | proof |
+|---|---|---|
+| 1 | The planner, rendered from the real components and the compiled stylesheet, at 390 / 1024 / 1440 in both themes | https://claude.ai/code/artifact/23cbbadd-4aea-48ba-bdd3-362e3fb23c3e |
+
+Built because `/planner` is behind Clerk and Chromium here cannot complete an
+outbound HTTPS request, so the Vercel preview is as unreachable as the app. The
+markup came from `renderToStaticMarkup` over the ACTUAL components through the
+repo's own vitest pipeline; the stylesheet is `.next/static/css/68a9b4d0374619e2.css`,
+the 82 kB bundle `next build` compiled for this branch. MEASURED before building:
+every class the redesign introduces is present in that bundle — `type-h3`,
+`surface-ring`, `bg-brand-wash`, `divide-line-soft`, `wide:sticky`,
+`max-wide:grid-cols-2`, `enter-step`.
+
+Each width is its own iframe at that exact pixel width, so the product's own
+breakpoints do the responding rather than me simulating them. **It is not a
+mockup, and it is also not the browser suite** — see NOT DONE.
+
 **All of it is server-rendered.** Tabs, search, the calendar and the week
 stepper are links and one GET form, so every filter survives a reload, the back
 button and a shared link — the reason `flow-journeys.spec.ts` already pins
@@ -96,6 +122,22 @@ anchors and the `h1` `Planner` are exactly as they were.
 - **No entrance animation on post rows.** docs/37 §12: "Anything on a data table
   row… a list that re-animates on every filter change is a list nobody can
   read." The page bands stagger; the rows do not.
+- **CI HAS NEVER EXECUTED AGAINST THIS DIFF.** Not "failed" — never ran. See
+  the outage section below. Everything in the Gate section was measured on this
+  machine only.
+- **The preview artifact is not the browser suite and must not be read as it.**
+  I choose the frame width there; a real viewport does not. The app shell and
+  sidebar are omitted, so the content area is slightly wider than the running
+  app at the same width, and the post data is representative rather than real.
+  It cannot catch what `no-truncated-labels` catches.
+- **Chromium's HTTPS block was RE-MEASURED on this lane today**, rather than
+  inherited from REQUESTS §25: `net::ERR_CONNECTION_RESET` on both
+  `https://example.com/` and the Vercel preview URL, using the repo's bundled
+  Chromium. Two incidental findings while proving it: the Playwright MCP server
+  is configured for a `chrome` channel absent at `/opt/google/chrome/chrome`,
+  and the repo's Playwright wants Chromium build **1228** while the sandbox has
+  **1194**, so launching needs an explicit `executablePath`. Both would bite
+  anyone trying to run the browser suite here even with a working network.
 - **The merge commit `d994d525` is authored `development@sahodalabs.com`** and
   will show Unverified. `git commit --amend` was refused twice by the permission
   classifier, and by the time it could be retried the commit was no longer HEAD.
@@ -177,15 +219,91 @@ fixed.** The two worth carrying forward:
   hour inside this session and is now pinned by `filters.test.ts` reproducing
   the page's own expression.
 
+## Anything retracted — addendum
+
+**A second one, and it was mine.** Three times during the session I reverted
+`ops/state/qa.pending.json`, correctly. Then I talked myself into COMMITTING it
+on the grounds that my own gate runs had written it. The repo's pre-commit hook
+refused and gave the reason: that file is scratch, every gate run rewrites it
+and attributes the run to whichever card is open (REQUESTS §18), so committing
+it puts one session's local run into everybody else's tree. **My first instinct
+was right and my reasoning was wrong.** I did not use the `ALLOW_QA_PENDING=1`
+escape hatch; the file is reverted and the tree is clean.
+
+Worth keeping from that detour: of the seven records my runs wrote, the
+11:18:33 pair logged `COMPOSITE: PASS · 18 successful, 18 total` — and that run
+was `FULL TURBO`, 123ms, **18 of 18 cached**. It returned zero, so the log is not
+lying, but a cached leg verified nothing. The entry that proves anything is the
+11:24:56 triple: `exit=0`, `27 successful, 27 total`, `0 cached, 27 total`. A
+scratch file that files cache replays as passes is a small false-green
+generator, which may be part of why it is scratch.
+
+## The CI outage, and why none of it is this diff
+
+**No GitHub Actions job has executed anywhere in this repository since 11:03:32.**
+MEASURED across six hourly check-ins, 11:09 to 16:52.
+
+| | this PR, 11:11 | `wt-karunesh`, 10:52 | `wt-karunesh`, 16:47 |
+|---|---|---|---|
+| `runner_id` | **0** | 1000000647 | **0** |
+| `runner_name` | **empty** | `GitHub Actions 1000000647` | **empty** |
+| `steps` | **none** | 13, all success | **none** |
+| job duration | **2s** | 10m38s | **3s** |
+| logs | HTTP 404 | present | 404 |
+
+Four facts rule it out as this branch's:
+
+1. **This branch went GREEN today.** `4eedbd5e` at 09:44 — job `98810814468`,
+   runner `1000000635`, 13 steps, 13m19s. The gate passes here when a machine
+   exists.
+2. **It is repo-wide.** At least four other branches fail identically:
+   `wt-karunesh`, `claude/advisor-qvz5wn`, `claude/divas-kickoff-03y2g2`,
+   `claude/lead-research-kickoff-qexr94`.
+3. **`wt-karunesh` was the control and has since fallen over too.** It proved
+   runners worked at 10:52 and has failed every run from 11:42 onward.
+4. **The head commit is 215 lines of Markdown.** `497ad34b` cannot fail
+   typecheck, lint or tests.
+
+**THE TRAP, CHECKED AND AVOIDED — this is the part to carry forward.** Run
+wall-clock is NOT execution time. Run `33168171652` displays **11m18s**
+(11:42:31 → 11:53:49) and looks like a real execution that genuinely failed. Its
+JOB record says attempt 2 ran **11:53:45 → 11:53:48 — three seconds**. The
+eleven minutes was queue time waiting for a runner that never arrived. Two
+earlier sessions read the run clock instead of the job record, got this
+backwards on PR #12, and one of those retractions carried a FABRICATED run URL.
+**Always read the job record: `runner_id`, `runner_name`, the steps array.**
+
+Actions taken and now SPENT: one standing-down comment
+(`issuecomment-5451816523`) and one re-run of the failed job (attempt 2, which
+also died in 2 seconds and thereby confirmed the diagnosis). Per the PR rules
+neither may be repeated. A check-in routine is armed and re-arms itself; it has
+been told to stop messaging the founder on quiet ticks and to surface only when
+a runner appears, a review lands, or the PR merges or closes.
+
+**Nothing in a sandbox can allocate a GitHub runner.** This needs someone with
+GitHub Actions settings or billing access. The 26-27 August handoffs record a
+fifteen-hour outage with this exact signature, so it may be recurring.
+
 ## What the next session in THIS lane should pick up
 
-1. **Run the smoke leg before this merges.** `.github/workflows/gate.yml`'s
-   `smoke` job, dispatched by hand. Five specs sweep `/planner` and none has
-   seen this diff. This is the top item and nothing else on this list matters
-   as much.
-2. **Look at the Vercel preview for `claude/kickoff-jiban-r91o7w`.** Judge the
-   banner, the rail at 1024 (the middle band nobody tests) and the toolbar at
-   390. It is the only visual evidence available.
+0. **CHECK WHETHER RUNNERS ARE BACK, BEFORE ANYTHING ELSE.** Read the job
+   record, never the run clock — see the outage section. If they are back, this
+   head has no fresh run and needs a REAL push to get one; never an empty commit
+   and never a push whose only purpose is to kick CI. There is genuine work
+   waiting that will carry a run with it: item 3 below.
+1. **Run the smoke leg once runners exist.** `.github/workflows/gate.yml`'s
+   `smoke` job, dispatched by hand with the project ref typed in. Five specs
+   sweep `/planner` and none has seen this diff:
+   `no-truncated-labels` (390px, no horizontal scroll, no clipped labels),
+   `every-section-loads` (the `h1` is exactly `Planner`), `no-impossible-remedy`,
+   `flow-journeys` (`?view=` survives a reload) and `flow-frames` (18 frames per
+   combo, which pins the three views). Nothing else on this list matters as much.
+2. **Look at the screen.** Either the Vercel preview for this branch, or the
+   rendered artifact at
+   https://claude.ai/code/artifact/23cbbadd-4aea-48ba-bdd3-362e3fb23c3e —
+   the second needs no login and no network the sandbox lacks. Judge the banner
+   in dark, the rail at 1024 (the middle band nobody tests) and the toolbar at
+   390.
 3. **The `text-accent` on tint sweep**, from the retraction above. `apps/web/CLAUDE.md`
    mandates a `dark:bg-s2` swap for this pair; `plan-week-panel.tsx:112` follows
    it and other call sites do not.
@@ -198,7 +316,14 @@ fixed.** The two worth carrying forward:
 
 ## Gate
 
-Forced, clean tree, repo root, nothing piped.
+Forced, clean tree, repo root, nothing piped. **Measured at 11:24 on the tree at
+`c1ce0cea` and NOT re-run at handoff time** — MEASURED, `git diff c1ce0cea HEAD`
+touches only `docs/`, so the code under test is byte-identical and a second run
+would be a cache replay reporting the same numbers. Re-running to produce a
+fresher timestamp would be theatre.
+
+**These are local results. CI has never executed against this diff** — see the
+outage section. Local green is not CI green and is not offered as a substitute.
 
 | leg | result | real output |
 |---|---|---|
