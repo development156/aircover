@@ -129,12 +129,30 @@ resolution.**
    `maxWorkers: 4`, load average 5.51 during the run). **One line, `}, 60_000)`,
    nothing weakened.** Not pushed from here: this branch's PR is docs-only and
    the file is not in its diff. Raised on PR #26 with the patch.
+
+   **It reproduced on a second independent full run** after the trunk moved and
+   was merged again: same file, same hook, `Hook timed out in 10000ms`, with
+   `5739 passed | 22 skipped` and **0 tests failed**. Two deterministic hits on
+   one hook, while every other PGlite hook in the suite passes, is a budget that
+   is wrong rather than contention that is unlucky. I called it starvation-shaped
+   the first time; the second run says it is simply too small.
 7. **CI is intermittently allocating no runner, and it is not any one branch.**
    MEASURED: eight `gate.yml` runs across five branches inside four minutes, all
    3 to 11 seconds, `runner_id: 0` on this one. A real run takes about eleven
    minutes. **Not the 26 August total outage** — run 609 on `wt-core` got a real
    runner this morning and went green in 11m 19s. No re-run has been spent.
-8. **Never `git add -A`, and here is why this one file keeps conflicting.** The
+8. **`typecheck` reads generated route types that only a build writes, so a
+   fresh checkout can fail spuriously.** MEASURED on the second `wt-core` merge:
+   `tsc --noEmit` reported two errors in code I had not touched —
+   `studio/page.tsx(93,21)` and `start-design.tsx(36,21)`, both
+   `` `/studio/${string}` `` not assignable to `RouteImpl`. `next.config` sets
+   `typedRoutes: true` and `typecheck` is a bare `tsc --noEmit`, so it reads
+   `.next/types/routes.d.ts` — **which was dated 2026-08-27 16:31, before
+   `studio/[id]/` existed, and listed only `/studio`.** PROVEN, not argued:
+   `npx next typegen` added `"/studio/[id]"` and `tsc --noEmit` then exited **0**.
+   Nothing was wrong with the studio code. Run `next typegen` (or a build) before
+   trusting a red typecheck on a branch that added a dynamic route.
+9. **Never `git add -A`, and here is why this one file keeps conflicting.** The
    QA hook does not merely append a row to `ops/state/qa.pending.json` — **it
    rewrites the whole file unescaped.** MEASURED at the end of this session,
    after my own gate run: the working copy differs from `HEAD` by **+45/-32**,
@@ -146,8 +164,23 @@ resolution.**
    conflict on rows neither of them wrote. That is the mechanism behind five
    sessions of "reverted rather than committed", and behind this session's own
    conflict. **Revert it; never commit it.** I reverted it.
-   `core.hooksPath` is unset, so `.githooks/pre-commit` is disarmed and nothing
-   but attention enforces this.
+
+   **A guard for this exists and it works — it was simply not armed here.**
+   `.githooks/pre-commit` refuses that path (`SCRATCH='ops/state/qa.pending.json'`,
+   overridable with `ALLOW_QA_PENDING=1` for a deliberate shape change). PROVEN
+   by execution, not by reading: I set `core.hooksPath`, staged a mutated copy,
+   and watched the commit be refused with "That file is scratch". **The defect is
+   that it was disarmed in this sandbox.** `scripts/cloud-setup.sh:272` runs
+   `git config core.hooksPath .githooks 2>/dev/null || true`, and MEASURED at
+   kickoff `core.hooksPath` was unset and `.sahoda-setup-status` absent — so the
+   setup script did not complete here, which is the same fact my LANE section
+   reported and did not connect. That is why Session 2 was able to commit the
+   file at all. I armed it for the rest of this session.
+
+   `wt-divas2` reached the same conclusion independently and first, in
+   `3df4ad77`, including the em dash re-encoding. My contribution is the
+   arithmetic (0 vs 306 non-ASCII, +45/-32, one real record) and the mutation
+   above, not the discovery.
 
 ## Gate
 
@@ -155,7 +188,10 @@ resolution.**
 | --- | --- | --- |
 | `node scripts/sandbox-probe.mjs` | **NO_BROWSER** | `yes https from Node — 200`; `NO browser binary NOT installed`; exit 0 |
 | `prettier --check .` (root, repo's pinned binary) | **PASS** | see below |
-| `turbo run typecheck lint test --force`, on the MERGED tree `4fd5ab18` | **1 failure** | `25 successful, 27 total`, `0 cached`, 5m30.656s. `@sahoda/db#test` was cancelled by that failure, not failed |
+| `turbo run typecheck lint test --force`, on the SECOND merged tree (`wt-core` `f018625d` in) | **1 failure, the same one** | `25 successful, 27 total`, `0 cached`, 4m46s. `@sahoda/web` reports `5739 passed \| 22 skipped`, **0 tests failed**, `1 failed` test FILE: the same `workspace-timezone` hook. `@sahoda/db#test` cancelled by it |
+| ↳ `tsc --noEmit` after `next typegen` | **PASS** | exit 0. Before typegen it reported 2 errors in `studio/` code; see item 8 |
+| ↳ `prettier --check .` on that tree | **PASS** | `All matched files use Prettier code style!` |
+| `turbo run typecheck lint test --force`, on the FIRST merged tree `4fd5ab18` | **1 failure** | `25 successful, 27 total`, `0 cached`, 5m30.656s. `@sahoda/db#test` was cancelled by that failure, not failed |
 | ↳ `@sahoda/web` tests | **0 tests failed** | `5712 passed \| 22 skipped`. `1 failed` **test file**, which died in its `beforeAll`: `workspace-timezone.pglite.test.ts`, `Hook timed out in 10000ms`. Pre-existing on the trunk; see item 6 above |
 | ↳ that file alone, immediately after | **PASS** | `1 passed (1)`, `15 passed (15)`, 8.08s |
 | CI `typecheck · lint · test · format` on `a7f32615` | **RAN NOTHING** | job 98937613996, `runner_id: 0`, `runner_name: ""`, 18:00:26Z→18:00:27Z. One second, zero steps |
