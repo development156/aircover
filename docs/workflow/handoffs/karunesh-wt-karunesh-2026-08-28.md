@@ -323,7 +323,16 @@ any `<dialog>` assertion that means "the user can see and reach this" is not tes
 | `pnpm install --frozen-lockfile` | **PASS** |
 | `turbo run test --force` (this sandbox, ambient DB URL present) | **FAIL** — `@sahoda/db` live-guard only, diagnosed above |
 | `test:smoke` (Playwright) | **UNRUN** — and this is the one that matters. `playwright test --list --grep @smoke` is unchanged in count, but **17 spec files were rewritten** for the composer rebuild and not one has executed. |
-| CI `typecheck · lint · test · format` | **FAIL** — every attempt, 2-4s each, no log, no step run, no runner ever assigned (`runner_id: 0`, `runner_name: ""`). Four more on this lane's later commits, same shape. The count is deliberately not written as a figure: every push adds two, so a number here is stale before it is read. **The shape is the finding, not the tally.** |
+| CI `typecheck · lint · test · format` | **FAIL** — every attempt, 2-4s each, no log, no step run, no runner ever assigned (`runner_id: 0`, `runner_name: ""`). Four more on this lane's later commits, same shape. The count is deliberately not written as a figure: every push adds two, so a number here is stale before it is read. **The shape is the finding, not the tally.** It is also **not this lane's**: the advisor's own push to `wt-core` at 19:04 UTC (run 33202187815, head `f528a85b`) failed the same way, 3 seconds, and so did the same commit on `claude/advisor-qvz5wn` (run 33202255454). Different branch, different author, different diff, identical shape. |
+
+## One more thing the next session needs to know
+
+**`wt-core` moved after this lane was synced.** `lane-sync push` took it at `127b29c4`; by 19:07
+UTC it was at `f528a85b` — the advisor fixed a missing `/studio/[id]` JS budget that had been
+ERRORing every `wt-core` deploy, plus a docs count. **This lane was NOT re-merged against that**,
+deliberately: the merge is small and low-conflict (this lane touches no `js-budget.json` route and
+no `studio` file), but it cannot be smoke-tested here, and a merge nobody can verify is not an
+improvement to hand over. Take `wt-core` first thing next session, then re-run the gate.
 
 ## In plain terms
 
