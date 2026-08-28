@@ -1,7 +1,9 @@
 # Handoff — girija — wt-girija3 — 2026-08-28
 
 **Branch** `claude/lead-research-kickoff-dw8slw` at `48a73e1d`. Lane `wt-girija3`.
-Pushed: **yes**. PR: **none yet, and one is owed** — see "What was NOT done".
+Pushed: **yes**. PR
+[#27](https://github.com/development156/sahodalabs/pull/27) → `wt-core`, draft,
+and this session is subscribed to its activity.
 
 The work is `0b3f9e5f`; `48a73e1d` merges `wt-core` in on top of it, taking the
 three commits that landed there during this session so the lane is not handed
@@ -100,12 +102,11 @@ hunting; this sends them to the fix.
 
 ## What was NOT done, and why
 
-- **No pull request, and one is OWED.** The GitHub MCP server was down at the
-  moment the commit was pushed (`Dynamic Client Registration rejected (HTTP
-  403)`) and there is no `gh` CLI in this sandbox. It has since reconnected, so
-  the next session can open it, or this one can if asked:
-  [compare](https://github.com/development156/sahodalabs/compare/wt-core...claude/lead-research-kickoff-dw8slw).
-  **Draft, into `wt-core`.**
+- **The pull request was late, not skipped.** The GitHub server was down at
+  the moment the commit was pushed (`Dynamic Client Registration rejected (HTTP
+  403)`) and there is no `gh` CLI here, so PR
+  [#27](https://github.com/development156/sahodalabs/pull/27) was opened once it
+  reconnected, at the end of the session rather than beside the push.
 - **Nothing pushed to `wt-core`.** `/handoff` step 4 conditions that on the gate,
   and the gate has an UNRUN leg (`@smoke`) plus a leg that fails for an
   environment reason. The PR is the reviewable record.
@@ -113,10 +114,11 @@ hunting; this sends them to the fix.
   complete an outbound HTTPS request in this sandbox and every `@smoke` spec
   signs in through Clerk (REQUESTS §25). This diff touches no page, so it is not
   the leg that would judge it, but UNRUN is UNRUN.
-- **The turbo starvation was NOT fixed**, and the reason is that no commit in
-  this repository can reach it. The lever is `--concurrency` on the turbo
-  invocation, and the failing invocation lives in the Stop hook's command line,
-  outside the repo. See "What needs a decision".
+- **The turbo starvation was measured here but NOT fixed here**, because no
+  commit in this repository could reach the failing invocation: it lived in the
+  Stop hook's command line, outside the repo. **Another lane fixed it during
+  this session** — `414762d3`, merged in at `48a73e1d`. Detail in "What needs a
+  decision", item 1, which is now answered rather than open.
 - **`--concurrency` was NOT added to the root `pnpm gate` script.** It would not
   change the Stop hook's behaviour (the hook calls `turbo` directly, not
   `pnpm gate`), and it retimes the gate for all nine lanes, which is `wt-core`'s
@@ -214,9 +216,9 @@ re-derives it.
 
 ## What the next session in THIS lane should pick up
 
-1. **Open the draft PR into `wt-core`** — it is the one thing owed from this
-   session and the GitHub server is back up.
-   [compare](https://github.com/development156/sahodalabs/compare/wt-core...claude/lead-research-kickoff-dw8slw).
+1. **Drive PR [#27](https://github.com/development156/sahodalabs/pull/27) to
+   green and get it merged.** It is open, draft, into `wt-core`, and it is the
+   only thing this lane has outstanding.
 2. **Do not treat a red `turbo run test` at default concurrency as a defect
    without checking WHICH file failed.** It has named a different innocent file
    on each of two consecutive runs. Run the suspect package alone first; if it
