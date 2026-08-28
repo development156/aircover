@@ -283,3 +283,129 @@ browse guards). **A guard absent from the count did not run.**
 `getaddrinfo ENOTFOUND db.rloztdhzfliyvpvxsgjl.supabase.co` — this sandbox has no
 DNS route to Supabase. It **PASSES in CI**, which does, and it is inside the
 5,738 above. One error message, one environment cause. MEASURED both ways.
+
+---
+
+## Session 2
+
+**Branch** `claude/kickoff-jiban-4fvij0` at `78dc1e15`. Lane `wt-jiban2`. Pushed:
+yes, `0 0` against `origin/claude/kickoff-jiban-4fvij0` (MEASURED,
+`git rev-list --left-right --count`).
+
+**No product code changed in this session.** Zero commits, clean tree. What this
+session did was watch PR #23's gate, and then gate `78dc1e15` locally because CI
+could not.
+
+### What shipped
+
+| item | proof | covered by |
+| --- | --- | --- |
+| Nothing new | `git status --short` empty; head unmoved at `78dc1e15` | — |
+| A local gate on `78dc1e15` | the table below | — |
+
+The gate matters here for one reason. Session 1's green run was on `d1dd5755`.
+`78dc1e15` sits two commits later, and one of them is `956b90a3`, the merge of
+`wt-core`. **That merge has never been gated anywhere** — CI has been unable to
+allocate a runner since, so the code this lane would hand over had no passing
+run against it. It does now, with one caveat below.
+
+### What was NOT done, and why
+
+- **Playwright `@smoke` is UNRUN.** Not passed. Unchanged from Session 1: the
+  workflow skips it, and Chromium in this sandbox cannot complete an outbound
+  HTTPS request, which every `@smoke` spec needs for Clerk. The retargeted
+  `connections-honesty` assertions still have never run against the real page.
+- **`@sahoda/db#test` is UNRUN**, not failed. Turbo tore it down mid-run when
+  `@sahoda/web#test` exited. It printed no summary line; every file it did reach
+  passed. Do not read its `[ELIFECYCLE]` line as a defect.
+- **No re-run and no second comment on PR #23.** One re-run was already spent
+  (attempt 2, identical) and one comment already posted
+  (`issuecomment-5452726550`). Five scheduled check-ins fired between 13:43Z and
+  17:51Z; the state was byte-identical at every one, so each re-armed silently.
+
+### Shared surfaces touched
+
+**None.** No file was edited this session.
+
+### Contract, migration or money
+
+**None.**
+
+### Guards written, and the mutation that proved each
+
+**None written this session.** Session 1's twenty mutations stand as recorded
+above.
+
+### Anything retracted
+
+**One, and it is a command string, not a result.** Session 1's gate table names
+the local lint leg as `lint.mjs .`. MEASURED: that invocation exits **1** with
+`console-log: 279 violation(s), baseline allows 0 — 279 NEW`, because `.` sweeps
+`.qa/*.mjs` and other root scripts that are outside any package's scope. The
+output Session 1 actually recorded — `lint ok: @sahoda/web (test-only=0
+assertionless-test=0 console-log=1 …)` — is what **`lint.mjs apps/web`**
+produces, MEASURED, exit 0. The verdict was right; the command written beside it
+was not, and someone re-running it as printed would have read a green leg as 279
+new violations.
+
+### What the next session in THIS lane should pick up
+
+1. **Run the `smoke` job by hand** on `.github/workflows/gate.yml` before PR #23
+   merges. It is dispatched manually with the project ref typed in. This is the
+   one leg standing between this lane and a merge.
+2. **Watch for the runner outage clearing.** When it does, the gate on
+   `78dc1e15` should reproduce the local table below, minus the contention
+   failure.
+3. Three founder decisions still open, unchanged: collapse the six
+   single-channel category chips into a "More" chip? quiet the orange readiness
+   chips now that the buttons carry orange? and someone with GitHub Actions
+   billing access should look at the runner allocation.
+4. `apps/web/e2e/connections-widths.spec.ts:51` still has `TILES = 8` against a
+   15-tile catalogue. Reported, not fixed.
+
+### Gate
+
+Run locally on `78dc1e15`. No leg piped. **CI could not run: 
+`typecheck · lint · test · format` is red on a runner-allocation outage** —
+job `98853848584`, `runner_id: 0`, empty `runner_name`, **3 seconds** against a
+real run's 12m1.999s, logs 404. That is an absent machine, not a failing test.
+
+| leg | result | real output |
+| --- | --- | --- |
+| `turbo typecheck lint test --force` | **FAIL (1 file, see below)** | `Tasks: 25 successful, 27 total` · `Cached: 0 cached, 27 total` · `5m9.494s` |
+| ↳ `@sahoda/web` | **1 suite failed** | `452 passed \| 3 skipped (456)` files · `5729 passed \| 22 skipped (5751)` tests |
+| ↳ `@sahoda/shared` | **PASS** | `26 passed (26)` files · `381 passed (381)` |
+| ↳ `@sahoda/sites` | **PASS** | `53 passed (53)` files · `1566 passed (1566)` |
+| ↳ `@sahoda/publishing` | **PASS** | `27 passed (27)` files · `473 passed (473)` |
+| ↳ `@sahoda/billing` | **PASS** | `30 passed \| 1 skipped (31)` files · `401 passed \| 13 skipped (414)` |
+| ↳ `@sahoda/jobs` | **PASS** | `34 passed (34)` files · `396 passed (396)` |
+| ↳ `@sahoda/mesh` | **PASS** | `26 passed (26)` files · `191 passed (191)` |
+| ↳ `@sahoda/research` | **PASS** | `13 passed (13)` files · `195 passed (195)` |
+| ↳ `@sahoda/db` | **UNRUN** | torn down by turbo mid-run; no summary printed |
+| `prettier --check .` | **PASS** | `All matched files use Prettier code style!` exit 0 |
+| `design/design-lint.mjs` | **PASS** | `1375 files scanned`, **0 new** on all five rules |
+| `lint.mjs apps/web` | **PASS** | `lint ok: @sahoda/web (… console-log=1 …)` — the 1 is the `url-door.ts` baseline |
+| Playwright `@smoke` | **UNRUN** | **NOT passed.** No browser network in this sandbox |
+
+`Cached: 0 cached, 27 total` is what makes the passing legs mean anything.
+
+**The one failure is contention, and here is the measurement that says so.**
+
+```
+FAIL  lib  src/lib/repo/workspace-timezone.pglite.test.ts > the three intake columns
+Error: Hook timed out in 10000ms.
+ ❯ src/lib/repo/workspace-timezone.pglite.test.ts:112:3
+   112|   beforeAll(async () => {
+   113|     db = await bootFullSchema()
+```
+
+`beforeAll` boots a full PGlite schema and got no CPU inside 10 seconds while
+455 other files ran alongside it. Run alone: **`1 passed (1)` files,
+`15 passed (15)` tests, 5.97s** — MEASURED. It also passed in CI on `d1dd5755`,
+inside that run's 5,738. **One error message, one cause.** It is not this lane's
+diff, which touched `/wallet` and `/connections` React components and no
+repository code.
+
+**On the counts.** CI on `d1dd5755` read `5738 passed | 13 skipped`. This run
+reads `5729 passed | 22 skipped` — the same 5,751 total, with the timed-out
+file's 9 tests moving from passed to skipped. Nothing went missing.
