@@ -2,13 +2,16 @@ import { Link2 } from 'lucide-react'
 import { ZERNIO_PLATFORMS } from '@sahoda/shared'
 
 import { ChannelTile } from '@/components/connections/channel-tile'
-import { Stagger } from '@/components/motion/stagger'
+import { PageTitle } from '@/components/page-title'
+import {
+  ConnectionMarketplace,
+  type MarketplaceSection,
+} from '@/components/connections/connection-marketplace'
 import { ConnectionHealthBanner } from '@/components/connections/connection-health-banner'
 import { ConnectOutcomeNotice } from '@/components/connections/connect-outcome-notice'
 import type { XRationMeterProps } from '@/components/connections/x-ration-meter'
 import { EmptyState } from '@/components/empty-state'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
-import { PageTitle } from '@/components/page-title'
 import { checkCountableLimit } from '@/lib/billing/entitlements'
 import { PLANNED } from '@/lib/connections/catalogue'
 import { groupChannels } from '@/lib/connections/groups'
@@ -46,6 +49,21 @@ export const metadata = { title: 'Connections' }
  * is answered better on the tile itself, where each channel states its `kind`
  * — *Feed*, *Local listing*, *Short video*, *Broadcast* — beside its own name,
  * rather than by a heading the reader has to scroll back to.
+ *
+ * ── THE BROWSE LAYER, AND WHY IT DID NOT REPLACE THE GROUPING ────────────────
+ * A category rail and a search field sit above all three groups
+ * (`ConnectionMarketplace`). The rail filters by the catalogue's own `kind` and
+ * counts every facet from the entries rather than storing a number, so a
+ * sixteenth channel appears in the sidebar the day its catalogue row lands and
+ * nothing here has to be told about it.
+ *
+ * It is a FILTER and not a set of headings, which is the §3.4 lesson above
+ * applied rather than forgotten: six of the nine kinds hold one or two channels,
+ * so heading by kind would put six paperweights on the page. Filtering down to
+ * one card is a result a person asked for; a heading over one card is a layout
+ * mistake. The three groups still answer the three questions; the rail answers
+ * "where is Pinterest", which at twenty cards is a real question and was not one
+ * at eight.
  *
  * ── ONE PRIMARY PER VIEW, AND USUALLY ZERO ───────────────────────────────────
  * Run 17 found four full-width solid-orange primaries on this one screen. There
@@ -221,7 +239,25 @@ export default async function ConnectionsPage({
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
-        <PageTitle sub="Connect your channels and manage where Sahoda publishes your content.">
+        {/* ── THE TRAIL, AND WHY IT IS NOT A SET OF LINKS ──────────────────
+            The reference this screen was redrawn from opens with
+            `Connections › Integrate` rather than a page title. Both segments are
+            here and neither is an anchor, because there is no
+            `/connections/integrate` route and no parent above `/connections`: the
+            first crumb would link to the page already open and the second would
+            name a page that does not exist. There is no `<nav>` over them for the
+            same reason. `PageTitle` carries the full reasoning and the contrast
+            measurement behind the segment's colour. */}
+        <PageTitle
+          crumb="Integrate"
+          /* The reference reads "Browse available platforms and choose the next
+             connection to add." This screen also holds the accounts already
+             linked and the controls that disconnect them, so that sentence is
+             true of less of the page than the one it would replace. Copy rule 1:
+             a rewrite may not be true in fewer cases. This keeps the reference's
+             job — say what browsing is for — and stays true of all three groups. */
+          sub="Browse every platform Sahoda can connect, add the next one, and manage what is already linked."
+        >
           Connections
         </PageTitle>
         {/* ── THE COUNT, PROMOTED OUT OF THE GROUP HEADING ──────────────────
@@ -315,148 +351,117 @@ export default async function ConnectionsPage({
             </p>
           ) : null}
 
-          {/* ── LINKED FIRST, AND ONLY WHEN THERE IS SOMETHING TO SHOW ───────
+          {/* ── THE THREE GROUPS, BROWSABLE ─────────────────────────────────
               The grid went from eight tiles to twenty on 2026-08-26, and at
               twenty the old single grid stopped answering the screen's first
               question. "Which of my channels is live" was a hunt through four
               rows of mostly-identical cards for the two carrying an account.
 
-              Rendered only when at least one account exists. An empty "Your
-              channels" heading over nothing is a section that exists to say the
-              customer has done nothing, which is a worse first line than simply
-              starting at "Add a channel". */}
-          {linkedEntries.length > 0 ? (
-            <ChannelGroup
-              name="Your channels"
-              lead="Linked accounts Sahoda can reach. Open Details on any card for what it can do."
-              guide="connections.linked"
-            >
-              {linkedEntries.map((entry) => (
-                <ChannelTile
-                  key={entry.id}
-                  entry={entry}
-                  connections={byChannel.get(entry.id) ?? []}
-                  ration={entry.id === 'x' ? ration : undefined}
-                  disabled={!(railReady && roomLeft)}
-                  disabledReason={connectBlocker(entry.id)}
-                />
-              ))}
-            </ChannelGroup>
-          ) : null}
+              The groups below are unchanged: linked, open, stalled, each
+              answering a different question. What is new is a category rail and
+              a search field over all three, because twenty cards is also the
+              point at which "where is Pinterest" stops being answerable by
+              looking. `ConnectionMarketplace` filters; it does not regroup, and
+              it renders no heading over an empty group — so "Your channels" over
+              nothing, which would be a section that exists to say the customer
+              has done nothing, still cannot happen. */}
+          <ConnectionMarketplace
+            sections={
+              [
+                {
+                  key: 'linked',
+                  name: 'Your channels',
+                  lead: 'Linked accounts Sahoda can reach. Open Details on any card for what it can do.',
+                  guide: 'connections.linked',
+                  items: linkedEntries.map((entry) => ({
+                    id: entry.id,
+                    label: entry.label,
+                    kind: entry.kind,
+                    blurb: entry.blurb,
+                    tile: (
+                      <ChannelTile
+                        entry={entry}
+                        connections={byChannel.get(entry.id) ?? []}
+                        ration={entry.id === 'x' ? ration : undefined}
+                        disabled={!(railReady && roomLeft)}
+                        disabledReason={connectBlocker(entry.id)}
+                      />
+                    ),
+                  })),
+                },
+                {
+                  key: 'open',
+                  name: linkedEntries.length > 0 ? 'Add a channel' : 'Connect your channels',
+                  lead: 'Every one of these opens a sign-in window and comes straight back.',
+                  guide: 'connections.connect_now',
+                  items: openEntries.map((entry) => ({
+                    id: entry.id,
+                    label: entry.label,
+                    kind: entry.kind,
+                    blurb: entry.blurb,
+                    tile: (
+                      <ChannelTile
+                        entry={entry}
+                        connections={[]}
+                        ration={entry.id === 'x' ? ration : undefined}
+                        disabled={!(railReady && roomLeft)}
+                        disabledReason={connectBlocker(entry.id)}
+                      />
+                    ),
+                  })),
+                },
+                {
+                  /* ── ONE GROUP FOR EVERY KIND OF "NO", AND EACH CARD SAYS WHICH
+                     Telegram and Snapchat are both unconnectable and for
+                     completely different reasons: Telegram's connect endpoint
+                     answers 200 with a bot CODE rather than an authUrl, so the
+                     OAuth rail cannot carry it and the surface it needs is
+                     unbuilt; Snapchat answers 403 `PLATFORM_BETA_RESTRICTED`, so
+                     nothing we build would help. Both MEASURED 2026-08-26.
 
-          <ChannelGroup
-            name={linkedEntries.length > 0 ? 'Add a channel' : 'Connect your channels'}
-            lead="Every one of these opens a sign-in window and comes straight back."
-            /* The count moved into the header card. Printing it here as well
-               would put one number in two places, which is how they drift. */
-            guide="connections.connect_now"
-          >
-            {openEntries.map((entry) => (
-              <ChannelTile
-                key={entry.id}
-                entry={entry}
-                connections={[]}
-                ration={entry.id === 'x' ? ration : undefined}
-                disabled={!(railReady && roomLeft)}
-                disabledReason={connectBlocker(entry.id)}
-              />
-            ))}
-          </ChannelGroup>
-
-          {/* ── ONE GROUP FOR EVERY KIND OF "NO", AND EACH CARD SAYS WHICH ────
-              Telegram and Snapchat are both unconnectable and for completely
-              different reasons: Telegram's connect endpoint answers 200 with a
-              bot CODE rather than an authUrl, so the OAuth rail cannot carry it
-              and the surface it needs is unbuilt; Snapchat answers 403
-              `PLATFORM_BETA_RESTRICTED`, so nothing we build would help. Both
-              MEASURED 2026-08-26.
-
-              They share a heading because what the reader can do about them is
-              the same — nothing, today — and they carry different sentences
-              because "we never built it" and "they will not let us" are
-              different claims and this product does not blur those. */}
-          {stalledEntries.length > 0 || PLANNED.length > 0 ? (
-            <ChannelGroup
-              name="Not available yet"
-              lead="Sahoda can't link these today. Each card says why, and they are different reasons."
-              /* No count. A fraction on a group nothing can connect to would have
-                 a numerator that can never move — a number that looks like
-                 progress and is a constant. */
-              guide="connections.coming_soon"
-            >
-              {stalledEntries.map((entry) => (
-                <ChannelTile
-                  key={entry.id}
-                  entry={entry}
-                  connections={byChannel.get(entry.id) ?? []}
-                  disabled
-                  disabledReason={connectBlocker(entry.id)}
-                />
-              ))}
-              {/* `connections` is required and explicitly EMPTY, not optional. A
-                  planned channel cannot hold a row — the CHECK constraint sees to
-                  it — and making the prop required means the type system asks
-                  every call site the question rather than defaulting one of them
-                  to a silent `undefined`. */}
-              {PLANNED.map((entry) => (
-                <ChannelTile key={entry.id} entry={entry} connections={[]} />
-              ))}
-            </ChannelGroup>
-          ) : null}
+                     They share a heading because what the reader can do about
+                     them is the same — nothing, today — and they carry different
+                     sentences because "we never built it" and "they will not let
+                     us" are different claims and this product does not blur
+                     those. */
+                  key: 'stalled',
+                  name: 'Not available yet',
+                  lead: "Sahoda can't link these today. Each card says why, and they are different reasons.",
+                  guide: 'connections.coming_soon',
+                  items: [
+                    ...stalledEntries.map((entry) => ({
+                      id: entry.id,
+                      label: entry.label,
+                      kind: entry.kind,
+                      blurb: entry.blurb,
+                      tile: (
+                        <ChannelTile
+                          entry={entry}
+                          connections={byChannel.get(entry.id) ?? []}
+                          disabled
+                          disabledReason={connectBlocker(entry.id)}
+                        />
+                      ),
+                    })),
+                    /* `connections` is required and explicitly EMPTY, not
+                       optional. A planned channel cannot hold a row — the CHECK
+                       constraint sees to it — and making the prop required means
+                       the type system asks every call site the question rather
+                       than defaulting one of them to a silent `undefined`. */
+                    ...PLANNED.map((entry) => ({
+                      id: entry.id,
+                      label: entry.label,
+                      kind: entry.kind,
+                      blurb: entry.blurb,
+                      tile: <ChannelTile entry={entry} connections={[]} />,
+                    })),
+                  ],
+                },
+              ] satisfies MarketplaceSection[]
+            }
+          />
         </>
       )}
     </div>
-  )
-}
-
-/**
- * One heading, one grid.
- *
- * `items-stretch` is the default and is load-bearing here: tiles carry different
- * amounts of content — X alone carries the spend meter — and a grid of eight
- * cards with eight different heights is exactly the loose rhythm §3.4 measures
- * inside this app's otherwise tight chrome. The tiles are `h-full` and push their
- * controls to the floor with `mt-auto`, so the row's tallest tile sets the height
- * and every control still lines up.
- */
-function ChannelGroup({
-  name,
-  lead,
-  count,
-  guide,
-  children,
-}: {
-  name: string
-  /** One line saying what the group IS, when the heading alone cannot. */
-  lead?: string
-  count?: string
-  guide: string
-  children: React.ReactNode
-}) {
-  return (
-    <section className="space-y-3" data-guide={guide}>
-      <div className="space-y-1">
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <h2 className="type-h2">{name}</h2>
-          {/* Words, not a pill. The old `2/4` badge was a hand-rolled chip that
-              existed nowhere else in the system, and a bare fraction beside a
-              heading reads as a score. "2 of 4 connected" says which two things
-              are being compared. */}
-          {count ? <span className="type-sm num text-muted">{count}</span> : null}
-        </div>
-        {lead ? <p className="type-sm text-muted">{lead}</p> : null}
-      </div>
-      {/* `.enter-step` is this product's ONE entrance (docs/37 §12) and it is
-          already reduced-motion safe in tokens.css, which zeroes delay as well
-          as duration — without that, `fill: both` left staggered rows invisible
-          for the length of their delay. Using the primitive rather than a new
-          animation is also why no dependency was added for this. */}
-      <Stagger
-        className="grid items-stretch gap-4 wide:grid-cols-4 max-wide:grid-cols-2 max-narrow:grid-cols-1"
-        itemClassName="h-full"
-      >
-        {children}
-      </Stagger>
-    </section>
   )
 }
