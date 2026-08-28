@@ -175,6 +175,11 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
     readability: 'readable',
     describes: 'what Sahoda worked out about your marketing',
   },
+  {
+    table: 'marketing_pass_runs',
+    readability: 'readable',
+    describes: 'when Sahoda last looked at your marketing, and what it was waiting for',
+  },
   { table: 'memory_events', readability: 'readable', describes: 'changes to your Brand Brain' },
   { table: 'ops_credit_requests', readability: 'readable', describes: 'credit top-up requests' },
   {

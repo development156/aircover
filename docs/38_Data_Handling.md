@@ -51,17 +51,22 @@ not a description somebody wrote down — it is a fact about how the database is
 holding a customer's data carries a `workspace_id` column, and the boundary between two customers is
 enforced by the database itself (PostgreSQL row-level security), not by the application.
 
-**MEASURED 2026-08-26: 52 tables.** They are listed in full in §3, and
+**MEASURED 2026-08-28: 53 tables.** They are listed in full in §3, and
 `packages/db/tests/data_handling_doc.pglite.test.ts` fails the build if that number or that list
-stops matching the database. (It read 49 on 2026-08-25, the figure this sentence carried until now;
-the three new ones are the library's folder system, `asset_folders`, `asset_folder_items` and
-`asset_smart_folders`. It read 48 on 2026-08-23; the forty-ninth was `marketing_observations`.)
+stops matching the database. (It read 52 on 2026-08-26, the figure this sentence carried until now;
+the fifty-third is `marketing_pass_runs`, the record of the Marketing Brain having examined a
+workspace. It read 49 on 2026-08-25; the three new ones then were the library's folder system,
+`asset_folders`, `asset_folder_items` and `asset_smart_folders`. It read 48 on 2026-08-23; the
+forty-ninth was `marketing_observations`.)
 
-> **Production holds 51 of those 52 today.** MEASURED against production on 2026-08-26 by counting
-> `public` base tables carrying a `workspace_id` column, not inferred from the migration list.
+> **Production holds 51 of those 53 today.** The 51 is MEASURED against production on 2026-08-26 by
+> counting `public` base tables carrying a `workspace_id` column, not inferred from the migration
+> list; the 53 is this branch's schema on 2026-08-28. **The gap has NOT been re-measured against
+> production since 26 August** and is stated as arithmetic, not as a reading.
 >
-> **Exactly one is missing: `ledger_actor_redactions`** (see §5), whose migration is written and
-> deliberately not applied.
+> **Two are missing.** `ledger_actor_redactions` (see §5), whose migration is written and
+> deliberately not applied; and `marketing_pass_runs`, added on this branch on 2026-08-28 and not
+> yet applied anywhere.
 >
 > This paragraph said "47 of those 52" and named five unapplied tables an hour before this edit,
 > and it was wrong in both halves. `marketing_observations` had already been applied when that was
@@ -124,6 +129,7 @@ the table belongs to one identified workspace.
 | `loop_cycles` | every week the Loop ran | `created_by` | removed |
 | `loop_settings` | your Loop settings | no direct identifiers | removed |
 | `marketing_observations` | what Sahoda worked out about your marketing | no direct identifiers | removed |
+| `marketing_pass_runs` | when Sahoda last looked at your marketing, and what it was waiting for | no direct identifiers | removed |
 | `memory_events` | changes to your Brand Brain | no direct identifiers | removed |
 | `ops_credit_requests` | credit top-up requests | no direct identifiers | removed |
 | `planner_events` | your planner | `title` | removed |
@@ -254,7 +260,7 @@ back. Both are re-checked on the server and the name is checked a third time by 
 because the delete is an addressable endpoint whatever the screen does. Only the **owner** of a
 workspace can do it.
 
-**What is removed:** every row in all 52 tables except the four in the next paragraph, plus every
+**What is removed:** every row in all 53 tables except the four in the next paragraph, plus every
 file in storage, plus the encrypted keys for the linked social accounts, plus the sign-in profile of every member
 for whom this was their last workspace — not only the person who pressed the button.
 
@@ -651,10 +657,10 @@ would be doing the thing it warns about.
 - Every base table carrying a `workspace_id`, from the database's own catalogue, on every build.
 - Whether each one is in the export list, and whether its stated readability matches its actual
   policies.
-- One complete cycle: create a workspace, fill all 52 tables, delete it, and count what is left —
+- One complete cycle: create a workspace, fill all 53 tables, delete it, and count what is left —
   including a second workspace that must be untouched.
 - That a FAILED deletion leaves everything exactly as it was. A trigger is installed that refuses to
-  let one table go; the deletion raises, naming the table, and all 52 tables still hold every row.
+  let one table go; the deletion raises, naming the table, and all 53 tables still hold every row.
   This is the only thing that demonstrates "all or nothing" rather than asserting it.
 - Whether the deletion writes to the financial ledger. It does not, and that is asserted against the
   function's own source.

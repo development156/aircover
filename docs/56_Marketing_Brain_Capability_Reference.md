@@ -35,6 +35,11 @@ Runs weekly, `30 21 * * 0`, `/api/cron/brain`, declared in
 `apps/web/vercel.json`. **Costs nothing**: no model call anywhere in the pass,
 which is why it does not ride the Loop's paid switch.
 
+Every pass also records that it LOOKED, per workspace, in `marketing_pass_runs`.
+That row is what lets an empty report name the day it was last examined and what
+it is still short of, which is the difference between a product that is waiting
+and one that has stopped.
+
 ### The second ability, which is worth more than the first
 
 The claims are not only printed on `/report`. `packages/mesh/src/market-context.ts`
@@ -45,9 +50,14 @@ injects them into the model as a system block carrying two hard instructions:
 > performed. **If it is not in the list above, it has not been measured.**"
 
 The planner therefore plans around what worked without ever telling the
-customer's audience about the customer's numbers. **Reach today: 1 of 8 mesh
-tasks** (`plan_week`). `caption-rewrite` and `content-variants` — the two that
-actually write copy — do not see it.
+customer's audience about the customer's numbers. **Reach as of 2026-08-28: 3 of
+8 mesh tasks** — `plan_week`, `caption_rewrite` and `content_variants`. It read
+1 of 8 until that date, the figure this sentence carried until now; the two that
+write copy were added because planning is the wrong end of the pipe to stop at.
+The plan decides what gets made; those two decide how it reads. Brand block above
+market block in all three, which is the only place RULING 1 is enforced, and
+`market-injection.test.ts` names the permitted set so the next widening is also a
+decision rather than a drift.
 
 ---
 
@@ -156,10 +166,13 @@ parse.
   `channel_return` needs 5 posts *per channel* across 14 days. The expected first
   result in production is honest declines, not sentences. The floors are right;
   the posting volume has to catch up.
-- **Declines are discarded.** The pass computes why each workspace produced
-  nothing, then throws it into an HTTP response. Nothing can currently
-  distinguish "silent because correct" from "silent because broken".
-  `docs/55` step 10.
+- **Declines are no longer discarded, as of 2026-08-28.** `marketing_pass_runs`
+  records one row per workspace per pass: the day it looked, what it wrote, and
+  the reason each computer produced nothing. `/report` turns that into "Sahoda
+  last looked on … and is waiting for …" instead of a static "Nothing yet". A
+  workspace whose pass THREW writes no row, so a missing row still reads as "we
+  could not look" and never as patience. `docs/55` step 10, built. **The
+  migration is not applied to any database yet** — it ships with the code.
 - **Nothing records whether an observation was seen, believed or acted on.**
   Every threshold is a constant somebody chose rather than a number the product
   earned. `docs/55` step 8, and the difference between a brain and a filing
