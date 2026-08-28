@@ -10,10 +10,19 @@
  * check.
  *
  * So this asks the live database the same question the manifest was built from,
- * and PRINTS the difference rather than merely failing. Without a database URL
- * it SKIPS, loudly — the sandbox has no `.env` and a test that failed there
- * would be red for a reason that is not a defect, which is how a suite gets
- * ignored. A skip is honest; a green pass without a connection would not be.
+ * and PRINTS the difference rather than merely failing. Without a database it
+ * SKIPS, loudly — a test that failed there would be red for a reason that is
+ * not a defect, which is how a suite gets ignored. A skip is honest; a green
+ * pass without a connection would not be.
+ *
+ * "Without a database" used to mean an unset `SUPABASE_DB_URL`, and that was
+ * the right test until 2026-08-24, when `scripts/cloud-setup.sh` began writing
+ * a real `.env` into the cloud sandbox. The URL is now SET in an environment
+ * whose DNS cannot resolve the host it names, so from that date this file was
+ * red on every sandbox run: `getaddrinfo ENOTFOUND`, twice, on a tree with no
+ * defect in it. Both conditions are honoured now — no URL, or a URL nothing
+ * answers at. `db-reachability.ts` draws that line and argues where, and its
+ * own guard is the thing keeping a real failure out of the skip.
  *
  * It is read-only: one `select` against `information_schema` and `pg_policies`,
  * inside a `begin read only` — see the note on that below, which is the reason
@@ -49,9 +58,13 @@
  */
 import { createRequire } from 'node:module'
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, type TestContext } from 'vitest'
 
+import { unreachableReason } from './db-reachability'
 import { EXPORT_TABLES } from './export-manifest'
+
+/** Thrown only when nothing answered at the address. Never when a server did. */
+class DatabaseUnreachable extends Error {}
 
 const DB_URL = process.env.SUPABASE_DB_URL ?? ''
 const describeWithDb = DB_URL === '' ? describe.skip : describe
@@ -109,7 +122,16 @@ describeWithDb('the export manifest against the live schema', () => {
       connectionString: DB_URL,
       ssl: { rejectUnauthorized: false },
     })
-    await client.connect()
+    try {
+      await client.connect()
+    } catch (error) {
+      // Only the CONNECT is allowed to excuse itself. Anything the server says
+      // once it has answered — a refused password, a denied grant, a query that
+      // errors — falls through and stays red.
+      const reason = unreachableReason(error)
+      if (reason !== null) throw new DatabaseUnreachable(reason)
+      throw error
+    }
     try {
       // `begin read only`, NOT `set default_transaction_read_only = on`.
       //
@@ -129,8 +151,27 @@ describeWithDb('the export manifest against the live schema', () => {
     }
   }
 
-  it('knows about every workspace-owned table, and invents none', async () => {
-    const rows = await readSchema()
+  /**
+   * The schema, or a skip naming the host that never answered.
+   *
+   * The skip is a runtime one rather than `describe.skip`, because reachability
+   * cannot be known at collection time without opening the connection this test
+   * exists to open. The note is what somebody reads in the reporter, so it says
+   * which host and which syscall, not "database unavailable".
+   */
+  async function readSchemaOrSkip(ctx: TestContext) {
+    try {
+      return await readSchema()
+    } catch (error) {
+      if (error instanceof DatabaseUnreachable) {
+        ctx.skip(`SUPABASE_DB_URL is set, but nothing answered: ${error.message}`)
+      }
+      throw error
+    }
+  }
+
+  it('knows about every workspace-owned table, and invents none', async (ctx) => {
+    const rows = await readSchemaOrSkip(ctx)
     const inDb = rows.map((r) => r.table_name).sort()
     const inManifest = EXPORT_TABLES.map((t) => t.table).sort()
 
@@ -149,8 +190,8 @@ describeWithDb('the export manifest against the live schema', () => {
     ).toEqual([])
   }, 30_000)
 
-  it('classifies readability the way the policies actually do', async () => {
-    const rows = await readSchema()
+  it('classifies readability the way the policies actually do', async (ctx) => {
+    const rows = await readSchemaOrSkip(ctx)
     const wrong: string[] = []
 
     for (const row of rows) {
