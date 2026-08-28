@@ -159,13 +159,14 @@ test.describe('connections is honest about every channel @smoke', () => {
       }
 
       // ── 4b · AND THE WITHHELD ONES ARE NOT OFFERED ────────────────────────
-      // The other direction, which is what actually holds the decision in place.
-      // Without it, `HIDDEN_FROM_OFFER` could be emptied tomorrow and the only
-      // signal would be three tiles quietly reappearing on a live screen.
+      // From wt-karunesh. The other direction, which is what actually holds the
+      // decision in place. Without it, `HIDDEN_FROM_OFFER` could be emptied
+      // tomorrow and the only signal would be three tiles quietly reappearing
+      // on a live screen.
       //
       // Sound only because this workspace has nothing linked: a workspace that
       // HAD linked one of these must still see it under "Your channels", which
-      // is why the filter is not applied to that group. `connections/groups.ts`
+      // is why the filter is not applied to that group. `connections/offer.ts`
       // carries that half, where it can be tested without a browser.
       for (const name of ['Telegram', 'TikTok', 'Slack']) {
         expect(text, `width ${width}: ${name} is not offered`).not.toContain(name)
@@ -185,6 +186,11 @@ test.describe('connections is honest about every channel @smoke', () => {
        * not a deletion. The first is that the figure is a real measurement: the
        * shape `100 of —` is what this guard was written against, so `\d+` is
        * the load-bearing part and an em dash still fails.
+       *
+       * MERGED, NOT PICKED. wt-karunesh's copy of this block still described
+       * the old `of` fraction, because that lane branched before the redesign.
+       * Taking its 4b and this lane's 5 keeps the new check AND the true
+       * description; taking either side whole would have lost one of them.
        */
       expect(text, `width ${width}: the X allowance is rendered`).toMatch(
         /\d+ posts remaining this month/i,
