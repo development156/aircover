@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 import type { Page } from '@playwright/test'
 
 import { adminClient, expect, signInSecondContext, test } from './fixtures/seeded-user'
-import { leaveOnboarding } from './fixtures/compose'
+import { leaveOnboarding, SEED_BODY } from './fixtures/compose'
 import { framesTaken, shot, timedGoto, useTheme, type Theme } from './helpers/ux-shot'
 
 /**
@@ -62,14 +62,25 @@ async function bootstrap(page: Page): Promise<void> {
   }
 }
 
-/** Open the composer on a real row for one channel, and return the post id. */
+/**
+ * Open the composer on a real row for one channel, and return the post id.
+ *
+ * Writing comes before picking, because the composer is a numbered sequence and
+ * the channel step is genuinely refused — `inert`, not merely dim — until step
+ * one has something in it. A tile clicked on a blank post cannot land.
+ */
 async function composerOn(page: Page, channel: string): Promise<string | null> {
   await timedGoto(page, '/posts/new')
-  const tile = page.locator(`[data-channel-tile="${channel}"]`)
   try {
+    const body = page.getByLabel('Your post')
+    await body.waitFor({ state: 'visible', timeout: 10_000 })
+    await body.fill(SEED_BODY)
+    await page.waitForURL(/\/posts\/[0-9a-f-]{36}$/, { timeout: 60_000 })
+
+    const tile = page.locator(`[data-channel-tile="${channel}"]`)
     await tile.waitFor({ state: 'visible', timeout: 10_000 })
     await tile.click()
-    await page.waitForURL(/\/posts\/[0-9a-f-]{36}$/, { timeout: 60_000 })
+    await expect(page.locator(`[data-version-card="${channel}"]`)).toBeVisible({ timeout: 30_000 })
   } catch {
     return null
   }

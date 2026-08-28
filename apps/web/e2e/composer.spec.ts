@@ -77,31 +77,39 @@ test.describe('the composer keeps one body per channel @smoke', () => {
     await page.goto('/posts/new')
     await expect(page.locator('[data-composer]')).toBeVisible({ timeout: 90_000 })
 
-    // ── 3. Channels, picked in the same place they can be un-picked. Fast and
-    //      reversible: this spec picks three and drops one before writing.
-    await page.locator('[data-channel-tile="x"]').click()
-    await page.locator('[data-channel-tile="linkedin"]').click()
-    await page.locator('[data-channel-tile="gbp"]').click()
-    await expect(page.locator('[data-version-card="gbp"]')).toBeVisible()
-    await page.locator('[data-channel-tile="gbp"]').click()
-    await expect(page.locator('[data-version-card="gbp"]')).toHaveCount(0)
-
-    // ── 4. Write once. The row does not exist until this is saved — opening a
+    // ── 3. Write once. The row does not exist until this is saved — opening a
     //      screen is not intent — so the id arriving in the address bar IS the
     //      evidence that the first save landed, and that is enforced rather than
     //      hoped for: the composer rewrites the address only after the save is
     //      confirmed. It used to rewrite it as soon as the row was created, one
     //      round trip earlier, and a reload in that window produced a real post
     //      with no channels on it.
+    //
+    //      Writing is also step ONE of a sequence the screen enforces: the
+    //      channel step below is refused outright until there is something for
+    //      it to shape.
     await page.getByLabel('Your post').fill(SOURCE_BODY)
     await page.waitForURL(/\/posts\/[0-9a-f-]{36}$/, { timeout: 60_000 })
     const postId = new URL(page.url()).pathname.split('/').pop() as string
     expect(postId).toMatch(/^[0-9a-f-]{36}$/)
 
-    // ── 4b. THE ADDRESS IS NOT A PROMISE THE ROW CANNOT KEEP ────────────────
-    // Reloaded immediately. Both channels picked in step 3 are still there,
-    // because the address only started pointing here once the write carrying
-    // them was confirmed.
+    // ── 4. Channels, picked in the same place they can be un-picked. Fast and
+    //      reversible: this spec picks three and drops one.
+    await page.locator('[data-channel-tile="x"]').click()
+    await page.locator('[data-channel-tile="linkedin"]').click()
+    await page.locator('[data-channel-tile="gbp"]').click()
+    await expect(page.locator('[data-version-card="gbp"]')).toBeVisible()
+    await page.locator('[data-channel-tile="gbp"]').click()
+    await expect(page.locator('[data-version-card="gbp"]')).toHaveCount(0)
+    await expect(page.getByText('Post saved')).toBeVisible({ timeout: 60_000 })
+
+    // ── 4b. THE PICKS ARE THE ROW'S, NOT THE SCREEN'S ──────────────────────
+    // Reloaded immediately. Both channels survive, and that is now a claim
+    // about a SECOND save rather than about the row's creation: the sequence
+    // means the picks happen after the id is in the address bar, so the line
+    // above waits for that save to land and this reload reads it back from the
+    // server. The defect this guards has not changed — a real post with no
+    // channels on it — only the write that could produce it.
     await page.reload()
     await expect(page.locator('[data-version-card="x"]')).toBeVisible({ timeout: 60_000 })
     await expect(page.locator('[data-version-card="linkedin"]')).toBeVisible()

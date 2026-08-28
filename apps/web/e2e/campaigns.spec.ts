@@ -82,15 +82,10 @@ async function writePostOnTwoChannels(page: Page, body: string): Promise<string>
   await page.goto('/posts/new')
   await expect(page.locator('[data-composer]')).toBeVisible({ timeout: 90_000 })
 
-  await page.locator('[data-channel-tile="instagram"]').click()
-  await page.locator('[data-channel-tile="linkedin"]').click()
-
-  // Both picked, before a word is written. These cards are the PICKER's answer,
-  // not the row's — the row does not exist yet, because opening a screen is not
-  // intent.
-  await expect(page.locator('[data-version-card="instagram"]')).toBeVisible()
-  await expect(page.locator('[data-version-card="linkedin"]')).toBeVisible()
-
+  // The words come first, because the screen is a numbered sequence and the
+  // channel step is refused until there is something for it to shape. This
+  // helper used to pick both channels before writing a word; that order is not
+  // slow now, it is impossible.
   await page.getByLabel('Your post').fill(body)
 
   // Read the id off the PATH. Nothing emits `?post=` any more, and a spec that
@@ -98,6 +93,15 @@ async function writePostOnTwoChannels(page: Page, body: string): Promise<string>
   await page.waitForURL(/\/posts\/[0-9a-f-]{36}$/, { timeout: 60_000 })
   const postId = new URL(page.url()).pathname.split('/').pop() as string
   expect(postId).toMatch(/^[0-9a-f-]{36}$/)
+
+  await page.locator('[data-channel-tile="instagram"]').click()
+  await page.locator('[data-channel-tile="linkedin"]').click()
+
+  // These cards are the PICKER's answer, not the row's. The reload below is
+  // what asks the row.
+  await expect(page.locator('[data-version-card="instagram"]')).toBeVisible()
+  await expect(page.locator('[data-version-card="linkedin"]')).toBeVisible()
+  await expect(page.getByText('Post saved')).toBeVisible({ timeout: 60_000 })
 
   // ── THE GUARANTEE THIS HELPER CARRIES, RETARGETED AND NOT DROPPED ──────────
   // The previous version ended by reloading and finding a channel TAB per
