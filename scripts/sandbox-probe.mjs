@@ -32,7 +32,14 @@ const dim = (m) => console.log(`       ${m}`)
 const result = {
   measuredAt: new Date().toISOString(),
   node: { httpsFetch: null },
-  chromium: { present: null, httpLoopback: null, httpOutbound: null, httpsOutbound: null },
+  chromium: {
+    present: null,
+    executablePath: null,
+    foundBy: null,
+    httpLoopback: null,
+    httpOutbound: null,
+    httpsOutbound: null,
+  },
   verdict: null,
   notes: [],
 }
@@ -73,9 +80,65 @@ try {
   // "not importable" on a machine with a working browser.
   chromium = pw.chromium ?? pw.default?.chromium
   if (!chromium) throw new Error('module resolved but exports no chromium')
-  const path = chromium.executablePath()
-  result.chromium.present = existsSync(path)
-  result.chromium.present ? ok(`browser binary present`) : no(`browser binary NOT installed`)
+
+  /**
+   * ── ASK THREE PLACES, NOT ONE ─────────────────────────────────────────────
+   * `chromium.executablePath()` is where Playwright EXPECTS the binary, which
+   * is not the same question as where one IS.
+   *
+   * MEASURED 2026-08-28 in this sandbox: it returns
+   * `/opt/pw-browsers/chromium-1228/chrome-linux64/chrome`, and what exists is
+   * `.../chromium-1228/chrome-linux/chrome` — same build, different directory
+   * name between Playwright versions. Builds 1194 and 1228 were both installed
+   * and 1194 drives the suite fine. This probe reported NO_BROWSER anyway,
+   * skipped all three network probes (leaving them `null` rather than `false`,
+   * which is the tell), and `browser-run.mjs` inherited that and told sessions
+   * the suite could never run here. It ran, 3 of 3, in the same hour.
+   *
+   * Worse, the probe never read `PLAYWRIGHT_CHROMIUM_PATH` — the opt-in the
+   * playwright config itself honours (`playwright.config.ts:168`) and the
+   * variable that makes those passing runs work. The tool that answers "can
+   * this box drive a browser" could not see the browser the repo had already
+   * been told about.
+   *
+   * So: an explicit override wins, then Playwright's own guess, then a scan of
+   * PLAYWRIGHT_BROWSERS_PATH for any chromium build with a real binary. The
+   * path that won is recorded, because "which browser answered" is the first
+   * thing the next session will want and it was never written down.
+   */
+  const candidates = []
+  for (const env of ['PLAYWRIGHT_CHROMIUM_PATH', 'SAHODA_CHROMIUM_PATH']) {
+    if (process.env[env]) candidates.push({ how: env, path: process.env[env] })
+  }
+  try {
+    candidates.push({ how: 'playwright default', path: chromium.executablePath() })
+  } catch {}
+  const root = process.env.PLAYWRIGHT_BROWSERS_PATH
+  if (root && existsSync(root)) {
+    const { readdirSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    // Newest build first: a directory sorts numerically after its prefix.
+    const builds = readdirSync(root)
+      .filter((d) => d.startsWith('chromium-'))
+      .sort((a, b) => Number(b.slice(9)) - Number(a.slice(9)))
+    for (const b of builds) {
+      for (const dir of ['chrome-linux', 'chrome-linux64']) {
+        candidates.push({ how: `scan ${b}/${dir}`, path: join(root, b, dir, 'chrome') })
+      }
+    }
+  }
+
+  const found = candidates.find((c) => c.path && existsSync(c.path))
+  result.chromium.present = Boolean(found)
+  result.chromium.executablePath = found ? found.path : null
+  result.chromium.foundBy = found ? found.how : null
+  if (found) {
+    ok(`browser binary present — ${found.how}`)
+    dim(found.path)
+  } else {
+    no(`browser binary NOT installed`)
+    dim(`looked in ${candidates.length} place(s); none existed`)
+  }
 } catch (e) {
   result.chromium.present = false
   no(`playwright not importable — ${String(e.message).slice(0, 50)}`)
@@ -88,7 +151,12 @@ try {
 if (result.chromium.present) {
   let browser
   try {
-    browser = await chromium.launch({ args: ['--no-sandbox'] })
+    browser = await chromium.launch({
+      args: ['--no-sandbox'],
+      // The binary discovery above is pointless if the launch still uses
+      // Playwright's default guess.
+      ...(result.chromium.executablePath ? { executablePath: result.chromium.executablePath } : {}),
+    })
     const probe = async (url, label, key) => {
       const page = await browser.newPage()
       try {
