@@ -28,6 +28,9 @@ function eligibleFacts(over: Partial<LoopFacts> = {}): LoopFacts {
       { platform: 'linkedin', status: 'active' },
     ],
     availableCredits: 1260,
+    // A resolved brain with every field confirmed. Each test below breaks one
+    // thing, and the brain is not the thing unless the test says it is.
+    brain: { resolved: true, confirmed: 15, total: 15 },
     planningWeek: WEEK,
     openCycle: null,
     dial: [
