@@ -59,7 +59,7 @@ function composer(channels: readonly string[] = ['x', 'linkedin']) {
     updated_at: '',
   } as unknown as Post
 
-  return render(
+  const rendered = render(
     <Composer
       post={post}
       variants={[] as PostVariant[]}
@@ -67,6 +67,16 @@ function composer(channels: readonly string[] = ['x', 'linkedin']) {
       templates={{ ok: true, templates: [] } as never}
     />,
   )
+
+  // ── THE VERSION CARDS LIVE IN PART TWO NOW ──────────────────────────────────
+  // The composer became a Meta-style map: the three parts of a post listed down
+  // the side, the one being worked on filling the screen. Everything this file
+  // is about — each channel's own box, its own undo history, its own emoji
+  // panel — is inside "Each platform", so the fixture goes there. The rail row
+  // is a real button and this is a real click, so the journey under test is the
+  // one a writer takes.
+  fireEvent.click(rendered.container.querySelector('[data-rail-step="2"] button') as HTMLElement)
+  return rendered
 }
 
 function editor(channel: 'X' | 'LinkedIn'): HTMLTextAreaElement {
@@ -90,7 +100,11 @@ describe('every channel gets its own controls, and they say which channel', () =
         screen.getByRole('button', { name: `Redo the last undone change to ${target}` }),
       ).toBeTruthy()
     }
-    // And the post's own box has its own set, named for it rather than a channel.
+    // And the post's own box has its own set, named for it rather than a
+    // channel. It is in part ONE — the words themselves — so the fixture goes
+    // back there to look, which is also the claim that the two sets are
+    // genuinely separate rather than one set rendered twice.
+    fireEvent.click(document.querySelector('[data-rail-step="1"] button') as HTMLElement)
     expect(screen.getByRole('button', { name: 'Clear your post' })).toBeTruthy()
   })
 

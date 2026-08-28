@@ -23,6 +23,13 @@ import { expect, type Page } from '@playwright/test'
  * that is what a person does and it is now the only honest way to reach a saved
  * post. The id arriving in the address bar is still not a side effect this waits
  * on; it IS the evidence that the first save landed.
+ *
+ * ── AND THE TYPING NOW COMES FIRST ──────────────────────────────────────────
+ * The composer became a numbered sequence on 2026-08-28: write, then choose
+ * where it goes, then send it. Step two is genuinely refused until step one has
+ * something in it, so the old order — tick a channel, then type — is not merely
+ * unusual now, it is impossible, and it failed as a click timeout rather than as
+ * anything that named the cause.
  */
 export async function bootstrapWorkspace(page: Page): Promise<void> {
   await page.goto('/home')
@@ -78,13 +85,61 @@ export async function leaveOnboarding(page: Page): Promise<void> {
  */
 export const SEED_BODY = 'A draft, opened by the test fixture.'
 
+/**
+ * Go to one of the composer's three parts, the way a writer does: by pressing
+ * its row in the rail down the side.
+ *
+ * ── WHY EVERY SPEC THAT TOUCHES THE COMPOSER NEEDS THIS NOW ─────────────────
+ * The screen became a map: the three parts of a post listed on the left, the
+ * one being worked on filling the right. So the channel tiles, the per-platform
+ * version cards and the send panel are no longer all in the document at once,
+ * and a locator for one of them is not slow on the wrong part, it is empty.
+ *
+ * The composer opens on part one every time — a writer coming back to a draft is
+ * here to read it — so a reload is exactly the place a spec has to come back
+ * through the rail. The one exception is an address carrying `#finish`, which
+ * the commit bar sets and which lands on part three on arrival.
+ */
+export async function openPart(page: Page, index: 1 | 2 | 3): Promise<void> {
+  // ── THE LOCK IS CHECKED FIRST, AND THAT IS NOT BELT AND BRACES ─────────────
+  // A refused row is `aria-disabled`, which Playwright does NOT treat as an
+  // actionability barrier: the click succeeds, nothing happens, and the failure
+  // arrives 30 seconds later naming a missing panel rather than the refusal
+  // that caused it. Asserted here so the message names the cause.
+  const row = page.locator(`[data-rail-step="${index}"]`)
+  await expect(row).toHaveAttribute('data-rail-locked', 'false', { timeout: 30_000 })
+  await row.locator('button').first().click()
+  await expect(page.locator(`[data-composer-panel="${index}"]`)).toBeVisible({ timeout: 30_000 })
+}
+
 export async function startPost(page: Page, channel: string): Promise<string> {
   await page.goto('/posts/new')
   await expect(page.locator('[data-composer]')).toBeVisible({ timeout: 60_000 })
-  await page.locator(`[data-channel-tile="${channel}"]`).click()
-  // The tick alone writes nothing now. Typing is what makes it a draft.
+  // WRITE FIRST, THEN PICK — and that order is now the product, not a taste.
+  // The composer is a sequence: the platform part is refused until something has
+  // been written, so a tile picked on a blank post is not a slow click, it is a
+  // click that can never land. Measured as a 5s timeout on the tile, in thirteen
+  // @smoke files at once, the moment the sequence went in.
   await page.getByLabel('Your post').fill(SEED_BODY)
   await page.waitForURL(/\/posts\/[0-9a-f-]{36}$/, { timeout: 60_000 })
+  // Part two is where the platforms are, and it is refused until the line above
+  // has put something in the post. This helper leaves the page THERE, which is
+  // what most callers want next; anything needing the words again says so.
+  await openPart(page, 2)
+  await page.locator(`[data-channel-tile="${channel}"]`).click()
+  // The pick is now a SECOND save rather than part of the row's creation, so it
+  // is waited on here: a caller that reloads straight after `startPost` would
+  // otherwise race a write still in flight and find a post with no channel on
+  // it. The version card is the picker's answer; the pair below is the row's.
+  //
+  // The PAIR, not a bare "Post saved" — and this is the whole point. The
+  // composer only rewrites the address once the first save is confirmed, so
+  // "Post saved" is already on screen the moment `waitForURL` returns. A lone
+  // wait for it can be satisfied by that earlier save and finish without
+  // waiting for anything at all. Requiring the pending state first makes the
+  // "Post saved" that follows necessarily the one the tile click caused.
+  await expect(page.locator(`[data-version-card="${channel}"]`)).toBeVisible({ timeout: 30_000 })
+  await expectPostSaved(page)
 
   const postId = new URL(page.url()).pathname.split('/').pop() as string
   expect(postId).toMatch(/^[0-9a-f-]{36}$/)

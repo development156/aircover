@@ -1,4 +1,4 @@
-import { expectPostSaved, startPost, leaveOnboarding } from './fixtures/compose'
+import { expectPostSaved, openPart, startPost, leaveOnboarding } from './fixtures/compose'
 import { makePng } from './fixtures/png'
 import { adminClient, expect, test } from './fixtures/seeded-user'
 
@@ -113,6 +113,9 @@ test.describe('media library', () => {
     await expectPostSaved(page)
 
     // ── 6. Attach FROM THE LIBRARY, through the composer's media panel ───────
+    // The pictures belong to the POST, so the panel is on part one beside the
+    // writing box. `startPost` leaves the page on the platform part.
+    await openPart(page, 1)
     await page.getByRole('button', { name: /choose from library/i }).click()
     const dialog = page.getByRole('dialog')
     await dialog.getByRole('button', { name: /shopfront\.png/i }).click()
@@ -305,6 +308,7 @@ test.describe('media library · widths and themes', () => {
         // Same retarget as above: the composer IS the post screen, so there is
         // no second navigation to it.
         await startPost(page, 'instagram')
+        await openPart(page, 1)
         await page.evaluate((mode) => {
           document.documentElement.setAttribute('data-theme', mode)
         }, theme)

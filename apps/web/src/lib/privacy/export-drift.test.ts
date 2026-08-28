@@ -74,7 +74,66 @@ const MIGRATIONS_DIR = resolve(
 )
 
 const DB_URL = process.env.SUPABASE_DB_URL ?? ''
-const describeWithDb = DB_URL === '' ? describe.skip : describe
+
+/**
+ * The skip condition is REACHABILITY, not "is the string set".
+ *
+ * The header above says this file skips loudly when there is no database,
+ * because a red here for want of a connection is red for a reason that is not
+ * a defect. That was written when the cloud sandbox had no `.env` at all, so
+ * "no URL" and "no database" were the same fact. They stopped being the same
+ * fact on 2026-08-24, when `scripts/cloud-setup.sh` began provisioning the
+ * sandbox from environment variables: `SUPABASE_DB_URL` is now set in a place
+ * that cannot open a socket to it. MEASURED 2026-08-27 in this sandbox: the URL
+ * is present and `pg` fails `getaddrinfo ENOTFOUND` against the host every
+ * time. The old gate let it through and the file went red exactly as its own
+ * header forbids.
+ *
+ * So probe once, here, and let the CONNECTION decide. This deliberately does
+ * not widen to query or assertion errors: those still fail the tests. Only a
+ * failure to establish the connection skips, and it says so on stderr — a skip
+ * nobody can see is how a suite gets ignored.
+ */
+/**
+ * `process.stderr.write`, not `console.warn`. MEASURED 2026-08-27: vitest
+ * attributes console output to a running test, and this runs during module
+ * evaluation with every test about to be skipped — the warning never reached
+ * the terminal. A skip nobody can see is the failure mode this whole probe
+ * exists to avoid, so write to the stream directly.
+ */
+function warnSkip(reason: string): void {
+  process.stderr.write(`[export-drift] SKIPPED: ${reason}\n`)
+}
+
+async function databaseIsReachable(): Promise<boolean> {
+  if (DB_URL === '') {
+    warnSkip('SUPABASE_DB_URL is not set.')
+    return false
+  }
+  const require = createRequire(import.meta.url)
+  const pg = require('pg') as {
+    Client: new (c: unknown) => { connect(): Promise<void>; end(): Promise<void> }
+  }
+  const client = new pg.Client({
+    connectionString: DB_URL,
+    ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 5_000,
+  })
+  try {
+    await client.connect()
+    await client.end()
+    return true
+  } catch (error) {
+    warnSkip(
+      `SUPABASE_DB_URL is set but the database could not be reached (${
+        error instanceof Error ? error.message : String(error)
+      }). This says nothing about the manifest. packages/db/tests/export_manifest.pglite.test.ts covers the migration files with no credentials; only this file can speak for production, so run it where the host is reachable.`,
+    )
+    return false
+  }
+}
+
+const describeWithDb = (await databaseIsReachable()) ? describe : describe.skip
 
 /** Both questions the manifest encodes, in one round trip. */
 const SCHEMA_QUERY = `

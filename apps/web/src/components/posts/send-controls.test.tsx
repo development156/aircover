@@ -87,6 +87,18 @@ describe('SendControls — the pair, and where the post is going', () => {
     expect(screen.getByText(/Nothing goes out until a channel is connected/i)).toBeInTheDocument()
   })
 
+  test('a post with NO platform chosen is told to choose one, not to connect one', () => {
+    // ── TWO REASONS NOTHING CAN GO OUT, AND ONLY ONE REMEDY WORKS ───────────
+    // Telling somebody to connect an account when they have connected three and
+    // picked none sends them to the wrong screen entirely. This state is easy
+    // to reach: a post whose platforms were all unticked keeps the send panel
+    // reachable, because a part already earned never shuts under the cursor.
+    controls({ channels: toChannelSet([]), live: [], connected: set('x') })
+
+    expect(screen.getByText(/Nothing goes out until you choose a platform/i)).toBeInTheDocument()
+    expect(screen.queryByText(/until a channel is connected/i)).not.toBeInTheDocument()
+  })
+
   test('the same button is LIVE the moment one channel is connected', () => {
     // The counterweight. A permanently disabled Send would satisfy the test
     // above and be a worse screen than the one it replaced.

@@ -136,7 +136,17 @@ test.describe('connections is honest about every channel @smoke', () => {
       expect(text).toContain('Not proven live')
       expect(text).not.toMatch(/verified live/i)
 
-      // ── 4 · EVERY CHANNEL IS NAMED, IN WORDS ──────────────────────────────
+      // ── 4 · EVERY CHANNEL WE OFFER IS NAMED, IN WORDS ─────────────────────
+      // RETARGETED 2026-08-28, and the claim narrowed on purpose rather than the
+      // list being trimmed to whatever passes. It read "every channel is named"
+      // and included Telegram. `HIDDEN_FROM_OFFER` now withholds telegram,
+      // tiktok and slack from a workspace that has not linked them, so the old
+      // form asserted the opposite of a deliberate product decision.
+      //
+      // This workspace has NO connections, so what it can see is the offer. The
+      // claim is unchanged in shape — /connections must name what it offers, in
+      // words a person recognises, never an internal id — and the two halves
+      // below are now stated separately because they are different claims.
       for (const name of [
         'Instagram',
         'LinkedIn',
@@ -144,9 +154,22 @@ test.describe('connections is honest about every channel @smoke', () => {
         'Facebook Pages',
         'YouTube',
         'Pinterest',
-        'Telegram',
       ]) {
         expect(text, `width ${width}: ${name} is named`).toContain(name)
+      }
+
+      // ── 4b · AND THE WITHHELD ONES ARE NOT OFFERED ────────────────────────
+      // From wt-karunesh. The other direction, which is what actually holds the
+      // decision in place. Without it, `HIDDEN_FROM_OFFER` could be emptied
+      // tomorrow and the only signal would be three tiles quietly reappearing
+      // on a live screen.
+      //
+      // Sound only because this workspace has nothing linked: a workspace that
+      // HAD linked one of these must still see it under "Your channels", which
+      // is why the filter is not applied to that group. `connections/offer.ts`
+      // carries that half, where it can be tested without a browser.
+      for (const name of ['Telegram', 'TikTok', 'Slack']) {
+        expect(text, `width ${width}: ${name} is not offered`).not.toContain(name)
       }
 
       // ── 5 · THE X METER IS A REAL NUMBER, AND IT IS ATTRIBUTED ────────────
@@ -163,6 +186,11 @@ test.describe('connections is honest about every channel @smoke', () => {
        * not a deletion. The first is that the figure is a real measurement: the
        * shape `100 of —` is what this guard was written against, so `\d+` is
        * the load-bearing part and an em dash still fails.
+       *
+       * MERGED, NOT PICKED. wt-karunesh's copy of this block still described
+       * the old `of` fraction, because that lane branched before the redesign.
+       * Taking its 4b and this lane's 5 keeps the new check AND the true
+       * description; taking either side whole would have lost one of them.
        */
       expect(text, `width ${width}: the X allowance is rendered`).toMatch(
         /\d+ posts remaining this month/i,

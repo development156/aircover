@@ -1,5 +1,7 @@
 import react from '@vitejs/plugin-react'
+import { cpus } from 'node:os'
 import { fileURLToPath } from 'node:url'
+
 import { defineConfig } from 'vitest/config'
 
 /**
@@ -49,8 +51,24 @@ export default defineConfig({
      *
      * CI gets the full machine: a hosted runner is dedicated, and halving its
      * workers would just make the gate slower for no gain.
+     *
+     * ── WHY THIS IS NO LONGER THE LITERAL 4 ─────────────────────────────────
+     * A flat 4 is a cut on the 12-core laptop it was measured on and NO CUT AT
+     * ALL on a 4-core box, where vitest would have used 4 anyway. MEASURED
+     * 2026-08-27 in the claude.ai/code sandbox (`os.cpus().length === 4`): the
+     * exact symptom above came straight back, three full runs of the same
+     * commit failing in three DIFFERENT files, every one green in isolation.
+     *
+     *   run 1   composer/one-fill       findByRole timed out
+     *   run 2   privacy/export-drift    (a separate defect, fixed in that file)
+     *   run 3   repo/workspace-timezone suite-level failure, 0 failed tests
+     *
+     * So express the cut as a cut. `cpus - 2` leaves the machine two cores for
+     * everything that is not the suite, the floor of 2 keeps a small box from
+     * dropping to serial, and the ceiling of 4 preserves the value measured on
+     * the 12-core machine exactly. 12 cores still yield 4; 4 cores now yield 2.
      */
-    maxWorkers: process.env.CI ? undefined : 4,
+    maxWorkers: process.env.CI ? undefined : Math.min(4, Math.max(2, cpus().length - 2)),
     projects: [
       {
         resolve: { alias },

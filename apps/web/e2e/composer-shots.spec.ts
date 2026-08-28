@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { bootstrapWorkspace, startPost, versionBox } from './fixtures/compose'
+import { bootstrapWorkspace, openPart, startPost, versionBox } from './fixtures/compose'
 import { expect, test } from './fixtures/seeded-user'
 
 /**
@@ -37,11 +37,18 @@ test.describe('composer screenshots', () => {
 
     // A post worth photographing: two channels, two bodies, two formats, and a
     // channel that has detached so the relink control is on screen.
+    //
+    // `startPost` leaves the page on part two, where the platforms are, so the
+    // second tile is picked here and the WORDS are set on part one before
+    // coming back. The rail is visible in every frame below, which is the point
+    // of re-shooting these at all.
     await page.locator('[data-channel-tile="x"]').click()
     await expect(page.locator('[data-version-card="x"]')).toBeVisible()
 
     await page.getByLabel('Name this post').fill('Monsoon hours')
+    await openPart(page, 1)
     await page.getByLabel('Your post').fill('We are open till nine all week, rain or not.')
+    await openPart(page, 2)
     await versionBox(page, 'X').fill('Open till 9 all week. Rain or not. ☔')
     await page.locator('[data-hashtags="x"]').fill('#chai #pune')
     await page.locator('[data-variant-format="x"]').selectOption('text')
