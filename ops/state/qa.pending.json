@@ -936,6 +936,71 @@
       "summary_plain": "The unit checks passed for @sahoda/jobs ONLY — this run was filtered and does not cover the workspace.",
       "details": "JOBS_EXIT=0\n@sahoda/jobs:test:  Test Files  34 passed (34)",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtcq3ryn-1e59a88b",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T09:02:18.189Z",
+      "finished_at": "2026-08-28T09:02:18.189Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The unit checks ran and something failed.",
+      "details": "@sahoda/web:test:  FAIL   ui  src/components/assets/asset-library.test.tsx > bulk filing > states the real added/alreadyThere counts, and Undo calls the inverse action\n@sahoda/web:test:  FAIL   ui  src/components/assets/asset-library.test.tsx > the bulk bar can move a selection to the trash > offers Undo, which puts back only what this call moved\n@sahoda/web:test:  FAIL   ui  src/components/composer/one-fill.test.tsx > the committing buttons inside the Send it panel > Confirm schedule is the schedule side one fill\n@sahoda/web:test:  Test Files  2 failed | 450 passed | 3 skipped (455)\n\n[exited with code 0]\n--- still running? ---\n21972 /bin/bash -c source /root/.claude/shell-snapshots/snapshot-bash-1787906143644-845ny6",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtcq86pk-d0fa7cee",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T09:05:43.925Z",
+      "finished_at": "2026-08-28T09:05:43.925Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks passed for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
+      "details": "WEB_EXIT=0\n@sahoda/web:test:  Test Files  452 passed | 3 skipped (455)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtcqjabi-1b440d26",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T09:14:21.819Z",
+      "finished_at": "2026-08-28T09:14:21.819Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks ran and everything passed.",
+      "details": "TURBO_EXIT=0\n Tasks:    27 successful, 27 total\nCached:    0 cached, 27 total\n  Time:    7m56.938s",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtcqjabi-a152fca3",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T09:14:21.819Z",
+      "finished_at": "2026-08-28T09:14:21.819Z",
+      "suite": "lint",
+      "status": "pass",
+      "summary_plain": "The lint checks ran and everything passed.",
+      "details": "TURBO_EXIT=0\n Tasks:    27 successful, 27 total\nCached:    0 cached, 27 total\n  Time:    7m56.938s",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtcqjabi-6a6b55a0",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T09:14:21.819Z",
+      "finished_at": "2026-08-28T09:14:21.819Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks ran and everything passed.",
+      "details": "TURBO_EXIT=0\n Tasks:    27 successful, 27 total\nCached:    0 cached, 27 total\n  Time:    7m56.938s",
+      "duration_ms": null
     }
   ]
 }
