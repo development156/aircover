@@ -1599,6 +1599,32 @@
       "summary_plain": "The unit checks passed (438 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": "      Tests  438 passed (438)",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtcudldp-10ed621f",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T11:01:54.683Z",
+      "finished_at": "2026-08-28T11:01:54.683Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The unit checks ran and something failed.",
+      "details": "AssertionError: These read source but never say what they cannot see. Add a sentence — \"WHAT IT CANNOT SEE: …\" — naming the access pattern the scan would miss (raw SQL, an RPC, a dynamic import, a commented entry, a template literal).: expected [ Array(1) ] to deeply equal []\n\n- Expected\n+ Received\n\n- []\n+ [\n=== what it scans:\n  const unseen = undeclared.filter((f) => !known.has(f))\n\n  if (unseen.length > 0 && !absorbNew) {\n    console.error(`  baseline NOT written — ${unseen.length} scanner(s) new to the register:`)\n    for (const f of unseen) console.error(`  REFUSED  ${f} (need --absorb-new)`)\n    process.exit(1)\n  }\n  for (const f of unseen) console.log(`  absorbing  ${f}`)\n  writeFileSync(BASELINE, `${JSON.stringify({ undeclared }, null, 2)}\\n`)\n  console.log(`baseline: ${baseline.undeclared.length} → ${undeclared.length}`)\n  process.exit(0)\n}\n\ndescribe('every scanner declares what it is blind to', () => {\n  it('finds the scanners by git grep, not by a list — a new one cannot hide', () => {\n    // If this ever drops to a handful, the enumeration broke and every\n    // assertion below became vacuously true.\n    expect(scanners.length).toBeGreaterThan(40)\n  })\n\n  it('no NEW scanner arrives without declaring its blind spot', () => {\n    const undeclared = scanners.filter((s) => !s.declaresLimit).map((s) => s.file)\n    const added = undeclared.filter((f) => !baseline.undeclared.includes(f))\n\n    expect(\n      added,\n      `These read source but never say what they cannot see. Add a sentence — ` +\n        `\"WHAT IT CANNOT SEE: …\" — naming the access pattern the scan would miss ` +\n        `(raw SQL, an RPC, a dynamic import, a commented entry, a template literal).`,\n    ).toEqual([])\n  })",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtcue3va-d1d23438",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T11:02:18.644Z",
+      "finished_at": "2026-08-28T11:02:18.644Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks ran and everything passed (8 passed).",
+      "details": "      Tests  8 passed (8)",
+      "duration_ms": null
     }
   ]
 }

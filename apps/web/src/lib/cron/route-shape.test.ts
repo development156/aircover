@@ -25,6 +25,17 @@ import { describe, expect, it } from 'vitest'
  * `maxDuration` is a build-time export Next reads out of the module; importing
  * these routes would pull `server-only`, a Clerk middleware seam and a live
  * billing env into a unit test to learn one number that is written on line 60.
+ *
+ * ── WHAT IT CANNOT SEE ───────────────────────────────────────────────────────
+ * It reads the route FILE and nothing the route calls. A pool built per
+ * workspace inside `run-loop.ts`, or inside any other module a handler reaches,
+ * is invisible here — which is where the real leak lived, and why
+ * `run-loop-resources.test.ts` counts pools through a stubbed port rather than
+ * by reading text. It also cannot see a `maxDuration` that is re-exported from
+ * another module, a loop written as `.forEach` or `.map` rather than `for` or
+ * `while`, an authorisation check reached through a wrapper by another name, or
+ * a route whose handler is not `export async function GET`. Each of those would
+ * pass this scan while breaking what it is scanning for.
  */
 
 const CRON_DIR = resolve(import.meta.dirname, '../../app/api/cron')
