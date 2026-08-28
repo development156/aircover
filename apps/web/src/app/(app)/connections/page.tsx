@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/empty-state'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
 import { PageTitle } from '@/components/page-title'
 import { checkCountableLimit } from '@/lib/billing/entitlements'
-import { CONNECTABLE, PLANNED } from '@/lib/connections/catalogue'
+import { CONNECTABLE, PLANNED, isOfferedForConnect } from '@/lib/connections/catalogue'
 import { readConnections, readConnectionSlots } from '@/lib/connections/read'
 import { groupByPlatform, hasHeadroom, slotSentence, type SlotUsage } from '@/lib/connections/slots'
 import { readXUsage } from '@/lib/connections/x-usage'
@@ -181,10 +181,20 @@ export default async function ConnectionsPage({
   const linkedEntries = CONNECTABLE.filter(
     (entry) => LIVE_VIA_ZERNIO.has(entry.id) && (byChannel.get(entry.id)?.length ?? 0) > 0,
   )
+  // `isOfferedForConnect` is applied to the two OFFER groups and deliberately not
+  // to `linkedEntries`. Hiding a channel we would rather not advertise and hiding
+  // an account the customer already linked are different acts: the second one
+  // strands a live connection that still holds a plan slot and still publishes,
+  // with nothing on the screen to disconnect it by. See `HIDDEN_FROM_OFFER`.
   const openEntries = CONNECTABLE.filter(
-    (entry) => LIVE_VIA_ZERNIO.has(entry.id) && (byChannel.get(entry.id)?.length ?? 0) === 0,
+    (entry) =>
+      isOfferedForConnect(entry.id) &&
+      LIVE_VIA_ZERNIO.has(entry.id) &&
+      (byChannel.get(entry.id)?.length ?? 0) === 0,
   )
-  const stalledEntries = CONNECTABLE.filter((entry) => !LIVE_VIA_ZERNIO.has(entry.id))
+  const stalledEntries = CONNECTABLE.filter(
+    (entry) => isOfferedForConnect(entry.id) && !LIVE_VIA_ZERNIO.has(entry.id),
+  )
 
   /**
    * Why Connect is unavailable on this tile, or `undefined` when it is not.
