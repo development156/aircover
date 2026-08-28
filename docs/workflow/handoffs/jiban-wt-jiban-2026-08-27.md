@@ -442,3 +442,68 @@ Everything Session 19 says about 320px to 1920px comes from reading class names.
 `connections-widths.spec.ts` is the spec that would settle it and it cannot reach
 the app in this container. The remedy is unchanged: run it where a browser has an
 ordinary network, or `node scripts/browser-run.mjs --remote`.
+
+---
+
+## Session 19, addendum 3 — STOP: `wt-core` IS RED, AND IT IS NOT THIS LANE
+
+`lane-sync push` merged `wt-core` a THIRD time. HEAD is now **`bb97b670`**, pushed.
+This merge was not tooling: **5,694 insertions across 39 files, including
+`packages/shared`** — a new Studio module (`packages/shared/src/studio/*`,
+`db/studio.ts`, 11 new exports). A `packages/shared` change is a contract change,
+so the gate was re-run rather than assumed.
+
+**The gate FAILED, and the failure is inherited.**
+
+| Leg | Real output | Verdict |
+| --- | --- | --- |
+| `turbo run typecheck lint test --concurrency=1 --force` on `bb97b670` | `Tasks: 26 successful, 27 total` · `Failed: @sahoda/web#typecheck` · 6m58s | **FAIL** |
+| ↳ the one error | `src/components/studio/start-design.tsx(36,21): error TS2345: Argument of type '`/studio/${string}`' is not assignable to parameter of type 'RouteImpl<`/studio/${string}`>'` | |
+
+**ONE failure, ONE error message, in a file this lane has never opened.** Root
+`CLAUDE.md`'s rule is to group by message rather than count: six unrelated suites
+red at once is an environment, one is a diff. This is one, and it is somebody
+else's diff — `git log` says the file's only commit is `e17b3f8a`,
+*"feat(studio): /studio is live"*.
+
+**MEASURED on `wt-core` ITSELF, not inferred from my merge.** Checked out
+`origin/wt-core` at `f018625d`, ran `tsc --noEmit` there, identical error. **The
+trunk is red on its own, and every lane that pulls it will go red for a reason
+they did not cause.** That is precisely what the gated `wt-core` step exists to
+prevent, and it did not.
+
+### The fix, which this lane did NOT apply
+
+`next.config` sets `typedRoutes: true`, so an interpolated path must be cast. The
+house pattern is already in three files — `planner/month-grid.tsx:101`,
+`ui/tabs.tsx:33`, `admin/sub-nav.tsx:3`:
+
+```ts
+import type { Route } from 'next'
+// …
+router.push(`/studio/${result.design.id}` as Route)
+```
+
+**Not pushed from here, deliberately.** The failure is red on the BASE branch, which
+is the one legitimate "not mine": the rule is to say what is failing and offer the
+patch rather than widen this PR into another lane's feature. Whoever owns `/studio`
+should land it, and it is one line.
+
+### What this means for PR #21
+
+**PR [#21](https://github.com/development156/sahodalabs/pull/21) will go red on CI,
+and not because of the /connections redesign.** The redesign's own gate was green
+twice on its own tree — `7e95be16` locally and on CI job `98677738126`, 12m47s,
+`success`. The red arrived with `bb97b670`, the merge `lane-sync` performed as part
+of handing this lane over.
+
+**`wt-core` must NOT take this lane until the trunk is fixed**, and pushing it would
+not help: the defect is already there.
+
+### Gate, final state of this lane
+
+| Leg | Real output | Verdict |
+| --- | --- | --- |
+| Everything this lane wrote, on `7e95be16` | 27 of 27 uncached, prettier clean, `js-budget ok`, CI `success` in 12m47s | **PASS** |
+| The same tree plus `wt-core` at `bb97b670` | 26 of 27, `@sahoda/web#typecheck` | **FAIL — inherited, `start-design.tsx:36`** |
+| Playwright execution | attempted; `ERR_CONNECTION_RESET` on loopback, addendum 2 | **UNRUN** |
