@@ -53,6 +53,14 @@ export * from './assets/trash'
 export * from './publishing/constraints'
 export * from './publishing/adapter'
 export * from './publishing/schedule'
+// Studio. The canvas sizes the editor offers, the integer paint model, and the
+// one serialiser both the browser preview and the server export read. Pure
+// string and integer functions: nothing here rasterises, and nothing decides
+// what a channel will accept — `presets.ts` hands that back to the Constraint
+// Engine above rather than restating a single limit.
+export * from './studio/presets'
+export * from './studio/paint'
+export * from './studio/svg'
 export * from './mesh/runner'
 export * from './mesh/tasks'
 // Messaging reply windows — what a platform will let you say, and when. Policy
