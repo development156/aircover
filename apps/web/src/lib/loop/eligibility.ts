@@ -272,9 +272,14 @@ function list(channels: readonly Channel[]): string {
  * would actually be wrong on somebody's screen.
  */
 export function explain(verdict: LoopVerdict): string {
+  // NO EM DASH IN ANY SENTENCE BELOW. These were written when the only reader
+  // was the cron's JSON, and they now render on /loop — where the founder's
+  // 2026-08-23 ruling applies: a dash joining two independent clauses becomes a
+  // full stop. The clauses are unchanged; splitting them costs no precision,
+  // which is the test that ruling has to pass.
   if (verdict.eligible) {
     const plan = verdict.advisory.suggestOnly
-      ? `Sahoda will plan your week for ${list(verdict.channels)}, as suggestions — every channel is set to suggest only.`
+      ? `Sahoda will plan your week for ${list(verdict.channels)}, as suggestions. Every channel is set to suggest only.`
       : `Sahoda will plan your week for ${list(verdict.channels)}.`
     // Said on the ELIGIBLE sentence rather than withheld: the week is going to
     // be written in a voice the model guessed at, and a person who knows that
@@ -288,18 +293,18 @@ export function explain(verdict: LoopVerdict): string {
     case 'never_enabled':
       return 'Turn the Loop on and Sahoda will plan your week every Sunday.'
     case 'paused':
-      return 'The Loop is paused — resume it and Sahoda will plan your next week.'
+      return 'The Loop is paused. Resume it and Sahoda will plan your next week.'
     case 'no_channel':
-      return 'Connect a channel first — Sahoda has nowhere to plan for.'
+      return 'Connect a channel first. Sahoda has nowhere to plan for.'
     case 'channel_lapsed': {
       const has = verdict.lapsed.length === 1 ? 'connection has' : 'connections have'
       const them = verdict.lapsed.length === 1 ? 'it' : 'them'
-      return `Your ${list(verdict.lapsed)} ${has} lapsed — reconnect ${them} and Sahoda has somewhere to plan for again.`
+      return `Your ${list(verdict.lapsed)} ${has} lapsed. Reconnect ${them} and Sahoda has somewhere to plan for again.`
     }
     case 'already_planned':
-      return `Sahoda already planned week ${verdict.isoWeek} of ${verdict.isoYear} — open it to review this week's briefs.`
+      return `Sahoda already planned week ${verdict.isoWeek} of ${verdict.isoYear}. Open it to review this week's briefs.`
     case 'insufficient_credits':
-      return `Planning a week costs ${credits(verdict.required)} and you have ${credits(verdict.available)} — top up and Sahoda will plan your next week.`
+      return `Planning a week costs ${credits(verdict.required)} and you have ${credits(verdict.available)}. Top up and Sahoda will plan your next week.`
     case 'brain_not_resolved':
       return 'Sahoda does not know your business yet. Build your Brand Brain and it can plan a week that sounds like you.'
   }
