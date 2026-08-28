@@ -1,11 +1,17 @@
 # Handoff — karunesh — wt-karunesh — 2026-08-28
 
-**Branch** `wt-karunesh` at `f096f68c`. Lane `wt-karunesh`. Pushed: yes, local and
+**Branch** `wt-karunesh` at `8ad40f19`. Lane `wt-karunesh`. Pushed: yes, local and
 `origin/wt-karunesh` match. PR [#22](https://github.com/development156/sahodalabs/pull/22), draft.
 
-**This file is a BLOCKER REGISTER, not a shipping report.** Three product changes landed and are
+**This file is a BLOCKER REGISTER as much as a shipping report.** Ten product changes landed and are
 green here; every one of them is stuck behind infrastructure this lane cannot reach. What the
 advisor needs is the list below, in order of who can act.
+
+**The headline for whoever merges:** the composer was rebuilt twice in one day, on two founder's
+rulings — first into a gated three-step sequence, then into a Meta-ads-manager layout with the
+three parts of a post listed down the side. **Seventeen e2e specs moved with it and NONE of them
+has been executed**, because Playwright cannot reach the network from this sandbox. That is the
+single largest unverified surface this lane has ever handed over.
 
 ## The one that blocks everything: the gate never starts
 
@@ -28,8 +34,7 @@ the runner's rather than this sandbox's — all forced, so none is a cache repla
 
 | leg | result |
 | --- | --- |
-| `vitest run` (apps/web, after the rail and its adversarial-pass fixes) | **PASS** — 5831 passed, 13 skipped |
-| `next build` + `js-budget.mjs` (same head) | **PASS** — 81 routes, `/posts/[id]` 32.5 kB |
+| `next build` + `js-budget.mjs`, at `8ad40f19` | **PASS** — 81 routes within budget, `/posts/[id]` 32.5 kB / 286 kB first load |
 | `CI=1 turbo run typecheck lint test --concurrency=1 --force` | **27/27 tasks**; `@sahoda/web` 5746 passed, 13 skipped |
 | `pnpm exec vitest run` (root — the leg the gate runs separately) | **223 passed**, 15 files |
 | `prettier --check .` | clean |
@@ -172,8 +177,49 @@ over.
   blew testing-library's one-second default. MEASURED 2 failures in 8 runs, 0 in 10 after the
   timeout was raised. While it fails, the two at-rest assertions it calibrates prove nothing.
 
+## What was NOT done, and why
+
+- **Playwright, at all.** Chromium in this sandbox cannot complete an outbound HTTPS request
+  (measured six ways, REQUESTS §25) and every `@smoke` spec signs in through Clerk. The 17 specs
+  reordered for the composer rebuild are **UNRUN, not passed.** They were changed by reading the
+  DOM and the unit tests. Two adversarial passes swept all 75 e2e files for locators pointing at a
+  part the page no longer shows and found two misses, both fixed; neither pass could execute them
+  either.
+- **Per-platform PHOTO selection.** Asked for as "image segregation" in the platform card. Not
+  built: `post_media.post_id` attaches a file to the POST, and the publish path reads it from
+  there, so a per-platform chooser in the screen would promise a segregation the publisher ignores
+  — the "no mock success" rule. Everything else under that heading (each platform's own copy,
+  hashtags, keywords, kind of post, and its own reading of the same files) already exists and is
+  now grouped in part two. **This needs a decision, not more code:** it is a `packages/publishing`
+  change as well as a screen change.
+- **`live-guard.test.ts:31` in `@sahoda/db`.** Diagnosed above, deliberately not repaired: it
+  guards a production-write incident and a wrong fix is worse than a known-red test.
+- **The route sweeps were not taught to walk composer parts.** `no-impossible-remedy.spec.ts` and
+  the UX sweeps read `/posts/new` and now see only part one. On a blank post that is nearly
+  everything — the two locked rows carry their remedies there — but the picker and the send panel
+  are outside those detectors until the sweep learns the rail.
+
 ## Shared surfaces touched
 
+- **`apps/web/src/components/composer/step-section.tsx` — DELETED**, with its test. It had one
+  caller (`composer.tsx`) and the rail replaced it. Every claim it held moved to
+  `composer-rail.test.tsx`; the one that did NOT survive the move ("an open part must not look
+  dimmed") was found missing by an adversarial pass and is now guarded. **Nothing outside this
+  lane imported it** (`grep` over `src` and `e2e`: zero hits).
+- **`apps/web/src/components/composer/finish-panel.tsx`** — gained an optional `labelledBy` and
+  then lost it again within the day. It ships WITHOUT the prop: the panel names itself, as it did
+  before. No constructor change either way.
+- **`apps/web/src/components/composer/commit-bar.tsx`** — new **optional** `onFinish`. Readers are
+  unaffected; the bar still sets `#finish` as before. Passing it is what makes the Save button's
+  second half work at all, so a caller that omits it gets the old defect back — `steps-wiring`
+  guards the call site, not just the bar.
+- **`apps/web/src/components/posts/send-controls.tsx`** — the "nothing goes out" line now branches
+  on `channels.length` before `live.length`. Copy only, no signature change, but it is a SHARED
+  sentence: `send-controls.test.tsx` pins both branches.
+- **`apps/web/e2e/fixtures/compose.ts`** — new exported `openPart(page, 1|2|3)`, and `startPost`
+  now leaves the page on **part two** rather than on one long page. Every spec that uses
+  `startPost` inherits that position. **This is the constructor-shaped change in this lane:** a
+  spec written against the old behaviour will not fail loudly, it will look at an empty part.
 - **`apps/web/src/components/ui/modal.tsx`** — hard-coded `id="modal-title"` replaced with
   `useId()`. The dialog renders whether or not it is open, so N mounted Modals put N identical ids
   in one document and `aria-labelledby` resolved to the first: on /posts every tile's delete dialog
@@ -187,13 +233,46 @@ over.
 
 ## Contract, migration or money
 
-**None.** No `packages/shared` change, no migration, no price, no ledger call. `deletePost` was read
-and confirmed to touch no ledger, which is what licenses the dialog's credit sentence.
+**None, all day.** No `packages/shared` change, no migration, no price, no ledger call, and nothing
+under `packages/db`. `deletePost` was read and confirmed to touch no ledger, which is what licenses
+the delete dialog's credit sentence. The composer rebuild is `apps/web` only: it stores nothing new
+and changes no write path — the same `savePost`, `saveVariant` and publish calls, reached through a
+different arrangement of the same screen.
+
+The one thing that WOULD have been a contract change is named under "What was NOT done": per
+platform photo selection needs either a new column or a `post_variants.extras` key **and** the
+publish path in `packages/publishing` to honour it. Left alone deliberately.
 
 ## Guards written, and the mutation that proved each
 
-Fifteen mutations applied and watched go red across the three changes. The ones worth the
-advisor's attention are the two that proved my own guards **worthless** before they were fixed:
+**Forty-one mutations applied and watched go red across the day's ten changes.** MEASURED, each one
+run and each one restored. The composer rebuild's own set, most recent first:
+
+| Mutation | Guard that caught it |
+| --- | --- |
+| the composer stops passing `onFinish` to the bar | `steps-wiring` — the Save button's second half |
+| the lock gate on the address removed | `steps-wiring` — an address is not a way past a lock |
+| the arrival read of `#finish` removed | same file, the deep-link case |
+| a part rendering another part's contents (two ways) | `steps-wiring` — each part holds its own |
+| the panel's `role`/`aria-labelledby` removed | `steps-wiring` — the panel is a named region |
+| the rail rows rendered 2, 3, 1 | `composer-rail` — order, read off the DOM not the attribute |
+| every row dimmed, so open rows look refused | `composer-rail` — an open part does NOT look unavailable |
+| the blurbs swapped, part one offering to schedule | `composer-rail` — each row says the right thing |
+| the `<nav>`'s name removed; `<ol>` → `<div>` | `composer-rail` — a named list of three |
+| `aria-controls` removed from the rows | `composer-rail` |
+| locked rows navigating anyway | `composer-rail` + `steps-wiring` |
+| `aria-disabled` removed | `composer-rail` |
+| the send note stops telling the two nothings apart | `send-controls` |
+| the finish heading pointing at a missing id; the heading removed | `finish-panel` + `steps-wiring` |
+| the latch made a no-op, and made to shrink | `composer-steps` + `steps-wiring` |
+
+**Three of those survived their first attempt and are the ones worth reading**: `onFinish`, the
+lock gate and the arrival read all stayed green under a test that looked correct, because
+`savePost` was mocked as a bare `vi.fn()` — it resolves to `undefined`, `use-autosave` reads `.ok`
+off it, the save path throws, and every assertion about what happens AFTER a save was passing for
+an unrelated reason. Fixed by giving the mock a real shape; only then did the three go red.
+
+The two from earlier in the day that proved my own guards **worthless** before they were fixed:
 
 - `className.toContain('bg-primary')` passed with the button on `variant="destructive"`, because
   destructive carries `hover:bg-primary`. Substring match on a token list. Now splits on whitespace.
@@ -206,33 +285,56 @@ any `<dialog>` assertion that means "the user can see and reach this" is not tes
 
 ## Anything retracted
 
-The turbo strict-mode claim above. State what was measured, not what was inferred — I inferred that
-one from three runs that happened not to have the variable set.
+- **The turbo strict-mode claim above.** State what was measured, not what was inferred — I
+  inferred that one from three runs that happened not to have the variable set.
+- **"Locked steps are refused by `inert`."** Written into `step-section.test.tsx`'s own comment and
+  wrong in this runtime: **jsdom implements no `inert` behaviour at all** — MEASURED, a button
+  inside an `inert` subtree still takes focus and still fires its handler. `aria-hidden` was doing
+  the work the comment credited to `inert`. The claim was corrected in the same commit, and the
+  rail replaced the mechanism entirely a few hours later.
+- **"The e2e reordering is complete."** Claimed after the first sequence commit; an adversarial
+  pass found `date-field-theme.spec.ts` pressing a step-three button on a blank post, and three
+  waits for "Post saved" that were already true when they were reached. Both fixed in `43f27986`.
+  The lesson is in the file's own header: it carries **no `@smoke` tag**, so nothing in the gate
+  would ever have reported it — the second time that same file has been broken invisibly.
 
 ## What the next session in THIS lane should pick up
 
-1. **Nothing, until the runners are back.** Three changes are queued behind a gate that cannot start.
-2. Then `live-guard.test.ts:31` — repair the assertion to test its own name (spy on the loader or
+1. **The `@smoke` leg, before anything else, on a machine with a normal network.** Dispatch the
+   `smoke` job on `.github/workflows/gate.yml` by hand. Seventeen specs were rewritten for a screen
+   that is now three views; they are reasoned, not observed. **If one thing from this lane gets
+   verified, make it this.**
+2. **Then nothing else, until the runners are back.** Ten changes are queued behind a gate that
+   cannot start.
+3. Then `live-guard.test.ts:31` — repair the assertion to test its own name (spy on the loader or
    snapshot `process.env` across the import), stop the credential printing, and prove it by deleting
    the `if (LIVE)` wrapper around `loadEnv` and watching the repaired test go red.
-3. Then the @smoke leg via the dispatched `smoke` job, because none of this lane has been through it.
+4. Then teach the route sweeps to walk the composer's three parts, so the picker and the send panel
+   are inside the impossible-remedy and contrast detectors again.
+5. Waiting on a decision, not on work: **per-platform photo selection** (see "What was NOT done").
 
 ## Gate
 
 | leg | result |
 | --- | --- |
-| `turbo run typecheck lint test --force` (CI=1, no ambient DB URL) | **PASS** — 27/27 |
-| `vitest run` (root) | **PASS** — 223 |
-| `prettier --check .` | **PASS** |
+| `turbo run typecheck lint test --force` (CI=1, no ambient DB URL), at `8ad40f19` | **PASS** — 27 successful / 27 total, 0 cached, 4m21s; `@sahoda/web` 5831 passed / 13 skipped |
+| `vitest run` (root), at `8ad40f19` | **PASS** — 223 passed, 15 files |
+| `prettier --check .` | **PASS** — all matched files |
 | `pnpm install --frozen-lockfile` | **PASS** |
 | `turbo run test --force` (this sandbox, ambient DB URL present) | **FAIL** — `@sahoda/db` live-guard only, diagnosed above |
-| `test:smoke` (Playwright) | **UNRUN** |
+| `test:smoke` (Playwright) | **UNRUN** — and this is the one that matters. `playwright test --list --grep @smoke` is unchanged in count, but **17 spec files were rewritten** for the composer rebuild and not one has executed. |
 | CI `typecheck · lint · test · format` | **FAIL** — every attempt, 2-4s each, no log, no step run, no runner ever assigned (`runner_id: 0`, `runner_name: ""`). Four more on this lane's later commits, same shape. The count is deliberately not written as a figure: every push adds two, so a number here is stale before it is read. **The shape is the finding, not the tally.** |
 
 ## In plain terms
 
-Three pieces of work are finished and pass every check I can run. None of them can move, because the
+Ten pieces of work are finished and pass every check I can run. None of them can move, because the
 machine that is supposed to sign them off has stopped starting up — it dies three seconds in, twice
 yesterday and three times today, without ever opening a file. That is not something anyone working
 on the code can fix; it needs whoever holds the account to look at the checking service. Two smaller
 annoyances are wasting everybody's time daily and are written up above with what to do about them.
+
+The one thing I would not let through on my say-so alone: the page for writing a post was rebuilt
+twice today, and the seventeen automated browser journeys that walk it were rewritten to match by
+reading the code rather than by running them, because the browser on this machine cannot reach the
+internet. Everything else here has been watched working. **Those have not**, and they are the
+checks that would catch the rebuild being wrong for a real person.
