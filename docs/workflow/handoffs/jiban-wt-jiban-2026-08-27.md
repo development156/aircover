@@ -507,3 +507,26 @@ not help: the defect is already there.
 | Everything this lane wrote, on `7e95be16` | 27 of 27 uncached, prettier clean, `js-budget ok`, CI `success` in 12m47s | **PASS** |
 | The same tree plus `wt-core` at `bb97b670` | 26 of 27, `@sahoda/web#typecheck` | **FAIL — inherited, `start-design.tsx:36`** |
 | Playwright execution | attempted; `ERR_CONNECTION_RESET` on loopback, addendum 2 | **UNRUN** |
+
+### Correction: `wt-core` is red TWO ways, not one, and the second was nearly mis-stated
+
+The CI wake said the Vercel deployment had also failed, and I was about to record
+that as the same typecheck error reaching `next build`. **It is not.** MEASURED,
+`pnpm --filter @sahoda/web build`:
+
+```
+js-budget FAILED — 1 route(s):
+  /(app)/studio/[id]  NEW ROUTE, no budget (713.4 kB) — add it with PERF_BUDGET_WRITE=1
+```
+
+A second, independent defect from the same merge: the new `/studio/[id]` route has
+no recorded budget. `/connections` is inside its own, so neither failure is this
+lane's. **The near-miss is the lesson: two red checks in one merge are not
+automatically one cause, and assuming so would have put a false sentence in front
+of whoever picks this up.**
+
+One comment was posted on PR #21 carrying both failures, both patches, and this
+lane's own green gate:
+<https://github.com/development156/sahodalabs/pull/21#issuecomment-5456241222>.
+The failed checks were NOT re-run — a re-run cannot help while the base carries
+the defect.
