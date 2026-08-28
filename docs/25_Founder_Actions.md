@@ -507,3 +507,85 @@ ingestion side is built and tested, and the screen is deliberately connected to 
 than to guessed column names — an earlier attempt guessed `competitors.name`, the real column is
 `competitors.display_name`, and every visit to `/radar` returned an error. One file connects it,
 and the real column names are now recorded in the code so nobody has to guess again.
+
+---
+
+## 15. The Sunday job has been failing since 23 August, and four things stand between you and a customer's first planned week — 28 August 2026
+
+**The headline: arming the Loop would not have worked.** Its one query named a
+table that does not exist, so every tick since 23 August raised an error before
+it looked at a single workspace. That is fixed on `claude/advisor-qvz5wn`. The
+four items below are what is left, and none of them can be done from a session.
+
+### What was wrong
+
+`/api/cron/loop` reads every workspace and decides who to plan for. That read
+asked for `loop_autonomy`; the table is called `loop_channel_autonomy`, and only
+the migration FILE is named the short way. MEASURED against production on
+28 August, running the query's own fragment:
+
+```
+ERROR:  42P01: relation "loop_autonomy" does not exist
+```
+
+So the job answered "the Loop cron failed" every time, for five days, and would
+have gone on doing so however the switch was set. Nothing was watching, because
+the only test of that function replaces the database with a stub that accepts
+any text at all. There is now a test that sends the real query to a real
+Postgres with every migration applied.
+
+### 15a · Apply one migration
+
+`packages/db/supabase/migrations/20260828100000_loop_reflect_reason.sql` adds one
+nullable column, `loop_cycles.reflect_reason`. It records WHY a week produced no
+learning. Six different reasons existed and only one of them was stored, so five
+of them reached the screen as the same silence.
+
+`pnpm db:push`. It is additive and touches no existing value. Until it runs, the
+Loop keeps the sentence it had — the code deliberately retries without the
+column rather than failing the write, because that write is what moves a cycle
+from one stage to the next.
+
+### 15b · Confirm the switch in Vercel
+
+`SAHODA_LOOP_CRON_MODE` must be the exact string `on`. It is NOT set in this
+sandbox's environment files, and what Vercel holds cannot be read from here. See
+the table in section 14 for what arming it spends. With the fix above it will
+now do something; before it, nothing.
+
+### 15c · The fix has to reach the branch the schedule runs from
+
+Scheduled jobs run against the DEFAULT branch and production serves `wt-web`.
+This work is on `claude/advisor-qvz5wn`. A green gate on a lane changes nothing
+a customer or a cron can see.
+
+### 15d · Resume one workspace, and you have your first real cycle
+
+MEASURED on 28 August, every workspace that has ever opened the Loop:
+
+| workspace | on? | channels | credits | weekly budget | brain |
+|---|---|---|---|---|---|
+| `6473b616` | **paused** | Google Business + X, both live | **1,196** | 150 | resolved |
+| `8846b067` | paused | Instagram + LinkedIn, both live | 0 | **0** | resolved, 4 of 15 confirmed |
+| `01061fe0` | on | none | 4 | 150 | resolved |
+| `526a15f9` | on | none | 7 | 140 | resolved |
+| `7be165c3` | on | none | 50 | 150 | resolved |
+
+Three have nowhere to plan for. Two are paused. Nobody is eligible, which is why
+the last real tick reported `eligible: 1, planned: 0` — and until this week the
+product said none of that out loud.
+
+**`6473b616` needs one click.** It has two live channels, a resolved brain and
+1,196 credits against a 150 budget. Resume it and the next Sunday tick plans its
+week. Its current week is already reported, so nothing is lost by waiting for
+Sunday rather than pressing Plan my week today.
+
+`8846b067` is the Instagram workspace and needs two things rather than one:
+credits, and a weekly budget above zero.
+
+### What you should watch when you do it
+
+The cycle stops at a cost preview and charges nothing until somebody approves it.
+The ledger's nine invariants were checked against production on 28 August and all
+nine hold with zero violations, so the balance you see before the run is the
+number to compare against afterwards.
