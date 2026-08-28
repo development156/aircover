@@ -176,3 +176,23 @@ exit code read separately, never piped.
 
 The gate has **one** failure that survives isolation, `live-guard.test.ts`, and it is an
 environment fact rather than a defect in the tree.
+
+### Second gate run, at `ab6cf0ea`
+
+`lane-sync push` took three more `wt-core` commits before pushing, so the gate was run
+again on the result. `TURBO_FORCE`, 0 cached, **and with `SUPABASE_DB_URL` /
+`SUPABASE_SERVICE_ROLE_KEY` unset**, which is the correct shape for a machine with no
+route: `packages/db`'s `live-guard.test.ts` passed, as predicted above.
+
+25 of 27 tasks successful. `@sahoda/web#test` failed with **two different files** from the
+first run — `src/lib/repo/workspace-timezone.pglite.test.ts` (`Hook timed out in 10000ms`)
+and `src/components/composer/one-fill.test.tsx` (`Unable to find role="button"`). Both
+**pass alone**: 15 tests and 6 tests, MEASURED immediately after.
+
+So across two full runs on this machine, four different files failed and every one of them
+is green in isolation. That is `vitest.config.ts:33`'s starved-machine pattern, and it is
+the reason **this lane was not pushed to `wt-core`**. The gate has not been green here
+once, for reasons that are not in the tree, and `wt-core` is what reaches production.
+
+Whoever merges: run the gate where the machine is not saturated, and run the @smoke leg
+where Chromium has egress. Neither can be done from this sandbox.
