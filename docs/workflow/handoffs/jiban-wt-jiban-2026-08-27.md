@@ -338,8 +338,48 @@ Forced, clean tree, repo root, nothing piped.
 | `reviewer` agent on the diff | no blockers; 1 Should + 1 Nit, both fixed in `5736edfc` | **PASS** |
 | `playwright test --list` | `277 tests in 72 files` · `--grep @smoke` → `118 tests in 37 files` | matches root `CLAUDE.md`, no drift |
 | Playwright EXECUTION | `sandbox-probe` = `NO_BROWSER` | **UNRUN** |
-| Vercel preview | Building on `f11d60d7` when last seen; not re-checked on `5736edfc` | **UNVERIFIED** |
+| Vercel preview | **Ready** on deployment `9Uitq5gM` for `7e95be16` | **PASS** |
+| CI `typecheck · lint · test · format` on `7e95be16` | `conclusion: success`, job `98677738126`, 21:25:26 to 21:38:13 = **12m47s of real execution** | **PASS** |
+| CI `Playwright @smoke (writes to the named database)` | `conclusion: skipped` — not dispatched on PRs by design, because it writes to the production Supabase project | **UNRUN, by design** |
 
 **CI executed again.** A `check_suite.completed` success arrived on `50603f62` at
 20:25 UTC, which closes the "zero executed jobs since 26 August 11:01" finding
 Session 18 recorded across six PRs. Not re-checked on `5736edfc`.
+
+---
+
+## Session 19, completed 2026-08-28
+
+Two rows in the table above were open when this handoff was written and now have
+real answers. **Nothing in the tree changed:** HEAD is still `7e95be16`, the
+working tree is clean, and the branch is level with
+`origin/claude/lead-design-7m7ios`.
+
+**The gate figures above were measured on this exact SHA.** They were NOT re-run
+on 28 August: the tree is byte-identical, so a second identical run buys no
+information at the cost of a quota three people share. That is a deliberate
+choice, stated so nobody reads the table as fresher than it is.
+
+**The 26 August CI stall is closed, on a JOB record rather than a run clock.**
+Session 18 recorded seven commits and zero executed jobs across six PRs, every run
+finishing in 2 to 7 seconds with `runner_id: 0` and 404 logs. Job `98677738126` on
+`7e95be16` ran **12m47s** and concluded `success`. Read at the job level, which is
+the correction Session 18 had to make twice — a run's wall clock includes queue
+time and says nothing about whether anything executed.
+
+**The preview is live and I did NOT verify it myself.**
+`https://sahodalabs-git-claude-lead-de-716243-development-4417s-projects.vercel.app/connections`
+is Ready per Vercel's own status on deployment `9Uitq5gM`. The curl was refused by
+this sandbox's permission prompt, so **Ready is Vercel's claim, not a request this
+session made.** `/connections` sits behind Clerk, so the rail, the search and the
+cards only render for a signed-in user who has a workspace.
+
+**Still UNRUN, and unchanged:** the browser leg. `sandbox-probe` reports
+`NO_BROWSER`, and CI's `smoke` job is skipped on every PR by design because it
+writes to the production database. So every responsive claim about this redesign
+stays INFERRED from class names. Dispatching that job is a deliberate act against
+production and was not taken.
+
+**`wt-core` has NOT been given this lane.** `lane-sync push` took `wt-core` in and
+pushed the lane; the promotion to `wt-core` is the one gated step in the system and
+was left for the founder. The gate it asks for is green, locally and on CI.
