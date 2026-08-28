@@ -1,7 +1,14 @@
 # Handoff — girija — wt-girija3 — 2026-08-28
 
-**Branch** `claude/lead-research-kickoff-dw8slw` at `0b3f9e5f`. Lane `wt-girija3`.
+**Branch** `claude/lead-research-kickoff-dw8slw` at `48a73e1d`. Lane `wt-girija3`.
 Pushed: **yes**. PR: **none yet, and one is owed** — see "What was NOT done".
+
+The work is `0b3f9e5f`; `48a73e1d` merges `wt-core` in on top of it, taking the
+three commits that landed there during this session so the lane is not handed
+over without having seen the trunk. **The gate figures below are measured on
+`0b3f9e5f`.** The merge touches only `.claude/`, `.githooks/` and `scripts/` —
+no file under `apps/` or `packages/` — so the suite results stand, and
+`prettier --check .` was re-run on the merged tree.
 
 **The lane is `wt-girija3`; the branch is not.** The harness pinned this cloud
 session to `claude/lead-research-kickoff-dw8slw` and it cannot leave, which is
@@ -267,12 +274,19 @@ the sufficiency of that exact number is not.
 
 ## What needs a decision
 
-1. **Whether the Stop hook's turbo invocation gets `--concurrency=2`** (or
-   `TURBO_CONCURRENCY=2` in the environment). It turned this exact leg from red
-   to green on a 4-core box. Nothing in this repository can set it, because the
-   hook calls `turbo` directly. Until somebody does, the hook will keep naming a
-   different innocent file every run — which is the fastest way to teach a lane
-   to ignore it.
+1. ~~Whether the Stop hook's turbo invocation gets `--concurrency=2`.~~
+   **ANSWERED, and not by this lane.** `414762d3` on `wt-core`, "the Stop hook
+   was manufacturing the failures it reported", landed while this handoff was
+   being written and was merged in at `48a73e1d`. `scripts/stop-gate.sh:96`
+   passes `--concurrency=2` for the reason measured here — its own header says
+   "Turbo's default fans out across packages and each package's runner fans out
+   again, which is how one gate saturates twelve cores by itself" — and adds
+   three things this lane did not think of: a machine-wide lock so two
+   worktrees cannot gate at once, a skip when nothing changed, and **a red run
+   re-run SERIALLY, so only a failure that survives both is reported.**
+   Two lanes reached the same diagnosis independently from different symptoms,
+   which is the strongest form the evidence could have taken. Nothing is owed
+   here.
 2. **`08_ROLES.md` says girija is design and jiban is research**, while the
    arguments to `/kickoff` said `/lead-research`. Raised by `wt-girija2` on
    26 August, restated on 27 August, still unruled. The arguments win per
