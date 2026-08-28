@@ -125,6 +125,13 @@ const EXPECTED_OPERATOR_ONLY = [
   // still reads exactly their own observations and an operator reads all of
   // them. This guard failing is what made the operator policy a decision.
   'marketing_observations',
+  // Added 2026-08-28 with migration 20260828060000, and this guard failing is
+  // again what made it a decision. `marketing_pass_runs` is the record of the
+  // brain having LOOKED, so it inherits the reason above verbatim: the store is
+  // hidden from customers, /admin is the only window, and an operator who
+  // cannot see which workspaces the Sunday pass reached cannot tell a pass that
+  // skipped a tenant from one that examined it and found nothing.
+  'marketing_pass_runs',
 ]
 
 /**
