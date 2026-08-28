@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { ChannelSchema, type Channel } from '../enums'
 import {
   STUDIO_PRESETS,
-  describeChannelFit,
+  summariseChannelFit,
   fitDesignToChannels,
   presetById,
   presetsForChannel,
@@ -154,9 +154,24 @@ describe('the link card and Instagram', () => {
     expect(1200 / 628).toBeGreaterThan(1.91)
   })
 
-  it('and accepts 1200x627, which is the same card one pixel shorter', () => {
+  /**
+   * ── THIS TEST'S NAME USED TO STATE A FALSE MEASUREMENT ────────────────────
+   * It read "accepts 1200x627, which is the same card one pixel shorter" while
+   * asserting on 1200x629. Both halves were wrong: 629 is one pixel TALLER, and
+   * 1200/627 is 1.9139, which is ABOVE the 1.91 ceiling and REFUSED. Caught by
+   * an adversarial review. The card has to get taller to come inside the band,
+   * not shorter, and that is the whole point of the boundary.
+   */
+  it('accepts 1200x629, one pixel TALLER, which brings it inside the band', () => {
+    expect(1200 / 629).toBeLessThan(1.91)
     const [fit] = fitDesignToChannels({ width: 1200, height: 629, ...SMALL_PNG }, ['instagram'])
     expect(fit?.violations).toEqual([])
+  })
+
+  it('and still refuses 1200x627, which is one pixel SHORTER and further out', () => {
+    expect(1200 / 627).toBeGreaterThan(1.91)
+    const [fit] = fitDesignToChannels({ width: 1200, height: 627, ...SMALL_PNG }, ['instagram'])
+    expect(fit?.violations.map((v) => v.code)).toContain('MEDIA_ASPECT')
   })
 
   it('so the link card is not offered for Instagram', () => {
@@ -189,44 +204,77 @@ describe('fitDesignToChannels', () => {
   })
 })
 
-describe('describeChannelFit', () => {
-  it('says nobody was asked, and never calls that an all-clear', () => {
-    const said = describeChannelFit([])
-    expect(said).toBe('No channel was checked for this size.')
-    expect(said).not.toMatch(/every channel|all channels|accepted|ready/i)
+describe('summariseChannelFit', () => {
+  it('says nobody was asked, and that is not an all-clear', () => {
+    expect(summariseChannelFit([])).toEqual({ kind: 'nothing-checked' })
   })
 
-  it('says nothing at all when every channel accepts', () => {
+  it('says all-accepted only when every channel accepted', () => {
     const fits = fitDesignToChannels({ width: 1080, height: 1080, ...SMALL_PNG }, [
       'instagram',
       'x',
     ])
-    expect(describeChannelFit(fits)).toBeNull()
+    expect(summariseChannelFit(fits)).toEqual({ kind: 'all-accepted' })
   })
 
-  it('names the channels that refused, and carries the reason through', () => {
-    const fits = fitDesignToChannels({ width: 1200, height: 628, ...SMALL_PNG }, [
-      'instagram',
-      'facebook',
-    ])
-    const said = describeChannelFit(fits)
-    expect(said).toContain('instagram')
-    expect(said).not.toContain('facebook')
-    expect(said).toMatch(/1\.91/)
+  it('never reports nothing-checked and all-accepted as the same thing', () => {
+    expect(summariseChannelFit([]).kind).not.toBe(
+      summariseChannelFit([{ channel: 'x', violations: [] }]).kind,
+    )
   })
 
-  it('joins two refusals with "and" rather than a bare list', () => {
-    const heavy = { width: 1080, height: 1080, mime: 'image/png', bytes: 6 * 1024 * 1024 }
-    const said = describeChannelFit(fitDesignToChannels(heavy, ['x', 'gbp']))
-    expect(said).toContain('x and gbp')
-    expect(said).toContain('do not take')
+  /**
+   * THE DEFECT THIS SHAPE EXISTS TO PREVENT.
+   *
+   * The first version returned one sentence naming every refusing channel and
+   * appended only the FIRST channel's reason. Here x refuses on bytes and
+   * instagram refuses on aspect, so a single shared reason is false about one
+   * of them and hands the reader a remedy that cannot work.
+   */
+  it('gives every refusing channel its OWN reasons, never the first one for all', () => {
+    const heavyAndWide = {
+      width: 1200,
+      height: 628,
+      mime: 'image/png',
+      bytes: 6 * 1024 * 1024,
+    }
+    const summary = summariseChannelFit(fitDesignToChannels(heavyAndWide, ['x', 'instagram']))
+    expect(summary.kind).toBe('refused')
+    if (summary.kind !== 'refused') return
+
+    const forX = summary.refusals.find((r) => r.channel === 'x')
+    const forInstagram = summary.refusals.find((r) => r.channel === 'instagram')
+    expect(forX).toBeDefined()
+    expect(forInstagram).toBeDefined()
+
+    // x is over its 5 MB cap and has NO aspect rule at all.
+    expect(forX!.reasons.join(' ')).toMatch(/MB/)
+    expect(forX!.reasons.join(' ')).not.toMatch(/1\.91/)
+    // instagram is inside 8 MB but outside the aspect band.
+    expect(forInstagram!.reasons.join(' ')).toMatch(/1\.91/)
   })
 
-  it('uses the singular verb for one channel', () => {
-    const said = describeChannelFit(
+  it('carries every violation for a channel, not just its first', () => {
+    // A gif that is also too heavy for x: wrong type AND over the cap.
+    const summary = summariseChannelFit(
+      fitDesignToChannels(
+        { width: 1080, height: 1080, mime: 'image/gif', bytes: 9 * 1024 * 1024 },
+        ['instagram'],
+      ),
+    )
+    expect(summary.kind).toBe('refused')
+    if (summary.kind !== 'refused') return
+    expect(summary.refusals[0]!.reasons.length).toBeGreaterThan(1)
+  })
+
+  it('puts no raw channel key into anything it returns as prose', () => {
+    // It returns DATA, so the only channel values are typed enum fields the
+    // screen renders through CHANNEL_LABELS. Nothing here is a sentence.
+    const summary = summariseChannelFit(
       fitDesignToChannels({ width: 1200, height: 628, ...SMALL_PNG }, ['instagram']),
     )
-    expect(said).toContain('does not take')
+    expect(typeof summary).toBe('object')
+    expect(JSON.stringify(summary)).not.toMatch(/does not take|do not take/)
   })
 })
 

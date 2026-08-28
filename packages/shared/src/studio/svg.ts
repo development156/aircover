@@ -14,6 +14,28 @@ import { hexOf, type Paint } from './paint'
  * function decides where a line breaks, the preview and the export are two
  * different programs again, because only one of them runs in a browser.
  *
+ * ── WHAT "CANNOT DRIFT" DOES AND DOES NOT MEAN. READ THIS BEFORE TRUSTING IT ─
+ * An identical string is not an identical picture, and the first version of this
+ * header claimed more than it was entitled to.
+ *
+ * What IS guaranteed: the geometry. Every position, size, radius and colour is
+ * an integer or a fixed decimal written into the string by this function, so a
+ * rectangle is in the same place and the same colour on both sides, and no
+ * layout decision is taken twice.
+ *
+ * What is NOT guaranteed: the TEXT. `fontFamily` is resolved against whatever
+ * fonts the renderer can see, and the browser and the server see different sets.
+ * Where a family is missing, both substitute silently and neither reports it, so
+ * a headline can be one width in the preview and another in the export. MEASURED
+ * in this sandbox: an installed family and an invented one produced identical
+ * ink, because fontconfig substitutes without complaint.
+ *
+ * So the narrow true claim is: THE LAYOUT CANNOT DRIFT, AND THE GLYPHS CAN. That
+ * is only safe while the caller both bakes its line breaks and ships the font it
+ * names to both sides. Neither of those is enforced by this module, and until a
+ * fingerprint test pins the shipped font's real ink, this is the feature's
+ * largest unproven assumption.
+ *
  * ── WHAT THIS BUYS, SAID PLAINLY ────────────────────────────────────────────
  * A shop owner on a slow connection sees the design change as they type, with
  * no network round trip and no engine downloaded. Export costs a model call of
@@ -117,17 +139,46 @@ function finite(...values: number[]): boolean {
   return values.every((value) => Number.isFinite(value))
 }
 
+/**
+ * The three values `text-anchor` may take, as a runtime set.
+ *
+ * ── THIS WAS AN INJECTION HOLE, AND IT WAS THE ONLY UNDEFENDED FIELD ────────
+ * `anchor` is typed as a union of three literals, so it looked safe and was the
+ * one interpolation with neither `escapeXml` nor `num` around it. Types are
+ * erased. MEASURED against the first commit: an `anchor` of
+ * `"/><image href="http://169.254.169.254/" .../><text a="` produced markup
+ * containing a LIVE `<image>` pointing at the cloud metadata endpoint, which is
+ * a server-side request-forgery hole that walks straight past the `data:` URI
+ * check three functions below. Found by an adversarial review and reproduced
+ * before it was fixed.
+ *
+ * A whitelist rather than an escape, because there are exactly three legal
+ * values and anything else is a caller that has already lost its types.
+ */
+const ANCHORS = new Set(['start', 'middle', 'end'])
+
+/** Every string that becomes an attribute value must be one of these, or the render refuses. */
+function isText(value: unknown): value is string {
+  return typeof value === 'string'
+}
+
 function rectMarkup(node: RectNode): string | null {
   if (!finite(node.x, node.y, node.width, node.height)) return null
   if (node.width < 0 || node.height < 0) return null
+  const fill = hexOf(node.fill)
+  if (fill === null) return null
   const radius = node.rx !== undefined && Number.isFinite(node.rx) ? ` rx="${num(node.rx)}"` : ''
   const opacity = node.fill.a < 1 ? ` fill-opacity="${num(node.fill.a)}"` : ''
-  return `<rect x="${num(node.x)}" y="${num(node.y)}" width="${num(node.width)}" height="${num(node.height)}"${radius} fill="${hexOf(node.fill)}"${opacity}/>`
+  return `<rect x="${num(node.x)}" y="${num(node.y)}" width="${num(node.width)}" height="${num(node.height)}"${radius} fill="${fill}"${opacity}/>`
 }
 
 function textMarkup(node: TextNode): string | null {
   if (!finite(node.x, node.y, node.fontSize, node.fontWeight)) return null
   if (node.fontSize <= 0) return null
+  if (!isText(node.text) || !isText(node.fontFamily)) return null
+  if (node.anchor !== undefined && !ANCHORS.has(node.anchor)) return null
+  const fill = hexOf(node.fill)
+  if (fill === null) return null
   const anchor = node.anchor === undefined ? '' : ` text-anchor="${node.anchor}"`
   const opacity = node.fill.a < 1 ? ` fill-opacity="${num(node.fill.a)}"` : ''
   return (
@@ -135,7 +186,7 @@ function textMarkup(node: TextNode): string | null {
     ` font-family="${escapeXml(node.fontFamily)}"` +
     ` font-size="${num(node.fontSize)}"` +
     ` font-weight="${num(node.fontWeight)}"` +
-    `${anchor} fill="${hexOf(node.fill)}"${opacity}` +
+    `${anchor} fill="${fill}"${opacity}` +
     ` xml:space="preserve">${escapeXml(node.text)}</text>`
   )
 }
@@ -162,6 +213,9 @@ export function renderSvg(scene: SvgScene): string | null {
   if (!Number.isInteger(scene.width) || !Number.isInteger(scene.height)) return null
   if (scene.width <= 0 || scene.height <= 0) return null
 
+  const background = hexOf(scene.background)
+  if (background === null) return null
+
   const parts: string[] = []
   for (const node of scene.nodes) {
     const markup =
@@ -179,7 +233,7 @@ export function renderSvg(scene: SvgScene): string | null {
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${scene.width}" height="${scene.height}"` +
     ` viewBox="0 0 ${scene.width} ${scene.height}">` +
-    `<rect width="${scene.width}" height="${scene.height}" fill="${hexOf(scene.background)}"/>` +
+    `<rect width="${scene.width}" height="${scene.height}" fill="${background}"/>` +
     parts.join('') +
     `</svg>`
   )

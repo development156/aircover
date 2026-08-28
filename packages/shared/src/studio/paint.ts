@@ -122,17 +122,42 @@ export function paintOf(r: number, g: number, b: number, a = 1): Paint | null {
 }
 
 /**
+ * Is this actually a paint, at runtime?
+ *
+ * ── TYPES ARE ERASED, AND THIS MODULE'S WHOLE JOB IS A RUNTIME PROPERTY ─────
+ * `Paint` is a structural interface, so `{ r: NaN, g: 0, b: 0, a: 1 }`
+ * satisfies the compiler. It reached `hexOf` and came back `#NaN0000`, which
+ * the renderer emitted into a fill attribute and the rasteriser painted PURE
+ * BLACK — the exact failure this file was written to prevent, arriving through
+ * the file itself. Found by an adversarial review of the first commit and
+ * reproduced before it was fixed.
+ *
+ * A paint that crosses a package boundary, comes back from JSON, or is built by
+ * arithmetic has not been checked by anything. So it is checked here.
+ */
+export function isPaint(value: unknown): value is Paint {
+  if (typeof value !== 'object' || value === null) return false
+  const paint = value as Partial<Paint>
+  for (const channel of [paint.r, paint.g, paint.b]) {
+    if (typeof channel !== 'number' || !Number.isFinite(channel)) return false
+    if (channel < 0 || channel > 255) return false
+  }
+  return typeof paint.a === 'number' && Number.isFinite(paint.a) && paint.a >= 0 && paint.a <= 1
+}
+
+/**
  * The only string this module ever produces, and the only one the renderer emits.
  *
  * Always six-digit lowercase hex. Alpha is deliberately NOT folded into an
  * eight-digit form: SVG carries opacity in its own attribute, and an
  * eight-digit fill is one of the shapes librsvg treats inconsistently. Callers
  * read `a` separately.
+ *
+ * Returns null for anything that is not a paint, rather than a black hex or a
+ * throw. Black would be indistinguishable from a colour somebody chose.
  */
-export function hexOf(paint: Paint): string {
-  const pair = (channel: number): string =>
-    Math.max(0, Math.min(255, Math.round(channel)))
-      .toString(16)
-      .padStart(2, '0')
+export function hexOf(paint: Paint): string | null {
+  if (!isPaint(paint)) return null
+  const pair = (channel: number): string => Math.round(channel).toString(16).padStart(2, '0')
   return `#${pair(paint.r)}${pair(paint.g)}${pair(paint.b)}`
 }

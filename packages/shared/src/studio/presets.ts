@@ -44,10 +44,19 @@ import { CONSTRAINTS, validateMedia } from '../publishing/constraints'
  * pixels the band would have kept, so it takes the band and cuts to the nearest
  * edge of it.
  *
- * A studio canvas is the opposite situation: THERE IS NO PHOTOGRAPH YET. A blank
- * canvas cannot be a band, because a band is not a thing you can draw on. Some
- * width and some height have to be chosen before a single pixel exists, and no
- * contract anywhere contains them.
+ * A studio canvas is a different situation: THE CANVAS ITSELF HAS NO ORIGINAL.
+ * A blank canvas cannot be a band, because a band is not a thing you can draw
+ * on. Some width and some height have to be chosen before a single pixel
+ * exists, and no contract anywhere contains them.
+ *
+ * That is a narrower defence than it first appears, and the narrowing matters. A
+ * design can CONTAIN a customer's photograph, and `svg.ts` draws an image node
+ * with `preserveAspectRatio="xMidYMid slice"`, which crops. So a photo dropped
+ * into a 1080x1350 design IS cut to fit a number chosen here. The distinction
+ * that survives is about which number is the JUDGE: `targets.ts` objects to a
+ * folklore size deciding whether a photo is acceptable, and no size in this file
+ * ever decides that. A design's own frame cropping a picture inside it is a
+ * composition, and the exported result still faces `validateMedia` unchanged.
  *
  * So the numbers below are a STARTING POINT, never a verdict. Nothing in this
  * file refuses anything, nothing here is compared against a customer's image,
@@ -56,13 +65,18 @@ import { CONSTRAINTS, validateMedia } from '../publishing/constraints'
  * does for an uploaded photo. `targets.ts` remains the only module allowed to
  * answer what shape an EXISTING picture should be cut to.
  *
- * ── SO NO LIMIT IS RESTATED HERE ────────────────────────────────────────────
- * Not one number from `CONSTRAINTS` is copied into this file. There is no second
- * table of minimum widths, no repeated aspect range, no duplicated byte cap. The
- * sizes below are a product choice about what a shop owner should be offered;
- * everything about what a platform will ACCEPT is read back out of the engine at
- * the moment it is asked. That is the rule this codebase already runs on for
- * captions, and a picture is not a special case.
+ * ── NO LIMIT IS RESTATED IN THE CODE ────────────────────────────────────────
+ * No executable line below reads a floor, an aspect range or a byte cap out of
+ * anything but `CONSTRAINTS` itself. There is no second table of minimum widths
+ * and no duplicated cap that could fall out of step, because there is no copy
+ * for anything to fall out of step WITH: everything about what a platform will
+ * accept is read back out of the engine at the moment it is asked.
+ *
+ * The engine's numbers DO appear a few lines above, in the block explaining why
+ * a floor cannot become a canvas size. That is prose, and prose can go stale
+ * without changing behaviour. It is written out because the argument is
+ * unreadable without it, and it is worth knowing that it is the one part of
+ * this file no test is checking.
  *
  * Pure: no I/O, no clock, no database.
  */
@@ -210,30 +224,49 @@ export function fitDesignToChannels(
   return validateMedia(specs, media)
 }
 
-/**
- * The sentence under an export, when some channels will not take it.
- *
- * ── THE THREE ANSWERS ARE DIFFERENT SENTENCES, NOT ONE HEDGED ONE ───────────
- * "No channel was checked" and "every channel accepts it" and "two of five
- * refuse it" are three separate facts, and a screen that blurs them is worse
- * than one that says nothing. An empty channel list means nobody asked, which is
- * not the same as an all-clear and must never be printed as one.
- *
- * Returns null when every channel accepts, because there is nothing to say and a
- * reassurance printed on every successful export is a sentence people stop
- * reading before the one time it matters.
- */
-export function describeChannelFit(fits: readonly ChannelFit[]): string | null {
-  if (fits.length === 0) return 'No channel was checked for this size.'
-  const refused = fits.filter((fit) => fit.violations.length > 0)
-  if (refused.length === 0) return null
+/** What a design's export means for the channels it was checked against. */
+export type ChannelFitSummary =
+  | { kind: 'nothing-checked' }
+  | { kind: 'all-accepted' }
+  | { kind: 'refused'; refusals: { channel: Channel; reasons: string[] }[] }
 
-  const names = refused.map((fit) => fit.channel)
-  const list =
-    names.length === 1
-      ? (names[0] as string)
-      : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1] as string}`
-  const verb = names.length === 1 ? 'does not take' : 'do not take'
-  const reason = refused[0]?.violations[0]?.message ?? ''
-  return reason === '' ? `${list} ${verb} this picture.` : `${list} ${verb} this picture. ${reason}`
+/**
+ * Sort the engine's verdicts into the three answers a screen can act on.
+ *
+ * ── THE THREE ANSWERS ARE DIFFERENT FACTS, NOT ONE HEDGED ONE ───────────────
+ * "Nobody was asked", "everybody accepts it" and "two of five refuse it" are
+ * three separate things, and a screen that blurs them is worse than one that
+ * says nothing. An empty list means nobody asked, which must never be printed
+ * as an all-clear.
+ *
+ * ── AND THIS RETURNS DATA, NOT A SENTENCE, FOR TWO MEASURED REASONS ─────────
+ * The first version built the sentence here and got both halves wrong.
+ *
+ * It named EVERY refusing channel and then appended `refused[0]`'s first
+ * violation message as though it explained all of them. Two channels refusing
+ * for different reasons, an aspect problem on one and a byte cap on the other,
+ * produced a sentence that was true of the first and false of the second, and
+ * gave the reader a remedy that could not fix what they were looking at. This
+ * codebase has a rule against exactly that.
+ *
+ * It also wrote the raw enum key into prose, so a customer read "gbp" rather
+ * than "Google Business". `@sahoda/shared` cannot know display names: the
+ * exhaustive `CHANNEL_LABELS` lives in `apps/web`, which imports this package
+ * and not the other way round. Sorting the verdicts here and letting the screen
+ * that owns the labels write the sentence is the only arrangement where neither
+ * half has to guess.
+ *
+ * Each refusal carries ITS OWN reasons, so a per-channel line can never quote
+ * another channel's problem.
+ */
+export function summariseChannelFit(fits: readonly ChannelFit[]): ChannelFitSummary {
+  if (fits.length === 0) return { kind: 'nothing-checked' }
+  const refusals = fits
+    .filter((fit) => fit.violations.length > 0)
+    .map((fit) => ({
+      channel: fit.channel,
+      reasons: fit.violations.map((violation) => violation.message),
+    }))
+  if (refusals.length === 0) return { kind: 'all-accepted' }
+  return { kind: 'refused', refusals }
 }

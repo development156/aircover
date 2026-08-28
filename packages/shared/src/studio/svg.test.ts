@@ -39,7 +39,13 @@ describe('renderSvg produces one document both sides can read', () => {
         anchor: 'middle',
       },
     ]
-    expect(renderSvg(scene(nodes))).toBe(renderSvg(scene(nodes)))
+    const once = renderSvg(scene(nodes))
+    // Without this the assertion below is satisfied by null === null, and would
+    // pass for a scene that never rendered at all. Caught by an adversarial
+    // review: it was the ONLY evidence behind the determinism claim.
+    expect(once).not.toBeNull()
+    expect(once).toContain('<text')
+    expect(once).toBe(renderSvg(scene(nodes)))
   })
 
   it('paints the background before anything else, so nodes sit on top', () => {
@@ -85,7 +91,11 @@ describe('no colour function can reach the markup', () => {
         },
       ]),
     )!
-    for (const fill of out.match(/fill="[^"]*"/g) ?? []) {
+    const fills = out.match(/fill="[^"]*"/g) ?? []
+    // Assert the COUNT first. Without it the loop passes vacuously if a colour
+    // ever leaves the fill attribute: background + rect + text = 3.
+    expect(fills).toHaveLength(3)
+    for (const fill of fills) {
       expect(fill).toMatch(/^fill="#[0-9a-f]{6}"$/)
     }
     expect(out).not.toContain('oklch')
@@ -267,5 +277,132 @@ describe('opacity travels in its own attribute', () => {
     expect(
       renderSvg(scene([{ kind: 'rect', x: 0, y: 0, width: 1, height: 1, fill: solid }])),
     ).not.toContain('fill-opacity=')
+  })
+})
+
+/**
+ * THE TWO HOLES AN ADVERSARIAL REVIEW FOUND IN THE FIRST COMMIT.
+ *
+ * Both were reachable because TypeScript's types are erased at runtime, and
+ * both were reproduced against the shipped code before being fixed.
+ */
+describe('the runtime holes that types did not close', () => {
+  it('refuses a paint channel that is not a real number, rather than emitting #NaN0000', () => {
+    // MEASURED against the first commit: hexOf({r: NaN, ...}) returned the
+    // string "#NaN0000", renderSvg put it in a fill attribute, and the
+    // rasteriser painted it pure black. That is the exact failure paint.ts
+    // exists to prevent, arriving through paint.ts.
+    const broken = { r: Number.NaN, g: 0, b: 0, a: 1 }
+    const out = renderSvg(scene([{ kind: 'rect', x: 0, y: 0, width: 5, height: 5, fill: broken }]))
+    expect(out).toBeNull()
+  })
+
+  it('refuses a non-finite background too', () => {
+    expect(
+      renderSvg(scene([], { background: { r: 0, g: 0, b: Number.POSITIVE_INFINITY, a: 1 } })),
+    ).toBeNull()
+  })
+
+  it('refuses a text anchor that is not one of the three legal values', () => {
+    // MEASURED against the first commit: this exact anchor produced markup
+    // containing a LIVE <image href="http://169.254.169.254/">, walking past
+    // the data-URI check entirely. `anchor` was the one interpolation with
+    // neither escapeXml nor num around it.
+    const injection =
+      '"/><image href="http://169.254.169.254/" width="10" height="10"/><text a="' as never
+    const out = renderSvg(
+      scene([
+        {
+          kind: 'text',
+          x: 0,
+          y: 0,
+          text: 'hi',
+          fontFamily: 'Noto Sans',
+          fontSize: 10,
+          fontWeight: 400,
+          fill: INK,
+          anchor: injection,
+        },
+      ]),
+    )
+    expect(out).toBeNull()
+  })
+
+  it('still accepts the three legal anchors', () => {
+    for (const anchor of ['start', 'middle', 'end'] as const) {
+      const out = renderSvg(
+        scene([
+          {
+            kind: 'text',
+            x: 0,
+            y: 0,
+            text: 'hi',
+            fontFamily: 'Noto Sans',
+            fontSize: 10,
+            fontWeight: 400,
+            fill: INK,
+            anchor,
+          },
+        ]),
+      )
+      expect(out, `anchor ${anchor}`).toContain(`text-anchor="${anchor}"`)
+    }
+  })
+
+  it('refuses a text or family that is not a string instead of throwing', () => {
+    const notAString = 42 as never
+    expect(
+      renderSvg(
+        scene([
+          {
+            kind: 'text',
+            x: 0,
+            y: 0,
+            text: notAString,
+            fontFamily: 'Noto Sans',
+            fontSize: 10,
+            fontWeight: 400,
+            fill: INK,
+          },
+        ]),
+      ),
+    ).toBeNull()
+    expect(
+      renderSvg(
+        scene([
+          {
+            kind: 'text',
+            x: 0,
+            y: 0,
+            text: 'hi',
+            fontFamily: notAString,
+            fontSize: 10,
+            fontWeight: 400,
+            fill: INK,
+          },
+        ]),
+      ),
+    ).toBeNull()
+  })
+
+  it('no injected node can survive into the markup', () => {
+    // The property behind all of the above: whatever a caller does, the output
+    // is either null or contains exactly the elements the scene declared.
+    const out = renderSvg(
+      scene([
+        {
+          kind: 'text',
+          x: 0,
+          y: 0,
+          text: 'hi',
+          fontFamily: 'Noto Sans',
+          fontSize: 10,
+          fontWeight: 400,
+          fill: INK,
+          anchor: '"/><image href="http://evil.example.com/"/><text a="' as never,
+        },
+      ]),
+    )
+    expect(out).toBeNull()
   })
 })
