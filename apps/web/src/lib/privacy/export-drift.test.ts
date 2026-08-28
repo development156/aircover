@@ -48,10 +48,18 @@
  * `buildWorkspaceExport` never queries the table and lists it by name instead.
  */
 import { createRequire } from 'node:module'
+import { resolve } from 'node:path'
+
+import { splitPhantoms, tablesCreatedByMigrations } from '@/lib/privacy/pending-tables'
 
 import { describe, it, expect } from 'vitest'
 
 import { EXPORT_TABLES } from './export-manifest'
+
+const MIGRATIONS_DIR = resolve(
+  import.meta.dirname,
+  '../../../../../packages/db/supabase/migrations',
+)
 
 const DB_URL = process.env.SUPABASE_DB_URL ?? ''
 const describeWithDb = DB_URL === '' ? describe.skip : describe
@@ -135,7 +143,32 @@ describeWithDb('the export manifest against the live schema', () => {
     const inManifest = EXPORT_TABLES.map((t) => t.table).sort()
 
     const missing = inDb.filter((t) => !inManifest.includes(t))
-    const phantom = inManifest.filter((t) => !inDb.includes(t))
+
+    // ── A PHANTOM AND A PENDING MIGRATION ARE DIFFERENT FACTS ───────────────
+    // Migrations here are applied BY HAND, so a table routinely lives in the
+    // migration files for hours before it lives in production — and during that
+    // window the manifest must already name it, because the pglite suite runs
+    // against this branch's schema and insists. Failing here for that state
+    // would make this suite red for something no session can fix, which is how
+    // a guard becomes one people learn to skip.
+    //
+    // A manifest entry that NO migration creates is still a phantom, and that is
+    // the defect this check was written for: a typo or a renamed table means a
+    // customer's export silently omits their data.
+    const { invented, pending } = splitPhantoms(
+      inManifest,
+      inDb,
+      tablesCreatedByMigrations(MIGRATIONS_DIR),
+    )
+    if (pending.length > 0) {
+      // Reported, never swallowed. A silent allowance is how the excused case
+      // becomes permanent.
+      console.warn(
+        `export manifest names ${pending.length} table(s) whose migration is written and NOT ` +
+          `applied to this database: ${pending.join(', ')}`,
+      )
+    }
+    const phantom = invented
 
     // Named, not counted. "1 table differs" sends someone hunting; the name
     // sends them to the fix.
@@ -145,7 +178,7 @@ describeWithDb('the export manifest against the live schema', () => {
     ).toEqual([])
     expect(
       phantom,
-      `the manifest lists tables that do not exist or do not carry workspace_id: ${phantom.join(', ')}`,
+      `the manifest lists tables that no migration creates and that do not exist: ${phantom.join(', ')}`,
     ).toEqual([])
   }, 30_000)
 

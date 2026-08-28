@@ -371,6 +371,14 @@ describe('every append-only table refuses a direct mutation', () => {
     // `knowledge_documents` deliberately has NO trigger — a document is a living
     // row — so it is correctly absent from this list.
     'knowledge_chunks',
+    // Added deliberately 2026-08-28, which is what this list's own failure
+    // message asks for. `loop_autopilot_log` records what autopilot decided
+    // BEFORE it acted, on the one path where nobody was watching. A cancellation
+    // is a new row rather than an edit, so the fact that a post was going out at
+    // 09:00 stays true after somebody stops it — an audit trail that can rewrite
+    // its own history is not one
+    // (20260828130000_loop_autopilot_log.sql).
+    'loop_autopilot_log',
     'ops_audit_log',
     'post_metric_snapshots',
     'post_publish_logs',

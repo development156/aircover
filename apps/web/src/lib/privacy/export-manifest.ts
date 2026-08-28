@@ -23,8 +23,8 @@
  * production, and `forbidden-target.ts` refuses that on purpose — so it has
  * never run, and SEVEN tables were quietly missing from every export:
  *
- *   audience_snapshots · billing_profiles · invoices · loop_briefs ·
- *   loop_channel_autonomy · loop_cycles · loop_settings
+ *   audience_snapshots · billing_profiles · invoices · loop_autopilot_log ·
+ *   loop_briefs · loop_channel_autonomy · loop_cycles · loop_settings
  *
  * Four of those are the Loop's, which is a record of what a customer was charged
  * for and what Sahoda decided on their behalf. An export omitting them still
@@ -161,6 +161,11 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
     table: 'ledger_actor_redactions',
     readability: 'no-read-policy',
     describes: 'whether your name is shown on your credit record',
+  },
+  {
+    table: 'loop_autopilot_log',
+    readability: 'readable',
+    describes: 'every post autopilot decided to publish for you, and what it decided',
   },
   { table: 'loop_briefs', readability: 'readable', describes: 'what the Loop planned each week' },
   {
