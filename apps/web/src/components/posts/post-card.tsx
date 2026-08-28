@@ -14,7 +14,7 @@ import { Card } from '@/components/ui/card'
 import type { DisplayPost } from '@/lib/posts/display-post'
 import { formatScheduledAt } from '@/lib/posts/schedule-format'
 import { bodyAfterFirstLine, displayTitleOf } from '@/lib/posts/display-title'
-import { relativeAge } from '@/lib/ops/session-pulse'
+import { formatSavedAt } from '@/lib/posts/saved-at'
 import { cn } from '@/lib/utils'
 
 /**
@@ -129,7 +129,7 @@ export function PostCard({
   const excerpt = excerptOf(
     heading.source === 'derived' ? bodyAfterFirstLine(post.body) : post.body,
   )
-  const savedAge = relativeAge(post.updated_at, now)
+  const savedAge = formatSavedAt(post.updated_at, now)
   const scheduledAt = formatScheduledAt(post.scheduled_at)
   // Distinct already: `post.channels` is a `ChannelSet`, deduplicated once when
   // the row was parsed. `posts.channels` is still a bare `text[]` with no unique
