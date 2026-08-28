@@ -259,7 +259,7 @@ export function ChannelTile({
          `transition-micro` is the product's own duration/easing pair, and
          tokens.css zeroes it under `prefers-reduced-motion`, so this needs no
          media query of its own and no dependency. */
-      className="surface-ring flex h-full flex-col rounded-card bg-surface p-3.5 transition-micro hover:-translate-y-px hover:shadow-card hover:surface-ring-firm"
+      className="surface-ring flex h-full flex-col rounded-card bg-surface p-4 transition-micro hover:-translate-y-px hover:shadow-card hover:surface-ring-firm"
     >
       <ChannelHeader entry={entry} details={details} />
 
@@ -285,7 +285,7 @@ export function ChannelTile({
           A hairline rather than a gap, because §6 is explicit that a gap past a
           point wants to be a divider — and because two zones separated only by
           space read as one zone with awkward spacing. */}
-      <hr className="my-2.5 border-0 border-t border-line-soft" />
+      <hr className="my-3 border-0 border-t border-line-soft" />
 
       {linked ? (
         <ChannelAccounts
@@ -330,7 +330,7 @@ export function ChannelTile({
           The tiles carry different amounts of content — X alone holds the spend
           row, and a channel with three accounts holds three rows — so without a
           rule the buttons floated at whatever height their own card ended at. */}
-      <div className="mt-auto flex items-center gap-2 border-t border-line-soft pt-2.5">
+      <div className="mt-auto flex items-center gap-2 border-t border-line-soft pt-3">
         {/* ── CONNECT IS ALWAYS OFFERED, AND THAT IS THE FIX ────────────────
             The tile used to render Connect ONLY when the platform had no
             connection at all, so once a workspace linked one Instagram account
