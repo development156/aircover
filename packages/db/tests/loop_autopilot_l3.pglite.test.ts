@@ -22,6 +22,18 @@ import { bootFullSchema } from './helpers/pglite-tenant'
  * TWO GUARDS ON ONE HOLE LOOK LIKE ONE GUARD WORKING. Each test below is
  * written so that exactly one condition is wrong and everything else is right,
  * which is the only arrangement that can tell which guard refused.
+ *
+ * ── WHAT IT CANNOT SEE ───────────────────────────────────────────────────────
+ * The last test reads the migration and `autopilot-floor.ts` as TEXT to check
+ * the two lists name the same four paths. That scan is blind to a path
+ * assembled at runtime — built by concatenation, held in a variable, or read
+ * from another module — and to a path written with different quoting than the
+ * regex expects. It is also blind to WHERE in the migration a path appears: a
+ * fifth path added to the SQL file outside the trigger's own array would be
+ * seen as present and would change no behaviour, while a path REMOVED from the
+ * array but left in a comment would be seen as present and would change
+ * behaviour badly. The behavioural tests above are what actually adjudicate the
+ * trigger; the text scan only catches the two lists drifting apart.
  */
 
 const MIGRATION = resolve(
