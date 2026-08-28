@@ -15,10 +15,14 @@
  *     ERROR:  42P01: relation "loop_autonomy" does not exist
  *
  * So the query raised, `runScheduledLoopCycles` threw before `assess()` was
- * reached even once, and the route answered `{ ok: false, error:
- * 'LOOP_CRON_FAILED' }` every Sunday from 23 August. The commit that broke it
- * is the commit whose whole purpose was to make the Loop say why it will not
- * plan for you.
+ * reached even once, and the route could only answer `{ ok: false, error:
+ * 'LOOP_CRON_FAILED' }`. The commit that broke it is the commit whose whole
+ * purpose was to make the Loop say why it will not plan for you.
+ *
+ * WHETHER THE SCHEDULE FIRED IS NOT OBSERVABLE from a session — the heartbeat
+ * lives in Redis. The database corroborates rather than proves: the newest
+ * cycle any workspace has started 2026-08-23 10:31 UTC and the breaking commit
+ * landed 11:55 UTC the same day. Nothing has been planned since.
  *
  * ── NOTHING WAS WATCHING, AND THAT IS THE PART WORTH FIXING ──────────────────
  * `run-loop-resources.test.ts` stubs the pool with `{ query: vi.fn() }` and

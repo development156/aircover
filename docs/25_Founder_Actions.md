@@ -512,10 +512,11 @@ and the real column names are now recorded in the code so nobody has to guess ag
 
 ## 15. The Sunday job has been failing since 23 August, and four things stand between you and a customer's first planned week — 28 August 2026
 
-**The headline: arming the Loop would not have worked.** Its one query named a
-table that does not exist, so every tick since 23 August raised an error before
-it looked at a single workspace. That is fixed on `claude/advisor-qvz5wn`. The
-four items below are what is left, and none of them can be done from a session.
+**The headline: arming the Loop would not have worked.** Its one query names a
+table that does not exist, so any tick that ran would have raised an error
+before looking at a single workspace. That is fixed on `claude/advisor-qvz5wn`.
+The four items below are what is left, and none of them can be done from a
+session.
 
 ### What was wrong
 
@@ -528,11 +529,18 @@ the migration FILE is named the short way. MEASURED against production on
 ERROR:  42P01: relation "loop_autonomy" does not exist
 ```
 
-So the job answered "the Loop cron failed" every time, for five days, and would
-have gone on doing so however the switch was set. Nothing was watching, because
-the only test of that function replaces the database with a stub that accepts
-any text at all. There is now a test that sends the real query to a real
-Postgres with every migration applied.
+So the job could only answer "the Loop cron failed", however the switch was set.
+
+**Whether it fired at all is not knowable from a session** — the heartbeat that
+records a run lives in Redis, not the database. What the database does say is
+consistent: the newest cycle any workspace has is from **10:31 UTC on 23 August**,
+and the commit that broke the query landed at **11:55 UTC the same day**. Nothing
+has been planned since, by anything, and the last thing that worked did so about
+an hour and a half before the break.
+
+Nothing was watching, because the only test of that function replaces the
+database with a stub that accepts any text at all. There is now a test that
+sends the real query to a real Postgres with every migration applied.
 
 ### 15a · Apply one migration
 
