@@ -1,5 +1,6 @@
 'use client'
 
+import { useRef } from 'react'
 import { Check } from 'lucide-react'
 import {
   ChannelSchema,
@@ -12,7 +13,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
-import { isOfferedForConnect } from '@/lib/connections/catalogue'
+import { isOfferedForConnect } from '@/lib/connections/offer'
 
 import { ChannelMark } from './channel-mark'
 import { CHANNEL_LABELS } from './channel-label'
@@ -60,29 +61,47 @@ export interface ChannelPickerProps {
  * the chip is on.
  */
 /**
- * The channels this picker offers, plus any the post already targets.
+ * The channels this picker offers.
  *
  * ── OFFERING A CHANNEL NOBODY CAN CONNECT IS AN IMPOSSIBLE REMEDY ────────────
- * `/connections` stopped offering telegram, and this picker kept listing it —
- * so a writer could pick Telegram, have a version generated for it, and then
- * find no way anywhere in the product to link a Telegram account. That is the
- * shape `no-impossible-remedy.spec.ts` exists to forbid: a control that invites
- * an action which cannot be completed.
+ * `/connections` stopped offering telegram, and this picker kept listing it — so
+ * a writer could pick Telegram, have a version generated for it, and then find
+ * nothing on the connections screen to link an account with. That is the shape
+ * `no-impossible-remedy.spec.ts` forbids: a control inviting an action that
+ * cannot be completed.
  *
- * Derived from the SAME set the connections screen filters on, not restated. A
- * second literal here is how the two screens would drift apart again, which is
- * the defect this is fixing.
+ * Derived from the same set `/connections` filters on, not restated. A second
+ * literal here is how the two screens drifted apart in the first place.
  *
- * ── AND A CHANNEL ALREADY ON THE POST IS ALWAYS SHOWN ────────────────────────
- * Filtering blindly would make an existing post's Telegram version invisible and
- * un-deselectable — the writer would see three chips, `savePost` would keep
- * writing four channels, and nothing on screen would explain it. What is being
- * withdrawn is the OFFER; what is already chosen stays visible and removable.
- * The same rule the connections screen follows for an account already linked.
+ * ── BUT THAT SET WITHHOLDS AN ADVERTISEMENT, NOT A CAPABILITY ────────────────
+ * Filtering on it alone was WRONG, and an adversarial pass caught it. Telegram
+ * is a real `Channel`: `constraints.ts` marks it publishable, the connect
+ * surface exists (`telegram-connect.tsx`), and `groups.ts` says in as many words
+ * that the offer rule "does NOT gate `linked`". So a workspace that has ALREADY
+ * linked a Telegram account could still publish there, still saw its tile under
+ * "Your channels" — and could not choose it when writing a post. A capability
+ * they hold, withheld by a rule about what to advertise.
+ *
+ * Three ways in, and each answers a different question:
+ *
+ *   offered     we are advertising it        → the ordinary case
+ *   connected   this workspace HOLDS it      → a capability, never withheld
+ *   selected    this post already targets it → a choice already made
+ *
+ * ── AND THE THIRD ONE IS REMEMBERED, NOT READ LIVE ───────────────────────────
+ * Reading `selected` on every render made deselection a ONE-WAY DOOR: untick a
+ * withdrawn channel and the chip vanishes on the next render, so a writer who
+ * mis-clicked could not put it back without reloading. The set is captured when
+ * the picker mounts and only grows, so a chip that has been on screen stays on
+ * screen for as long as the writer is looking at it.
  */
-export function offeredChannels(selected: ChannelSet): readonly Channel[] {
+export function offeredChannels(
+  everSelected: ReadonlySet<Channel>,
+  connected?: ReadonlySet<Channel>,
+): readonly Channel[] {
   return ChannelSchema.options.filter(
-    (channel) => isOfferedForConnect(channel) || selected.includes(channel),
+    (channel) =>
+      isOfferedForConnect(channel) || connected?.has(channel) === true || everSelected.has(channel),
   )
 }
 
@@ -93,6 +112,17 @@ export function ChannelPicker({
   connected,
   hideLabel = false,
 }: ChannelPickerProps) {
+  /**
+   * Every channel that has been selected while this picker has been on screen.
+   *
+   * A ref, not state: it only ever grows and nothing renders differently the
+   * moment it changes, so re-rendering on a write would be work for nothing.
+   * Seeded from the post's own channels so an existing Telegram version is
+   * visible on the first paint rather than after the first click.
+   */
+  const everSelected = useRef<Set<Channel>>(new Set(selected))
+  for (const channel of selected) everSelected.current.add(channel)
+
   function toggle(channel: Channel) {
     const next = selected.includes(channel)
       ? selected.filter((item) => item !== channel)
@@ -109,7 +139,7 @@ export function ChannelPicker({
     <div className="space-y-2" data-guide="post-channels">
       {hideLabel ? null : <Label>Channels</Label>}
       <div className="flex flex-wrap gap-1.5">
-        {offeredChannels(selected).map((channel) => {
+        {offeredChannels(everSelected.current, connected).map((channel) => {
           const isOn = selected.includes(channel)
           return (
             <button
