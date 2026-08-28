@@ -24,8 +24,8 @@ import {
   type StepsReached,
 } from '@/lib/posts/composer-steps'
 
+import { ComposerRail } from './composer-rail'
 import { FinishPanel } from './finish-panel'
-import { StepSection } from './step-section'
 import { ExtrasPane } from './extras-pane'
 import { WritingPane } from './writing-pane'
 import { useComposerActions } from './use-composer-actions'
@@ -224,6 +224,36 @@ export function Composer({
   const steps = keepWhatWasReached(rawSteps, reached.current)
   reached.current = reachedAfter(reached.current, steps)
 
+  /**
+   * Which part fills the screen. Always the words on arrival, whatever the post
+   * already holds: a writer who opens a draft is here to read it, and landing
+   * them on a schedule picker would answer a question they have not asked.
+   */
+  const [active, setActive] = useState<1 | 2 | 3>(1)
+
+  /**
+   * ── THE SAVE-AND-GO BUTTON STILL WORKS, AND IT IS STILL AN ADDRESS ──────────
+   * `CommitBar` saves and then sets the address to `#finish`. That was a scroll
+   * when all three parts were on one page; with a rail the send panel is not in
+   * the document until part three is showing, and a hash pointing at nothing is
+   * a button that silently does nothing.
+   *
+   * So the address is honoured rather than replaced: the bar keeps setting it,
+   * Back still returns, and this brings the part it names into view. Refused
+   * while sending is locked — an address is not a way around a gate.
+   */
+  const sendOpen = useRef(false)
+  sendOpen.current = steps.send.access === 'open'
+
+  useEffect(() => {
+    const jump = () => {
+      if (window.location.hash === '#finish' && sendOpen.current) setActive(3)
+    }
+    jump()
+    window.addEventListener('hashchange', jump)
+    return () => window.removeEventListener('hashchange', jump)
+  }, [])
+
   return (
     <div className="space-y-grid" data-composer data-guide="post-editor">
       <DivergenceNotice
@@ -236,58 +266,52 @@ export function Composer({
 
       <ComposerHeader title={draft.title} onTitleChange={(title) => autosave.update({ title })} />
 
-      {/* ── THE ORDER IS THE ARGUMENT, AND IT HOLDS AT EVERY WIDTH ──────────
-          One column: write it, see each version, then attach and reuse. Two
-          columns: the versions take the whole right side and the writing sits
-          above the extras on the left. Explicit grid placement rather than two
-          wrapper divs, because the versions have to come BETWEEN the other two
-          when they stack — MEASURED at 768px with a single left pane, the only
-          thing on this screen no competitor has was the last thing on the page,
-          below an empty media well. */}
-      {/* ── THE LEFT COLUMN IS ONE CELL AT WIDE, AND THAT IS THE WHOLE FIX ──
-          MEASURED at 1440 with three channels: the writing box ended at y=574
-          and the template card began at y=1029. A 455px hole nobody chose.
+      {/* ── THE SCREEN IS A MAP AND ONE PART OF IT ─────────────────────────
+          Founder's ruling, 2026-08-28, from a screenshot of Meta's ads manager:
+          the parts of the thing being built are listed down the left and the one
+          being worked on fills the right. `ComposerRail` carries the argument
+          for why that is a map rather than a wizard.
 
-          The cause is CSS grid, not spacing. The versions column carried
-          `row-span-2`, and a spanning item taller than the rows it spans has its
-          excess DISTRIBUTED across them — so row 1 grew far past the writing
-          pane and `items-start` pinned the pane to the top of a near-empty row.
-          The hole grew with every channel added, so it was worst on the screen
-          doing the most work.
+          At narrow the rail stacks above the panel, because a 240px column and a
+          writing box cannot both have a phone's width. */}
+      <div className="grid items-start gap-grid wide:grid-cols-[minmax(0,240px)_minmax(0,1fr)]">
+        <ComposerRail
+          steps={steps}
+          channels={draft.channels}
+          active={active}
+          onSelect={setActive}
+          onSelectChannel={(channel) => {
+            setActive(2)
+            // After the panel has swapped, not before: the card does not exist
+            // in the document until part two renders, and `scrollIntoView` on a
+            // missing element is a silent no-op.
+            requestAnimationFrame(() => {
+              document
+                .querySelector(`[data-version-card="${channel}"]`)
+                ?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+            })
+          }}
+        />
 
-          THREE ROW-SIZING FIXES WERE TRIED AND ALL THREE FAILED, each measured:
-          `max-content_1fr`, `min-content_1fr` and `min-content_auto` every one
-          left the gap at exactly 455px. A track function cannot refuse a
-          spanning item's contribution; only removing the span can.
+        <div className="min-w-0 space-y-grid" data-composer-panel={active}>
+          {active === 1 ? (
+            <>
+              <WritingPane
+                body={draft.body}
+                onBodyChange={(body) => {
+                  autosave.update({ body })
+                  // Every channel still following moves with it. Channels written
+                  // independently are left exactly as they are.
+                  variantsApi.mirrorSource(body)
+                }}
+              />
 
-          So the left column becomes ONE grid cell at wide, stacking the writing
-          pane and the extras with no span anywhere. At narrow the wrapper is
-          `display: contents`, which dissolves it so all three are direct grid
-          items again and `order` can put the versions BETWEEN them — which is
-          the order the original comment defends, and the reason a plain wrapper
-          would not do: measured at 768px, the versions were once last on the
-          page, below an empty media well, and they are the one thing here no
-          competitor has. */}
-      <StepSection index={1} title="Write your post" step={steps.write}>
-        <div className="grid items-start gap-grid wide:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
-          {/* `contents` at narrow dissolves this wrapper so all three panes are
-            direct grid items and `order` can interleave them. At wide it becomes
-            a real column, which is what removes the span. */}
-          <div className="contents wide:flex wide:flex-col wide:gap-grid">
-            <WritingPane
-              body={draft.body}
-              onBodyChange={(body) => {
-                autosave.update({ body })
-                // Every channel still following moves with it. Channels written
-                // independently are left exactly as they are.
-                variantsApi.mirrorSource(body)
-              }}
-            />
-
-            {/* Order 3 so it lands AFTER the versions once the wrapper
-              dissolves at narrow. Inside the wide flex column it simply follows
-              the writing pane. */}
-            <div className="order-3">
+              {/* ── THE PICTURES AND THE SAVED STARTS BELONG TO THE WORDS ─────
+                  Not to a platform. `post_media.post_id` is the shape of the
+                  table: a file is attached to the POST, and what differs per
+                  platform is the RULE applied to it. So it is attached once
+                  here, and part two scores the same files against each
+                  platform's own limits. */}
               <ExtrasPane
                 body={draft.body}
                 onBodyChange={(body) => {
@@ -301,74 +325,64 @@ export function Composer({
                 libraryNames={libraryNames}
                 templates={templates}
               />
-            </div>
-          </div>
+            </>
+          ) : null}
 
-          {/* Order 2 puts the versions BETWEEN the writing pane and the extras
-              once the wrapper has dissolved. At wide it is simply column two.
+          {active === 2 ? (
+            <>
+              <ChannelPicker
+                selected={draft.channels}
+                onChange={(channels: ChannelSet) => {
+                  autosave.update({ channels })
+                  // A channel the writer has just ticked opens on the kind of post
+                  // that channel usually carries — words everywhere except Instagram,
+                  // which has no text-only post. Derived from `requiresMedia`, never
+                  // tabulated.
+                  formats.seedNew(channels)
+                }}
+                connected={connected}
+                hideLabel
+              />
 
-              ── AND IT STAYS IN STEP ONE'S GRID, WHICH IS NOT A COMPROMISE ──
-              The versions pane belongs to step TWO by subject: it is each
-              channel's own copy. It stays here because the grid comment above
-              records three measured attempts at row sizing that all failed, and
-              the only thing that fixed a 455px hole was this exact structure.
-              Lifting one column out to satisfy a numbering would reintroduce
-              the defect that structure exists to prevent.
-              
-              Nothing is lost by it: with no channels picked the pane renders its
-              own empty state, and that state says whichever of the two things is
-              actually true — write first on a blank post, pick a channel in step
-              two once there are words — so it never points at a panel that is
-              still refusing clicks. */}
-          <div className="order-2">
-            <VersionsPane
+              {/* EVERY VERSION AT ONCE, AND THIS IS THE ONE PLACE THAT MATTERS.
+                  The rail switches between the three PARTS. Inside this one,
+                  nothing is switched: all of the chosen platforms' cards are on
+                  the page together, each with its own words, its own hashtags,
+                  its own kind of post and its own reading of the same files.
+                  A tab strip here would hide three versions out of four and
+                  take the product's whole point with them. */}
+              <VersionsPane
+                channels={draft.channels}
+                canonicalBody={draft.body}
+                variants={variantsApi}
+                formats={formats}
+                media={media}
+                flush={actions.flushAndResolve}
+                onGenerated={variantsApi.applyGenerated}
+                generateIsPrimary={!everyChannelWritten}
+                onSaved={(channel) => void actions.saveVersion(channel)}
+              />
+            </>
+          ) : null}
+
+          {active === 3 ? (
+            <FinishPanel
+              postId={postId}
               channels={draft.channels}
-              canonicalBody={draft.body}
-              variants={variantsApi}
-              formats={formats}
-              media={media}
-              flush={actions.flushAndResolve}
-              onGenerated={variantsApi.applyGenerated}
-              generateIsPrimary={!everyChannelWritten}
-              onSaved={(channel) => void actions.saveVersion(channel)}
+              scheduledAt={draft.scheduledAt}
+              onScheduleChange={actions.changeSchedule}
+              scheduleError={actions.scheduleError}
+              autoPublish={autoPublish}
+              connected={connected}
+              statusRows={statusRows}
+              flush={actions.flush}
+              saveVariantNow={actions.saveVersion}
+              saveAllVersions={actions.saveAllAndWait}
+              unsavedVersions={actions.unsaved.length}
             />
-          </div>
+          ) : null}
         </div>
-      </StepSection>
-
-      <StepSection index={2} title="Choose where it goes" step={steps.channels}>
-        <ChannelPicker
-          selected={draft.channels}
-          onChange={(channels: ChannelSet) => {
-            autosave.update({ channels })
-            // A channel the writer has just ticked opens on the kind of post
-            // that channel usually carries — words everywhere except Instagram,
-            // which has no text-only post. Derived from `requiresMedia`, never
-            // tabulated.
-            formats.seedNew(channels)
-          }}
-          connected={connected}
-          hideLabel
-        />
-      </StepSection>
-
-      <StepSection index={3} title="Send it" step={steps.send}>
-        <FinishPanel
-          labelledBy="step-3"
-          postId={postId}
-          channels={draft.channels}
-          scheduledAt={draft.scheduledAt}
-          onScheduleChange={actions.changeSchedule}
-          scheduleError={actions.scheduleError}
-          autoPublish={autoPublish}
-          connected={connected}
-          statusRows={statusRows}
-          flush={actions.flush}
-          saveVariantNow={actions.saveVersion}
-          saveAllVersions={actions.saveAllAndWait}
-          unsavedVersions={actions.unsaved.length}
-        />
-      </StepSection>
+      </div>
 
       <CommitBar
         status={autosave.status}

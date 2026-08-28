@@ -157,6 +157,14 @@ async function run(page: Page, width: number, theme: Theme): Promise<void> {
   }
   await frame('14-composer-written')
 
+  // The composer lists the three parts of a post down the side. The platform
+  // part is refused until something is written, so the journey goes there only
+  // now — and photographing the rail is part of the point.
+  const platformPart = page.locator('[data-rail-step="2"] button')
+  if (await present(platformPart, 5000)) {
+    await tap(c, 'Go to the platform part', platformPart)
+    await page.waitForTimeout(800)
+  }
   const tile = page.locator('[data-channel-tile="instagram"]')
   if (await present(tile, 5000)) {
     await tap(c, 'Pick the Instagram channel', tile)
@@ -165,6 +173,11 @@ async function run(page: Page, width: number, theme: Theme): Promise<void> {
   await frame('15-composer-channel-picked')
 
   // ── STOP 8. Schedule it. This is the goal of the journey.
+  const sendPart = page.locator('[data-rail-step="3"] button')
+  if (await present(sendPart, 5000)) {
+    await tap(c, 'Go to the send part', sendPart)
+    await page.waitForTimeout(800)
+  }
   const schedule = page.getByRole('button', { name: /schedule/i }).first()
   if (await present(schedule, 5000)) {
     await tap(c, 'Schedule', schedule)

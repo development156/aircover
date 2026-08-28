@@ -85,16 +85,39 @@ export async function leaveOnboarding(page: Page): Promise<void> {
  */
 export const SEED_BODY = 'A draft, opened by the test fixture.'
 
+/**
+ * Go to one of the composer's three parts, the way a writer does: by pressing
+ * its row in the rail down the side.
+ *
+ * ── WHY EVERY SPEC THAT TOUCHES THE COMPOSER NEEDS THIS NOW ─────────────────
+ * The screen became a map: the three parts of a post listed on the left, the
+ * one being worked on filling the right. So the channel tiles, the per-platform
+ * version cards and the send panel are no longer all in the document at once,
+ * and a locator for one of them is not slow on the wrong part, it is empty.
+ *
+ * The composer opens on part one every time, INCLUDING after a reload — a
+ * writer coming back to a draft is here to read it. So a reload is exactly the
+ * place a spec has to come back through the rail.
+ */
+export async function openPart(page: Page, index: 1 | 2 | 3): Promise<void> {
+  await page.locator(`[data-rail-step="${index}"] button`).click()
+  await expect(page.locator(`[data-composer-panel="${index}"]`)).toBeVisible({ timeout: 30_000 })
+}
+
 export async function startPost(page: Page, channel: string): Promise<string> {
   await page.goto('/posts/new')
   await expect(page.locator('[data-composer]')).toBeVisible({ timeout: 60_000 })
   // WRITE FIRST, THEN PICK — and that order is now the product, not a taste.
-  // The composer is a numbered sequence: step two is `inert` until something has
-  // been written, so a tile clicked on a blank post is not a slow click, it is a
+  // The composer is a sequence: the platform part is refused until something has
+  // been written, so a tile picked on a blank post is not a slow click, it is a
   // click that can never land. Measured as a 5s timeout on the tile, in thirteen
   // @smoke files at once, the moment the sequence went in.
   await page.getByLabel('Your post').fill(SEED_BODY)
   await page.waitForURL(/\/posts\/[0-9a-f-]{36}$/, { timeout: 60_000 })
+  // Part two is where the platforms are, and it is refused until the line above
+  // has put something in the post. This helper leaves the page THERE, which is
+  // what most callers want next; anything needing the words again says so.
+  await openPart(page, 2)
   await page.locator(`[data-channel-tile="${channel}"]`).click()
   // The pick is now a SECOND save rather than part of the row's creation, so it
   // is waited on here: a caller that reloads straight after `startPost` would
