@@ -88,6 +88,12 @@ function Row({ index, step, active, onSelect, children }: RowProps) {
       */}
       <button
         type="button"
+        id={`rail-step-${index}`}
+        // Names the panel beside it, and says which panel it drives. Without
+        // these the panel is an unnamed region and pressing a row announces
+        // nothing at all: the only signal is `aria-current`, which a reader has
+        // to go back and re-read the rail to find.
+        aria-controls="composer-panel"
         aria-disabled={locked || undefined}
         aria-current={active ? 'step' : undefined}
         onClick={() => {

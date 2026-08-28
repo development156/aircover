@@ -20,11 +20,19 @@ vi.mock('@/app/actions/posts-ai', () => ({
   generateVariants: vi.fn(),
   rewriteCaption: vi.fn(),
 }))
+/**
+ * `savePost` RESOLVES HERE, and that is load-bearing rather than tidy.
+ *
+ * A bare `vi.fn()` resolves to `undefined`, and `use-autosave` reads `.ok` off
+ * the result — so the save path throws, the bar's Save button never reaches its
+ * second half, and any test of what happens AFTER a save passes or fails for
+ * reasons that have nothing to do with its subject.
+ */
 vi.mock('@/app/actions/posts', () => ({
-  createPost: vi.fn(),
-  savePost: vi.fn(),
-  saveVariant: vi.fn(),
-  setVariantFormat: vi.fn(),
+  createPost: vi.fn(async () => ({ ok: true, id: 'p1', updatedAt: '2026-08-28T00:00:01.000Z' })),
+  savePost: vi.fn(async () => ({ ok: true, updatedAt: '2026-08-28T00:00:01.000Z' })),
+  saveVariant: vi.fn(async () => ({ ok: true, version: 1 })),
+  setVariantFormat: vi.fn(async () => ({ ok: true })),
 }))
 vi.mock('@/app/actions/posts-schedule', () => ({ schedulePost: vi.fn(), cancelSchedule: vi.fn() }))
 vi.mock('@/app/actions/posts-publish', () => ({ simulatePublish: vi.fn() }))
@@ -225,6 +233,95 @@ describe('what each row actually opens', () => {
   })
 })
 
+describe('each part holds its own contents and nobody else’s', () => {
+  /**
+   * ── WHY THIS IS NOT COVERED BY "THE SECOND ROW OPENS THE VERSIONS" ─────────
+   * Those tests say a part CONTAINS what it should. Nothing said a part does
+   * not also contain the other two, and an adversarial pass proved it: rendering
+   * the writing box on part two as well, or the send panel on part two as well,
+   * left the whole suite green. A screen showing all three at once is the exact
+   * thing the founder's ruling replaced.
+   */
+  const WRITING = 'Your post'
+  const versionCards = (c: HTMLElement) => c.querySelectorAll('[data-version-card]').length
+  const sendPanel = (c: HTMLElement) => c.querySelector('section#finish')
+
+  test('the words, and nothing from the other two', () => {
+    const container = composer({ body: 'Fresh bread.', channels: ['x'] })
+
+    expect(screen.getByLabelText(WRITING)).toBeVisible()
+    expect(versionCards(container)).toBe(0)
+    expect(container.querySelector('[data-channel-tile]')).toBeNull()
+    expect(sendPanel(container)).toBeNull()
+  })
+
+  test('each platform, and nothing from the other two', () => {
+    const container = composer({ body: 'Fresh bread.', channels: ['x'] })
+    fireEvent.click(railButton(container, 2))
+
+    expect(versionCards(container)).toBe(1)
+    expect(container.querySelector('[data-channel-tile]')).not.toBeNull()
+    expect(screen.queryByLabelText(WRITING)).not.toBeInTheDocument()
+    expect(sendPanel(container)).toBeNull()
+  })
+
+  test('sending, and nothing from the other two', () => {
+    const container = composer({ body: 'Fresh bread.', channels: ['x'] })
+    fireEvent.click(railButton(container, 3))
+
+    expect(sendPanel(container)).not.toBeNull()
+    expect(screen.queryByLabelText(WRITING)).not.toBeInTheDocument()
+    expect(versionCards(container)).toBe(0)
+  })
+
+  test('the panel is a named region, and the row that opened it is the name', () => {
+    const container = composer({ body: 'Fresh bread.', channels: ['x'] })
+    fireEvent.click(railButton(container, 2))
+
+    // Without this a screen-reader user presses a row and is told nothing at
+    // all: `aria-current` is the only signal and it is back in the rail.
+    const panel = container.querySelector('#composer-panel')
+    expect(panel?.getAttribute('role')).toBe('region')
+    expect(panel?.getAttribute('aria-labelledby')).toBe('rail-step-2')
+    expect(container.querySelector('#rail-step-2')?.textContent).toMatch(/each platform/i)
+  })
+})
+
+describe('the bar’s Save takes the reader to the send panel', () => {
+  test('every press, even when the address already says finish', async () => {
+    // ── THE WIRING, NOT THE BUTTON ──────────────────────────────────────────
+    // `commit-bar.test.tsx` proves the BAR asks. Nothing proved the composer
+    // listens: dropping `onFinish` from the call site left the whole suite
+    // green, which an adversarial pass found by doing exactly that. This is the
+    // only test that presses the real button on the real screen.
+    //
+    // The address is set to `#finish` first ON PURPOSE. That is the state the
+    // defect lived in: assigning a hash that is already set fires no event, so
+    // the second press used to save the post and move nothing.
+    window.location.hash = 'finish'
+    const container = composer({ body: 'Fresh bread.', channels: ['x'] })
+    expect(shown(container)).toBe('3')
+
+    fireEvent.click(railButton(container, 1))
+    expect(shown(container)).toBe('1')
+
+    fireEvent.click(screen.getByRole('button', { name: /^Save$/ }))
+    await waitFor(() => expect(shown(container)).toBe('3'))
+    window.location.hash = ''
+  })
+
+  test('and an address alone is never a way past a lock', async () => {
+    // A post with words and no platform cannot send, so a link naming the send
+    // panel is refused the same as the row is. An address is a request, not an
+    // exemption.
+    window.location.hash = 'finish'
+    const container = composer({ body: 'Fresh bread.' })
+
+    expect(shown(container)).toBe('1')
+    window.location.hash = ''
+  })
+})
+
 describe('the platforms listed under the second row', () => {
   test('a channel on the post is listed, and pointing at it opens that part', () => {
     const container = composer({ body: 'Fresh bread.', channels: ['x', 'linkedin'] })
@@ -243,23 +340,35 @@ describe('the platforms listed under the second row', () => {
   })
 })
 
-describe('a blank post is never sent somewhere it cannot go', () => {
-  test('it is not told to pick a channel in a part that refuses clicks', () => {
+describe('no remedy that cannot work', () => {
+  test('a blank post is told to write, and is not sent anywhere', () => {
     composer()
 
-    // ── NO IMPOSSIBLE REMEDY ────────────────────────────────────────────────
-    // The versions pane has its own empty state. It used to read "pick a
-    // channel in step 2" unconditionally, which on a blank post points at a row
-    // that will not open — a remedy that cannot work is worse than no remedy,
-    // because the reader tries it.
-    expect(screen.queryByText(/pick a channel in step 2/i)).not.toBeInTheDocument()
+    // The two locked rows are the only advice a blank post gets, and both say
+    // the one thing that works. Nothing points at a part that refuses clicks.
     expect(screen.getAllByText(/write your post first/i).length).toBeGreaterThan(0)
+    expect(screen.queryByText(/pick a platform/i)).not.toBeInTheDocument()
   })
 
-  test('once there are words, the part that was refused is the one it points at', () => {
+  test('the empty versions pane points at the picker on its own screen', () => {
+    // ── THIS SENTENCE HAS BEEN WRONG TWICE, IN OPPOSITE DIRECTIONS ──────────
+    // It said "above" when the picker was below, then "in step 2" when the
+    // reader was standing in step 2. So the guard is not the wording: it is
+    // that whatever the sentence points at is ON THIS SCREEN and usable. The
+    // picker is asserted here as an actual element in the same panel.
     const container = composer({ body: 'Fresh bread every morning.' })
     fireEvent.click(railButton(container, 2))
 
-    expect(screen.getByText(/pick a channel in step 2/i)).toBeVisible()
+    const panel = container.querySelector('#composer-panel') as HTMLElement
+    expect(panel.textContent).toMatch(/pick a platform above/i)
+    expect(panel.querySelector('[data-channel-tile]')).not.toBeNull()
+
+    // And it is genuinely above: the picker comes before the pane in the
+    // document, which is what "above" means to the reader being advised.
+    const tile = panel.querySelector('[data-channel-tile]') as Node
+    const sentence = [...panel.querySelectorAll('p')].find((el) =>
+      /pick a platform above/i.test(el.textContent ?? ''),
+    ) as Node
+    expect(tile.compareDocumentPosition(sentence) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 })

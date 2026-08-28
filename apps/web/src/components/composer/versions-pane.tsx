@@ -4,7 +4,6 @@ import type { Channel, ChannelSet, PostMedia } from '@sahoda/shared'
 import type { PostFormat } from '@sahoda/publishing/format'
 
 import { GeneratePanel } from '@/components/posts/generate-panel'
-import { hasWriting } from '@/lib/posts/composer-steps'
 import type { GeneratedVariant } from '@/lib/posts/state'
 import type { VariantsApi } from '@/components/posts/use-variants'
 
@@ -66,17 +65,15 @@ export function VersionsPane({
 
       {channels.length === 0 ? (
         <p className="surface-ring rounded-card bg-surface p-4 text-[13px] text-muted">
-          {/* TWO NOTHINGS, AND ONLY ONE OF THEM HAS A REMEDY YET.
-              On a blank post step two is refused, so "pick a channel in step 2"
-              would send a reader to a panel that will not take the click. Once
-              something is written the picker is genuinely open, and then the
-              step number is the right pointer: it moved BELOW this pane when the
-              composer became a sequence, so the old word "above" pointed the
-              wrong way, and a number survives a layout change in a way a
-              direction does not. */}
-          {hasWriting(canonicalBody)
-            ? 'Pick a channel in step 2 and its version opens here.'
-            : 'Write your post first. Each channel gets its own version, shaped from what you write.'}
+          {/* ── THE REMEDY POINTS AT SOMETHING ON THIS SCREEN ─────────────────
+              This sentence has been wrong twice, in opposite directions, and
+              both times because it named a PLACE. It said "above" while the
+              picker was below; it then said "in step 2" while the reader was
+              standing in step 2 with the picker directly overhead. This pane
+              only ever renders inside the platform part, and the picker is the
+              element immediately before it there, so "above" is true by
+              construction now rather than by luck. */}
+          Pick a platform above and its version opens here.
         </p>
       ) : (
         <>

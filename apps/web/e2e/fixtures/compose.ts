@@ -95,12 +95,20 @@ export const SEED_BODY = 'A draft, opened by the test fixture.'
  * version cards and the send panel are no longer all in the document at once,
  * and a locator for one of them is not slow on the wrong part, it is empty.
  *
- * The composer opens on part one every time, INCLUDING after a reload — a
- * writer coming back to a draft is here to read it. So a reload is exactly the
- * place a spec has to come back through the rail.
+ * The composer opens on part one every time — a writer coming back to a draft is
+ * here to read it — so a reload is exactly the place a spec has to come back
+ * through the rail. The one exception is an address carrying `#finish`, which
+ * the commit bar sets and which lands on part three on arrival.
  */
 export async function openPart(page: Page, index: 1 | 2 | 3): Promise<void> {
-  await page.locator(`[data-rail-step="${index}"] button`).click()
+  // ── THE LOCK IS CHECKED FIRST, AND THAT IS NOT BELT AND BRACES ─────────────
+  // A refused row is `aria-disabled`, which Playwright does NOT treat as an
+  // actionability barrier: the click succeeds, nothing happens, and the failure
+  // arrives 30 seconds later naming a missing panel rather than the refusal
+  // that caused it. Asserted here so the message names the cause.
+  const row = page.locator(`[data-rail-step="${index}"]`)
+  await expect(row).toHaveAttribute('data-rail-locked', 'false', { timeout: 30_000 })
+  await row.locator('button').first().click()
   await expect(page.locator(`[data-composer-panel="${index}"]`)).toBeVisible({ timeout: 30_000 })
 }
 
