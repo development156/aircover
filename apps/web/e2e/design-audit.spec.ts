@@ -67,7 +67,7 @@ const ROUTES: ReadonlyArray<{ path: string; slug: string; archetype: string }> =
   // real pipeline over real rows. Kept in the camera because a pipeline is a
   // SHAPE this pass wants photographed, which is why it was here to begin with.
   { path: '/leads', slug: 'leads', archetype: 'pipeline' },
-  { path: '/studio', slug: 'studio', archetype: 'roadmap · gallery' },
+  { path: '/studio', slug: 'studio', archetype: 'gallery · editor' },
   // No longer a roadmap screen either: it plans a batch, prices it out of
   // pricing.config.json and charges for it. Still the fan-out shape.
   { path: '/remix', slug: 'remix', archetype: 'fan-out · priced' },
