@@ -383,3 +383,62 @@ production and was not taken.
 **`wt-core` has NOT been given this lane.** `lane-sync push` took `wt-core` in and
 pushed the lane; the promotion to `wt-core` is the one gated step in the system and
 was left for the founder. The gate it asks for is green, locally and on CI.
+
+---
+
+## Session 19, addendum 2 — `wt-core` moved again, and the browser leg was ATTEMPTED
+
+`lane-sync push` found the lane **2 commits behind** a second time and merged
+`wt-core` in. HEAD is now **`2f117718`**, pushed. What came in was tooling only,
+no product code: `scripts/sandbox-probe.mjs`, `scripts/browser-run.mjs`,
+`scripts/cloud-setup.sh`, a new `scripts/stop-gate.sh`, and `.claude/settings.json`.
+
+**The gate was re-run, because this is a different tree.** That is the distinction
+the note above draws: an identical tree does not need a second run, a merged one
+does.
+
+| Leg | Real output | Verdict |
+| --- | --- | --- |
+| `turbo run typecheck lint test --concurrency=1 --force` on `2f117718` | `Tasks: 27 successful, 27 total` · `Cached: 0 cached, 27 total` · 7m01s | **PASS** |
+| ↳ `@sahoda/web:test` | 151.48s, uncached | **PASS** |
+| `prettier --check .` (root) | `All matched files use Prettier code style!` | **PASS** |
+
+### The probe now claims the browser suite can run here. MEASURED: it cannot.
+
+This is the finding worth carrying, and it belongs to whoever wrote the transport
+rather than to this lane's diff.
+
+`scripts/sandbox-probe.mjs` now reports **`LOCAL_ONLY`** with `browser binary
+present` — it was `NO_BROWSER` earlier in this same session — and writes
+`SAHODA_BROWSER_VIA_NODE=1` into the `.env` files, saying "every browser request
+now travels over Node instead of Chromium's socket, so the suite CAN run here".
+
+**It does not.** MEASURED, `pnpm exec playwright test connections-widths.spec.ts`:
+
+| What | Result |
+| --- | --- |
+| `connections-widths.spec.ts` | **2 failed of 2**, both at `signIn`, `e2e/fixtures/seeded-user.ts:231` |
+| The actual error | `page.goto: net::ERR_CONNECTION_RESET at http://127.0.0.1:3100/sign-in` |
+
+**Read that error carefully, because it is not the failure everyone expects.** It
+is **plain HTTP to the app's OWN dev server on loopback**, not HTTPS to Clerk.
+Clerk's server side worked: the run minted a real sign-in ticket, so
+`clerkFetch('/sign_in_tokens')` reached Clerk over Node and came back with a token
+that is in the failing URL. What broke is the browser navigating to `127.0.0.1`.
+
+**One hypothesis was formed, tested, and REFUTED — do not repeat it.** I expected
+`installNodeTransport` to be sending loopback requests through `HTTPS_PROXY`, which
+would reset them. MEASURED: Node `fetch` of a local listener returns **200**, both
+as-is and with `NO_PROXY=127.0.0.1,localhost`, and `no_proxy` is already set in this
+environment. That is not the cause. **I did not find the cause and am not guessing
+at one.**
+
+**No file was edited to chase this.** The transport is another lane's work, landed
+in `wt-core` minutes earlier, and editing it from here is how two sessions collide.
+
+### So the responsive claims are still INFERRED
+
+Everything Session 19 says about 320px to 1920px comes from reading class names.
+`connections-widths.spec.ts` is the spec that would settle it and it cannot reach
+the app in this container. The remedy is unchanged: run it where a browser has an
+ordinary network, or `node scripts/browser-run.mjs --remote`.
