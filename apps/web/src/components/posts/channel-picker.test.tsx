@@ -131,3 +131,51 @@ describe('ChannelPicker selected state', () => {
     }
   })
 })
+
+describe('the channels the picker offers', () => {
+  test('does not offer a channel the product will not let you connect', () => {
+    render(<ChannelPicker selected={toChannelSet([])} onChange={() => {}} />)
+
+    // `/connections` stopped offering Telegram, and this picker kept listing it.
+    // A writer could pick it, have a version generated, and then find nowhere in
+    // the product to link a Telegram account — an invitation to an action that
+    // cannot be completed, which is the shape `no-impossible-remedy` forbids.
+    expect(screen.queryByRole('button', { name: /Telegram/ })).not.toBeInTheDocument()
+
+    // And the rest are untouched. Asserted so "hide Telegram" cannot quietly
+    // become "hide everything the connections screen is fussy about".
+    expect(screen.getByRole('button', { name: /^X$/ })).toBeVisible()
+    expect(screen.getByRole('button', { name: /LinkedIn/ })).toBeVisible()
+    expect(screen.getByRole('button', { name: /Instagram/ })).toBeVisible()
+  })
+
+  test('still shows a withdrawn channel that the post ALREADY targets', () => {
+    render(<ChannelPicker selected={toChannelSet(['telegram'])} onChange={() => {}} />)
+
+    // Filtering blindly would make an existing post's Telegram version invisible
+    // and un-deselectable: three chips on screen, four channels still being
+    // saved, and nothing explaining the difference. The OFFER is withdrawn; a
+    // choice already made stays visible and removable.
+    const chip = screen.getByRole('button', { name: /Telegram/ })
+    expect(chip).toBeVisible()
+    expect(chip).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  test('gives every channel its own logo, never a shared placeholder', () => {
+    render(<ChannelPicker selected={toChannelSet([])} onChange={() => {}} />)
+
+    // ── THE DEFECT THIS PINS ────────────────────────────────────────────────
+    // `channel-mark.tsx` carried its own map of three logos and fell through to
+    // a grey MAP PIN for the rest, so Google Business Profile and Facebook Pages
+    // rendered as the same anonymous glyph on a row whose whole job is telling
+    // channels apart — while /connections showed their real logos. `ChannelLogo`
+    // marks its fallback with `data-placeholder`, so this asserts the absence of
+    // the admission rather than the presence of any particular picture.
+    for (const el of document.querySelectorAll('[data-channel]')) {
+      expect(el.getAttribute('data-placeholder')).toBeNull()
+    }
+    // And that the marks are actually there, so the loop above cannot pass by
+    // finding nothing at all.
+    expect(document.querySelectorAll('[data-channel]').length).toBeGreaterThan(0)
+  })
+})

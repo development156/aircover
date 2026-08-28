@@ -12,6 +12,8 @@ import {
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
+import { isOfferedForConnect } from '@/lib/connections/catalogue'
+
 import { ChannelMark } from './channel-mark'
 import { CHANNEL_LABELS } from './channel-label'
 
@@ -57,6 +59,33 @@ export interface ChannelPickerProps {
  * from `--line` to a materially darker value, and the check dot only exists when
  * the chip is on.
  */
+/**
+ * The channels this picker offers, plus any the post already targets.
+ *
+ * ── OFFERING A CHANNEL NOBODY CAN CONNECT IS AN IMPOSSIBLE REMEDY ────────────
+ * `/connections` stopped offering telegram, and this picker kept listing it —
+ * so a writer could pick Telegram, have a version generated for it, and then
+ * find no way anywhere in the product to link a Telegram account. That is the
+ * shape `no-impossible-remedy.spec.ts` exists to forbid: a control that invites
+ * an action which cannot be completed.
+ *
+ * Derived from the SAME set the connections screen filters on, not restated. A
+ * second literal here is how the two screens would drift apart again, which is
+ * the defect this is fixing.
+ *
+ * ── AND A CHANNEL ALREADY ON THE POST IS ALWAYS SHOWN ────────────────────────
+ * Filtering blindly would make an existing post's Telegram version invisible and
+ * un-deselectable — the writer would see three chips, `savePost` would keep
+ * writing four channels, and nothing on screen would explain it. What is being
+ * withdrawn is the OFFER; what is already chosen stays visible and removable.
+ * The same rule the connections screen follows for an account already linked.
+ */
+export function offeredChannels(selected: ChannelSet): readonly Channel[] {
+  return ChannelSchema.options.filter(
+    (channel) => isOfferedForConnect(channel) || selected.includes(channel),
+  )
+}
+
 export function ChannelPicker({
   selected,
   onChange,
@@ -80,7 +109,7 @@ export function ChannelPicker({
     <div className="space-y-2" data-guide="post-channels">
       {hideLabel ? null : <Label>Channels</Label>}
       <div className="flex flex-wrap gap-1.5">
-        {ChannelSchema.options.map((channel) => {
+        {offeredChannels(selected).map((channel) => {
           const isOn = selected.includes(channel)
           return (
             <button
