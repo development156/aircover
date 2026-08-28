@@ -139,3 +139,168 @@ system doing its job rather than a hazard.
    channels, a resolved brain and 1,196 credits and needs one click.
 4. **Phase 2 (L3 autopilot) is NOT started**, by design: the document says to
    read Phase 1's report first.
+
+---
+
+# Session 2
+
+**Branch** `claude/advisor-qvz5wn` at `ebe5828e`. Lane `wt-divas`. Pushed: **yes**.
+PR [#20](https://github.com/development156/sahodalabs/pull/20), draft, into
+`wt-core`, `mergeable_state: unstable` (merges cleanly; only the starved CI
+check is red). Zero behind `origin/wt-core`.
+
+Session 1 above delivered Phase 1 of `LOOP_BUILD_1.md`. This session resolved
+the `wt-core` merge that Session 1 left open, then built **Phase 2 parts 1 and
+2**. Parts 3 to 6 are NOT built and the reason is structural, not time.
+
+## What shipped
+
+| # | What | Proof | Covered by |
+|---|---|---|---|
+| 1 | The `wt-core` merge, keeping BOTH lanes' fixes to the probe rather than picking one | `7fa1956e` | probe re-run MEASURED: "browser binary present — scan chromium-1228/chrome-linux", no install fired |
+| 2 | L3 is storable, and only under two preconditions enforced by a trigger | `10ab12c1`, `20260828120000_loop_autopilot_l3.sql` | `loop_autopilot_l3.pglite.test.ts`, 18 tests |
+| 3 | `autopilot_daily_cap` (default 3) and `autopilot_cancel_minutes` (default 30, floor 5) | same migration | same file, 4 of those 18 |
+| 4 | The autopilot audit trail, every row naming what it acted on | `ebe5828e`, `20260828130000_loop_autopilot_log.sql` | `loop_autopilot_log.pglite.test.ts`, 12 tests |
+| 5 | "Invented" and "written but not applied" split apart in the export drift check | `ebe5828e`, `lib/privacy/pending-tables.ts` | `pending-tables.test.ts`, 8 tests |
+| 6 | The never-list as names a row can carry | `lib/loop/autopilot-refusals.ts` | adjudicated against the migration; **nothing writes them yet** |
+
+**The cross-tenant guard was VERIFIED before anything was built on it**, which
+is what the build document demands. Five hostile calls against production, five
+distinct refusals: `CROSS_TENANT_ACCOUNT` (a well-formed foreign account),
+`INVALID_VARIANT` (another workspace's variant spliced onto this post),
+`INVALID_ACCOUNT` (malformed id), `POST_NOT_PUBLISHABLE` (a draft),
+`INVALID_POST` (nonexistent). MEASURED 2026-08-28. It is `STABLE` and
+`prosecdef: false`, and it re-derives the workspace FROM the post.
+
+## What was NOT done, and why
+
+**Phase 2 parts 3, 4, 5 and 6 are not built, and it is not a time problem.** All
+four need the autopilot DISPATCH PATH, which does not exist:
+
+- **P3 undo** — there is nothing to unpublish, because nothing publishes.
+- **P4 telling the person** — the announcement and cancel window are stored
+  facts (`decision='announced'`, `dispatch_after`), and nothing writes them.
+- **P5 kill switch under autopilot** — the existing kill switch is proven,
+  including a hand-scheduled `origin='plan_week'` post surviving
+  (`loop_migrations.pglite.test.ts`). Re-proving it "with autopilot armed"
+  requires autopilot to arm something.
+- **P6 the never-list enforced** — the names exist; no code writes one.
+  `loop_autopilot_log.pglite.test.ts`'s own WHAT IT CANNOT SEE section says
+  exactly this: a name present in both files and used by nothing would pass.
+
+Building the dispatcher is the next piece and it is substantial.
+
+**No real publish was executed**, per the document's one exception. Nothing in
+this session reached an adapter.
+
+**Three migrations are written and NOT applied**: `20260828100000` (Session 1),
+`20260828120000` and `20260828130000`. `db push` is a founder action. Nothing in
+the app can write level 3 yet, so no customer is reachable by any of it.
+
+**The @smoke leg still fails and it is still not this lane's.** Same transport
+resets Session 1 measured, re-measured this session: gate leg 3 FAILED in 21.2s.
+
+**The brain floor is a product judgement I made.** The four fields come from
+`BRAIN_FIELDS`' own priority order, and the argument is in
+`autopilot-floor.ts`'s header. It has not been ruled on.
+
+## Shared surfaces touched
+
+| Surface | What changed | Who it breaks |
+|---|---|---|
+| `packages/db/supabase/migrations` | two new files, both additive | nobody until applied; `bootFullSchema()` applies them, so every pglite suite now runs against them |
+| `packages/db/tests/rls_tenant_isolation.pglite.test.ts` | `loop_autopilot_log` added to `EXPECTED_GUARDED` | a lane adding another append-only table hits the same list, which is the design |
+| `apps/web/src/lib/privacy/export-manifest.ts` | one entry added, and the header list | **READERS, not constructors** — `EXPORT_TABLES` gained a row; nothing's type changed |
+| `apps/web/src/lib/privacy/export-drift.test.ts` | phantom check now splits invented from pending | a lane whose manifest entry has no migration still fails, which is the point |
+| `docs/38_Data_Handling.md` | table row, and the count 52 → 53 | any lane adding a tenant table must move it again |
+| `scripts/sandbox-probe.mjs`, `scripts/browser-run.mjs` | merge resolution, both lanes' behaviour kept | every lane that pulls `wt-core` |
+
+`packages/shared` was **not** touched this session. `AutonomyLevelSchema` still
+admits only 0, 1 and 2, deliberately: the database now permits 3 under
+conditions, and the application does not yet. That asymmetry is the safe
+direction and is stated in the migration.
+
+## Contract, migration or money
+
+Two additive migrations, no contract change, no price touched, no ledger write.
+
+`loop_channel_autonomy.level`'s CHECK widened from `<= 2` to `<= 3`. That is the
+only existing constraint relaxed anywhere in this branch, and the same file adds
+the trigger that makes the new value conditional. A test asserts 4 is still
+refused, so the ceiling moved by exactly one.
+
+## Guards written, and the mutation that proved each
+
+Every one was applied, run, and WATCHED go red.
+
+| Guard | Mutation | What went red |
+|---|---|---|
+| The named brain floor | a COUNT floor (3 of 4) instead of the named set | "REFUSES L3 when only the red lines are unconfirmed" **alone**. This is the real defect reproduced: most-fields-confirmed publishes unattended with no red lines |
+| Supervised cycle | supervision read as "a cycle finished", dropping the human | "REFUSES L3 when a cycle finished but no person approved its cost" **alone** |
+| The trigger's reach | `before insert` only | "REFUSES an UPDATE to L3 as firmly as an INSERT" **alone** |
+| Audit trail identifiers | `account_id text not null default ''` — the exact `ops_audit_log` shape | the empty-account test **alone** |
+| Append-only | trigger removed | both mutation tests red, the other ten green |
+| Pending/invented split | every absent manifest entry excused as pending | the two invented-table tests red — that allowance going bad |
+| The migration scan | scan matches no files | the size guard fires, so an empty scan cannot excuse everything |
+
+No two mutations hit the same test, so no guard here is hiding behind another —
+the failure mode the build document warns about.
+
+## Anything retracted
+
+**`docs/38` said `ledger_actor_redactions` was the one table written and not
+applied. That is retracted.** MEASURED 2026-08-28 by asking the catalog for both
+names: it came back, `loop_autopilot_log` did not. It has been applied some time
+since 2026-08-26. Production holds **52** workspace-owned tables and this
+branch's migrations create **53**. Third revision that paragraph has gone stale,
+which the corrected text now says.
+
+**`ops_audit_log` is worse than the build document records.** It says 95% of
+12,196 rows name nothing. MEASURED: **17,556 rows, 16,915 nameless, 96.3%**.
+
+**Session 1's claim that the smoke failures might be the dev server is
+retracted.** It was TESTED against a production `next start` build and the same
+specs failed identically. The cause is a loopback transport reset
+(`net::ERR_CONNECTION_RESET at http://127.0.0.1:3210/design-system`), not
+on-demand compilation.
+
+## What the next session in THIS lane should pick up
+
+1. **Get a ruling on the brain floor** before building on it. Four named fields,
+   argued in `autopilot-floor.ts`. It gates a feature that publishes unattended.
+2. **Build the autopilot dispatcher.** It is the blocker for four of Phase 2's
+   six parts. It must: read the per-channel dial, write `announced` with a
+   `dispatch_after`, refuse with a NAMED reason from `AUTOPILOT_REFUSALS`, and
+   reach the existing publish path — which already runs Constraint Engine →
+   refusal gate → `assert_account_for_scheduled_post` → adapter, in that order
+   (`runPublishPost.ts:597`). Guardrail 5 is therefore structurally true
+   already; what is missing is the autopilot-specific checks in front of it.
+3. **The founder's four items**, `docs/25_Founder_Actions.md` §15, plus the two
+   new migrations.
+4. **The @smoke transport resets.** Dispatch the `smoke` job on `gate.yml` by
+   hand and compare. Do not assume either way.
+
+## Gate
+
+Run on `ebe5828e`, a clean tree, each leg's real output.
+
+| Leg | Result | Evidence |
+|---|---|---|
+| `turbo-typecheck-lint-test` | **PASS** | 27/27 tasks, **`Cached: 0`**, 6m32.773s. Forced with `--force` because the gate's own run replayed it in 1.3s, which verifies nothing |
+| `vitest-root` | **PASS** | 3.4s. Caught two of my files arriving as scanners without a blind-spot declaration; both now declare one |
+| `turbo-smoke` | **FAIL** | 21.2s. The browser leg. Same transport resets as Session 1, re-measured against a production build and not caused by the dev server |
+| `prettier-check` | **PASS** | 37.7s |
+| `turbo-build` | **PASS** | 112.8s |
+
+Package detail from the forced run: `@sahoda/web` **5,803 passed**, 13 skipped,
+460 files; `@sahoda/db` **698 passed**, 207 skipped; `@sahoda/jobs` 396 passed;
+`@sahoda/mesh` 191 passed.
+
+**One discrepancy I did NOT explain.** `@sahoda/db` reports 698 passed and zero
+failed under `turbo run test`, and a standalone
+`pnpm --filter @sahoda/db exec vitest run` in this sandbox reports **1 failed**
+— `live-guard.test.ts`, "does not read the repo-root .env while the flag is
+absent". That failure reproduces on a CLEAN tree (MEASURED by stashing), so it
+is not this lane's. Why the two invocations disagree is **UNMEASURED**: turbo's
+`test` task declares `env: ["SAHODA_ALLOW_LIVE_TESTS"]` and `globalEnv: []`,
+which is a plausible mechanism and is not the same thing as having checked.
