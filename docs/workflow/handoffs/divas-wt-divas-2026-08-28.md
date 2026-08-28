@@ -10,11 +10,17 @@ the single most important thing here is a defect it does not mention.
 
 ## The answer first
 
-**The Sunday cron has raised an error on every run since 23 August and no
-workspace has ever been planned for or told why not.** Its one query read
-`from loop_autonomy d`; the table is `loop_channel_autonomy`. MEASURED against
-production by running the fragment verbatim:
+**The Sunday cron could not run at all, and nothing was watching.** Its one query
+read `from loop_autonomy d`; the table is `loop_channel_autonomy`. MEASURED
+against production by running the fragment verbatim:
 `ERROR: 42P01: relation "loop_autonomy" does not exist`.
+
+Whether the schedule fired is NOT observable from here — the heartbeat is in
+Redis, not the database — so "every tick failed" is INFERRED, not measured. What
+is measured: the newest cycle in production started **2026-08-23 10:31 UTC**, and
+the commit that broke the query landed **11:55 UTC the same day**. Nothing has
+been planned since, and the last thing that worked did so 84 minutes before the
+break.
 
 The commit that introduced it, `3aa6186d` on 23 August, is the one whose whole
 purpose was to make the Loop say why it will not plan for you.
