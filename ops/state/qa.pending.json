@@ -1001,6 +1001,84 @@
       "summary_plain": "The unit checks ran and everything passed.",
       "details": "TURBO_EXIT=0\n Tasks:    27 successful, 27 total\nCached:    0 cached, 27 total\n  Time:    7m56.938s",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtcsi8yl-c7737783",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T10:09:32.635Z",
+      "finished_at": "2026-08-28T10:09:32.635Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks ran and everything passed (16 passed).",
+      "details": " RUN  v4.1.10 /home/user/sahodalabs/apps/web\n\n\n Test Files  2 passed (2)\n      Tests  16 passed (16)\n   Start at  10:09:30\n   Duration  1.63s (transform 1.71s, setup 0ms, import 2.53s, tests 41ms, environment 0ms)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtcsim27-72cc9e05",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T10:09:49.612Z",
+      "finished_at": "2026-08-28T10:09:49.612Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks ran (3 passed), but 16 tests did NOT run — this does not prove the suite passes.",
+      "details": " RUN  v4.1.10 /home/user/sahodalabs/apps/jobs\n\n\n Test Files  1 passed (1)\n      Tests  3 passed | 16 skipped (19)\n   Start at  10:09:40\n   Duration  9.27s (transform 149ms, setup 0ms, import 193ms, tests 8.85s, environment 0ms)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtcsw13d-d4b1800e",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T10:20:15.623Z",
+      "finished_at": "2026-08-28T10:20:15.623Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The typecheck, lint, unit checks ran together and something failed (5335 passed, 2 failed).",
+      "details": "{\n  \"ok\": false,\n  \"allPassed\": false,\n  \"ranAt\": \"2026-08-27T06:04:28.714Z\",\n  \"stages\": [\n    {\n      \"name\": \"turbo-typecheck-lint-test\",\n      \"code\": 0,\n      \"signal\": null,\n      \"ms\": 670\n    },\n    {\n      \"name\": \"vitest-root\",\n      \"code\": 1,\n      \"signal\": null,\n      \"ms\": 3600\n    }\n  ],\n  \"skipped\": [\n    \"turbo-smoke\",\n    \"prettier-check\",\n    \"turbo-build\"\n  ],\n  \"notSelected\": [],\n  \"failedStage\": \"vitest-root\"\n}\n=== tail of stage 1 log ===\n@sahoda/web:test: [disabled primary] dark --ink-mute on --surface-2 = 5.51:1\n@sahoda/web:test: \n@sahoda/web:test: stdout | src/components/ui/button.disabled-contrast.test.tsx > a disabled primary is legible AND looks inert, in both themes > the OLD recipe still measures as the defect it was, so this test can fail\n@sahoda/web:test: [disabled primary] the OLD light pair, white on --line = 1.21:1\n@sahoda/web:test: \n@sahoda/web:test: stdout | src/components/ui/button.disabled-contrast.test.tsx > a disabled primary is legible AND looks inert, in both themes > dark does not make the refusal look pressable\n@sahoda/web:test: [disabled primary] dark: shipped 5.51:1 vs white 16.10:1\n@sahoda/web:test: \n@sahoda/web:test:  ✓  ui  src/components/ui/button.disabled-contrast.test.tsx (5 tests) 9ms\n@sahoda/web:test:  ✓  ui  src/components/onboarding/intake-recovery.test.tsx (12 tests) 9ms\n@sahoda/web:test:  ✓  ui  src/components/onboarding/stage/persistence.test.tsx (13 tests) 10ms\n@sahoda/web:test:  ✓  ui  src/components/posts/variant-state.test.tsx (5 tests) 6ms\n@sahoda/web:test:  ✓  ui  src/components/knowledge/add-document.test.tsx (2 tests) 4ms\n@sahoda/web:test:  ✓  ui  src/app/layout.test.tsx (3 tests) 5ms\n@sahoda/web:test: \n@sahoda/web:test:  Test Files  401 passed | 3 skipped (404)\n@sahoda/web:test:       Tests  5106 passed | 13 skipped (5119)\n@sahoda/web:test:    Start at  06:02:03\n@sahoda/web:test:    Duration  111.81s (transform 17.68s, setup 18.43s, import 90.75s, tests 78.71s, environment 83.36s)\n@sahoda/web:test: \n\n Tasks:    27 successful, 27 total\nCached:    27 cached, 27 total\n  Time:    111ms >>> FULL TURBO\n\n=== tail of stage 2 log ===\n+   \"results\": [\n+     {\n+       \"killed\": true,\n+       \"name\": \"answer\",\n+       \"summary\": \"\",\n+     },\n+   ],\n  }\n\n ❯ scripts/lib/mutation-harness.test.mjs:247:8\n    245|           runTests: async () => ({ killed: true, summary: '' }),\n    246|         }),\n    247|       ).rejects.toThrow(MutationHarnessError)\n       |        ^\n    248|\n    249|       // And crucially, the source was never touched.\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n\n Test Files  1 failed | 15 passed (16)\n      Tests  2 failed | 229 passed (231)\n   Start at  06:04:25\n   Duration  2.79s (transform 416ms, setup 0ms, import 694ms, tests 4.31s, environment 1ms)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtct6gm7-c5b4c3a3",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T10:28:22.301Z",
+      "finished_at": "2026-08-28T10:28:22.301Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks passed (3 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
+      "details": " RUN  v4.1.10 /home/user/sahodalabs/apps/web\n\n\n Test Files  1 passed (1)\n      Tests  3 passed (3)\n   Start at  10:28:12\n   Duration  9.60s (transform 219ms, setup 0ms, import 332ms, tests 8.86s, environment 0ms)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtct6uj3-ed267b9f",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T10:28:40.332Z",
+      "finished_at": "2026-08-28T10:28:40.332Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The unit checks ran and something failed (3 failed).",
+      "details": "1\n     × parses and executes — every relation it names exists 6ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯\n FAIL  |lib| src/lib/cron/loop-facts-sql.pglite.test.ts > LOOP_FACTS_SQL against the real schema > parses and executes — every relation it names exists\n FAIL  |lib| src/lib/cron/loop-facts-sql.pglite.test.ts > LOOP_FACTS_SQL against the real schema > returns the settings, balance, connections and dial for a workspace\n FAIL  |lib| src/lib/cron/loop-facts-sql.pglite.test.ts > LOOP_FACTS_SQL against the real schema > includes a workspace with no loop_settings row, as a null paused\nerror: relation \"loop_autonomy\" does not exist\n      Tests  3 failed (3)\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run src/lib/cron/loop-facts-sql.pglite.test.ts",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtct78k2-e317bf6a",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T10:28:58.510Z",
+      "finished_at": "2026-08-28T10:28:58.510Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks passed (19 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
+      "details": " RUN  v4.1.10 /home/user/sahodalabs/apps/web\n\n\n Test Files  3 passed (3)\n      Tests  19 passed (19)\n   Start at  10:28:49\n   Duration  9.10s (transform 1.93s, setup 0ms, import 2.83s, tests 8.68s, environment 0ms)",
+      "duration_ms": null
     }
   ]
 }
