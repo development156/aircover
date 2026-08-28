@@ -1,54 +1,43 @@
-import Image from 'next/image'
-import { MapPin } from 'lucide-react'
 import type { Channel } from '@sahoda/shared'
 
+import { ChannelLogo } from '@/components/connections/channel-logo'
+
 /**
- * A platform's own logo.
+ * A platform's own logo, for the composer, the planner and the posts list.
  *
- * ── THE ONE PLACE BRAND COLOUR IS ALLOWED IN ───────────────────────────────────
- * docs/26 §1.6: platform marks keep their own brand colours, because that is
- * IDENTITY rather than UI chrome. It is the only exception in the system, and it
- * never leaks into a button, a surface or body text — which is why this is a
- * component and not a class anybody can reach for.
+ * ── THIS FILE HELD A SECOND, STALER COPY OF THE SAME MAP ─────────────────────
+ * It carried its own `MARK` record with three PNGs — instagram, linkedin, x —
+ * and fell through to a grey MAP PIN for everything else. `ChannelLogo` on
+ * /connections has the complete set: six shipped PNGs plus seven marks drawn to
+ * scale for the platforms that ship none.
  *
- * Extracted out of the deleted create flow, where it was a private helper. Two
- * screens needed it and only one had it.
+ * So Google Business Profile, Facebook Pages and Telegram all rendered as the
+ * SAME anonymous pin in the channel picker, on a row whose entire job is telling
+ * channels apart — while three feet away on /connections they had their own
+ * logos. Two maps for one question is why one of them went stale, and adding
+ * three more entries here would have left the same trap for the next platform.
+ *
+ * There is one map now and this is a thin wrapper over it. `CatalogueChannel` is
+ * a superset of `Channel`, so every value this component can receive is one
+ * `ChannelLogo` already handles.
+ *
+ * ── THE MAP PIN WAS WORSE THAN ANONYMOUS ─────────────────────────────────────
+ * A pin is a PLACE. As a stand-in for a missing logo it read as a claim about
+ * the channel rather than an admission about us, and it was plausible on exactly
+ * one of the three — a listings product — which is what let it look deliberate.
+ * `ChannelLogo`'s fallback is `CircleSlash`, which says "no mark" and is true.
+ *
+ * Brand colour is allowed here and nowhere else: a logo is IDENTITY, not UI
+ * chrome (docs/26 §1.6). Decorative always — every call site renders the channel
+ * name beside it, so alt text would make a screen reader say "Instagram
+ * Instagram".
  */
-const MARK: Partial<Record<Channel, string>> = {
-  instagram: '/channels/instagram.png',
-  linkedin: '/channels/linkedin.png',
-  x: '/channels/x.png',
-}
 
 export interface ChannelMarkProps {
   channel: Channel
   size?: number
 }
 
-/** GBP ships no mark in the package; `google-ads.png` is a different product. */
 export function ChannelMark({ channel, size = 18 }: ChannelMarkProps) {
-  const src = MARK[channel]
-  if (src === undefined) {
-    return (
-      <span
-        aria-hidden
-        data-channel={channel}
-        className="grid shrink-0 place-items-center rounded-sm bg-s2 text-muted"
-        style={{ width: size, height: size }}
-      >
-        <MapPin size={Math.round(size * 0.62)} strokeWidth={1.8} />
-      </span>
-    )
-  }
-  return (
-    <Image
-      src={src}
-      alt=""
-      aria-hidden
-      data-channel={channel}
-      width={size}
-      height={size}
-      className="shrink-0 rounded-sm"
-    />
-  )
+  return <ChannelLogo channel={channel} size={size} className="rounded-sm" />
 }

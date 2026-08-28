@@ -131,3 +131,118 @@ describe('ChannelPicker selected state', () => {
     }
   })
 })
+
+describe('the channels the picker offers', () => {
+  test('does not offer a channel the product will not let you connect', () => {
+    render(<ChannelPicker selected={toChannelSet([])} onChange={() => {}} />)
+
+    // `/connections` stopped offering Telegram, and this picker kept listing it.
+    // A writer could pick it, have a version generated, and then find nowhere in
+    // the product to link a Telegram account — an invitation to an action that
+    // cannot be completed, which is the shape `no-impossible-remedy` forbids.
+    expect(screen.queryByRole('button', { name: /Telegram/ })).not.toBeInTheDocument()
+
+    // And the rest are untouched. Asserted so "hide Telegram" cannot quietly
+    // become "hide everything the connections screen is fussy about".
+    expect(screen.getByRole('button', { name: /^X$/ })).toBeVisible()
+    expect(screen.getByRole('button', { name: /LinkedIn/ })).toBeVisible()
+    expect(screen.getByRole('button', { name: /Instagram/ })).toBeVisible()
+  })
+
+  test('still shows a withdrawn channel that the post ALREADY targets', () => {
+    render(<ChannelPicker selected={toChannelSet(['telegram'])} onChange={() => {}} />)
+
+    // Filtering blindly would make an existing post's Telegram version invisible
+    // and un-deselectable: three chips on screen, four channels still being
+    // saved, and nothing explaining the difference. The OFFER is withdrawn; a
+    // choice already made stays visible and removable.
+    const chip = screen.getByRole('button', { name: /Telegram/ })
+    expect(chip).toBeVisible()
+    expect(chip).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  test('never withholds a channel this workspace has actually connected', () => {
+    render(
+      <ChannelPicker
+        selected={toChannelSet([])}
+        onChange={() => {}}
+        connected={new Set(['telegram'] as const)}
+      />,
+    )
+
+    // ── THE DEFECT AN ADVERSARIAL PASS CAUGHT ───────────────────────────────
+    // The offer set withholds an ADVERTISEMENT, not a capability — `groups.ts`
+    // says so in as many words: it "does NOT gate `linked`". Filtering on it
+    // alone meant a workspace that had already linked a Telegram account could
+    // still publish there, still saw its tile under "Your channels", and could
+    // not choose it when writing a post. A capability they hold, withheld by a
+    // rule about what to advertise.
+    expect(screen.getByRole('button', { name: /Telegram/ })).toBeVisible()
+  })
+
+  test('lets a withdrawn channel be un-ticked and ticked again', async () => {
+    const user = userEvent.setup()
+    render(<Harness initial={toChannelSet(['telegram'])} />)
+
+    // Reading the live selection made deselection a ONE-WAY DOOR: untick and the
+    // chip vanishes on the next render, so a mis-click could not be undone
+    // without reloading. An audit found it; nothing here toggled the chip off.
+    const chip = screen.getByRole('button', { name: /Telegram/ })
+    await user.click(chip)
+    expect(screen.getByRole('button', { name: /Telegram/ })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+    await user.click(screen.getByRole('button', { name: /Telegram/ }))
+    expect(screen.getByRole('button', { name: /Telegram/ })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  test('does not bring a withdrawn channel back when some OTHER channel is picked', () => {
+    render(<ChannelPicker selected={toChannelSet(['x'])} onChange={() => {}} />)
+
+    // An audit mutation changed `selected.includes(channel)` to
+    // `selected.length > 0` and all eight tests stayed green, because no test
+    // ever rendered a NON-EMPTY selection that excluded Telegram. Picking X
+    // brought Telegram back onto the screen.
+    expect(screen.getByRole('button', { name: /^X$/ })).toBeVisible()
+    expect(screen.queryByRole('button', { name: /Telegram/ })).not.toBeInTheDocument()
+  })
+
+  test('gives every channel its own logo, never a shared placeholder', () => {
+    render(<ChannelPicker selected={toChannelSet([])} onChange={() => {}} />)
+
+    // ── THE DEFECT THIS PINS ────────────────────────────────────────────────
+    // `channel-mark.tsx` carried its own map of three logos and fell through to
+    // a grey MAP PIN for the rest, so Google Business Profile and Facebook Pages
+    // rendered as the same anonymous glyph on a row whose whole job is telling
+    // channels apart — while /connections showed their real logos. `ChannelLogo`
+    // marks its fallback with `data-placeholder`, so this asserts the absence of
+    // the admission rather than the presence of any particular picture.
+    for (const el of document.querySelectorAll('[data-channel]')) {
+      expect(el.getAttribute('data-placeholder')).toBeNull()
+    }
+    // And that the marks are actually there, so the loop above cannot pass by
+    // finding nothing at all.
+    const marks = [...document.querySelectorAll('[data-channel]')]
+    expect(marks.length).toBeGreaterThan(0)
+
+    // ── AND THAT THEY ARE DIFFERENT FROM ONE ANOTHER ────────────────────────
+    // The absence check alone was not enough: an audit mutation hard-coded the
+    // logo to Instagram for every channel and all eight tests stayed green,
+    // restoring the exact "one shared glyph" defect this change exists to fix.
+    // Distinct sources is the property that was actually wanted.
+    const sources = marks.map((el) => el.getAttribute('src') ?? el.getAttribute('data-channel'))
+    expect(new Set(sources).size).toBe(marks.length)
+  })
+
+  test('renders each mark at the size its caller asked for', () => {
+    render(<ChannelPicker selected={toChannelSet([])} onChange={() => {}} />)
+
+    // Dropping the `size` pass-through left every test green while every mark
+    // jumped to the shared default of 22px — the timeline asks for 13, the send
+    // outcomes for 15, the readout for 16. Silently wrong in four places.
+    for (const el of document.querySelectorAll('img[data-channel]')) {
+      expect(el.getAttribute('width')).toBe('18')
+    }
+  })
+})

@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 
 import { expect, test } from './fixtures/seeded-user'
-import { leaveOnboarding } from './fixtures/compose'
+import { expectPostSaved, leaveOnboarding, openPart } from './fixtures/compose'
 
 /**
  * CAMPAIGNS, end to end, against the real app and the real database:
@@ -82,15 +82,10 @@ async function writePostOnTwoChannels(page: Page, body: string): Promise<string>
   await page.goto('/posts/new')
   await expect(page.locator('[data-composer]')).toBeVisible({ timeout: 90_000 })
 
-  await page.locator('[data-channel-tile="instagram"]').click()
-  await page.locator('[data-channel-tile="linkedin"]').click()
-
-  // Both picked, before a word is written. These cards are the PICKER's answer,
-  // not the row's — the row does not exist yet, because opening a screen is not
-  // intent.
-  await expect(page.locator('[data-version-card="instagram"]')).toBeVisible()
-  await expect(page.locator('[data-version-card="linkedin"]')).toBeVisible()
-
+  // The words come first, because the screen is a numbered sequence and the
+  // channel step is refused until there is something for it to shape. This
+  // helper used to pick both channels before writing a word; that order is not
+  // slow now, it is impossible.
   await page.getByLabel('Your post').fill(body)
 
   // Read the id off the PATH. Nothing emits `?post=` any more, and a spec that
@@ -98,6 +93,22 @@ async function writePostOnTwoChannels(page: Page, body: string): Promise<string>
   await page.waitForURL(/\/posts\/[0-9a-f-]{36}$/, { timeout: 60_000 })
   const postId = new URL(page.url()).pathname.split('/').pop() as string
   expect(postId).toMatch(/^[0-9a-f-]{36}$/)
+
+  // The platforms are part two of the screen, and it is refused until the line
+  // above has put something in the post.
+  await openPart(page, 2)
+  await page.locator('[data-channel-tile="instagram"]').click()
+  await page.locator('[data-channel-tile="linkedin"]').click()
+
+  // These cards are the PICKER's answer, not the row's. The reload below is
+  // what asks the row.
+  await expect(page.locator('[data-version-card="instagram"]')).toBeVisible()
+  await expect(page.locator('[data-version-card="linkedin"]')).toBeVisible()
+  // The PAIR, not a bare "Post saved": that phrase is already on screen from
+  // the save that created the row, so waiting for it alone would pass before
+  // the channels were written and the reload below would read a post without
+  // them.
+  await expectPostSaved(page)
 
   // ── THE GUARANTEE THIS HELPER CARRIES, RETARGETED AND NOT DROPPED ──────────
   // The previous version ended by reloading and finding a channel TAB per
@@ -111,6 +122,9 @@ async function writePostOnTwoChannels(page: Page, body: string): Promise<string>
   // are the same claim about the same column, read through a surface that did
   // not write it.
   await page.reload()
+  // A reload comes back on the words, so the cards this reads are one press
+  // down the rail — which is the point: they are being re-read from the server.
+  await openPart(page, 2)
   await expect(page.locator('[data-version-card="instagram"]')).toBeVisible({ timeout: 30_000 })
   await expect(page.locator('[data-version-card="linkedin"]')).toBeVisible()
 

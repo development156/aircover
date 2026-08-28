@@ -1,4 +1,4 @@
-import { expectPostSaved, leaveOnboarding } from './fixtures/compose'
+import { expectPostSaved, leaveOnboarding, openPart } from './fixtures/compose'
 import { expect, test } from './fixtures/seeded-user'
 
 /**
@@ -58,8 +58,11 @@ test.describe('golden path @smoke', () => {
     // everyone who ticked a channel and changed their mind. The row appears on
     // the first save that has something to WRITE, so the words come first here
     // and the id then arrives in the address bar without the screen changing.
-    await page.locator('[data-channel-tile="instagram"]').click()
-
+    //
+    // The words also come first because the screen now INSISTS on it: the
+    // composer lists the three parts of a post down the side and the platform
+    // part is refused until something is written. This is the golden path, so
+    // it walks it in order, through the rail, the way a person does.
     const body = page.getByLabel('Your post')
     await expect(body).toBeVisible()
     await body.fill('Fresh chai every morning at the corner shop.')
@@ -67,6 +70,11 @@ test.describe('golden path @smoke', () => {
     await page.waitForURL(/\/posts\/[0-9a-f-]{36}$/, { timeout: 60_000 })
     const postId = new URL(page.url()).pathname.split('/').pop()
     expect(postId).toMatch(/^[0-9a-f-]{36}$/)
+
+    // Part two, now that part one has been earned.
+    await openPart(page, 2)
+    await page.locator('[data-channel-tile="instagram"]').click()
+    await expect(page.locator('[data-version-card="instagram"]')).toBeVisible({ timeout: 30_000 })
 
     // A SECOND edit, and the transition belongs to THAT one.
     //
@@ -81,6 +89,7 @@ test.describe('golden path @smoke', () => {
     //
     // So the golden path writes twice, which is what writing is: the words, then
     // the second thought. The reload below reads the second thought back.
+    await openPart(page, 1)
     await body.fill('Fresh chai every morning at the corner shop. Open from six.')
     await expectPostSaved(page)
 

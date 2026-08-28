@@ -164,6 +164,12 @@ export function FinishPanel({
       aria-labelledby="finish-heading"
       className="surface-ring scroll-mt-6 space-y-4 rounded-card bg-surface p-4"
     >
+      {/* ── ONE HEADING, AND IT IS THIS ONE ──────────────────────────────────
+          This briefly took the id of a heading rendered above it, back when the
+          three parts were stacked on one page and each carried a numbered
+          title — two identical headings read as two sections to anyone moving
+          by heading. The rail replaced that: a rail row is navigation, not a
+          heading, so the panel names itself again and there is exactly one. */}
       <h2 id="finish-heading" className="type-h2">
         Send it
       </h2>

@@ -8,7 +8,9 @@ import {
   PLANNED_CHANNELS,
   READINESS_CLASS,
   READINESS_LABEL,
+  ENTRY,
   asChannel,
+  isOfferedForConnect,
 } from './catalogue'
 
 describe('the channel catalogue', () => {
@@ -118,5 +120,35 @@ describe('the channel catalogue', () => {
     // check was performed and passed would be a different, false claim.
     expect(READINESS_LABEL['built-not-proven']).not.toMatch(/verified|checked|tested/i)
     expect(READINESS_LABEL['publishes-today']).toMatch(/publish/i)
+  })
+})
+
+describe('the channels /connections does not offer', () => {
+  it('withholds telegram, tiktok and slack from the offer', () => {
+    // The ask, stated as the thing the customer would see. Anchored to the ids
+    // rather than to the size of the set, so adding a fourth later does not
+    // silently retire this assertion.
+    for (const id of ['telegram', 'tiktok', 'slack'] as const) {
+      expect(isOfferedForConnect(id)).toBe(false)
+    }
+  })
+
+  it('keeps every other connectable platform on offer', () => {
+    // The other direction, and the one that catches a typo in the set. A set
+    // holding 'tik-tok' would pass the test above by accident of the literal and
+    // hide nothing; this fails if the hidden set grows a member nobody asked for.
+    const withheld = CONNECTABLE.filter((entry) => !isOfferedForConnect(entry.id)).map((e) => e.id)
+    expect(withheld.sort()).toEqual(['slack', 'telegram', 'tiktok'])
+  })
+
+  it('still describes all three, so an EXISTING connection can render', () => {
+    // The guarantee that makes this a filter and not a deletion. A workspace that
+    // already linked one of these holds a live row and a plan slot; "Your
+    // channels" looks the entry up by id for its name and logo, and a missing
+    // entry there is an account that publishes and cannot be seen or disconnected.
+    for (const id of ['telegram', 'tiktok', 'slack'] as const) {
+      expect(ENTRY[id]).toBeDefined()
+      expect(ENTRY[id].label.length).toBeGreaterThan(0)
+    }
   })
 })

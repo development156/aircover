@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 import type { Page } from '@playwright/test'
 
 import { adminClient, expect, signInSecondContext, test } from './fixtures/seeded-user'
-import { leaveOnboarding } from './fixtures/compose'
+import { leaveOnboarding, openPart, SEED_BODY } from './fixtures/compose'
 import { framesTaken, shot, timedGoto, useTheme, type Theme } from './helpers/ux-shot'
 
 /**
@@ -62,14 +62,30 @@ async function bootstrap(page: Page): Promise<void> {
   }
 }
 
-/** Open the composer on a real row for one channel, and return the post id. */
+/**
+ * Open the composer on a real row for one channel, and return the post id.
+ *
+ * Writing comes before picking, because the composer lists the three parts of a
+ * post down the side and the platform part is genuinely refused until part one
+ * has something in it. A tile picked on a blank post cannot land.
+ *
+ * This leaves the page on the WORDS, because every test below types into them
+ * first. The ones that need a version card go to the platform part themselves.
+ */
 async function composerOn(page: Page, channel: string): Promise<string | null> {
   await timedGoto(page, '/posts/new')
-  const tile = page.locator(`[data-channel-tile="${channel}"]`)
   try {
+    const body = page.getByLabel('Your post')
+    await body.waitFor({ state: 'visible', timeout: 10_000 })
+    await body.fill(SEED_BODY)
+    await page.waitForURL(/\/posts\/[0-9a-f-]{36}$/, { timeout: 60_000 })
+
+    await openPart(page, 2)
+    const tile = page.locator(`[data-channel-tile="${channel}"]`)
     await tile.waitFor({ state: 'visible', timeout: 10_000 })
     await tile.click()
-    await page.waitForURL(/\/posts\/[0-9a-f-]{36}$/, { timeout: 60_000 })
+    await expect(page.locator(`[data-version-card="${channel}"]`)).toBeVisible({ timeout: 30_000 })
+    await openPart(page, 1)
   } catch {
     return null
   }
@@ -172,10 +188,20 @@ for (const { width, theme } of COMBOS) {
         'We roast every Tuesday and we sell only what we roasted that week, which sounds like a slogan until you taste the difference between a bag opened on Thursday and the same bag opened three weeks later, and once you have tasted that you will never go back to a supermarket shelf again, so come in on Saturday morning and we will pour you both side by side and say nothing at all while you decide which one you actually want to take home with you today.',
       )
       await page.waitForTimeout(2500)
+      // The refusal a person meets is on X's own card, which is the platform
+      // part of the screen. Photographing part one here would photograph a box
+      // that has no limit of its own and no objection to make.
+      await openPart(page, 2).catch(() => {})
+      await page.waitForTimeout(1200)
       await shot(page, { journey: JOURNEY, stop: 'A2-over-limit', width, theme })
 
       // Now ask it to go out anyway. What the product says HERE is the whole test.
-      const commit = page.getByRole('button', { name: /schedule|publish|send|approve/i }).first()
+      await openPart(page, 3).catch(() => {})
+      // Anchored to the two route tiles. The rail row for this part reads
+      // "3 Send it — Schedule it, or send it now", so a loose match takes the
+      // ROW and this frame photographs a panel with nothing pressed — which is
+      // the whole subject of this test.
+      const commit = page.getByRole('button', { name: /^Schedule it|^Post now/ }).first()
       if (await commit.isVisible().catch(() => false)) {
         await commit.click().catch(() => {})
         await page.waitForTimeout(2000)
@@ -199,6 +225,10 @@ for (const { width, theme } of COMBOS) {
           .setInputFiles({ name: 'banner.png', mimeType: 'image/png', buffer: pngOf(1200, 300) })
           .catch(() => {})
         await page.waitForTimeout(4000)
+        // Attached on part one, because a file belongs to the POST. The refusal
+        // is per platform, so the frame that shows it is the platform part.
+        await openPart(page, 2).catch(() => {})
+        await page.waitForTimeout(1200)
         await shot(page, { journey: JOURNEY, stop: 'B1-wrong-aspect', width, theme })
       } else {
         await shot(page, {

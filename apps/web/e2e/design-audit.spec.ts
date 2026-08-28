@@ -157,22 +157,33 @@ interface SeededPost {
   channels: string[]
 }
 
+const richestPost = (posts: readonly SeededPost[]): string | null => {
+  // The post with the MOST channels. Shooting a single-channel post would
+  // photograph the one arrangement in which per-channel editing looks like
+  // ordinary editing.
+  const richest = [...posts].sort((a, b) => b.channels.length - a.channels.length)[0]
+  return richest ? `/posts/${richest.id}` : null
+}
+
+/**
+ * ── THE COMPOSER IS THREE SCREENS NOW, AND THIS CAMERA SAW ONE ───────────────
+ * It lists the three parts of a post down the side and opens on the words. So a
+ * single frame of `/posts/<id>` photographs the writing box and nothing else —
+ * not the per-platform cards, not the send panel — while this file describes
+ * itself as the only camera ever pointed at the most important screen in the
+ * app. An adversarial pass caught that silently: the frame count never moved.
+ *
+ * `open` is pressed after the route loads and before the shutter.
+ */
 const DYNAMIC: ReadonlyArray<{
   slug: string
   archetype: string
   resolve: (posts: readonly SeededPost[]) => string | null
+  open?: 1 | 2 | 3
 }> = [
-  {
-    slug: 'posts-detail',
-    archetype: 'editor',
-    // The post with the MOST channels, so the variant tab strip renders as a
-    // strip. Shooting a single-channel post would photograph the one arrangement
-    // in which per-channel editing looks like ordinary editing.
-    resolve: (posts) => {
-      const richest = [...posts].sort((a, b) => b.channels.length - a.channels.length)[0]
-      return richest ? `/posts/${richest.id}` : null
-    },
-  },
+  { slug: 'posts-detail', archetype: 'editor', resolve: richestPost },
+  { slug: 'posts-detail-platforms', archetype: 'editor', resolve: richestPost, open: 2 },
+  { slug: 'posts-detail-send', archetype: 'editor', resolve: richestPost, open: 3 },
 ]
 
 const SHOOT_DYNAMIC = ONLY.length > 0 ? DYNAMIC.filter((r) => ONLY.includes(r.slug)) : DYNAMIC
@@ -278,7 +289,7 @@ test.describe('design audit', () => {
 
     // ── Resolve the routes whose path the seed just made knowable.
     const seededPosts = (inserted ?? []) as SeededPost[]
-    const resolved: { path: string; slug: string; archetype: string }[] = []
+    const resolved: { path: string; slug: string; archetype: string; open?: 1 | 2 | 3 }[] = []
     for (const route of SHOOT_DYNAMIC) {
       const path = route.resolve(seededPosts)
       if (path === null) {
@@ -286,7 +297,7 @@ test.describe('design audit', () => {
         continue
       }
       console.log(`[audit] ${route.slug} resolved to ${path}`)
-      resolved.push({ path, slug: route.slug, archetype: route.archetype })
+      resolved.push({ path, slug: route.slug, archetype: route.archetype, open: route.open })
     }
     const shootList = [...SHOOT, ...resolved]
 
@@ -312,6 +323,18 @@ test.describe('design audit', () => {
             await shot.goto(route.path, { waitUntil: 'domcontentloaded', timeout: 45_000 })
             // Let the route settle; many screens fetch after mount.
             await shot.waitForTimeout(1800)
+            // A composer frame that names a part goes to it first. Tolerated
+            // rather than asserted: this harness photographs, it does not judge,
+            // and a missing rail must not take the other frames down with it.
+            const part = (route as { open?: 1 | 2 | 3 }).open
+            if (part !== undefined) {
+              await shot
+                .locator(`[data-rail-step="${part}"] button`)
+                .first()
+                .click()
+                .catch(() => {})
+              await shot.waitForTimeout(1200)
+            }
             await shot.screenshot({ path: `${dir}/${route.slug}.png`, fullPage: true })
             written += 1
           } catch (e) {

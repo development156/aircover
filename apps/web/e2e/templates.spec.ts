@@ -1,4 +1,4 @@
-import { bootstrapWorkspace, SEED_BODY, startPost } from './fixtures/compose'
+import { bootstrapWorkspace, openPart, SEED_BODY, startPost } from './fixtures/compose'
 import { adminClient, expect, test } from './fixtures/seeded-user'
 
 /**
@@ -30,6 +30,12 @@ test.describe('templates @smoke', () => {
     await startPost(page, 'x')
 
     // ── 1. AN EMPTY LIBRARY IS AN EMPTY STATE, NOT A ZERO ────────────────────
+    //
+    // The saved starting points belong to the WORDS, so they live on part one
+    // beside the writing box. `startPost` leaves the page on the platform part,
+    // and this test moves between the two deliberately: which part a control
+    // lives on is half of what it means.
+    await openPart(page, 1)
     await expect(page.getByText(/nothing saved yet/i)).toBeVisible()
     await expect(page.getByText(/\d+ saved/)).toHaveCount(0)
 
@@ -44,7 +50,9 @@ test.describe('templates @smoke', () => {
     await page.getByLabel('Your post').fill(BODY)
     // The X version follows the post, so it holds these words too — and the box
     // is what proves the mirror reached the screen and not just the state.
+    await openPart(page, 2)
     await expect(page.locator('[data-variant-editor="x"]')).toHaveValue(BODY)
+    await openPart(page, 1)
     await page.locator('[data-template-save]').click()
     await page.getByLabel(/template name/i).fill(NAME)
     await page.getByRole('button', { name: /^save template$/i }).click()
@@ -83,8 +91,10 @@ test.describe('templates @smoke', () => {
     // exactly what is in the box before the click, so "the template put these
     // words here" is still the only reading of the line after it.
     await expect(page.locator('[data-variant-editor="linkedin"]')).toHaveValue(SEED_BODY)
+    await openPart(page, 1)
     await page.getByText(NAME).click()
     await expect(page.getByLabel('Your post')).toHaveValue(BODY)
+    await openPart(page, 2)
     await expect(page.locator('[data-variant-editor="linkedin"]')).toHaveValue(BODY)
     await page
       .locator('[data-version-card="linkedin"]')
@@ -110,6 +120,7 @@ test.describe('templates @smoke', () => {
     // Reloaded. The composer knows nothing about templates, so words that come
     // back from the server reached the row rather than living in React state.
     await page.reload()
+    await openPart(page, 2)
     await expect(page.getByRole('textbox', { name: 'LinkedIn copy', exact: true })).toHaveValue(
       BODY,
     )
