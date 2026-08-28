@@ -10,7 +10,8 @@ import { EmptyState } from '@/components/empty-state'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
 import { PageTitle } from '@/components/page-title'
 import { checkCountableLimit } from '@/lib/billing/entitlements'
-import { CONNECTABLE, PLANNED, isOfferedForConnect } from '@/lib/connections/catalogue'
+import { PLANNED } from '@/lib/connections/catalogue'
+import { groupChannels } from '@/lib/connections/groups'
 import { readConnections, readConnectionSlots } from '@/lib/connections/read'
 import { groupByPlatform, hasHeadroom, slotSentence, type SlotUsage } from '@/lib/connections/slots'
 import { readXUsage } from '@/lib/connections/x-usage'
@@ -177,24 +178,20 @@ export default async function ConnectionsPage({
    *   linked    an account exists            → what is live
    *   open      connectable, none linked yet → what you can add
    *   stalled   named, and we cannot link it → why not
+   *
+   * The split itself lives in `lib/connections/groups.ts`, because nothing
+   * imports this file and so nothing could test it here. MEASURED: with the
+   * grouping inline, deleting the hiding filter from both offer groups left
+   * typecheck, lint and all 5724 unit tests green.
    */
-  const linkedEntries = CONNECTABLE.filter(
-    (entry) => LIVE_VIA_ZERNIO.has(entry.id) && (byChannel.get(entry.id)?.length ?? 0) > 0,
-  )
-  // `isOfferedForConnect` is applied to the two OFFER groups and deliberately not
-  // to `linkedEntries`. Hiding a channel we would rather not advertise and hiding
-  // an account the customer already linked are different acts: the second one
-  // strands a live connection that still holds a plan slot and still publishes,
-  // with nothing on the screen to disconnect it by. See `HIDDEN_FROM_OFFER`.
-  const openEntries = CONNECTABLE.filter(
-    (entry) =>
-      isOfferedForConnect(entry.id) &&
-      LIVE_VIA_ZERNIO.has(entry.id) &&
-      (byChannel.get(entry.id)?.length ?? 0) === 0,
-  )
-  const stalledEntries = CONNECTABLE.filter(
-    (entry) => isOfferedForConnect(entry.id) && !LIVE_VIA_ZERNIO.has(entry.id),
-  )
+  const {
+    linked: linkedEntries,
+    open: openEntries,
+    stalled: stalledEntries,
+  } = groupChannels({
+    liveVia: LIVE_VIA_ZERNIO,
+    linkedCount: (id) => byChannel.get(id)?.length ?? 0,
+  })
 
   /**
    * Why Connect is unavailable on this tile, or `undefined` when it is not.
