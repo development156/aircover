@@ -452,3 +452,106 @@ invisible to every test that existed:
 - **The free canvas.** I built slots per FSD 3.4 and you left the call to me.
   `SvgScene` already takes free positions, so a canvas is additive rather than a
   rewrite — but shipping one changes what `/studio` promises customers.
+
+---
+
+# Session 5, close-out — the gate, and a correction I owe
+
+**Branch** `claude/divas-kickoff-03y2g2` at `7fb8cc85`. Lane `wt-divas2`.
+Pushed: yes, **and merged to `wt-core`** (`127b29c4..7fb8cc85`).
+
+## The correction, first, because it changes what you believe
+
+**Everything above this line reported "2 pre-existing DNS failures" in
+`apps/web` and "1 pre-existing failure" in `packages/db`. Under the real gate
+there are none, and the gate is the authority. I was wrong four times.**
+
+MEASURED, and here is the mechanism:
+
+| | `SUPABASE_DB_URL` | `export-drift` | `live-guard` |
+| --- | --- | --- | --- |
+| `pnpm turbo run test` (THE GATE) | filtered out | **SKIPS**, 2 skipped | **PASSES** |
+| `pnpm --filter … exec vitest run` (what I kept running) | leaks in from the shell | RUNS, dies on DNS | FAILS |
+
+`turbo.json`'s `test` task declares `env: ["SAHODA_ALLOW_LIVE_TESTS"]`, so turbo
+passes ONLY that variable to the child. The sandbox's ambient `SUPABASE_DB_URL`
+— written by `scripts/cloud-setup.sh` — never reaches a gate run.
+`packages/db/tests/helpers/env.ts:39` reads `process.env.SUPABASE_DB_URL`, and
+`export-drift.test.ts:57` is `describe.skip` when it is empty.
+
+**So `live-guard` was never broken. It was doing its job**: it exists to assert
+that with the flag absent, no live credential is visible to a test run, and when
+I invoked vitest directly a live credential WAS visible. It failed correctly, at
+me, for bypassing turbo.
+
+**What survives of that finding, and it is much smaller than I said:** when that
+assertion fails it compares the real connection string to `''`, so the string
+lands in the output. Worth changing to compare a boolean or a redacted form. It
+is NOT a leak from a broken test and I should not have told the founder to
+rotate a credential on that reading. **Retracted.**
+
+## Gate — the whole thing, forced, unpiped
+
+`pnpm turbo run typecheck lint test --force` → **EXIT 0**, 27 of 27 tasks,
+**0 cached**, 4m21s. Not a replay.
+
+| package | result |
+| --- | --- |
+| `@sahoda/shared` | **PASS** 509 |
+| `@sahoda/sites` | **PASS** 1566 |
+| `@sahoda/web` | **PASS** 5748, 13 skipped |
+| `@sahoda/db` | **PASS** 682, 207 skipped |
+| `@sahoda/publishing` | **PASS** 473 |
+| `@sahoda/billing` | **PASS** 401, 13 skipped |
+| `@sahoda/jobs` | **PASS** 396 |
+| `@sahoda/research` | **PASS** 195 |
+| `@sahoda/mesh` | **PASS** 191 |
+| `npx prettier --check .` | **PASS**, exit 0 |
+
+**10,161 tests passing.** The ten `FAIL` strings in the log are deliberate
+stderr from tests exercising failure paths, not results; exit 0 settles it.
+
+| leg | result |
+| --- | --- |
+| `next build` + js-budget | **UNRUN** — the command is denied by sandbox permissions |
+| Playwright `@smoke` | **UNRUN** — 277 tests in 72 files COLLECT unchanged, so the four spec edits parse, but no browser here reaches the network |
+
+**The 207 skipped in `@sahoda/db` and the 13 in `@sahoda/web` are the live-DB
+suites, skipped BY DESIGN because the flag is absent.** CLAUDE.md's warning
+applies and is worth restating: a suite that ran nothing reports as passing.
+Those are UNRUN, not passed.
+
+## What was NOT done, and why
+
+Unchanged from the session above, plus: I did not fix `live-guard`'s assertion
+message, because it is not mine and the change deserves its own commit rather
+than riding along in a studio merge.
+
+## Shared surfaces touched
+
+None beyond those already listed above. This close-out added no code.
+
+## Contract, migration or money
+
+None new. **The migration written today is still NOT APPLIED** —
+`supabase db push` cannot run from this sandbox (DNS for the Supabase host does
+not resolve here), so it needs a human on a machine with network.
+
+## Guards written, and the mutation that proved each
+
+None new in this close-out. Fifteen this session, listed above.
+
+## Anything retracted
+
+**The credential finding, in full.** See the top of this section.
+
+## What the next session in THIS lane should pick up
+
+1. **Apply the migration.** Nothing in Studio works against a real database
+   until then, and it is the only thing standing between this code and a person
+   using it.
+2. `next build` and the smoke suite, both still UNRUN and both owed.
+3. Bundle the font, then the ink-fingerprint guard.
+4. Export to the library; `studio_exports` is waiting.
+5. **Run the gate through turbo, not through a bare `vitest`.** Today's whole
+   false-failure story came from that, and it cost four wrong reports.
