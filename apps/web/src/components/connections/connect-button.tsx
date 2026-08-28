@@ -48,21 +48,40 @@ export function ConnectButton({
     // is how the page ended up with two different tiles for one idea.
     <div className="flex w-full flex-col gap-1">
       <Button
-        /* SECONDARY, not primary, and this is the reference's own rule rather
-           than a preference: "one primary per view" and "orange is rationed"
-           (README §Design system). /connections renders FOUR of these at once —
-           Instagram, LinkedIn, X, Google Business Profile — so making each one
-           a solid orange full-width button spent the accent four times on a
-           single screen and turned a calm checklist into the loudest page in
-           the app.
+        /* ── ORANGE TO CONNECT, QUIET TO ADD ANOTHER ───────────────────────
+           Founder's ruling, 28 August 2026, with a reference image and the hex
+           written out: the first Connect on a channel is a primary and is
+           painted `--brand`; a channel that already has an account gets the
+           quiet control.
 
-           Four equal options also means there is no single primary here: none
-           of these channels outranks the others, and the page's real job is to
-           show which are connected. The workhorse secondary says "you may press
-           this" without shouting, and the accent stays available for the one
-           place a screen genuinely has a primary action. */
-        variant="secondary"
-        size="sm"
+           ── WHAT THIS OVERTURNS, STATED RATHER THAN DELETED ────────────────
+           This was `variant="secondary"` and the comment here argued "one
+           primary per view" (§1.5): four solid orange buttons on one screen
+           turned a calm checklist into the loudest page in the app. That
+           argument was written when this grid held FOUR channels. It now holds
+           FIFTEEN, which makes the arithmetic worse, not better — so this is
+           not a case of the old reason having expired. It is a case of the
+           founder weighing the same fact differently, and the ruling is theirs
+           to make.
+
+           What makes it defensible rather than merely instructed: each card is
+           a SEPARATE decision about a SEPARATE account, not fifteen options
+           competing for one choice. §1.5's "one primary per VIEW" is about a
+           screen where the reader must pick once. Here the reader picks
+           independently, up to fifteen times, and a control that starts an
+           OAuth handover is the strongest thing its own card does.
+
+           ── AND THE SPLIT IS THE HONEST HALF ──────────────────────────────
+           `addingAnother` keeps the quiet control, because that IS a secondary
+           act: the channel already works, and a second account is an addition
+           rather than the thing this card exists to get done. So the orange
+           marks "not yet connected", which is a real distinction a reader can
+           act on, rather than decorating every card equally.
+
+           `size` is the kit's default 38px step, up from `sm`'s 28px. A control
+           this wide at 28px reads as a strip rather than a button, which is the
+           gap between our card and the reference the founder sent. */
+        variant={addingAnother ? 'secondary' : 'primary'}
         /* `justify-between` with a leading mark and a trailing chevron. The mark
            is the one thing that differs by intent: a link for the first account,
            a plus for the next, so the two acts are not one control wearing two
