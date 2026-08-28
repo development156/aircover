@@ -6,6 +6,11 @@
 Supersedes nothing. Depends on `docs/51`, `docs/52`, `docs/53`, `docs/54` and on
 `apps/web/REQUESTS.md` §22, §25, §29.
 
+**`docs/56` is the companion:** what the store can already do, the four
+properties that make it reusable, and the filing rule for deciding whether a
+proposed feature routes through it. Read that one before designing a feature;
+this one before building a step.
+
 ---
 
 ## The founder's model, which this plan is organised around
@@ -226,7 +231,14 @@ Collecting them unlocks the strongest sentence a two-brain system can produce:
 Neither hemisphere can say that alone. It is also the finding most likely to
 change positioning, which is why it is worth the collection work.
 
-### 10 · Store the declines and the runs
+### 10 · Store the declines and the runs — **BUILT 2026-08-28**
+
+`marketing_pass_runs` (migration `20260828060000`) holds one row per workspace
+per pass: the day, what it wrote, and the reason each computer produced nothing.
+`/report`'s empty state reads it through `lib/brain/waiting.ts`. A pass that
+threw writes no row, so a missing row means "we could not look" and never "we
+were waiting". **Not applied to any database yet.** The paragraph below is the
+argument that produced it and is kept as the record.
 
 Every week the pass computes why each workspace produced nothing, then discards
 it into an HTTP response. There is also no row anywhere recording that the pass
