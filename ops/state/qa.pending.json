@@ -1495,6 +1495,45 @@
       "summary_plain": "The unit checks passed (405 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": " Test Files  41 passed (41)\n      Tests  405 passed (405)\n   Start at  10:50:12\n   Duration  8.29s (transform 5.46s, setup 610ms, import 13.05s, tests 6.18s, environment 2.58s)\n\nTSC_OK\nCached:    7 cached, 9 total\n  Time:    2.101s",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtcu030y-993c23d4",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T10:51:24.369Z",
+      "finished_at": "2026-08-28T10:51:24.369Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The unit checks ran and something failed (19 passed, 6 failed).",
+      "details": "⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯\n\n\n Test Files  1 failed (1)\n      Tests  6 failed | 19 passed (25)\n   Start at  10:51:23\n   Duration  244ms (transform 26ms, setup 0ms, import 41ms, tests 15ms, environment 0ms)\n\nundefined\n/home/user/sahodalabs/apps/web:\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run src/lib/cron/route-shape.test.ts",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtcu0mo9-81441811",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T10:51:49.831Z",
+      "finished_at": "2026-08-28T10:51:49.831Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks passed (25 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
+      "details": "      Tests  25 passed (25)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtcu10go-92021940",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T10:52:07.702Z",
+      "finished_at": "2026-08-28T10:52:07.702Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The unit checks ran and something failed (49 passed, 2 failed).",
+      "details": "--- MUTATION A: radar loses maxDuration\n     × 'radar' declares a maxDuration 4ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 24 passed (25)\n--- MUTATION B: the sweep finds no routes\n     × finds the routes at all, so an empty sweep cannot pass 4ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed (1)\n      Tests  25 passed (25)",
+      "duration_ms": null
     }
   ]
 }
