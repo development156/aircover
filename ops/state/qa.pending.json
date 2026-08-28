@@ -1534,6 +1534,32 @@
       "summary_plain": "The unit checks ran and something failed (49 passed, 2 failed).",
       "details": "--- MUTATION A: radar loses maxDuration\n     × 'radar' declares a maxDuration 4ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 24 passed (25)\n--- MUTATION B: the sweep finds no routes\n     × finds the routes at all, so an empty sweep cannot pass 4ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed (1)\n      Tests  25 passed (25)",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtcu37ih-7b5e204f",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T10:53:50.152Z",
+      "finished_at": "2026-08-28T10:53:50.152Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks passed (8 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
+      "details": " RUN  v4.1.10 /home/user/sahodalabs/apps/web\n\n\n Test Files  1 passed (1)\n      Tests  8 passed (8)\n   Start at  10:53:49\n   Duration  348ms (transform 121ms, setup 0ms, import 141ms, tests 7ms, environment 0ms)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtcu3ntc-19d77036",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T10:54:11.278Z",
+      "finished_at": "2026-08-28T10:54:11.278Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The unit checks ran and something failed (29 passed, 3 failed).",
+      "details": "--- MUTATION A: back to filtering after the limit\n     × asks the database for this cycle, rather than filtering after a limit 8ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 7 passed (8)\n--- MUTATION B: a ranking of one is allowed\n     × withholds a ranking of one post, because one post is not a ranking 7ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 7 passed (8)\n--- MUTATION C: sum a post's dailies instead of its best\n     × takes a post best reading, never the sum of its daily ones 7ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 7 passed (8)\n      Tests  8 passed (8)",
+      "duration_ms": null
     }
   ]
 }
