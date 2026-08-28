@@ -134,9 +134,20 @@ resolution.**
    3 to 11 seconds, `runner_id: 0` on this one. A real run takes about eleven
    minutes. **Not the 26 August total outage** — run 609 on `wt-core` got a real
    runner this morning and went green in 11m 19s. No re-run has been spent.
-8. **Never `git add -A`.** `core.hooksPath` is unset, so `.githooks/pre-commit`
-   is disarmed and nothing but attention stops the QA hook's file riding along.
-   Item 2 above is what that costs.
+8. **Never `git add -A`, and here is why this one file keeps conflicting.** The
+   QA hook does not merely append a row to `ops/state/qa.pending.json` — **it
+   rewrites the whole file unescaped.** MEASURED at the end of this session,
+   after my own gate run: the working copy differs from `HEAD` by **+45/-32**,
+   of which exactly ONE line is the new record (`qa-mtd9ppcu-7d7b1f34`) and the
+   rest is `\u2014`, `\u23af` and `\u00d7` unescaping across 60 rows nobody
+   touched. The committed file holds **0** non-ASCII characters; the hook's
+   output holds **306**. So every session that commits this file offers a diff
+   that looks like sixty changed records and is one, and two such sessions
+   conflict on rows neither of them wrote. That is the mechanism behind five
+   sessions of "reverted rather than committed", and behind this session's own
+   conflict. **Revert it; never commit it.** I reverted it.
+   `core.hooksPath` is unset, so `.githooks/pre-commit` is disarmed and nothing
+   but attention enforces this.
 
 ## Gate
 
