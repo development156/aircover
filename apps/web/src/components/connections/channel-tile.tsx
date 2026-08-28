@@ -263,16 +263,23 @@ export function ChannelTile({
     >
       <ChannelHeader entry={entry} details={details} />
 
-      {/* ── THE BLURB LEFT THE TILE FACE, AND IT DID NOT LEAVE THE SCREEN ──
-          It read "Publish posts, reels and stories directly to Instagram." on
-          every card. One sentence is ~40px, twenty cards is ~800px of prose
-          nobody reads twice, and it answered a question ("what is Instagram
-          for") that almost nobody on this screen is asking. It is still one tap
-          away, verbatim, inside Details — `channelDetailContent` passes the same
-          string — which is where the reader who IS asking will look.
+      {/* ── THE BLURB IS BACK ON THE TILE FACE, CLAMPED ────────────────────
+          It was removed on 2026-08-27 with a real measurement behind it: one
+          sentence is ~40px, twenty cards is ~800px of prose nobody reads twice,
+          and it answered a question ("what is Instagram for") that almost nobody
+          on this screen is asking. Founder's ruling, 2026-08-27, reversing that:
+          a marketplace card without a line saying what the platform is for is a
+          logo and a button, and the reader who has never connected anything is
+          exactly the reader this screen is for.
 
-          What replaced it is nothing. The tile is shorter, and shorter is the
-          whole request. */}
+          `line-clamp-2` is the half of the old argument that survives. The
+          removal was about UNBOUNDED height across twenty cards; two lines is
+          bounded, so every tile in a row ends at the same place whatever its
+          sentence runs to, and `mt-auto` on the floor below keeps the buttons on
+          one line. The full sentence stays one tap away inside Details, verbatim
+          — `channelDetailContent` is handed the same string, so there is one
+          source and not two. */}
+      <p className="type-sm mt-2 line-clamp-2 text-muted">{entry.blurb}</p>
 
       {/* THE DIVIDER IS THE AXIS. Above: the channel. Below: your accounts.
           A hairline rather than a gap, because §6 is explicit that a gap past a
