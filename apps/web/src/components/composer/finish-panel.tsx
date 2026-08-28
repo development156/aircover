@@ -46,6 +46,14 @@ export interface FinishPanelProps {
   saveAllVersions: () => Promise<boolean>
   /** How many versions are not in their row yet. */
   unsavedVersions: number
+  /**
+   * The id of a heading that already names this panel.
+   *
+   * Given, the panel drops its own heading and is labelled by that one — the
+   * composer's numbered step three says "Send it" directly above it, and two
+   * copies of one heading read as two sections. Omitted, it names itself.
+   */
+  labelledBy?: string
 }
 
 /** The two things that can happen to a finished post. */
@@ -154,6 +162,7 @@ export function FinishPanel({
   saveVariantNow,
   saveAllVersions,
   unsavedVersions,
+  labelledBy,
 }: FinishPanelProps) {
   const [chosen, setChosen] = useState<Route | null>(null)
   const route = chosen ?? (scheduledAt === null ? null : 'schedule')
@@ -161,12 +170,21 @@ export function FinishPanel({
   return (
     <section
       id="finish"
-      aria-labelledby="finish-heading"
+      aria-labelledby={labelledBy ?? 'finish-heading'}
       className="surface-ring scroll-mt-6 space-y-4 rounded-card bg-surface p-4"
     >
-      <h2 id="finish-heading" className="type-h2">
-        Send it
-      </h2>
+      {/* ── ONE HEADING, NOT TWO ─────────────────────────────────────────────
+          Inside the composer this panel IS step three, and the step renders its
+          own numbered "Send it" directly above. Two identical headings, one of
+          them numbered, read as two different sections to anyone moving by
+          heading — so the caller hands over the id of the one that already
+          exists and this panel labels itself by it instead of adding a second.
+          Standalone, it still needs a name of its own. */}
+      {labelledBy === undefined ? (
+        <h2 id="finish-heading" className="type-h2">
+          Send it
+        </h2>
+      ) : null}
 
       <div
         role="group"

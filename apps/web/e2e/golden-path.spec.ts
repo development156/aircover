@@ -58,8 +58,10 @@ test.describe('golden path @smoke', () => {
     // everyone who ticked a channel and changed their mind. The row appears on
     // the first save that has something to WRITE, so the words come first here
     // and the id then arrives in the address bar without the screen changing.
-    await page.locator('[data-channel-tile="instagram"]').click()
-
+    //
+    // The words also come first because the screen now INSISTS on it: the
+    // composer is a numbered sequence and the channel step is refused until
+    // something is written. This is the golden path, so it walks it in order.
     const body = page.getByLabel('Your post')
     await expect(body).toBeVisible()
     await body.fill('Fresh chai every morning at the corner shop.')
@@ -67,6 +69,10 @@ test.describe('golden path @smoke', () => {
     await page.waitForURL(/\/posts\/[0-9a-f-]{36}$/, { timeout: 60_000 })
     const postId = new URL(page.url()).pathname.split('/').pop()
     expect(postId).toMatch(/^[0-9a-f-]{36}$/)
+
+    // Step two, now that step one has been earned.
+    await page.locator('[data-channel-tile="instagram"]').click()
+    await expect(page.locator('[data-version-card="instagram"]')).toBeVisible({ timeout: 30_000 })
 
     // A SECOND edit, and the transition belongs to THAT one.
     //

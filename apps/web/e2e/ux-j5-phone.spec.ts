@@ -140,15 +140,19 @@ test.describe('ux j5 phone', () => {
     await bootstrap(page)
 
     await timedGoto(page, '/posts/new')
-    const tile = page.locator('[data-channel-tile="instagram"]')
-    await tile.click().catch(() => {})
-    await page.waitForTimeout(2500)
     await shot(page, { journey: JOURNEY, stop: 'P3-composer-phone', width: 390, theme: 'light' })
 
     const body = page.getByLabel('Your post')
     if (await body.isVisible().catch(() => false)) {
       await body.click()
       await body.type('Saturday cupping is open again.', { delay: 12 })
+      // The channel step opens only once something is written — the composer is
+      // a sequence now — so the tile is picked here rather than on arrival.
+      await page.waitForTimeout(2500)
+      await page
+        .locator('[data-channel-tile="instagram"]')
+        .click()
+        .catch(() => {})
       // An on-screen keyboard takes roughly half the height of a 390x844 phone.
       // The visual viewport shrinks; the layout viewport often does not, which is
       // exactly how a `fixed bottom-0` bar ends up under the keyboard.

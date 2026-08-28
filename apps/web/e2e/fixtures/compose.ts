@@ -23,6 +23,13 @@ import { expect, type Page } from '@playwright/test'
  * that is what a person does and it is now the only honest way to reach a saved
  * post. The id arriving in the address bar is still not a side effect this waits
  * on; it IS the evidence that the first save landed.
+ *
+ * ── AND THE TYPING NOW COMES FIRST ──────────────────────────────────────────
+ * The composer became a numbered sequence on 2026-08-28: write, then choose
+ * where it goes, then send it. Step two is genuinely refused until step one has
+ * something in it, so the old order — tick a channel, then type — is not merely
+ * unusual now, it is impossible, and it failed as a click timeout rather than as
+ * anything that named the cause.
  */
 export async function bootstrapWorkspace(page: Page): Promise<void> {
   await page.goto('/home')
@@ -81,10 +88,20 @@ export const SEED_BODY = 'A draft, opened by the test fixture.'
 export async function startPost(page: Page, channel: string): Promise<string> {
   await page.goto('/posts/new')
   await expect(page.locator('[data-composer]')).toBeVisible({ timeout: 60_000 })
-  await page.locator(`[data-channel-tile="${channel}"]`).click()
-  // The tick alone writes nothing now. Typing is what makes it a draft.
+  // WRITE FIRST, THEN PICK — and that order is now the product, not a taste.
+  // The composer is a numbered sequence: step two is `inert` until something has
+  // been written, so a tile clicked on a blank post is not a slow click, it is a
+  // click that can never land. Measured as a 5s timeout on the tile, in thirteen
+  // @smoke files at once, the moment the sequence went in.
   await page.getByLabel('Your post').fill(SEED_BODY)
   await page.waitForURL(/\/posts\/[0-9a-f-]{36}$/, { timeout: 60_000 })
+  await page.locator(`[data-channel-tile="${channel}"]`).click()
+  // The pick is now a SECOND save rather than part of the row's creation, so it
+  // is waited on here: a caller that reloads straight after `startPost` would
+  // otherwise race a write still in flight and find a post with no channel on
+  // it. The version card is the picker's answer; "Post saved" is the row's.
+  await expect(page.locator(`[data-version-card="${channel}"]`)).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('Post saved')).toBeVisible({ timeout: 60_000 })
 
   const postId = new URL(page.url()).pathname.split('/').pop() as string
   expect(postId).toMatch(/^[0-9a-f-]{36}$/)

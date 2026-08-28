@@ -16,7 +16,16 @@ import type { TemplatesRead } from '@/lib/templates/read'
 import { CommitBar } from './commit-bar'
 import { ComposerHeader } from './composer-header'
 import { DivergenceNotice } from './divergence-notice'
+import { ChannelPicker } from '@/components/posts/channel-picker'
+import {
+  composerSteps,
+  keepWhatWasReached,
+  reachedAfter,
+  type StepsReached,
+} from '@/lib/posts/composer-steps'
+
 import { FinishPanel } from './finish-panel'
+import { StepSection } from './step-section'
 import { ExtrasPane } from './extras-pane'
 import { WritingPane } from './writing-pane'
 import { useComposerActions } from './use-composer-actions'
@@ -147,6 +156,9 @@ export function Composer({
    * typing is still one they never chose a format for in this session, and
    * widening this set mid-sentence would silently stop seeding it.
    */
+  /** See the latch note beside `steps` below. Grows only, and never shrinks. */
+  const reached = useRef<StepsReached>({ channels: false, send: false })
+
   const existingVariantChannels = useRef<ReadonlySet<Channel>>(
     new Set(variants.map((v) => v.channel)),
   )
@@ -184,6 +196,21 @@ export function Composer({
     draft.channels.length > 0 &&
     draft.channels.every((channel) => !variantsApi.states[channel].following)
 
+  /**
+   * Which steps this post has earned. Derived on every render from the draft
+   * itself rather than held in state: a step's reachability is a FACT about the
+   * post, and a second copy of a fact is a second thing to keep in step.
+   *
+   * The one thing carried across renders is a LATCH, and it is the same rule
+   * this lane has now written four times: the gate is on the OFFER. Emptying the
+   * body and then unticking the last channel would otherwise shut step two with
+   * the pointer still inside it, mid-edit. A reload starts the rules again from
+   * the post, which is right — at that point the post really does say nothing.
+   */
+  const rawSteps = composerSteps({ body: draft.body, channels: draft.channels })
+  const steps = keepWhatWasReached(rawSteps, reached.current)
+  reached.current = reachedAfter(reached.current, steps)
+
   return (
     <div className="space-y-grid" data-composer data-guide="post-editor">
       <DivergenceNotice
@@ -194,19 +221,7 @@ export function Composer({
         onRetry={() => void autosave.flush({ create: true })}
       />
 
-      <ComposerHeader
-        title={draft.title}
-        onTitleChange={(title) => autosave.update({ title })}
-        channels={draft.channels}
-        onChannelsChange={(channels: ChannelSet) => {
-          autosave.update({ channels })
-          // A channel the writer has just ticked opens on the kind of post that
-          // channel usually carries — words everywhere except Instagram, which
-          // has no text-only post. Derived from `requiresMedia`, never tabulated.
-          formats.seedNew(channels)
-        }}
-        connected={connected}
-      />
+      <ComposerHeader title={draft.title} onTitleChange={(title) => autosave.update({ title })} />
 
       {/* ── THE ORDER IS THE ARGUMENT, AND IT HOLDS AT EVERY WIDTH ──────────
           One column: write it, see each version, then attach and reuse. Two
@@ -240,72 +255,107 @@ export function Composer({
           would not do: measured at 768px, the versions were once last on the
           page, below an empty media well, and they are the one thing here no
           competitor has. */}
-      <div className="grid items-start gap-grid wide:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
-        {/* `contents` at narrow dissolves this wrapper so all three panes are
+      <StepSection index={1} title="Write your post" step={steps.write}>
+        <div className="grid items-start gap-grid wide:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
+          {/* `contents` at narrow dissolves this wrapper so all three panes are
             direct grid items and `order` can interleave them. At wide it becomes
             a real column, which is what removes the span. */}
-        <div className="contents wide:flex wide:flex-col wide:gap-grid">
-          <WritingPane
-            body={draft.body}
-            onBodyChange={(body) => {
-              autosave.update({ body })
-              // Every channel still following moves with it. Channels written
-              // independently are left exactly as they are.
-              variantsApi.mirrorSource(body)
-            }}
-          />
-
-          {/* Order 3 so it lands AFTER the versions once the wrapper
-              dissolves at narrow. Inside the wide flex column it simply follows
-              the writing pane. */}
-          <div className="order-3">
-            <ExtrasPane
+          <div className="contents wide:flex wide:flex-col wide:gap-grid">
+            <WritingPane
               body={draft.body}
               onBodyChange={(body) => {
                 autosave.update({ body })
+                // Every channel still following moves with it. Channels written
+                // independently are left exactly as they are.
                 variantsApi.mirrorSource(body)
               }}
+            />
+
+            {/* Order 3 so it lands AFTER the versions once the wrapper
+              dissolves at narrow. Inside the wide flex column it simply follows
+              the writing pane. */}
+            <div className="order-3">
+              <ExtrasPane
+                body={draft.body}
+                onBodyChange={(body) => {
+                  autosave.update({ body })
+                  variantsApi.mirrorSource(body)
+                }}
+                channels={draft.channels}
+                postId={postId}
+                media={media}
+                previews={previews}
+                libraryNames={libraryNames}
+                templates={templates}
+              />
+            </div>
+          </div>
+
+          {/* Order 2 puts the versions BETWEEN the writing pane and the extras
+              once the wrapper has dissolved. At wide it is simply column two.
+
+              ── AND IT STAYS IN STEP ONE'S GRID, WHICH IS NOT A COMPROMISE ──
+              The versions pane belongs to step TWO by subject: it is each
+              channel's own copy. It stays here because the grid comment above
+              records three measured attempts at row sizing that all failed, and
+              the only thing that fixed a 455px hole was this exact structure.
+              Lifting one column out to satisfy a numbering would reintroduce
+              the defect that structure exists to prevent.
+              
+              Nothing is lost by it: with no channels picked the pane renders its
+              own empty state, and that state says whichever of the two things is
+              actually true — write first on a blank post, pick a channel in step
+              two once there are words — so it never points at a panel that is
+              still refusing clicks. */}
+          <div className="order-2">
+            <VersionsPane
               channels={draft.channels}
-              postId={postId}
+              canonicalBody={draft.body}
+              variants={variantsApi}
+              formats={formats}
               media={media}
-              previews={previews}
-              libraryNames={libraryNames}
-              templates={templates}
+              flush={actions.flushAndResolve}
+              onGenerated={variantsApi.applyGenerated}
+              generateIsPrimary={!everyChannelWritten}
+              onSaved={(channel) => void actions.saveVersion(channel)}
             />
           </div>
         </div>
+      </StepSection>
 
-        {/* Order 2 puts the versions BETWEEN the writing pane and the extras
-            once the wrapper has dissolved. At wide it is simply column two. */}
-        <div className="order-2">
-          <VersionsPane
-            channels={draft.channels}
-            canonicalBody={draft.body}
-            variants={variantsApi}
-            formats={formats}
-            media={media}
-            flush={actions.flushAndResolve}
-            onGenerated={variantsApi.applyGenerated}
-            generateIsPrimary={!everyChannelWritten}
-            onSaved={(channel) => void actions.saveVersion(channel)}
-          />
-        </div>
-      </div>
+      <StepSection index={2} title="Choose where it goes" step={steps.channels}>
+        <ChannelPicker
+          selected={draft.channels}
+          onChange={(channels: ChannelSet) => {
+            autosave.update({ channels })
+            // A channel the writer has just ticked opens on the kind of post
+            // that channel usually carries — words everywhere except Instagram,
+            // which has no text-only post. Derived from `requiresMedia`, never
+            // tabulated.
+            formats.seedNew(channels)
+          }}
+          connected={connected}
+          hideLabel
+        />
+      </StepSection>
 
-      <FinishPanel
-        postId={postId}
-        channels={draft.channels}
-        scheduledAt={draft.scheduledAt}
-        onScheduleChange={actions.changeSchedule}
-        scheduleError={actions.scheduleError}
-        autoPublish={autoPublish}
-        connected={connected}
-        statusRows={statusRows}
-        flush={actions.flush}
-        saveVariantNow={actions.saveVersion}
-        saveAllVersions={actions.saveAllAndWait}
-        unsavedVersions={actions.unsaved.length}
-      />
+      <StepSection index={3} title="Send it" step={steps.send}>
+        <FinishPanel
+          labelledBy="step-3"
+          postId={postId}
+          channels={draft.channels}
+          scheduledAt={draft.scheduledAt}
+          onScheduleChange={actions.changeSchedule}
+          scheduleError={actions.scheduleError}
+          autoPublish={autoPublish}
+          connected={connected}
+          statusRows={statusRows}
+          flush={actions.flush}
+          saveVariantNow={actions.saveVersion}
+          saveAllVersions={actions.saveAllAndWait}
+          unsavedVersions={actions.unsaved.length}
+        />
+      </StepSection>
 
       <CommitBar
         status={autosave.status}
