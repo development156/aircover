@@ -56,20 +56,20 @@ describe('the Loop says why it will not plan', () => {
 
   it('distinguishes paused from never enabled', () => {
     const v = assess(eligibleFacts({ settings: { paused: true, weeklyBudgetCredits: 150 } }))
-    expect(explain(v)).toBe('The Loop is paused — resume it and Sahoda will plan your next week.')
+    expect(explain(v)).toBe('The Loop is paused. Resume it and Sahoda will plan your next week.')
     expect(v.eligible === false && v.reason).toBe('paused')
   })
 
   it('says connect when a workspace never had a channel', () => {
     const v = assess(eligibleFacts({ connections: [] }))
-    expect(explain(v)).toBe('Connect a channel first — Sahoda has nowhere to plan for.')
+    expect(explain(v)).toBe('Connect a channel first. Sahoda has nowhere to plan for.')
     expect(v.eligible === false && v.reason).toBe('no_channel')
   })
 
   it('says RECONNECT, naming the channel, when one lapsed', () => {
     const v = assess(eligibleFacts({ connections: [{ platform: 'instagram', status: 'expired' }] }))
     expect(explain(v)).toBe(
-      'Your Instagram connection has lapsed — reconnect it and Sahoda has somewhere to plan for again.',
+      'Your Instagram connection has lapsed. Reconnect it and Sahoda has somewhere to plan for again.',
     )
     expect(v.eligible === false && v.reason).toBe('channel_lapsed')
   })
@@ -84,14 +84,14 @@ describe('the Loop says why it will not plan', () => {
       }),
     )
     expect(explain(v)).toBe(
-      'Your Instagram and X connections have lapsed — reconnect them and Sahoda has somewhere to plan for again.',
+      'Your Instagram and X connections have lapsed. Reconnect them and Sahoda has somewhere to plan for again.',
     )
   })
 
   it('says the week is already planned rather than repeating the charge', () => {
     const v = assess(eligibleFacts({ openCycle: { id: 'cyc-9', status: 'planning' } }))
     expect(explain(v)).toBe(
-      "Sahoda already planned week 35 of 2026 — open it to review this week's briefs.",
+      "Sahoda already planned week 35 of 2026. Open it to review this week's briefs.",
     )
     expect(v.eligible === false && v.reason).toBe('already_planned')
   })
@@ -99,7 +99,7 @@ describe('the Loop says why it will not plan', () => {
   it('says how many credits are short, with both numbers', () => {
     const v = assess(eligibleFacts({ availableCredits: 4 }))
     expect(explain(v)).toBe(
-      'Planning a week costs 20 credits and you have 4 credits — top up and Sahoda will plan your next week.',
+      'Planning a week costs 20 credits and you have 4 credits. Top up and Sahoda will plan your next week.',
     )
     expect(v.eligible === false && v.reason).toBe('insufficient_credits')
   })
@@ -138,7 +138,7 @@ describe('the Loop says why it will not plan', () => {
     expect(v.eligible).toBe(true)
     expect(v.eligible && v.advisory.suggestOnly).toBe(true)
     expect(explain(v)).toBe(
-      'Sahoda will plan your week for Instagram and LinkedIn, as suggestions — every channel is set to suggest only.',
+      'Sahoda will plan your week for Instagram and LinkedIn, as suggestions. Every channel is set to suggest only.',
     )
   })
 
@@ -162,7 +162,7 @@ describe('the Loop says why it will not plan', () => {
       eligibleFacts({ connections: [], availableCredits: 0, workspaceId: 'ws-on' }),
     )
     expect(explain(loopOnNoChannels)).toBe(
-      'Connect a channel first — Sahoda has nowhere to plan for.',
+      'Connect a channel first. Sahoda has nowhere to plan for.',
     )
 
     const pausedWithChannels = assess(
@@ -172,14 +172,14 @@ describe('the Loop says why it will not plan', () => {
       }),
     )
     expect(explain(pausedWithChannels)).toBe(
-      'The Loop is paused — resume it and Sahoda will plan your next week.',
+      'The Loop is paused. Resume it and Sahoda will plan your next week.',
     )
   })
 
   // ── A CHANNEL THE LOOP CANNOT PLAN FOR IS NOT A CHANNEL ───────────────────
   it('ignores a connected platform that is not one of the four', () => {
     const v = assess(eligibleFacts({ connections: [{ platform: 'tiktok', status: 'active' }] }))
-    expect(explain(v)).toBe('Connect a channel first — Sahoda has nowhere to plan for.')
+    expect(explain(v)).toBe('Connect a channel first. Sahoda has nowhere to plan for.')
   })
 
   it('never returns eligible without naming at least one channel', () => {

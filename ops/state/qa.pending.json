@@ -1560,6 +1560,45 @@
       "summary_plain": "The unit checks ran and something failed (29 passed, 3 failed).",
       "details": "--- MUTATION A: back to filtering after the limit\n     × asks the database for this cycle, rather than filtering after a limit 8ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 7 passed (8)\n--- MUTATION B: a ranking of one is allowed\n     × withholds a ranking of one post, because one post is not a ranking 7ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 7 passed (8)\n--- MUTATION C: sum a post's dailies instead of its best\n     × takes a post best reading, never the sum of its daily ones 7ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 7 passed (8)\n      Tests  8 passed (8)",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtcu6z72-459a1c50",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T10:56:45.996Z",
+      "finished_at": "2026-08-28T10:56:45.996Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The unit checks ran and something failed.",
+      "details": "     × tells a workspace with no channel to connect one 15ms\n     × tells a workspace whose channel lapsed to RECONNECT, never to connect 3ms\n     × distinguishes paused from never enabled 10ms\n     × says connect when a workspace never had a channel 2ms\n     × says RECONNECT, naming the channel, when one lapsed 5ms\n     × names every lapsed channel, and pluralises 2ms\n     × says the week is already planned rather than repeating the charge 3ms\n     × says how many credits are short, with both numbers 2ms\n     × still plans when every channel is at L0, and says the week will only suggest 3ms\n     × explains both production workspaces measured on 2026-08-23 2ms\n     × ignores a connected platform that is not one of the four 3ms\n⎯⎯⎯⎯⎯⎯ Failed Tests 11 ⎯⎯⎯⎯⎯⎯⎯\nAssertionError: expected 'The Loop is paused. Resume it and Sah…' to be 'The Loop is paused — resume it and Sa…' // Object.is equality\nAssertionError: expected 'Connect a channel first. Sahoda has n…' to be 'Connect a channel first — Sahoda has …' // Object.is equality",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtcu7owe-a8e2b517",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T10:57:19.307Z",
+      "finished_at": "2026-08-28T10:57:19.307Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The unit checks ran and something failed (233 passed, 1 failed).",
+      "details": "updated apps/web/src/lib/loop/eligibility.test.ts\nupdated apps/web/src/lib/loop/verdict.test.ts\n     × tells a workspace whose channel lapsed to RECONNECT, never to connect 14ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\nAssertionError: expected 'Your Instagram connection has lapsed.…' to contain 'reconnect'\n      Tests  1 failed | 233 passed (234)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtcu8ba3-636391f2",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-28T10:57:48.313Z",
+      "finished_at": "2026-08-28T10:57:48.313Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks passed (438 passed) for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
+      "details": "      Tests  438 passed (438)",
+      "duration_ms": null
     }
   ]
 }

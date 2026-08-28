@@ -61,7 +61,7 @@ describe('loopVerdict — what the screen tells a workspace', () => {
 
   it('tells a workspace with no channel to connect one', () => {
     const v = loopVerdict(snapshot({ connected: toChannelSet([]) }), NOW)
-    expect(explain(v)).toBe('Connect a channel first — Sahoda has nowhere to plan for.')
+    expect(explain(v)).toBe('Connect a channel first. Sahoda has nowhere to plan for.')
     expect(remedy(v)).toEqual({ href: '/connections', label: 'Connect a channel' })
   })
 
@@ -77,7 +77,10 @@ describe('loopVerdict — what the screen tells a workspace', () => {
       snapshot({ connected: toChannelSet([]), lapsed: toChannelSet(['instagram']) }),
       NOW,
     )
-    expect(explain(v)).toContain('reconnect')
+    // Case-insensitive on purpose: the word now starts a sentence, and this
+    // assertion is about the CLAIM (reconnect, not connect) rather than about
+    // a capital letter that a copy edit is free to change.
+    expect(explain(v)).toMatch(/reconnect/i)
     expect(explain(v)).not.toContain('Connect a channel first')
     expect(remedy(v)).toEqual({ href: '/connections', label: 'Reconnect it' })
   })
