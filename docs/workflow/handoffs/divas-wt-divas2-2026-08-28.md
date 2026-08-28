@@ -257,3 +257,198 @@ stays typed slots and `SvgScene` remains an internal representation only.
 Second, smaller: **Polotno is $899/month and nobody has decided.** Nothing built
 here depends on that decision — the serialiser is a pure function with no runtime,
 so it can keep running alongside any engine that gets licensed later.
+
+---
+
+# Session 5 — the design studio, built (2026-08-28, later)
+
+**Branch** `claude/divas-kickoff-03y2g2` at `e17b3f8a`. Lane `wt-divas2`. Pushed: yes.
+
+## The answer first
+
+**`/studio` is live.** It was a roadmap page this morning; it now saves designs,
+renders them, and lets a person edit one. Six commits, and the single most
+valuable thing found in the whole day is not a feature: **a brand colour handed
+to the renderer as an OKLCH string rasterises to pure black, silently**, and
+this product stores brand colours as OKLCH.
+
+## What shipped, by commit
+
+| SHA | what |
+| --- | --- |
+| `08a180ca` | `presets.ts`, `paint.ts`, `svg.ts` — the renderer and the colour rail |
+| `90dfd922` | two runtime holes an adversarial review found, and four overclaims narrowed |
+| `7c2127b5` | `[contract]` two tables, the document schema, the RLS test |
+| `a9e2519f` | three templates, and two defects only a rendered PNG could find |
+| `621859ee` | the brand palette, the read layer, the server actions |
+| `e17b3f8a` | the gallery, the editor, and the six guards retargeted |
+
+## Founder's rulings this session, all applied
+
+| # | ruling | where it lives now |
+| --- | --- | --- |
+| 1 | slots, not a free canvas (my call, they deferred) | `document.ts` — there is nowhere to store a position |
+| 2 | font, my call | Noto Sans + Indic, named in `TEMPLATE_FONT`. **Not yet bundled** |
+| 4 | customers save their own templates | `studio_designs.is_template` |
+| 5 | designs get saved | `20260828100000_studio_designs.sql` |
+| 7 | 2 to 10 slides | `MAX_CAROUSEL_PAGES` |
+| 8 | Polotno killed | nothing depends on it. It also removed the judges' main objection to layout-as-code |
+| 9 | exports stay free | the page says so and it is true: no model call |
+| 10 | /studio goes live | done, six guards retargeted |
+
+## Guards, and the mutation that proved each
+
+Fifteen mutations this session, every one applied, watched go red, reverted.
+
+| guard | mutation | red |
+| --- | --- | --- |
+| preset table | claim a channel that refuses / drop one silently / excuse one the engine refuses | 2 / 1 / 1 |
+| paint | accept `oklch(...)` | 3 |
+| svg | stop escaping text / drop the data-URI rule / skip a refused node | 1 / 7 / 4 |
+| the pixel guard | emit `oklch()` instead of hex | 3 in shared **and the PNG went black** |
+| review fixes | remove `isPaint` / drop the anchor whitelist | 5 / 2 |
+| RLS | no policies / a policy of `using (true)` | 4 / 4 |
+| document | allow a layout / raise the cap / read empty as `''` | 1 / 1 / 3 |
+| template | shrink the caption box / stop counting descenders / narrow a slot | 1 / 0 then 2 / 1 |
+| emptiness | a failed read that says "no designs" / unreadable rows as empty | 1 / 2 |
+
+**Two mutations taught more than the guards did.**
+
+The RLS one: stripping the policies made four tests red but left "the other
+tenant sees nothing" GREEN. `relrowsecurity` is true schema-wide regardless, so
+removing policies denies *everything* and that assertion passed for entirely the
+wrong reason. Only an over-permissive `using (true)` policy proves the read
+guards. **Neither mutation alone proves that test.**
+
+The descender one: zeroing the constant left all 35 template tests green,
+because the fixed frames carry slack. A guard that passes for two values of its
+own constant is not testing it, so the constant is pinned separately.
+
+## What rendering found that no test had
+
+I rendered the three templates to PNG and looked at them. Two real defects, both
+invisible to every test that existed:
+
+1. **The photo caption collided with the line beneath it.** Every number in the
+   template was self-consistent. Descenders are not counted by a baseline.
+   `textBlockFits` now catches it from the data, and immediately found a SECOND
+   overflow no picture had shown: `statement`'s footnote only collides at two
+   lines and every sample had one.
+2. **Every `maxChars` was wrong.** `statement` offered 80 characters for a box
+   that holds about 38. Nothing could have caught it: the limit was declared
+   beside the geometry with no relationship a test could check. It is DERIVED
+   now, from a character width MEASURED through the real rasteriser (mixed case
+   0.61-0.64 em, ALL CAPS 0.753, Devanagari 0.395; the bound is 0.75 because a
+   shop owner really does type "CLOSED TODAY").
+
+**Looking at output is a check nothing else performs.** That is the lesson.
+
+## Shared surfaces touched
+
+- **`packages/shared/src/index.ts`** — six `export *` lines. Additive only.
+- **`packages/shared/src/studio/`** and **`src/db/studio.ts`** — new.
+- **`packages/db/tests/helpers/pglite-tenant.ts`** — ONE new key in
+  `SHAPE_OVERRIDES`. Other lanes use this helper. Additive; the first override
+  whose problem is a composite FOREIGN KEY rather than a CHECK.
+- **`apps/web/src/lib/perf/read-waterfall.baseline.json`** — rewritten. It
+  records /studio 6→7 and the new /studio/[id], AND picks up two routes I did
+  not touch: `/assets` and `/report` each LOST a sequential read when
+  `a64c1f88` moved them into a `Promise.all`. The ratchet only fails on growth,
+  so that improvement sat unrecorded. **Real, correct, and not mine.**
+- **`apps/web/src/lib/privacy/export-manifest.ts`**, **`docs/38`** — two tables
+  added, count 52 → 54.
+- **Four e2e specs** — see below.
+
+## Contract, migration or money
+
+- **`[contract]`** in `7c2127b5`: `DesignDocumentSchema` and two row schemas are
+  new exports from `@sahoda/shared`. Additive; nothing existing changed shape.
+- **A migration is WRITTEN AND NOT APPLIED.** `supabase db push` cannot run from
+  this sandbox: DNS for `db.<ref>.supabase.co` does not resolve here, which is
+  the same failure that fails two tests all day on a clean tree. The CLI is
+  present (2.109.1) and no project is linked. **This push needs a human on a
+  machine with network.**
+- **No money.** Nothing touches `pricing.config.json` or the ledger. The page's
+  "exports are free" claim is true: drawing is our own code.
+
+## The six guards that pinned /studio, and what happened to each
+
+| spec | what I did |
+| --- | --- |
+| `page.test.tsx` | **RETARGETED, not deleted.** Its sentence is gone; its claim inverted and moved to `lib/studio/emptiness.ts` |
+| `roadmap-honesty.spec.ts` | **REPOINTED.** `/studio` was its ONLY entry, so removing it would have left the scan looping over zero routes reporting green. Now guards the five `/ads/*` screens; header word ONE → FIVE and still self-checks |
+| `roadmap-figures-scan.spec.ts` | `/studio` removed; a stale comment about it quoting `carousel` corrected |
+| `no-impossible-remedy.spec.ts` | `/studio` KEPT. The property is stronger on a real screen, not weaker. Its comment corrected |
+| `every-section-loads.spec.ts` | unchanged; the title is still "Studio" |
+| `design-audit.spec.ts` | archetype `roadmap · gallery` → `gallery · editor` |
+
+## Anything retracted
+
+**Three, all mine.**
+
+1. "Not one number from `CONSTRAINTS` is copied" — false of my own header's
+   explanatory table. True of the code; the claim now says which.
+2. "The preview and the export cannot drift" — true of LAYOUT, **false of
+   TEXT**. Two font families produce identical ink here; the renderer's header
+   now states the narrow version.
+3. `ops/state/qa.pending.json` — I said it was "not my authored work", then that
+   it should be committed. Both wrong. It is scratch by policy and a pre-commit
+   hook refuses it.
+
+## What was NOT done, and why
+
+- **`next build` and the JS-size check are UNRUN.** The command is denied by
+  sandbox permissions. This is the leg most likely to catch a problem from six
+  new barrel exports, and `packages/shared`'s own history has that precedent.
+  **Run it before this merges.**
+- **Playwright is UNRUN.** 277 tests in 72 files still COLLECT, unchanged, so my
+  four spec edits parse. But no browser here reaches the network. The four
+  edited specs are reasoned, not executed. **The repointed
+  `roadmap-honesty` list is the one to watch:** I inferred the five `/ads/*`
+  screens quote no figure from `grep` finding no `creditCost` call, which is
+  strong but is not a run.
+- **No export to the assets library yet.** `studio_exports` exists and nothing
+  writes to it. The button is not built.
+- **No carousels in the editor.** The schema holds 1-10 pages; the editor edits
+  page one.
+- **No image slots in the editor.** `photo-bottom` renders a picture when given
+  bytes, and there is no picker yet.
+- **No font is bundled.** `TEMPLATE_FONT` names Noto; nothing ships it. Until it
+  does, the server and the browser may substitute differently and neither will
+  say so. This is the feature's largest unproven assumption.
+- **The two forked OKLCH modules were left alone.** Unifying them is a real
+  refactor across two packages.
+
+## Gate
+
+| leg | result | evidence |
+| --- | --- | --- |
+| `turbo typecheck` (9 packages, `--force`) | **PASS** | 9 of 9, 0 cached |
+| `turbo lint` (9 packages, `--force`) | **PASS** | design-lint 1379 files, raw hex 0 |
+| `vitest` @sahoda/shared | **PASS** | 31 files, **509 tests** |
+| `vitest` @sahoda/db | **1 FAIL / 681 pass** | the failure is `live-guard.test.ts`, PRE-EXISTING (proved by stash) |
+| `vitest` @sahoda/web | **2 FAIL / 5748 pass** | both `export-drift.test.ts`, both `ENOTFOUND db.<ref>.supabase.co`, PRE-EXISTING |
+| `prettier --check .` | **PASS** | |
+| `next build` + js-budget | **UNRUN** | denied by sandbox permissions |
+| Playwright `@smoke` | **UNRUN** | 277 tests collect; no browser network |
+
+## What the next session in THIS lane should pick up
+
+1. **Apply the migration.** Nothing works against a real database until then.
+2. **Run `next build` and the smoke suite.** Both UNRUN and both mine to owe.
+3. **Bundle the font**, then write the ink-fingerprint guard. `raster.test.ts`
+   already holds the control that MEASURES substitution being invisible today.
+4. **Export to the library.** `studio_exports` and its unique key are waiting;
+   `uploadAsset` will refuse the second identical export and that table is the
+   answer.
+5. Image slots, then carousels.
+
+## Needs a decision
+
+- **A live database password is printed into test output** by
+  `packages/db/tests/live-guard.test.ts`, which fails on a clean tree. Not mine
+  and not from this work. Rotate the credential and stop the assertion echoing
+  the value. Raised three times today, still open.
+- **The free canvas.** I built slots per FSD 3.4 and you left the call to me.
+  `SvgScene` already takes free positions, so a canvas is additive rather than a
+  rewrite — but shipping one changes what `/studio` promises customers.
