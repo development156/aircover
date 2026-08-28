@@ -11,9 +11,24 @@
  *
  * So this asks the live database the same question the manifest was built from,
  * and PRINTS the difference rather than merely failing. Without a database URL
- * it SKIPS, loudly — the sandbox has no `.env` and a test that failed there
- * would be red for a reason that is not a defect, which is how a suite gets
- * ignored. A skip is honest; a green pass without a connection would not be.
+ * it SKIPS, loudly — a test that failed for want of a credential would be red
+ * for a reason that is not a defect, which is how a suite gets ignored. A skip
+ * is honest; a green pass without a connection would not be.
+ *
+ * ── THE SECOND KIND OF NOTHING, 2026-08-28 ──────────────────────────────────
+ * The cloud sandbox GAINED a `.env` on 2026-08-24, so `SUPABASE_DB_URL` is now
+ * set where it used to be absent, and this file stopped skipping and started
+ * FAILING instead: `getaddrinfo ENOTFOUND db.<ref>.supabase.co`. MEASURED — the
+ * host resolves AAAA-only and the sandbox has no IPv6 route, so the packet never
+ * leaves. Two red tests, on an untouched tree, naming the export manifest for a
+ * fault in the machine.
+ *
+ * It now says that instead. The probe runs ONCE in `beforeAll`; if the host is
+ * unreachable both tests skip at runtime with the host and the errno printed.
+ * The classifier is `db-route.ts` and its net is four errno codes wide on
+ * purpose — a refused connection, a timeout and every Postgres SQLSTATE stay
+ * red. `db-route.test.ts` asserts both halves and needs no database, so the
+ * thing that can silence this file is itself checked on every gate run.
  *
  * It is read-only: one `select` against `information_schema` and `pg_policies`,
  * inside a `begin read only` — see the note on that below, which is the reason
@@ -49,8 +64,9 @@
  */
 import { createRequire } from 'node:module'
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
 
+import { readOrStandDown } from './db-route'
 import { EXPORT_TABLES } from './export-manifest'
 
 const DB_URL = process.env.SUPABASE_DB_URL ?? ''
@@ -129,8 +145,21 @@ describeWithDb('the export manifest against the live schema', () => {
     }
   }
 
-  it('knows about every workspace-owned table, and invents none', async () => {
-    const rows = await readSchema()
+  /**
+   * One round trip for the whole file, taken here so an unreachable host is
+   * classified before either assertion runs. `rows` stays null only when
+   * `noRoute` is set — any other failure is rethrown and the suite goes red in
+   * `beforeAll`, which is where a broken database belongs.
+   */
+  let rows: Array<{ table_name: string; has_read_policy: boolean }> | null = null
+  let noRoute: string | null = null
+
+  beforeAll(async () => {
+    ;({ rows, noRoute } = await readOrStandDown(readSchema))
+  }, 30_000)
+
+  it('knows about every workspace-owned table, and invents none', (ctx) => {
+    if (rows === null) return ctx.skip(`cannot answer: ${noRoute}`)
     const inDb = rows.map((r) => r.table_name).sort()
     const inManifest = EXPORT_TABLES.map((t) => t.table).sort()
 
@@ -147,10 +176,10 @@ describeWithDb('the export manifest against the live schema', () => {
       phantom,
       `the manifest lists tables that do not exist or do not carry workspace_id: ${phantom.join(', ')}`,
     ).toEqual([])
-  }, 30_000)
+  })
 
-  it('classifies readability the way the policies actually do', async () => {
-    const rows = await readSchema()
+  it('classifies readability the way the policies actually do', (ctx) => {
+    if (rows === null) return ctx.skip(`cannot answer: ${noRoute}`)
     const wrong: string[] = []
 
     for (const row of rows) {
@@ -168,5 +197,5 @@ describeWithDb('the export manifest against the live schema', () => {
     // policy starts answering [] instead of erroring, and without this the
     // export would begin quietly claiming the customer has no such rows.
     expect(wrong, wrong.join(' · ')).toEqual([])
-  }, 30_000)
+  })
 })
