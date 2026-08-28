@@ -73,8 +73,38 @@ try {
   // "not importable" on a machine with a working browser.
   chromium = pw.chromium ?? pw.default?.chromium
   if (!chromium) throw new Error('module resolved but exports no chromium')
-  const path = chromium.executablePath()
+  let path = chromium.executablePath()
   result.chromium.present = existsSync(path)
+
+  // ── INSTALL IT RATHER THAN JUST REPORTING IT MISSING ──────────────────────
+  // Playwright ships a downloader, not a browser. `scripts/cloud-setup.sh` now
+  // installs one, but a session started BEFORE that landed — or any box where
+  // setup was skipped — still has an empty cache, and "NO_BROWSER" then reads
+  // as a verdict about the environment when it is really a missing one-off
+  // step. So try the step. It is idempotent and takes seconds when already
+  // present.
+  if (!result.chromium.present) {
+    dim('browser binary absent — installing chromium (one-off, ~1 min)')
+    try {
+      execFileSync(
+        'pnpm',
+        ['--filter', '@sahoda/web', 'exec', 'playwright', 'install', 'chromium'],
+        {
+          stdio: 'ignore',
+          timeout: 300_000,
+        },
+      )
+      path = chromium.executablePath()
+      result.chromium.present = existsSync(path)
+      result.notes.push('chromium was missing and was installed by this probe.')
+    } catch {
+      result.notes.push(
+        'chromium is missing and the install FAILED. Run it by hand and read the ' +
+          'error: pnpm --filter @sahoda/web exec playwright install chromium',
+      )
+    }
+  }
+
   result.chromium.present ? ok(`browser binary present`) : no(`browser binary NOT installed`)
 } catch (e) {
   result.chromium.present = false
