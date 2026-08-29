@@ -1,9 +1,8 @@
 ---
 paths:
-  - '**/*.py'
-  - '**/*.pyi'
+  - "**/*.py"
+  - "**/*.pyi"
 ---
-
 # Python Coding Style
 
 > This file extends [common/coding-style.md](../common/coding-style.md) with Python specific content.
