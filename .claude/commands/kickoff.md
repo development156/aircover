@@ -76,7 +76,54 @@ plainly and stay there — but keep `sahoda.lane` set to the lane you were given
 ```bash
 find apps/web/src/app -name page.tsx | wc -l    # 59 = the product
 cat .sahoda-setup-status 2>/dev/null            # OK, or INCOMPLETE naming what is missing
+```
 
+## 2b · Install the browser, every session, before you probe
+
+**Playwright ships a downloader, not a browser.** Install one here, on every
+`/kickoff`, without checking first:
+
+```bash
+pnpm --filter @sahoda/web exec playwright install chromium
+```
+
+`cloud-setup.sh` already runs this at environment start — but its failure is
+deliberately tolerated so a broken install cannot stop the session, and it never
+runs at all for a session that started before it landed. That gap is why every
+cloud lane reported `NO_BROWSER` for weeks and why "Playwright is UNRUN on all
+nine lanes" was true rather than pessimistic. Running it again here closes it.
+
+It is idempotent, and both halves are MEASURED (2026-08-29):
+
+| cache                              | result                                                                                                                   |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| already has a browser              | **exit 0 in 2 seconds**, nothing re-downloaded                                                                           |
+| empty, as a fresh cloud sandbox is | **100 seconds, 646 MB** — chromium, the headless shell and ffmpeg, ending in a real executable it names on the last line |
+
+So it costs a warm box nothing, and you never have to decide whether this box is
+cloud or local. Just run it — **including when `lane-sync pull` stopped on a
+conflict and you are about to report and stop.** That is the session most likely
+to need a browser next and least likely to have installed one.
+
+Read the path off the last line of its output rather than assuming one. The
+directory name moves between Playwright builds — `chrome-linux64` here,
+`chrome-linux` in the sandbox at the same version — and that exact mismatch is
+what made the probe report `NO_BROWSER` on a box that had a working browser.
+
+**Not `npm init -y && npm install playwright`.** This is a pnpm workspace with 17
+`workspace:*` dependencies and no `package-lock.json`; `npm` at the root rewrites
+the tracked `package.json` and writes a second lockfile beside `pnpm-lock.yaml`,
+in every worktree, on every kickoff. The line above installs the browser for the
+`@playwright/test` version `apps/web` already pins, so the runner and the binary
+cannot drift apart — which is its own failure mode, and reads as
+"Executable doesn't exist".
+
+If it fails, say so in your report and call the browser leg **UNRUN**. Do not
+call it passing, and do not reach for `--ignore-certificate-errors`.
+
+## 2c · Then measure what this box can actually do
+
+```bash
 node scripts/sandbox-probe.mjs                  # what CAN this box actually do?
 ```
 
@@ -126,7 +173,7 @@ invokes them directly, not now.
 
 ```
 LANE
-  owner · lane · branch you are actually on · SHA · routes · setup status
+  owner · lane · branch you are actually on · SHA · routes · setup status · browser verdict
 
 DONE — what this lane already finished
   From your own newest handoff. What shipped, with the SHA or file:line.
