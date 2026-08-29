@@ -2,10 +2,14 @@ import Image from 'next/image'
 import { CircleSlash } from 'lucide-react'
 
 import {
-  DiscordMark,
-  GoogleBusinessMark,
+  FacebookMark,
+  GoogleMark,
+  InstagramMark,
   PinterestMark,
   RedditMark,
+} from '@/components/connections/brand-marks'
+import {
+  DiscordMark,
   SlackMark,
   SnapchatMark,
   ThreadsMark,
@@ -32,9 +36,10 @@ import { cn } from '@/lib/utils'
  * ── EVERY CHANNEL IN THE CATALOGUE NOW HAS A MARK ────────────────────────────
  * This used to hold three PNGs and fall through to a grey map-pin for everything
  * else — which meant Google Business Profile rendered anonymously on the one
- * screen whose entire subject is telling channels apart. The package ships marks
- * for facebook, youtube and telegram that nothing was using; GBP and Pinterest
- * ship none and are drawn (`drawn-marks.tsx`).
+ * screen whose entire subject is telling channels apart. Marks now come from
+ * three places: the founder-supplied five in `brand-marks.tsx`, the evocations
+ * in `drawn-marks.tsx` for platforms nobody has supplied, and the shipped PNGs
+ * below.
  *
  * The fallback survives, and its glyph changed from a map-pin to `CircleSlash`.
  * A map-pin is a PLACE, so as a stand-in for a missing mark it read as a claim
@@ -44,26 +49,29 @@ import { cn } from '@/lib/utils'
  */
 
 const MARK: Partial<Record<CatalogueChannel, string>> = {
-  instagram: '/channels/instagram.png',
   linkedin: '/channels/linkedin.png',
   x: '/channels/x.png',
-  facebook: '/channels/facebook.png',
   youtube: '/channels/youtube.png',
   telegram: '/channels/telegram.png',
   // Shipped in `public/channels/` and unused until the connect-only platforms
   // landed. `google-ads.png` and `shopify.png` are still unused and are NOT
   // wired to anything: google-ads is a different Google product from `gbp` and
-  // pointing at it would mislabel the channel.
+  // pointing at it would mislabel the channel. `facebook.png` and
+  // `instagram.png` joined them on 2026-08-29, superseded by the supplied marks
+  // and kept on disk rather than deleted, in case a raster is wanted elsewhere.
   tiktok: '/channels/tiktok.png',
   whatsapp: '/channels/whatsapp.png',
 }
 
-/** Marks with no shipped asset, drawn to scale instead of falling back. */
-const DRAWN: Partial<Record<CatalogueChannel, typeof GoogleBusinessMark>> = {
-  gbp: GoogleBusinessMark,
+/** Every mark drawn as vector rather than loaded as a raster. The first five are
+ *  the supplied logos; the rest are this file's own evocations. */
+const DRAWN: Partial<Record<CatalogueChannel, typeof GoogleMark>> = {
+  facebook: FacebookMark,
+  gbp: GoogleMark,
+  instagram: InstagramMark,
   pinterest: PinterestMark,
-  discord: DiscordMark,
   reddit: RedditMark,
+  discord: DiscordMark,
   slack: SlackMark,
   threads: ThreadsMark,
   snapchat: SnapchatMark,
