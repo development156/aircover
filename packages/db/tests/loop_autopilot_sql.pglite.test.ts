@@ -4,6 +4,12 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { bootFullSchema } from './helpers/pglite-tenant'
 
 import {
+  toAnnouncedForPerson,
+  toAnnouncedPost,
+  toCandidateRow,
+  toHistoryRow,
+} from '../../../apps/web/src/lib/loop/autopilot/row-mappers'
+import {
   ACTIVE_BRAIN_SQL,
   POST_AUTOPILOT_HISTORY_SQL,
   ANNOUNCED_FOR_PERSON_SQL,
@@ -940,6 +946,106 @@ describe('the autopilot dispatcher SQL against the real schema', () => {
     it("never reads another workspace's rows", async () => {
       const r = await db.query(POST_AUTOPILOT_HISTORY_SQL, [OTHER, post, variant])
       expect(r.rows).toHaveLength(0)
+    })
+  })
+
+  /**
+   * ── THE SEAM: A REAL ROW THROUGH THE REAL MAPPER ───────────────────────────
+   * Everything either side of this was already proven and the join was not. The
+   * statements are checked against a real Postgres above; the decisions are
+   * checked against well-formed objects in the unit suites, which mock the
+   * store entirely. Neither ever ran a row THIS DATABASE PRODUCED through the
+   * code that reads its columns.
+   *
+   * A column renamed in the SQL, or a typo in `row.account_id`, leaves both
+   * halves green and hands `undefined` to a decision. That is the same shape as
+   * the kill-switch defect this branch already fixed: correct guards on both
+   * sides, nothing on the seam.
+   */
+  describe('the seam — rows this database produced, through the mappers that read them', () => {
+    const post = 'ea000000-0000-4000-8000-0000000000ea'
+    const variant = 'eb000000-0000-4000-8000-0000000000eb'
+
+    beforeAll(async () => {
+      await db.exec(`
+        insert into posts (id, workspace_id, title, status, channels, created_by)
+          values ('${post}', '${WS}', 'Seam post', 'draft', '{x}', '${USER}');
+      `)
+      await db.query(WRITE_DECISION_SQL, [
+        WS,
+        post,
+        variant,
+        'x',
+        'acct-seam',
+        null,
+        null,
+        'announced',
+        null,
+        new Date('2030-01-01T09:30:00.000Z').toISOString(),
+      ])
+    }, 120_000)
+
+    it('toAnnouncedPost reads every column PENDING_ANNOUNCEMENTS_SQL returns', async () => {
+      const r = await db.query(PENDING_ANNOUNCEMENTS_SQL, [WS, 50])
+      const row = r.rows.find((x) => (x as { post_id: string }).post_id === post)
+      expect(row).toBeDefined()
+
+      const mapped = toAnnouncedPost(row)
+      expect(mapped).toMatchObject({
+        postId: post,
+        variantId: variant,
+        channel: 'x',
+        accountId: 'acct-seam',
+      })
+      // A real Date, not an Invalid Date: every comparison against NaN is
+      // false, so a bad timestamp gives a window that never opens and never
+      // closes.
+      expect(Number.isFinite(mapped.dispatchAfter.getTime())).toBe(true)
+    })
+
+    it('toAnnouncedForPerson reads every column ANNOUNCED_FOR_PERSON_SQL returns', async () => {
+      const r = await db.query(ANNOUNCED_FOR_PERSON_SQL, [WS, 50])
+      const row = r.rows.find((x) => (x as { post_id: string }).post_id === post)
+      expect(row).toBeDefined()
+
+      const mapped = toAnnouncedForPerson(row)
+      expect(mapped).toMatchObject({ postId: post, channel: 'x', postTitle: 'Seam post' })
+      expect(Number.isFinite(mapped.announcedAt.getTime())).toBe(true)
+    })
+
+    it('toHistoryRow reads every column POST_AUTOPILOT_HISTORY_SQL returns', async () => {
+      const r = await db.query(POST_AUTOPILOT_HISTORY_SQL, [WS, post, variant])
+      expect(r.rows).toHaveLength(1)
+
+      const mapped = toHistoryRow(r.rows[0])
+      expect(mapped.decision).toBe('announced')
+      // The column default, and the value the whole kill-switch fix rests on.
+      expect(mapped.actor).toBe('autopilot')
+      expect(mapped.refusalReason).toBeNull()
+      expect(mapped.dispatchAfter).not.toBeNull()
+      expect(Number.isFinite(mapped.createdAt.getTime())).toBe(true)
+    })
+
+    it('toCandidateRow reads every column AUTOPILOT_CANDIDATES_SQL returns', async () => {
+      const r = await db.query(AUTOPILOT_CANDIDATES_SQL, [WS, 50])
+      // The candidate fixtures earlier in this file leave at least one row.
+      expect(r.rows.length).toBeGreaterThan(0)
+
+      const mapped = toCandidateRow(r.rows[0])
+      expect(typeof mapped.postId).toBe('string')
+      expect(typeof mapped.variantId).toBe('string')
+      expect(typeof mapped.body).toBe('string')
+      // The one a `?? ''` would have quietly emptied, and the log's CHECK
+      // would then have refused the row at write time with nobody watching.
+      expect(mapped.accountId.length).toBeGreaterThan(0)
+    })
+
+    it('a mapper THROWS on a missing column rather than handing on undefined', () => {
+      // The property that makes the four tests above meaningful. If a renamed
+      // column produced `undefined` instead of an error, every assertion here
+      // could be satisfied by a row that had lost half its fields.
+      expect(() => toAnnouncedPost({ post_id: 'p' })).toThrow(/variant_id/)
+      expect(() => toHistoryRow({ decision: 'announced' })).toThrow(/actor|created_at/)
     })
   })
 })

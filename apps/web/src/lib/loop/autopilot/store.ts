@@ -5,6 +5,7 @@ import type { Channel } from '@sahoda/shared'
 
 import type { AutopilotRefusal } from '@/lib/loop/autopilot-refusals'
 import type { AutopilotHistoryRow } from './history-copy'
+import { toAnnouncedForPerson, toAnnouncedPost, toCandidateRow, toHistoryRow } from './row-mappers'
 import type { AnnouncedPost } from './dispatch-due'
 import {
   ACTIVE_BRAIN_SQL,
@@ -104,21 +105,7 @@ export async function readPendingAnnouncements(
   limit = 200,
 ): Promise<AnnouncedPost[]> {
   const r = await getPool().query(PENDING_ANNOUNCEMENTS_SQL, [workspaceId, limit])
-  return (
-    r.rows as {
-      post_id: string
-      variant_id: string
-      channel: Channel
-      account_id: string
-      dispatch_after: string | Date
-    }[]
-  ).map((row) => ({
-    postId: row.post_id,
-    variantId: row.variant_id,
-    channel: row.channel,
-    accountId: row.account_id,
-    dispatchAfter: new Date(row.dispatch_after),
-  }))
+  return r.rows.map(toAnnouncedPost)
 }
 
 export interface DecisionRow {
@@ -195,27 +182,7 @@ export interface CandidateRow {
  */
 export async function readCandidateRows(workspaceId: string, limit = 100): Promise<CandidateRow[]> {
   const r = await getPool().query(AUTOPILOT_CANDIDATES_SQL, [workspaceId, limit])
-  return (
-    r.rows as {
-      post_id: string
-      variant_id: string
-      channel: Channel
-      body: string
-      last_error: unknown
-      brief_id: string | null
-      cycle_id: string | null
-      account_id: string
-    }[]
-  ).map((row) => ({
-    postId: row.post_id,
-    variantId: row.variant_id,
-    channel: row.channel,
-    body: row.body,
-    lastError: row.last_error,
-    accountId: row.account_id,
-    briefId: row.brief_id,
-    cycleId: row.cycle_id,
-  }))
+  return r.rows.map(toCandidateRow)
 }
 
 /**
@@ -286,23 +253,7 @@ export async function readAnnouncedForPerson(
   limit = 50,
 ): Promise<AnnouncedForPerson[]> {
   const r = await getPool().query(ANNOUNCED_FOR_PERSON_SQL, [workspaceId, limit])
-  return (
-    r.rows as {
-      post_id: string
-      variant_id: string
-      channel: Channel
-      post_title: string
-      dispatch_after: string | Date
-      announced_at: string | Date
-    }[]
-  ).map((row) => ({
-    postId: row.post_id,
-    variantId: row.variant_id,
-    channel: row.channel,
-    postTitle: row.post_title,
-    dispatchAfter: new Date(row.dispatch_after),
-    announcedAt: new Date(row.announced_at),
-  }))
+  return r.rows.map(toAnnouncedForPerson)
 }
 
 /**
@@ -330,19 +281,5 @@ export async function readPostAutopilotHistory(
   variantId: string,
 ): Promise<AutopilotHistoryRow[]> {
   const r = await getPool().query(POST_AUTOPILOT_HISTORY_SQL, [workspaceId, postId, variantId])
-  return (
-    r.rows as {
-      decision: AutopilotHistoryRow['decision']
-      refusal_reason: string | null
-      dispatch_after: string | Date | null
-      created_at: string | Date
-      actor: string
-    }[]
-  ).map((row) => ({
-    decision: row.decision,
-    refusalReason: row.refusal_reason,
-    dispatchAfter: row.dispatch_after === null ? null : new Date(row.dispatch_after),
-    createdAt: new Date(row.created_at),
-    actor: row.actor,
-  }))
+  return r.rows.map(toHistoryRow)
 }
