@@ -26,6 +26,44 @@ nobody had asked for.
 
 ---
 
+## 0 · If the cloud Setup script never ran, run it here
+
+`scripts/cloud-setup.sh` belongs in the cloud environment's **Setup script**
+field. Leave that field empty and none of it happens: no `.env` files, no
+`pnpm install`, no browser, `core.hooksPath` unset so **both git guards are
+silently off**, and git authored as the personal account — which makes **Vercel
+refuse the deployment**. Ten live sessions were created that way on 2026-08-29,
+with the environment variables set and the Setup script field blank.
+
+```bash
+# BOTH conditions. The second one is not optional — see below.
+if [ ! -f apps/web/.env.local ] && [ -n "${NEXT_PUBLIC_SUPABASE_URL:-}${CLERK_SECRET_KEY:-}" ]; then
+  echo "setup never ran in this environment — running it now"
+  bash scripts/cloud-setup.sh
+fi
+cat .sahoda-setup-status 2>/dev/null   # OK, or INCOMPLETE naming what is missing
+```
+
+It reads the variables already set on the environment, writes the three `.env`
+files from them, installs dependencies and the browser, arms `core.hooksPath`
+and sets the `SAHODALABS` identity. It holds no secret, always exits 0, and is
+safe to run twice.
+
+**Why both conditions, and why not the obvious guard.** `cloud-setup.sh`
+truncates `.env`, `apps/web/.env` and `apps/web/.env.local` — `: > "$target"` —
+before rewriting each from the environment. On a laptop those values live _in_
+the files and not in the environment, so an unguarded run **blanks them**.
+MEASURED in `wt-core` on 2026-08-29: `.sahoda-setup-status` is absent there too
+and all three required variables are unset, so gating on that status file alone
+— the guard you would reach for first — destroys **77 lines of real secrets**.
+`.env.local` absent means there is nothing to lose; a required variable present
+means there is something to write. Neither test is sufficient by itself.
+
+**Say in your report whether you had to run it.** If you did, that environment
+is still missing its Setup script field, and every future session started there
+will need this too. Fixing the field is a person's job in the cloud settings —
+this command heals the session, not the environment.
+
 ## 1 · Pin who and where
 
 Parse `owner:` and `branch:` from the arguments. **If either is missing, stop and
@@ -75,8 +113,54 @@ plainly and stay there — but keep `sahoda.lane` set to the lane you were given
 
 ```bash
 find apps/web/src/app -name page.tsx | wc -l    # 59 = the product
-cat .sahoda-setup-status 2>/dev/null            # OK, or INCOMPLETE naming what is missing
+```
 
+## 2b · Install the browser, every session, before you probe
+
+**Playwright ships a downloader, not a browser.** Install one here, on every
+`/kickoff`, without checking first:
+
+```bash
+pnpm --filter @sahoda/web exec playwright install chromium
+```
+
+`cloud-setup.sh` already runs this at environment start — but its failure is
+deliberately tolerated so a broken install cannot stop the session, and it never
+runs at all for a session that started before it landed. That gap is why every
+cloud lane reported `NO_BROWSER` for weeks and why "Playwright is UNRUN on all
+nine lanes" was true rather than pessimistic. Running it again here closes it.
+
+It is idempotent, and both halves are MEASURED (2026-08-29):
+
+| cache                              | result                                                                                                                   |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| already has a browser              | **exit 0 in 2 seconds**, nothing re-downloaded                                                                           |
+| empty, as a fresh cloud sandbox is | **100 seconds, 646 MB** — chromium, the headless shell and ffmpeg, ending in a real executable it names on the last line |
+
+So it costs a warm box nothing, and you never have to decide whether this box is
+cloud or local. Just run it — **including when `lane-sync pull` stopped on a
+conflict and you are about to report and stop.** That is the session most likely
+to need a browser next and least likely to have installed one.
+
+Read the path off the last line of its output rather than assuming one. The
+directory name moves between Playwright builds — `chrome-linux64` here,
+`chrome-linux` in the sandbox at the same version — and that exact mismatch is
+what made the probe report `NO_BROWSER` on a box that had a working browser.
+
+**Not `npm init -y && npm install playwright`.** This is a pnpm workspace with 17
+`workspace:*` dependencies and no `package-lock.json`; `npm` at the root rewrites
+the tracked `package.json` and writes a second lockfile beside `pnpm-lock.yaml`,
+in every worktree, on every kickoff. The line above installs the browser for the
+`@playwright/test` version `apps/web` already pins, so the runner and the binary
+cannot drift apart — which is its own failure mode, and reads as
+"Executable doesn't exist".
+
+If it fails, say so in your report and call the browser leg **UNRUN**. Do not
+call it passing, and do not reach for `--ignore-certificate-errors`.
+
+## 2c · Then measure what this box can actually do
+
+```bash
 node scripts/sandbox-probe.mjs                  # what CAN this box actually do?
 ```
 
@@ -126,7 +210,7 @@ invokes them directly, not now.
 
 ```
 LANE
-  owner · lane · branch you are actually on · SHA · routes · setup status
+  owner · lane · branch you are actually on · SHA · routes · setup status · browser verdict
 
 DONE — what this lane already finished
   From your own newest handoff. What shipped, with the SHA or file:line.
