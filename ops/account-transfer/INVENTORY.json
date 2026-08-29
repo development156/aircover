@@ -4,7 +4,10 @@
     "commands": 20,
     "agents": 26,
     "skills": 22,
-    "githooks": ["pre-commit", "pre-push"]
+    "githooks": [
+      "pre-commit",
+      "pre-push"
+    ]
   },
   "exportedHere": {
     "ruleFiles": 21,

@@ -1,9 +1,8 @@
 ---
 paths:
-  - '**/*.py'
-  - '**/*.pyi'
+  - "**/*.py"
+  - "**/*.pyi"
 ---
-
 # Python Testing
 
 > This file extends [common/testing.md](../common/testing.md) with Python specific content.
