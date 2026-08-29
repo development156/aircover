@@ -157,7 +157,8 @@ describe('dispatch hands the post to the existing sweep', () => {
     vi.mocked(loopCronEnabled).mockReturnValue(false)
     const report = await runWorkspaceAutopilotTick(deps)
     expect(store.armForPublish).not.toHaveBeenCalled()
-    expect(report.refusalsByReason).toEqual({ CANCELLED: 1 })
+    expect(report.cancelled).toBe(1)
+    expect(report.refused).toBe(0)
   })
 
   it('a refused arming is not an error and does not stop the tick', async () => {

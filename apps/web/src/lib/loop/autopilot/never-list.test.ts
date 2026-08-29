@@ -110,6 +110,12 @@ async function reasonsWritten(input: {
  * written down or the next reader cannot tell which.
  */
 const NOT_PERSISTED: Record<string, string> = {
+  // The kill switch writes `decision = 'cancelled'` with no refusal_reason,
+  // and a person pressing stop writes the same row with actor = 'person'. So
+  // this name never lands in refusal_reason — it is a `wait` reason for a post
+  // already cancelled, and the sentence a reader gets comes from
+  // `autopilotStatus`, which reads the ACTOR rather than guessing.
+  CANCELLED: 'a cancellation is its own decision, not a refusal reason',
   // A post inside its cancel window is being WAITED FOR, not refused. Writing
   // a row every tick would record the fact that time had not passed yet, once
   // per tick, for every announced post — the ops_audit_log defect exactly.
@@ -162,10 +168,14 @@ describe('every name on the never-list reaches a real row', () => {
     ).toEqual([AUTOPILOT_REFUSALS.WEEKLY_BUDGET])
   })
 
-  it('CANCELLED, from the kill switch stopping a due post', async () => {
-    expect(await reasonsWritten({ pending: [announced()], killed: true })).toEqual([
-      AUTOPILOT_REFUSALS.CANCELLED,
-    ])
+  it('CANCELLED is NOT written as a refusal — the kill switch cancels', async () => {
+    // It used to be, and that was a defect: a refusal row is rendered by
+    // looking its name up in AUTOPILOT_REFUSAL_COPY, and the screen told
+    // customers "You stopped this post" when the kill switch had. The row is
+    // now `decision = 'cancelled'` with no reason, and the actor column says
+    // who. This test is the retargeted version of the one that asserted the
+    // old shape, kept so the change cannot silently revert.
+    expect(await reasonsWritten({ pending: [announced()], killed: true })).toEqual([])
   })
 })
 

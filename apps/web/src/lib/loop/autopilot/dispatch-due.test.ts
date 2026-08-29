@@ -110,12 +110,15 @@ describe('decideDue — the world can change inside the window', () => {
     })
   })
 
-  it('REFUSES everything while the kill switch is on', () => {
+  it('CANCELS everything while the kill switch is on — it does not refuse it', () => {
+    // Retargeted, not weakened. The guarantee is unchanged: nothing goes out.
+    // What changed is how it is recorded. A refusal row carries a guardrail's
+    // name, and rendering `CANCELLED` as a refusal made the screen say "You
+    // stopped this post" to a customer who had not touched it. The kill switch
+    // withdraws permission, which is a cancellation, and a cancellation's
+    // explanation is the ACTOR column.
     const post = announced({ dispatchAfter: new Date('2020-01-01T00:00:00.000Z') })
-    expect(decideDue(post, world({ killed: true }))).toMatchObject({
-      kind: 'refuse',
-      reason: AUTOPILOT_REFUSALS.CANCELLED,
-    })
+    expect(decideDue(post, world({ killed: true }))).toMatchObject({ kind: 'cancel' })
   })
 
   it('the kill switch outranks an armed channel and a closed window together', () => {
@@ -123,7 +126,8 @@ describe('decideDue — the world can change inside the window', () => {
       announced({ dispatchAfter: new Date('2020-01-01T00:00:00.000Z') }),
       world({ killed: true, levelFor: () => AUTOPILOT_LEVEL }),
     )
-    expect(decision.kind).toBe('refuse')
+    expect(decision.kind).toBe('cancel')
+    expect(decision.kind).not.toBe('dispatch')
   })
 
   it('does not re-refuse a post already dispatched, even under the kill switch', () => {

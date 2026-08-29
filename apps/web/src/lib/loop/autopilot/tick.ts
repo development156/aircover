@@ -55,6 +55,7 @@ const EMPTY: AutopilotTickReport = {
   refused: 0,
   refusalsByReason: {},
   dispatched: 0,
+  cancelled: 0,
   waiting: 0,
   publishFailed: 0,
 }

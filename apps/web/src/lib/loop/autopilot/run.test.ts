@@ -201,8 +201,13 @@ describe('phase two — the row is written BEFORE the publish is attempted', () 
     })
     const report = await runAutopilotTick(h.deps)
     expect(h.published).toHaveLength(0)
-    expect(report.refused).toBe(2)
-    expect(report.refusalsByReason).toEqual({ CANCELLED: 2 })
+    // Counted as cancellations, not refusals. No guardrail judged these posts.
+    expect(report.cancelled).toBe(2)
+    expect(report.refused).toBe(0)
+    expect(h.written.every((r) => r.decision === 'cancelled')).toBe(true)
+    // And no refusal_reason: the log's CHECK demands one only for `refused`,
+    // and a name here is what previously made the screen blame the customer.
+    expect(h.written.every((r) => !r.refusalReason)).toBe(true)
   })
 })
 

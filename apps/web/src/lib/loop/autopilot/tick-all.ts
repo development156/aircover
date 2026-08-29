@@ -33,6 +33,7 @@ export interface AllTicksReport {
   announced: number
   refused: number
   dispatched: number
+  cancelled: number
   waiting: number
   publishFailed: number
   /** Workspaces whose tick threw, by id. Empty is the normal case. */
@@ -45,6 +46,7 @@ export async function runAllAutopilotTicks(now: Date, limit = 200): Promise<AllT
     announced: 0,
     refused: 0,
     dispatched: 0,
+    cancelled: 0,
     waiting: 0,
     publishFailed: 0,
     failed: [],
@@ -73,6 +75,7 @@ export async function runAllAutopilotTicks(now: Date, limit = 200): Promise<AllT
       report.announced += one.announced
       report.refused += one.refused
       report.dispatched += one.dispatched
+      report.cancelled += one.cancelled
       report.waiting += one.waiting
       report.publishFailed += one.publishFailed
     } catch {
