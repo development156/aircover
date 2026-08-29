@@ -129,7 +129,7 @@ describe('OnboardingFlow charges once per press', () => {
   })
 
   test('a double press dispatches ONE resolve', async () => {
-    // THE MONEY: `newResolveObjectRef` mints a fresh ledger key per dispatch, so
+    // THE MONEY: each dispatch reaches the ledger on its own, so
     // two dispatches are two charges. The mocked action must SETTLE — React 19
     // queues actions, so a never-settling one never invokes the second action
     // and the assertion below could not fail either way.
