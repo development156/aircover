@@ -8,6 +8,7 @@ import {
   type DesignDraft,
   type SaveState,
   canonicalKey,
+  describeDraftBlock,
 } from '@/lib/studio/autosave'
 
 /**
@@ -46,7 +47,13 @@ export function useDesignAutosave({
   draft: DesignDraft
   initial: DesignDraft
   save: (draft: DesignDraft) => Promise<SaveOutcome>
-}): { state: SaveState; dirty: boolean; flush: () => Promise<boolean> } {
+}): {
+  state: SaveState
+  dirty: boolean
+  /** Why no write will be attempted, or null. See `describeDraftBlock`. */
+  blocked: string | null
+  flush: () => Promise<boolean>
+} {
   const [saved, setSaved] = useState<DesignDraft>(initial)
   const [state, setState] = useState<SaveState>({ kind: 'idle' })
   const key = canonicalKey(draft)
@@ -68,6 +75,9 @@ export function useDesignAutosave({
     if (inFlight.current !== null) return inFlight.current
     const attempt = draftRef.current
     if (canonicalKey(attempt) === canonicalKey(savedRef.current)) return true
+    // Refused before it is sent. The server would refuse it too, with a worse
+    // sentence, once every 1.2 seconds.
+    if (describeDraftBlock(attempt) !== null) return false
 
     setState({ kind: 'saving' })
     const run = (async () => {
@@ -145,5 +155,5 @@ export function useDesignAutosave({
     return () => window.removeEventListener('beforeunload', warn)
   }, [dirty])
 
-  return { state, dirty, flush }
+  return { state, dirty, blocked: describeDraftBlock(draft), flush }
 }

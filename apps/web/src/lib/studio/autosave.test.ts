@@ -2,7 +2,13 @@ import { describe, expect, test } from 'vitest'
 
 import type { DesignDocument } from '@sahoda/shared'
 
-import { AUTOSAVE_DELAY_MS, describeSaveState, draftIsDirty, type DesignDraft } from './autosave'
+import {
+  AUTOSAVE_DELAY_MS,
+  describeDraftBlock,
+  describeSaveState,
+  draftIsDirty,
+  type DesignDraft,
+} from './autosave'
 
 /**
  * WHAT AUTOSAVE PROMISES, AND THE ONE WAY IT COULD QUIETLY BECOME A WRITE LOOP.
@@ -179,5 +185,62 @@ describe('describeSaveState', () => {
   test('the delay is a pause in typing, not a wait somebody notices', () => {
     expect(AUTOSAVE_DELAY_MS).toBeGreaterThan(0)
     expect(AUTOSAVE_DELAY_MS).toBeLessThanOrEqual(3000)
+  })
+})
+
+/**
+ * THE RETRY STORM THE AUTOSAVE WOULD OTHERWISE HAVE CREATED.
+ *
+ * MEASURED against `TitleSchema` (`z.string().trim().min(1).max(80)`): an empty
+ * name is refused and so is one made only of spaces. The server answers with
+ * "part of it was not readable", which names nothing the person can act on, and
+ * with an autosave that answer would arrive every 1.2 seconds for as long as
+ * the box stayed empty.
+ */
+describe('describeDraftBlock', () => {
+  test('an empty name blocks the save and says which box', () => {
+    const said = describeDraftBlock({ ...draft('Open Sunday'), title: '' })
+    expect(said).not.toBeNull()
+    expect(said).toMatch(/name/i)
+  })
+
+  test('a name of only spaces blocks it too, because the schema trims first', () => {
+    expect(describeDraftBlock({ ...draft('Open Sunday'), title: '   ' })).not.toBeNull()
+  })
+
+  test('it promises the typing survives, because that is the fear', () => {
+    const said = describeDraftBlock({ ...draft('Open Sunday'), title: '' })
+    expect(said).toMatch(/still on this screen/i)
+  })
+
+  /**
+   * It never claims something failed. Nothing was sent and nothing was refused:
+   * saying "could not be saved" would describe an event that did not happen.
+   */
+  test('it does not report a failure, because no write was attempted', () => {
+    const said = describeDraftBlock({ ...draft('Open Sunday'), title: '' })
+    expect(said).not.toMatch(/could not|failed|error/i)
+  })
+
+  test('a name that is only a name blocks nothing', () => {
+    expect(describeDraftBlock(draft('Open Sunday'))).toBeNull()
+    expect(describeDraftBlock({ ...draft('Open Sunday'), title: 'x' })).toBeNull()
+  })
+
+  test('a full-length name is fine, because the schema allows eighty', () => {
+    expect(describeDraftBlock({ ...draft('Open Sunday'), title: 'x'.repeat(80) })).toBeNull()
+  })
+
+  test('the block outranks every other status, because it is the actionable one', () => {
+    const blocked = 'Give this design a name.'
+    expect(
+      describeSaveState({ kind: 'failed', message: 'Sahoda could not save.' }, true, blocked),
+    ).toBe(blocked)
+    expect(describeSaveState({ kind: 'saving' }, true, blocked)).toBe(blocked)
+    expect(describeSaveState({ kind: 'saved' }, false, blocked)).toBe(blocked)
+  })
+
+  test('the copy carries no em dash, which is the standing ruling for prose', () => {
+    expect(describeDraftBlock({ ...draft('Open Sunday'), title: '' })).not.toMatch(/[—–]/)
   })
 })
