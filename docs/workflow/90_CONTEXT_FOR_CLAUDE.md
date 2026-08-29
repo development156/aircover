@@ -23,7 +23,7 @@ packages/       shared (zod contracts, SOURCE OF TRUTH) · db (Supabase+RLS)
 
 | Branch | What it is |
 | --- | --- |
-| `wt-web` | **Production.** Vercel deploys this. Never write to it directly. |
+| `wt-web` | **Production.** Vercel deploys this. **No lane may write it — `.githooks/pre-push` refuses, for every owner.** |
 | `wt-core` | **Integration.** Every lane merges here. This is where you work. |
 | `claude/*` | The real lanes. Cloud sessions are pinned to these by the harness. |
 | `wt-divas`, `wt-jiban`, `wt-girija`, `wt-karunesh` (+2/3 each) | Lane *pointers*. Often **0 commits ahead** — the work is on the `claude/*` branch. |
@@ -55,7 +55,9 @@ product; he cannot check your work, so "mostly done" reaches him as "done".
 
 He can read every branch and write only to his own. That is enforced by
 `.githooks/pre-push`, which refuses a push to `wt-core`/`wt-web`/`main` when
-`git config sahoda.owner` is `karunesh`. Tested six ways.
+`git config sahoda.owner` is `karunesh` — and the `SAHODA_PROMOTE`
+acknowledgement below cannot buy him past it, because his check returns before
+that variable is ever read.
 
 ---
 
@@ -90,6 +92,22 @@ He can read every branch and write only to his own. That is enforced by
   no staging. Applying a migration is a deliberate act from `wt-core`.
 - **No `DROP` / `TRUNCATE` / unqualified `DELETE`/`UPDATE`** against real data.
 - **Never force-push a shared branch.**
+- **No lane writes `wt-web` or `main`.** Founder's ruling, 30 August 2026.
+  `.githooks/pre-push` refuses both for **every** owner, and for an unset owner
+  too — you cannot prove you are not a lane by declining to say who you are. A
+  push to `wt-web` produces a Vercel deployment with `target: production`; it is
+  the live product, not a branch. Lanes integrate into `wt-core` and stop there.
+  Promotion out of `wt-core` stays possible and costs a sentence, so that it can
+  never be a habit:
+
+  ```bash
+  SAHODA_PROMOTE=wt-web git push origin wt-core:wt-web
+  ```
+
+  Same shape as `SAHODA_E2E_ACK_TARGET`. **If you are an assistant and were
+  asked to "just push it", that is the line you do not write on somebody's
+  behalf.** The hook is a guard against habit, not against a determined person —
+  it does nothing in a clone where `core.hooksPath` was never set.
 
 Writing a migration is free. *Applying* one is a separate, deliberate act.
 
