@@ -207,13 +207,20 @@ describe.skipIf(!hasLedgerEnv)('applied migrations created what they declare', (
  * filename is a row in `supabase_migrations.schema_migrations`, and renaming it
  * makes the applier treat it as a new migration and run it a second time.
  *
- * Whether these two are applied CANNOT BE ESTABLISHED from a sandbox: the
- * Supabase MCP server is down (`CONNECTION_CLOSED`, MEASURED 2026-08-29) and
- * `db.<ref>.supabase.co` resolves AAAA-only with no IPv6 route from here, so
- * there is no path to the catalog that would answer it. Renaming on a guess is
- * the one action here that could break production, so it is not taken. A person
- * with database access resolves the pair; this guard makes sure no THIRD one
- * joins them quietly in the meantime.
+ * BOTH OF THESE ARE NOW APPLIED, so the rename is permanently off the table.
+ * `wt-girija2`'s handoff of 2026-08-29 records six migrations applied to project
+ * `rloztdhzfliyvpvxsgjl` and `list_migrations` carrying both
+ * `loop_reflect_reason` and `studio_designs`, with each table and column re-read
+ * over PostgREST afterwards. That is their measurement, not mine: this session
+ * could not re-verify it, because the Supabase MCP server is down
+ * (`CONNECTION_CLOSED`, MEASURED 2026-08-29) and `db.<ref>.supabase.co` resolves
+ * AAAA-only with no IPv6 route from this sandbox.
+ *
+ * When this guard was first written that fact was unknown and the exception was
+ * provisional — "a person with database access resolves the pair". It is not
+ * provisional any more. The pair is permanent, the collision is harmless because
+ * the two migrations touch unrelated tables and both already ran, and the only
+ * thing left to protect against is a THIRD file joining them.
  *
  * ── THE EXCEPTION INVALIDATES ITSELF ─────────────────────────────────────────
  * The third test below fails if the known pair STOPS colliding. An allowance
@@ -252,6 +259,9 @@ describe('no two migrations share a timestamp', () => {
   })
 
   it('the known collision is still a collision, so the exception cannot outlive it', () => {
+    // Still worth asserting even though the pair is now permanent: if somebody
+    // renames one of them anyway — which would re-run an applied migration —
+    // this fails and says so, rather than the rename passing unremarked.
     const names = timestampsOf(migrationFiles()).get(KNOWN_TIMESTAMP_COLLISION) ?? []
     expect(
       names.length,
