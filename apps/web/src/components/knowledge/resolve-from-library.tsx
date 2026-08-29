@@ -38,18 +38,19 @@ export function ResolveFromLibrary({ cost }: { cost: number }) {
         <div className="min-w-0">
           <h2 className="type-h3 flex items-center gap-2 text-ink">
             <Sparkles size={16} strokeWidth={1.8} aria-hidden className="text-accent" />
-            Let your library teach the Brand Brain
+            Turn these into what Sahoda knows about you
           </h2>
           <p className="type-sm mt-1 max-w-[62ch] text-muted">
-            Sahoda reads what you have added and suggests what it says about your business. It
-            changes nothing on its own. Every suggestion waits for you on the{' '}
+            Sahoda reads everything you have added and works out your promise, your voice and who
+            you are for, quoting the line it got each one from. It changes nothing on its own. Every
+            suggestion waits for your yes on the{' '}
             <Link
               href="/brain/resolve"
               className="font-[550] text-accent underline underline-offset-2"
             >
               resolution console
             </Link>
-            , with the passage it came from underneath it.
+            .
           </p>
         </div>
         <div className="max-narrow:w-full">
