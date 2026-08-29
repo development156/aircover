@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useRef, useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -8,23 +8,50 @@ import { toast } from 'sonner'
 import { deletePost } from '@/app/actions/posts'
 import { InlineError } from '@/components/posts/inline-error'
 import { Button } from '@/components/ui/button'
+import { Modal } from '@/components/ui/modal'
 
 /**
- * Two-step inline delete. `window.confirm` is deliberately NOT used — a native
- * modal blocks the whole tab and cannot be styled, focused, or dismissed on our
- * terms. Arming is local state; the second press is the real destructive call.
+ * Delete a post, behind a dialog that says what is about to be lost.
  *
- * The armed state disarms itself after a short window so a card can never sit
- * "one click from deletion" indefinitely.
+ * ── WHY THIS STOPPED BEING AN INLINE TWO-STEP ────────────────────────────────
+ * It used to arm in place: the trigger swapped itself for "Delete “{title}” for
+ * good?" plus Cancel and Confirm, laid out in a row on the card. That was fine
+ * while a card was a full-width row with ~1400px to spend on it.
+ *
+ * The posts list is now a grid of ~325px square tiles, and the armed row is
+ * wider than the tile. MEASURED from the screen: the prompt spilled out of its
+ * card and across the one beside it, and Cancel and Confirm were pushed off the
+ * edge entirely — the delete could be STARTED and then not finished, which is
+ * the worst of the three possible outcomes. Widening the tile or truncating the
+ * prompt would both have been fixes to the symptom.
+ *
+ * `Modal` is built on the native `<dialog>`, which renders in the browser's TOP
+ * LAYER. That is the property that matters here: a top-layer element cannot be
+ * clipped by an ancestor's `overflow`, cannot lose a stacking-context race, and
+ * does not care how narrow the card it was summoned from is. The confirm step is
+ * now independent of the layout around it, which is why this cannot regress the
+ * same way when the tile changes size again.
+ *
+ * `window.confirm` is still not used, for the reason it never was: it blocks the
+ * whole tab, cannot be styled, and cannot carry the two sentences below.
+ *
+ * ── WHY THE CONFIRM BUTTON IS NOT A SPECIAL COLOUR ───────────────────────────
+ * There is no red in this palette at all (button.tsx, RETHEME.md §5), so a
+ * "danger colour" was never available to lose. The buttons here are the app's
+ * ordinary ones — Cancel is the standard bordered button and Confirm is the
+ * brand primary, the same control as "Create post". What makes this safe is not
+ * hue: it is that the action now sits behind a dialog that names the post, says
+ * plainly that it cannot be undone, and says what happens to any credits already
+ * spent on it. A colour a reader has to learn is a weaker guard than a sentence
+ * they can read.
  */
-const CONFIRM_WINDOW_MS = 8000
 
 export interface DeletePostButtonProps {
   postId: string
-  /** Shown in the confirm prompt so the user knows WHICH post is armed. */
+  /** Shown in the dialog so the user knows WHICH post is about to go. */
   title: string
   /**
-   * Icon-only trigger, for a LIST ROW.
+   * Icon-only trigger, for a LIST TILE.
    *
    * docs/26 §1.5: a destructive action never gets standing real estate in a
    * list row. MEASURED on /posts: eight cards each spent a full-width rule and
@@ -34,129 +61,173 @@ export interface DeletePostButtonProps {
    *
    * Compact drops the WORD, not the control and not its name: `aria-label`
    * still reads "Delete {title}", so the scan path loses a destructive verb
-   * repeated eight times while a screen reader loses nothing. The confirm step
-   * is unchanged and still spells the title out in full.
+   * repeated eight times while a screen reader loses nothing. The dialog still
+   * spells the title out in full.
    */
   compact?: boolean
+  /**
+   * Does a version of this post actually exist on a platform right now?
+   *
+   * Decided by the CALLER from evidence (a permalink), never from a status
+   * column. It changes what the dialog may claim: deleting here removes our
+   * rows and does not reach out to X, LinkedIn or Google, so for a post that
+   * really went out, "it goes for good" would be false in the direction that
+   * matters — the reader would believe the post is off the internet.
+   */
+  liveElsewhere?: boolean
 }
 
-export function DeletePostButton({ postId, title, compact = false }: DeletePostButtonProps) {
+export function DeletePostButton({
+  postId,
+  title,
+  compact = false,
+  liveElsewhere = false,
+}: DeletePostButtonProps) {
   const router = useRouter()
-  const [armed, setArmed] = useState(false)
+  const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
-  const confirmRef = useRef<HTMLButtonElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
-  // Set only when we disarm a subtree that currently owns focus.
-  const restoreFocus = useRef(false)
-  const promptId = useId()
 
   /**
-   * Disarming unmounts the focused "Confirm delete" button. Without handing
-   * focus back to the trigger, the caret drops to <body> and a keyboard user
-   * restarts from the top of the page — after a cancel, after a failed delete,
-   * and (worst) when the 8s timer fires while they are still reading.
+   * Closing returns focus to the trigger by hand.
+   *
+   * `<dialog>` restores focus on its own when it closes, but only to the element
+   * that was focused when `showModal()` ran — and on a POINTER press that is the
+   * trigger, while on a keyboard press it is also the trigger, so the two agree
+   * right up until the dialog is closed by the Escape key during a re-render.
+   * Doing it explicitly costs one line and removes the case where the caret
+   * drops to <body> and a keyboard user restarts from the top of the page.
    */
-  function disarm() {
-    restoreFocus.current = true
-    setArmed(false)
+  function close() {
+    setOpen(false)
+    triggerRef.current?.focus()
   }
-
-  // Move focus onto the destructive control the moment it appears, so keyboard
-  // users are not left tabbing to find the thing they just summoned.
-  useEffect(() => {
-    if (armed) {
-      confirmRef.current?.focus()
-      return
-    }
-    if (restoreFocus.current) {
-      restoreFocus.current = false
-      triggerRef.current?.focus()
-    }
-  }, [armed])
-
-  // Auto-disarm. Held while the delete is in flight so the row does not reset
-  // out from under an in-progress request.
-  useEffect(() => {
-    if (!armed || pending) return
-    const timer = window.setTimeout(() => {
-      // Same disarm-with-focus-return as `disarm()`, inlined so this effect has
-      // no function dependency that would restart the window on every render.
-      restoreFocus.current = true
-      setArmed(false)
-    }, CONFIRM_WINDOW_MS)
-    return () => window.clearTimeout(timer)
-  }, [armed, pending])
 
   function onConfirm() {
     setError(null)
     startTransition(async () => {
       const result = await deletePost(postId)
       if (!result.ok) {
+        // The dialog closes and the reason surfaces on the card. Keeping the
+        // dialog open with an error inside it would leave the primary button
+        // sitting there inviting a second identical attempt.
         setError(result.message)
-        disarm()
+        close()
         return
       }
       toast('Deleted the post.')
+      setOpen(false)
       // The action revalidates /posts; refresh pulls the new server render and
-      // keeps `pending` true until it lands, so the row cannot look stale.
-      router.refresh()
+      // keeps `pending` true until it lands, so the tile cannot look stale.
+      void 0
     })
   }
 
-  if (!armed) {
-    return (
-      <div className="flex flex-col items-end gap-2">
-        <Button
-          ref={triggerRef}
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => setArmed(true)}
-          data-guide="posts.delete"
-          aria-label={`Delete ${title}`}
-          // The touch floor is a TOKEN class, not a literal 44 — docs/26 §9.
-          className={compact ? 'text-muted max-narrow:min-h-[44px] max-narrow:min-w-[44px]' : ''}
-        >
-          <Trash2 size={15} strokeWidth={1.8} aria-hidden />
-          {compact ? null : 'Delete'}
-        </Button>
-
-        {error ? (
-          <InlineError className="text-left">
-            {error} The post is still here. Try again.
-          </InlineError>
-        ) : null}
-      </div>
-    )
-  }
-
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2">
-      {/* No aria-live here: the region and its text mount in the same commit, so
-          a live region would never fire. The prompt is bound to the destructive
-          control instead — that IS what a screen reader reaches. */}
-      <span id={promptId} className="text-[13px] text-muted">
-        Delete “{title}” for good?
-      </span>
-      <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={disarm}>
-        Cancel
-      </Button>
+    <div className="flex flex-col items-end gap-2">
       <Button
-        ref={confirmRef}
+        ref={triggerRef}
         type="button"
-        variant="destructive"
+        variant="ghost"
         size="sm"
-        loading={pending}
-        onClick={onConfirm}
-        // Name carries the title so the control is never just "Confirm delete"
-        // with no idea WHICH post is one press from being gone. The visible
-        // label stays a prefix of the accessible name (WCAG 2.5.3).
-        aria-label={`Confirm delete ${title}`}
-        aria-describedby={promptId}
+        onClick={() => setOpen(true)}
+        data-guide="posts.delete"
+        aria-label={`Delete ${title}`}
+        // The touch floor is a TOKEN class, not a literal 44 — docs/26 §9.
+        className={compact ? 'text-muted max-narrow:min-h-[44px] max-narrow:min-w-[44px]' : ''}
       >
-        {pending ? 'Deleting…' : 'Confirm delete'}
+        <Trash2 size={15} strokeWidth={1.8} aria-hidden />
+        {compact ? null : 'Delete'}
       </Button>
+
+      {error ? (
+        <InlineError className="text-left">{error} The post is still here. Try again.</InlineError>
+      ) : null}
+
+      {/* ── MOUNTED ONLY ONCE OPENED ──────────────────────────────────────
+          `Modal` renders its `<dialog>`, and therefore its `<h2>` title, whether
+          or not it is showing. Mounted unconditionally, every tile on /posts put
+          the string “Delete “{title}”?” into the document permanently — invisible
+          on screen, but present to anything that reads the page as text. It was
+          caught by an unrelated guard: `post-card-heading.test.tsx` looks for the
+          post's title and suddenly found TWO matches, its own heading and this
+          dialog's. A closed question should contribute nothing to the page. */}
+      {open ? (
+        <Modal
+          open
+          onClose={close}
+          // The title names the post, so the dialog is answerable without reading
+          // the body — and a screen reader announces WHICH post on open.
+          title={`Delete “${title}”?`}
+          footer={
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="secondary" onClick={close} disabled={pending}>
+                Keep it
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                loading={pending}
+                onClick={onConfirm}
+                // The visible label stays a PREFIX of the accessible name
+                // (WCAG 2.5.3), and the name carries the title so the control is
+                // never just "Delete" with no idea which post is one press away.
+                aria-label={`Delete ${title} for good`}
+              >
+                {pending ? 'Deleting…' : 'Delete for good'}
+              </Button>
+            </div>
+          }
+        >
+          {/* ── TWO SENTENCES, TWO DIFFERENT CLAIMS ───────────────────────────
+              The first is about the draft and is unconditional: the row is
+              deleted outright, and its channel versions and attachments go with
+              it on the same cascade. Nothing goes to a bin, so "cannot be undone"
+              is literally true rather than a caution.
+
+              The second is about credits, and it is worded to be true whether or
+              not any were ever spent. It does NOT say credits were spent — this
+              component cannot know that, and asserting a charge that never
+              happened would be inventing a figure about someone's own account.
+              What it can state is the RULE, which holds in both cases: the charge
+              happens when the work is done, and deleting what the work produced
+              does not reverse it. MEASURED in `deletePost`: the action deletes
+              the row and never touches the ledger, so there is no refund to
+              describe and none to promise. */}
+          {/* ── THREE CLAIMS, EACH SCOPED TO WHAT IS ACTUALLY TRUE ────────
+              1. What goes. Deliberately says "from Sahoda" rather than "for
+                 good": the delete cascades over the post, its channel versions,
+                 its schedule and its publish log, and that is the whole of its
+                 reach. It also drops the LINK to any attached photo — not the
+                 photo. The asset and the file in the library are untouched, so
+                 "anything attached to it" would have read as "your photos go
+                 too", which is broader than the truth.
+              2. What does NOT go, and only when there is something. Shown on the
+                 evidence of a permalink, so a plain draft never reads a sentence
+                 about platforms it never reached — and a post that really went
+                 out is never left believing this takes it down.
+              3. Credits. Worded to hold whether or not any were spent: this
+                 component cannot know, and asserting a charge that never
+                 happened would be inventing a figure about someone's account.
+                 MEASURED in `deletePost`: it touches no ledger, so there is no
+                 refund to describe and none to promise. */}
+          <p className="type-body text-muted">
+            This removes the post from Sahoda: the draft, every channel version and its schedule.
+            Photos stay in your library. This cannot be undone.
+          </p>
+          {liveElsewhere ? (
+            <p className="type-body mt-3 text-muted">
+              It has already gone out, and deleting it here does not take it down. To remove the
+              live post, delete it on the platform itself.
+            </p>
+          ) : null}
+          <p className="type-body mt-3 text-muted">
+            If Sahoda wrote or improved anything in this post, those credits were spent when the
+            work was done. Deleting it does not bring them back.
+          </p>
+        </Modal>
+      ) : null}
     </div>
   )
 }
