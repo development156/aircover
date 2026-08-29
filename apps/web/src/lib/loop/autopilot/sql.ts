@@ -377,3 +377,27 @@ export const ANNOUNCED_FOR_PERSON_SQL = `select a.post_id,
    )
  order by a.dispatch_after asc
  limit $2`
+
+/**
+ * Which workspaces autopilot has anything to do for: those with at least one
+ * channel armed to level 3.
+ *
+ * ── WHY THE DIAL AND NOT loop_settings ───────────────────────────────────────
+ * A workspace can have opened the Loop, set a budget and a cap, and armed
+ * nothing. Scanning by settings would walk every Loop workspace on every tick
+ * to discover that most of them have no L3 channel — work proportional to the
+ * customers who are NOT using the feature.
+ *
+ * The dial is the fact that decides it, and today `AutonomyLevelSchema` refuses
+ * to write a 3 through the application at all, so this returns nothing in every
+ * environment. That is stated rather than relied upon: the route is gated by
+ * its own flag as well, because "the query happens to return nothing" is a
+ * property of today's data and a flag is a decision somebody made.
+ *
+ * Parameters: $1 row limit.
+ */
+export const AUTOPILOT_WORKSPACES_SQL = `select distinct workspace_id
+  from loop_channel_autonomy
+ where level = 3
+ order by workspace_id
+ limit $1`
