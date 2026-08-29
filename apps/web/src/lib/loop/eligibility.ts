@@ -56,6 +56,29 @@ export const PLANNABLE_STATUS = 'active'
 /** Statuses that mean "this was connected and no longer works" — reconnectable. */
 const LAPSED_STATUSES = new Set(['expired', 'revoked', 'error'])
 
+/**
+ * The Brand Brain, as eligibility needs it.
+ *
+ * `resolved` is whether an ACTIVE `brand_memory` row exists at all. It is the
+ * one that blocks: `packages/mesh` injects the brand prefix from that row and
+ * `brand-context.ts` returns null without it, so a workspace with no brain is
+ * planned for at the full price with a generic, ungrounded prompt — a week of
+ * posts about somebody's business written from nothing.
+ *
+ * `confirmed` out of `total` is the confirmation ring, and it does NOT block.
+ * MEASURED against production 2026-08-28: all five workspaces that have opened
+ * the Loop have an active brain, and four of them have zero confirmed fields.
+ * Refusing those would refuse almost the whole fleet for a state that is
+ * legitimate at L1, where a person reads every draft before it goes anywhere.
+ * It rides as an advisory instead. The confirmed FLOOR belongs to L3, where
+ * nobody is reading.
+ */
+export interface BrainFact {
+  resolved: boolean
+  confirmed: number
+  total: number
+}
+
 export interface LoopSettingsFact {
   paused: boolean
   weeklyBudgetCredits: number
@@ -78,6 +101,8 @@ export interface LoopFacts {
   openCycle: { id: string; status: string } | null
   /** The autonomy dial, per channel. Absent channels fall back to L1. */
   dial: readonly { channel: Channel; level: AutonomyLevel }[]
+  /** The Brand Brain. See `BrainFact` for which half blocks and which advises. */
+  brain: BrainFact
 }
 
 export type LoopRefusal =
@@ -87,6 +112,7 @@ export type LoopRefusal =
   | { reason: 'channel_lapsed'; lapsed: readonly Channel[] }
   | { reason: 'already_planned'; cycleId: string; isoYear: number; isoWeek: number }
   | { reason: 'insufficient_credits'; available: number; required: number }
+  | { reason: 'brain_not_resolved' }
 
 export type LoopRefusalReason = LoopRefusal['reason']
 
@@ -107,6 +133,14 @@ export interface LoopAdvisory {
   suggestOnly: boolean
   /** The lowest level across the workspace's connected channels. */
   governingLevel: AutonomyLevel
+  /**
+   * True when a brain exists but nobody has confirmed a single field of it.
+   *
+   * Not a refusal — see `BrainFact`. It is said out loud because the week will
+   * be written in a voice the model guessed and the customer has never agreed
+   * to, and a person who is told that reads the drafts differently.
+   */
+  brainUnconfirmed: boolean
 }
 
 export type LoopVerdict =
@@ -144,6 +178,12 @@ export function assess(facts: LoopFacts): LoopVerdict {
 
   if (facts.settings === null) return no({ reason: 'never_enabled' })
   if (facts.settings.paused) return no({ reason: 'paused' })
+
+  // Above the channel check, because it is the more foundational absence and
+  // the one the product's own onboarding resolves first: a brain is what every
+  // channel's posts are written FROM. Sending somebody to connect Instagram
+  // when Sahoda knows nothing about their business fixes the second problem.
+  if (!facts.brain.resolved) return no({ reason: 'brain_not_resolved' })
 
   const channels = facts.connections
     .filter((c) => c.status === PLANNABLE_STATUS)
@@ -201,7 +241,11 @@ export function assess(facts: LoopFacts): LoopVerdict {
     workspaceId: facts.workspaceId,
     channels: unique,
     weeklyBudgetCredits: facts.settings.weeklyBudgetCredits,
-    advisory: { suggestOnly: governingLevel === 0, governingLevel },
+    advisory: {
+      suggestOnly: governingLevel === 0,
+      governingLevel,
+      brainUnconfirmed: facts.brain.confirmed === 0,
+    },
   }
 }
 
@@ -228,26 +272,74 @@ function list(channels: readonly Channel[]): string {
  * would actually be wrong on somebody's screen.
  */
 export function explain(verdict: LoopVerdict): string {
+  // NO EM DASH IN ANY SENTENCE BELOW. These were written when the only reader
+  // was the cron's JSON, and they now render on /loop — where the founder's
+  // 2026-08-23 ruling applies: a dash joining two independent clauses becomes a
+  // full stop. The clauses are unchanged; splitting them costs no precision,
+  // which is the test that ruling has to pass.
   if (verdict.eligible) {
-    return verdict.advisory.suggestOnly
-      ? `Sahoda will plan your week for ${list(verdict.channels)}, as suggestions — every channel is set to suggest only.`
+    const plan = verdict.advisory.suggestOnly
+      ? `Sahoda will plan your week for ${list(verdict.channels)}, as suggestions. Every channel is set to suggest only.`
       : `Sahoda will plan your week for ${list(verdict.channels)}.`
+    // Said on the ELIGIBLE sentence rather than withheld: the week is going to
+    // be written in a voice the model guessed at, and a person who knows that
+    // reads the drafts differently. MEASURED 2026-08-28: four of the five
+    // workspaces that have opened the Loop are in this state.
+    return verdict.advisory.brainUnconfirmed
+      ? `${plan} Nothing in your Brand Brain is confirmed yet, so it will write in a voice it guessed at.`
+      : plan
   }
   switch (verdict.reason) {
     case 'never_enabled':
       return 'Turn the Loop on and Sahoda will plan your week every Sunday.'
     case 'paused':
-      return 'The Loop is paused — resume it and Sahoda will plan your next week.'
+      return 'The Loop is paused. Resume it and Sahoda will plan your next week.'
     case 'no_channel':
-      return 'Connect a channel first — Sahoda has nowhere to plan for.'
+      return 'Connect a channel first. Sahoda has nowhere to plan for.'
     case 'channel_lapsed': {
       const has = verdict.lapsed.length === 1 ? 'connection has' : 'connections have'
       const them = verdict.lapsed.length === 1 ? 'it' : 'them'
-      return `Your ${list(verdict.lapsed)} ${has} lapsed — reconnect ${them} and Sahoda has somewhere to plan for again.`
+      return `Your ${list(verdict.lapsed)} ${has} lapsed. Reconnect ${them} and Sahoda has somewhere to plan for again.`
     }
     case 'already_planned':
-      return `Sahoda already planned week ${verdict.isoWeek} of ${verdict.isoYear} — open it to review this week's briefs.`
+      return `Sahoda already planned week ${verdict.isoWeek} of ${verdict.isoYear}. Open it to review this week's briefs.`
     case 'insufficient_credits':
-      return `Planning a week costs ${credits(verdict.required)} and you have ${credits(verdict.available)} — top up and Sahoda will plan your next week.`
+      return `Planning a week costs ${credits(verdict.required)} and you have ${credits(verdict.available)}. Top up and Sahoda will plan your next week.`
+    case 'brain_not_resolved':
+      return 'Sahoda does not know your business yet. Build your Brand Brain and it can plan a week that sounds like you.'
+  }
+}
+
+/**
+ * WHERE A PERSON GOES TO FIX IT, and never anywhere that cannot fix it.
+ *
+ * Every remedy here is a route that exists and an action that can succeed from
+ * the state the reason describes. `no-impossible-remedy.spec.ts` walks the app
+ * as a fresh account and fails on the other kind — a reload offered for a
+ * missing workspace, a "connect" offered to somebody whose connection lapsed.
+ *
+ * The two in-page anchors are remedies too: the Loop's own controls and the
+ * cycle already on the screen. `already_planned` is the reason that most needs
+ * one, because its sentence says "open it" and the thing to open is further
+ * down the same page — a link to nowhere would make that sentence false.
+ *
+ * Null for an eligible verdict. There is nothing to remedy.
+ */
+export function remedy(verdict: LoopVerdict): { href: string; label: string } | null {
+  if (verdict.eligible) return null
+  switch (verdict.reason) {
+    case 'never_enabled':
+    case 'paused':
+      return { href: '#loop-controls', label: 'Turn the Loop on' }
+    case 'no_channel':
+      return { href: '/connections', label: 'Connect a channel' }
+    case 'channel_lapsed':
+      return { href: '/connections', label: 'Reconnect it' }
+    case 'already_planned':
+      return { href: '#loop-current', label: 'Review this week' }
+    case 'insufficient_credits':
+      return { href: '/wallet', label: 'Top up' }
+    case 'brain_not_resolved':
+      return { href: '/brain', label: 'Build your Brand Brain' }
   }
 }

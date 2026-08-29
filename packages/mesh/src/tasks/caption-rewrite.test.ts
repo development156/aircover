@@ -261,4 +261,28 @@ describe('captionRewriteTask brand grounding', () => {
       'the tasting menu',
     )
   })
+
+  /**
+   * docs/51 RULING 1: the Brand Brain has veto, the Marketing Brain has voice.
+   * Enforced here as reading order, which is the whole of the enforcement — so
+   * this assertion is the ruling, not a formatting preference.
+   */
+  it('puts the brand block ABOVE the market block, which is the arbitration rule', () => {
+    const brand = { role: 'system' as const, content: 'BRAND', cache: true }
+    const market = { role: 'system' as const, content: 'MEASURED' }
+    const messages = captionRewriteTask.buildMessages(input, ctx, brand, undefined, market)
+    const contents = messages.map((m) => m.content)
+    expect(contents.indexOf('BRAND')).toBeGreaterThan(-1)
+    expect(contents.indexOf('MEASURED')).toBeGreaterThan(contents.indexOf('BRAND'))
+  })
+
+  it('rewrites without observations when the workspace has none', () => {
+    const brand = { role: 'system' as const, content: 'BRAND', cache: true }
+    const messages = captionRewriteTask.buildMessages(input, ctx, brand)
+    expect(messages.some((m) => m.content === 'MEASURED')).toBe(false)
+  })
+
+  it('reads the Marketing Brain, because what shortens a caption should know what works', () => {
+    expect(captionRewriteTask.wantsMarketContext).toBe(true)
+  })
 })
