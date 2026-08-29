@@ -197,3 +197,38 @@ export function removePage(doc: DesignDocument, index: number): DesignDocument {
   if (!Number.isInteger(index) || index < 0 || index >= doc.pages.length) return doc
   return { ...doc, pages: doc.pages.filter((_, at) => at !== index) }
 }
+
+/**
+ * Move one slide to a different position.
+ *
+ * ── SLIDE ORDER IS MEANING, NOT PRESENTATION ────────────────────────────────
+ * A carousel is read in order: the hook is slide one and the offer is the last
+ * one. Until this existed a design could only grow at the end, so putting a
+ * slide anywhere but last meant deleting every slide after it and typing them
+ * again. That is not a missing convenience, it is a carousel editor that cannot
+ * arrange a carousel.
+ *
+ * ── THE CLAMP IS A REFUSAL, NOT A CORRECTION ────────────────────────────────
+ * A target past either end returns the document UNCHANGED, the same contract as
+ * `addPage` and `removePage`, rather than silently landing the slide at the end
+ * it was pushed against. Clamping reads as success to a caller and to a person:
+ * pressing "move right" on the last slide would flash the strip and change
+ * nothing, which is worse than a button that is plainly disabled.
+ *
+ * Moving a slide onto its own position is likewise unchanged, so a caller that
+ * fires on every drag frame cannot turn a no-op into a save.
+ */
+export function movePage(doc: DesignDocument, from: number, to: number): DesignDocument {
+  const last = doc.pages.length - 1
+  const inRange = (n: number) => Number.isInteger(n) && n >= 0 && n <= last
+  if (!inRange(from) || !inRange(to) || from === to) return doc
+
+  const pages = [...doc.pages]
+  // Removed first, then inserted at the target read against the SHORTENED
+  // array. That is what makes `to` mean "the position it ends up at" for both
+  // directions; splicing into the original indices moves a slide one place too
+  // far whenever it travels right.
+  const [moved] = pages.splice(from, 1)
+  pages.splice(to, 0, moved!)
+  return { ...doc, pages }
+}

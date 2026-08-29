@@ -13,6 +13,7 @@ import {
   slotLabelOf,
   templateById,
   imageIdOf,
+  movePage,
   removePage,
   slotKeysOf,
   type DesignDocument,
@@ -331,6 +332,31 @@ export function DesignEditor({
     })
   }
 
+  /**
+   * Move the slide being edited one place.
+   *
+   * The view follows it. A slide that moves while the editor keeps looking at
+   * the position it left would show a different slide's words in the fields
+   * somebody is typing in, which is the same defect as a stale preview.
+   *
+   * `movePage` refuses a target past either end by returning the same document,
+   * so the buttons are disabled there AND the rule holds underneath them.
+   */
+  function moveSlide(by: -1 | 1) {
+    const to = activeIndex + by
+    // Computed from `doc` rather than inside a `setDoc` updater: an updater
+    // that calls another setter is not pure, and React runs it twice in
+    // development to catch exactly that.
+    const next = movePage(doc, activeIndex, to)
+    if (next === doc) return
+    setDoc(next)
+    setPageAt(to)
+    // Announced, because somebody who is not watching the strip gets no other
+    // signal: the chips are the only thing that changed, and the fields keep
+    // the same words because the view follows the slide.
+    setNote(`Moved to slide ${to + 1} of ${doc.pages.length}.`)
+  }
+
   /** Remove the slide being edited. The last one cannot go; the button is absent there. */
   function removeSlide() {
     setNote(null)
@@ -461,14 +487,37 @@ export function DesignEditor({
             Add a slide
           </Button>
           {doc.pages.length <= 1 ? null : (
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={removeSlide}
-              disabled={saving || exporting}
-            >
-              Remove this slide
-            </Button>
+            <>
+              {/* Order is what a carousel MEANS: slide one is the hook and the
+                  last one is the offer. Without these a slide could only be put
+                  in the middle by deleting everything after it and typing it
+                  again. Disabled rather than hidden at the ends, so the pair
+                  does not move around under somebody's finger. */}
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => moveSlide(-1)}
+                disabled={activeIndex === 0 || saving || exporting}
+              >
+                Move left
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => moveSlide(1)}
+                disabled={activeIndex === doc.pages.length - 1 || saving || exporting}
+              >
+                Move right
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={removeSlide}
+                disabled={saving || exporting}
+              >
+                Remove this slide
+              </Button>
+            </>
           )}
           {doc.pages.length < MAX_CAROUSEL_PAGES ? null : (
             <span className="type-sm text-muted">

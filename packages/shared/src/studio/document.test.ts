@@ -8,6 +8,7 @@ import {
   blankDocument,
   imageIdOf,
   isCarousel,
+  movePage,
   removePage,
   slotOf,
   textOf,
@@ -265,5 +266,93 @@ describe('addPage and removePage', () => {
   test('two slides are a carousel and one is a post', () => {
     expect(isCarousel(doc(1))).toBe(false)
     expect(isCarousel(doc(2))).toBe(true)
+  })
+})
+
+/**
+ * ── MOVING A SLIDE ──────────────────────────────────────────────────────────
+ * Order is the carousel's meaning: slide one is the hook and the last one is
+ * the offer. The tests below are about WHERE each slide ends up, checked by the
+ * words on it, because a test that only counted pages would pass for a move
+ * that landed a slide one place off.
+ */
+describe('movePage', () => {
+  const keys = ['headline', 'detail'] as const
+
+  /** Four slides, each labelled with its starting position. */
+  const labelled = (): DesignDocument => {
+    let out = blankDocument('photo-bottom', keys)
+    for (let i = 1; i < 4; i += 1) out = addPage(out, keys)
+    return {
+      ...out,
+      pages: out.pages.map((page, index) => ({
+        slots: { ...page.slots, headline: { kind: 'text' as const, text: `page ${index}` } },
+      })),
+    }
+  }
+
+  const order = (doc: DesignDocument) => doc.pages.map((page) => textOf(page, 'headline'))
+
+  test('a slide moved right lands exactly where it was sent, not one short of it', () => {
+    // The trap this exists to catch: splicing into the ORIGINAL indices instead
+    // of the shortened array puts a right-moving slide one place too far left,
+    // and the page count is identical either way.
+    expect(order(movePage(labelled(), 0, 2))).toEqual(['page 1', 'page 2', 'page 0', 'page 3'])
+  })
+
+  test('a slide moved left lands where it was sent', () => {
+    expect(order(movePage(labelled(), 3, 1))).toEqual(['page 0', 'page 3', 'page 1', 'page 2'])
+  })
+
+  test('moving one step swaps a neighbouring pair and touches nothing else', () => {
+    expect(order(movePage(labelled(), 1, 2))).toEqual(['page 0', 'page 2', 'page 1', 'page 3'])
+  })
+
+  test('the slide keeps everything on it, not just its position', () => {
+    const four = labelled()
+    const withPicture: DesignDocument = {
+      ...four,
+      pages: four.pages.map((page, index) =>
+        index === 0 ? { slots: { ...page.slots, detail: { kind: 'image', assetId: 'a1' } } } : page,
+      ),
+    }
+    const moved = movePage(withPicture, 0, 3)
+    expect(imageIdOf(moved.pages[3]!, 'detail')).toBe('a1')
+  })
+
+  /**
+   * A target past either end is REFUSED, not clamped. Clamping reads as success
+   * and would make "move right" on the last slide change nothing while looking
+   * like it worked.
+   */
+  test('a target past either end changes nothing', () => {
+    const four = labelled()
+    expect(movePage(four, 0, 4)).toBe(four)
+    expect(movePage(four, 0, -1)).toBe(four)
+    expect(movePage(four, 4, 0)).toBe(four)
+    expect(movePage(four, -1, 0)).toBe(four)
+  })
+
+  test('a fractional index changes nothing', () => {
+    const four = labelled()
+    expect(movePage(four, 1.5, 0)).toBe(four)
+    expect(movePage(four, 0, 1.5)).toBe(four)
+  })
+
+  test('moving a slide onto itself changes nothing, so a drag cannot spend a save', () => {
+    const four = labelled()
+    expect(movePage(four, 2, 2)).toBe(four)
+  })
+
+  test('a single-slide design has nowhere to move to', () => {
+    const one = blankDocument('photo-bottom', keys)
+    expect(movePage(one, 0, 0)).toBe(one)
+  })
+
+  test('the document still parses, and still has every slide', () => {
+    const moved = movePage(labelled(), 0, 3)
+    expect(DesignDocumentSchema.safeParse(moved).success).toBe(true)
+    expect(moved.pages).toHaveLength(4)
+    expect(new Set(order(moved)).size).toBe(4)
   })
 })
