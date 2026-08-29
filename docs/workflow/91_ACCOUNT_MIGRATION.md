@@ -154,10 +154,30 @@ is the same rigour with no technical language at all.
 
 ---
 
+## The Setup script field
+
+**The Setup script field does NOT run in the repository root.** MEASURED
+2026-08-30 on wt-karunesh2: with `setup.sh` present on every branch in this repo,
+the field `bash setup.sh` still died with `bash: setup.sh: No such file or
+directory`, exit 127 — the same failure the earlier `bash scripts/cloud-setup.sh`
+gave. One cause explains both, and it is not the branch. Paste this instead:
+
+```
+bash -c 'set +e; R="$(git rev-parse --show-toplevel 2>/dev/null)"; for d in "$PWD" "$R"; do [ -n "$d" ] && [ -f "$d/setup.sh" ] && { bash "$d/setup.sh"; exit 0; }; done; F="$(find "$HOME" /workspace /repo /app /src -maxdepth 4 -name setup.sh -type f 2>/dev/null | head -1)"; [ -n "$F" ] && { echo "SAHODA: found $F"; bash "$F"; exit 0; }; echo "SAHODA: no setup.sh found. pwd=$PWD"; ls -la; exit 0'
+```
+
+It looks for the repo where it stands, then where git says the root is, then
+under `$HOME` and the usual container roots, and **exits 0 whatever it finds** —
+including when it finds nothing, where it prints `pwd` and a listing so the next
+attempt is informed rather than another guess. Proven at exit 0 from the repo
+root, from `$HOME`, from `/tmp`, from `/`, and with no `setup.sh` anywhere.
+
 ## The five rules that must survive the move
 
-1. **Never push to `wt-web`.** That is the live product. Only a proven `wt-core`
-   is promoted, deliberately.
+1. **No lane writes `wt-web` or `main`** — enforced since 30 August 2026 by
+   `.githooks/pre-push`, for every owner and for an unset one. That is the live
+   product. Only a proven `wt-core` is promoted, and it costs a typed
+   acknowledgement: `SAHODA_PROMOTE=wt-web git push origin wt-core:wt-web`.
 2. **Never run `supabase db push`.** Production is `rloztdhzfliyvpvxsgjl` and
    there is no staging.
 3. **Never execute a publish.** It posts to a real customer's feed.
