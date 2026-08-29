@@ -67,6 +67,7 @@ function rowsOf(n: number) {
     open_cycle_status: null,
     connections: [],
     dial: [],
+    brain_payload: null,
   }))
 }
 
@@ -81,6 +82,11 @@ function eligibleRows(n: number) {
     open_cycle_status: null,
     connections: [{ platform: 'instagram', status: 'active' }],
     dial: [{ channel: 'instagram', level: 1 }],
+    // A resolved brain, because `brain_not_resolved` refuses above the channel
+    // check and a workspace with a null payload is not eligible at all. Without
+    // this these twenty rows refuse and the pool test measures the wrong path —
+    // which is exactly what it did when the reason was added.
+    brain_payload: { field_meta: {} },
   }))
 }
 
