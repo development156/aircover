@@ -123,8 +123,12 @@ const ROUTES = [
   //   /remix            a priced batch that charges and refuses
   //   /leads            two doors, a public form and promote-from-inbox
   //   /brain/knowledge  a document library with counts of its own
-  //   /studio           still a roadmap screen, and therefore the MOST likely
-  //                     of the six to offer a remedy it cannot fulfil
+  //   /studio           BUILT on 2026-08-28, and it stays in this list rather
+  //                     than leaving it. The property is about remedies a
+  //                     screen offers, and a screen that can now DO things is
+  //                     more able to offer an impossible one, not less. Its
+  //                     empty state says "pick a layout above", which is a
+  //                     remedy on the same screen and therefore fulfillable.
   //
   '/playbooks',
   '/radar',

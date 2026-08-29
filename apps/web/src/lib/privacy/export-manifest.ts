@@ -23,8 +23,8 @@
  * production, and `forbidden-target.ts` refuses that on purpose — so it has
  * never run, and SEVEN tables were quietly missing from every export:
  *
- *   audience_snapshots · billing_profiles · invoices · loop_briefs ·
- *   loop_channel_autonomy · loop_cycles · loop_settings
+ *   audience_snapshots · billing_profiles · invoices · loop_autopilot_log ·
+ *   loop_briefs · loop_channel_autonomy · loop_cycles · loop_settings
  *
  * Four of those are the Loop's, which is a record of what a customer was charged
  * for and what Sahoda decided on their behalf. An export omitting them still
@@ -162,6 +162,11 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
     readability: 'no-read-policy',
     describes: 'whether your name is shown on your credit record',
   },
+  {
+    table: 'loop_autopilot_log',
+    readability: 'readable',
+    describes: 'every post autopilot decided to publish for you, and what it decided',
+  },
   { table: 'loop_briefs', readability: 'readable', describes: 'what the Loop planned each week' },
   {
     table: 'loop_channel_autonomy',
@@ -174,6 +179,11 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
     table: 'marketing_observations',
     readability: 'readable',
     describes: 'what Sahoda worked out about your marketing',
+  },
+  {
+    table: 'marketing_pass_runs',
+    readability: 'readable',
+    describes: 'when Sahoda last looked at your marketing, and what it was waiting for',
   },
   { table: 'memory_events', readability: 'readable', describes: 'changes to your Brand Brain' },
   { table: 'ops_credit_requests', readability: 'readable', describes: 'credit top-up requests' },
@@ -207,6 +217,16 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { table: 'site_pages', readability: 'readable', describes: 'the pages of your sites' },
   { table: 'site_sections', readability: 'readable', describes: 'the sections on those pages' },
   { table: 'sites', readability: 'readable', describes: 'your websites' },
+  { table: 'studio_designs', readability: 'readable', describes: 'the designs you made in Studio' },
+  {
+    table: 'studio_exports',
+    readability: 'readable',
+    // NOT "your exported pictures". The pictures themselves are rows in
+    // `assets`, already covered above, with the bytes in the bucket. This table
+    // holds only the LINK between a design and the file it became, which is a
+    // different fact and would be a false claim under the other sentence.
+    describes: 'which picture each design became',
+  },
   { table: 'subscriptions', readability: 'readable', describes: 'your plan' },
   { table: 'templates', readability: 'readable', describes: 'your saved templates' },
   { table: 'tour_progress', readability: 'readable', describes: 'which tours you have seen' },

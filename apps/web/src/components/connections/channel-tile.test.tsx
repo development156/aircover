@@ -250,3 +250,37 @@ describe('the coming-soon tile does not pretend to be pressable', () => {
     expect(tile.className).toMatch(/hover:-translate-y-px/)
   })
 })
+
+/**
+ * THE SENTENCE ON THE CARD FACE.
+ *
+ * It was removed on 2026-08-27 and restored on the founder's ruling the same
+ * day, clamped to two lines. The guard asserts the SENTENCE, not the class: a
+ * card that says what the platform is for is the claim, and `line-clamp-2` is
+ * one implementation of the height half of it.
+ *
+ * Details is mounted only while open, so a closed tile holds the blurb exactly
+ * once and the count below is a real check that it is on the FACE rather than
+ * hidden in a panel nobody opened.
+ */
+describe('the card face', () => {
+  it('states what the platform is for, in the catalogue’s own words', () => {
+    render(<ChannelTile entry={ENTRY.instagram} connections={[]} now={NOW} />)
+
+    const said = screen.getAllByText(ENTRY.instagram.blurb)
+    expect(said).toHaveLength(1)
+    // Inside the card, not inside a dialog: the reader gets it without pressing
+    // anything, which is the whole of the ruling.
+    expect(said[0]!.closest('article')).not.toBeNull()
+  })
+
+  it('bounds that sentence to two lines so a row of cards ends level', () => {
+    render(<ChannelTile entry={ENTRY.gbp} connections={[]} now={NOW} />)
+
+    // The one structural assertion in this file, and it earns its place: the
+    // removal argument was entirely about UNBOUNDED height over twenty cards, so
+    // the clamp is the reason the sentence is allowed back rather than a
+    // decoration on top of it.
+    expect(screen.getByText(ENTRY.gbp.blurb).className).toContain('line-clamp-2')
+  })
+})

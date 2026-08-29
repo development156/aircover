@@ -51,17 +51,33 @@ not a description somebody wrote down — it is a fact about how the database is
 holding a customer's data carries a `workspace_id` column, and the boundary between two customers is
 enforced by the database itself (PostgreSQL row-level security), not by the application.
 
-**MEASURED 2026-08-26: 52 tables.** They are listed in full in §3, and
+**MEASURED 2026-08-28: 56 tables.** They are listed in full in §3, and
 `packages/db/tests/data_handling_doc.pglite.test.ts` fails the build if that number or that list
-stops matching the database. (It read 49 on 2026-08-25, the figure this sentence carried until now;
-the three new ones are the library's folder system, `asset_folders`, `asset_folder_items` and
-`asset_smart_folders`. It read 48 on 2026-08-23; the forty-ninth was `marketing_observations`.)
+stops matching the database. (It read 52 on 2026-08-26, the figure this sentence carried until now.
+FOUR arrived on 2026-08-28 from three different lanes, which is why no lane's own figure — 53, 54
+and 53 again — was right: each counted only its own. Studio's `studio_designs` and
+`studio_exports`, which arrived when Studio stopped being a roadmap screen and started saving a
+customer's designs; `loop_autopilot_log`, which records what autopilot decided before it acted;
+and `marketing_pass_runs`, which records when Sahoda last looked at your marketing. It read 49 on
+2026-08-25; the three added then were the library's folder system, `asset_folders`,
+`asset_folder_items` and `asset_smart_folders`. It read 48 on 2026-08-23; the forty-ninth was
+`marketing_observations`.)
 
-> **Production holds 51 of those 52 today.** MEASURED against production on 2026-08-26 by counting
-> `public` base tables carrying a `workspace_id` column, not inferred from the migration list.
+> **Production holds 52 of those 56 today.** MEASURED against production on 2026-08-28 by counting
+> `public` base tables carrying a `workspace_id` column, not inferred from the migration list, and
+> re-taken at the merge rather than carried over — the reading below it moved when the last two
+> lanes both edited this paragraph.
 >
-> **Exactly one is missing: `ledger_actor_redactions`** (see §5), whose migration is written and
-> deliberately not applied.
+> **Four are missing, and all four are written-not-applied:** `loop_autopilot_log`,
+> `studio_designs`, `studio_exports` and `marketing_pass_runs`. MEASURED by asking the catalog for
+> each name at the integration, not carried over from any lane.
+> `supabase db push` needs a human, so a migration existing in this repository never means a table
+> exists in production.
+>
+> **`ledger_actor_redactions` is NO LONGER one of the missing.** This paragraph named it through
+> several revisions and that is now stale: it was applied some time between 2026-08-26 and
+> 2026-08-28, MEASURED by asking the catalog for it and getting it back. That is the third time this
+> one paragraph has gone out of date, and the reason the sentence below it exists.
 >
 > This paragraph said "47 of those 52" and named five unapplied tables an hour before this edit,
 > and it was wrong in both halves. `marketing_observations` had already been applied when that was
@@ -119,10 +135,12 @@ the table belongs to one identified workspace.
 | `knowledge_documents` | the documents you added to the knowledge library | `title` `content_sha256` `addressed_instructions` `created_by` | removed |
 | `leads` | enquiries from your site | `name` `email` `phone` `payload` | removed |
 | `ledger_actor_redactions` | whether your name is shown on your credit record | no direct identifiers | **kept** |
+| `loop_autopilot_log` | every post autopilot decided to publish for you, and what it decided | `account_id` | removed |
 | `loop_briefs` | what the Loop planned each week | `title` `body` | removed |
 | `loop_channel_autonomy` | how much the Loop may do on each channel | `created_by` | removed |
 | `loop_cycles` | every week the Loop ran | `created_by` | removed |
 | `loop_settings` | your Loop settings | no direct identifiers | removed |
+| `marketing_pass_runs` | when Sahoda last looked at your marketing, and what it was waiting for | no direct identifiers | removed |
 | `marketing_observations` | what Sahoda worked out about your marketing | no direct identifiers | removed |
 | `memory_events` | changes to your Brand Brain | no direct identifiers | removed |
 | `ops_credit_requests` | credit top-up requests | no direct identifiers | removed |
@@ -140,6 +158,8 @@ the table belongs to one identified workspace.
 | `site_pages` | the pages of your sites | `title` | removed |
 | `site_sections` | the sections on those pages | `content` | removed |
 | `sites` | your websites | `name` `created_by` | removed |
+| `studio_designs` | the designs you made in Studio | `title` `doc` `created_by` | removed |
+| `studio_exports` | which picture each design became | `created_by` via the asset | removed |
 | `subscriptions` | your plan | no direct identifiers | removed |
 | `templates` | your saved templates | `name` `body` `created_by` | removed |
 | `tour_progress` | which tours you have seen | `user_id` | removed |
@@ -254,7 +274,7 @@ back. Both are re-checked on the server and the name is checked a third time by 
 because the delete is an addressable endpoint whatever the screen does. Only the **owner** of a
 workspace can do it.
 
-**What is removed:** every row in all 52 tables except the four in the next paragraph, plus every
+**What is removed:** every row in all 56 tables except the four in the next paragraph, plus every
 file in storage, plus the encrypted keys for the linked social accounts, plus the sign-in profile of every member
 for whom this was their last workspace — not only the person who pressed the button.
 
@@ -651,10 +671,10 @@ would be doing the thing it warns about.
 - Every base table carrying a `workspace_id`, from the database's own catalogue, on every build.
 - Whether each one is in the export list, and whether its stated readability matches its actual
   policies.
-- One complete cycle: create a workspace, fill all 52 tables, delete it, and count what is left —
+- One complete cycle: create a workspace, fill all 56 tables, delete it, and count what is left —
   including a second workspace that must be untouched.
 - That a FAILED deletion leaves everything exactly as it was. A trigger is installed that refuses to
-  let one table go; the deletion raises, naming the table, and all 52 tables still hold every row.
+  let one table go; the deletion raises, naming the table, and all 54 tables still hold every row.
   This is the only thing that demonstrates "all or nothing" rather than asserting it.
 - Whether the deletion writes to the financial ledger. It does not, and that is asserted against the
   function's own source.
