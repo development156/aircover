@@ -5,6 +5,7 @@ import { bootFullSchema } from './helpers/pglite-tenant'
 
 import {
   ACTIVE_BRAIN_SQL,
+  ANNOUNCED_FOR_PERSON_SQL,
   CANCEL_ANNOUNCEMENT_SQL,
   ARM_FOR_PUBLISH_SQL,
   AUTOPILOT_CANDIDATES_SQL,
@@ -758,6 +759,110 @@ describe('the autopilot dispatcher SQL against the real schema', () => {
       expect(r.rows).toHaveLength(0)
       const still = await db.query<{ post_id: string }>(PENDING_ANNOUNCEMENTS_SQL, [WS, 50])
       expect(still.rows.map((x) => x.post_id)).toContain(theirs)
+    })
+  })
+
+  describe('what a person sees before it goes out', () => {
+    const shown = 'ca000000-0000-4000-8000-0000000000ca'
+    const variant = 'cb000000-0000-4000-8000-0000000000cb'
+
+    beforeAll(async () => {
+      await db.exec(`
+        insert into posts (id, workspace_id, title, status, channels, created_by)
+          values ('${shown}', '${WS}', 'Friday special', 'draft', '{x}', '${USER}');
+      `)
+      await db.query(WRITE_DECISION_SQL, [
+        WS,
+        shown,
+        variant,
+        'x',
+        'acct-7',
+        null,
+        null,
+        'announced',
+        null,
+        new Date('2030-01-01T09:30:00.000Z').toISOString(),
+      ])
+    }, 120_000)
+
+    it('names the post in the words the person wrote, not an id', async () => {
+      const r = await db.query<{ post_title: string; channel: string; dispatch_after: string }>(
+        ANNOUNCED_FOR_PERSON_SQL,
+        [WS, 50],
+      )
+      const row = r.rows.find((x) => x.post_title === 'Friday special')
+      expect(row).toBeDefined()
+      expect(row?.channel).toBe('x')
+      expect(row?.dispatch_after).not.toBeNull()
+    })
+
+    it('SHOWS a post whose window has closed, because the cancel still works on it', async () => {
+      // Hiding it while CANCEL_ANNOUNCEMENT_SQL will still stop it would be a
+      // screen withholding a remedy the product has.
+      const late = 'cc000000-0000-4000-8000-0000000000cc'
+      await db.exec(`
+        insert into posts (id, workspace_id, title, status, channels, created_by)
+          values ('${late}', '${WS}', 'Overdue one', 'draft', '{x}', '${USER}');
+      `)
+      await db.query(WRITE_DECISION_SQL, [
+        WS,
+        late,
+        variant,
+        'x',
+        'acct-7',
+        null,
+        null,
+        'announced',
+        null,
+        new Date('2020-01-01T00:00:00.000Z').toISOString(),
+      ])
+      const r = await db.query<{ post_title: string }>(ANNOUNCED_FOR_PERSON_SQL, [WS, 50])
+      expect(r.rows.map((x) => x.post_title)).toContain('Overdue one')
+    })
+
+    it('stops showing one that has been cancelled', async () => {
+      await db.query(CANCEL_ANNOUNCEMENT_SQL, [WS, shown, variant])
+      const r = await db.query<{ post_title: string }>(ANNOUNCED_FOR_PERSON_SQL, [WS, 50])
+      expect(r.rows.map((x) => x.post_title)).not.toContain('Friday special')
+    })
+
+    it('stops showing one that has been dispatched', async () => {
+      const sent = 'cd000000-0000-4000-8000-0000000000cd'
+      await db.exec(`
+        insert into posts (id, workspace_id, title, status, channels, created_by)
+          values ('${sent}', '${WS}', 'Already sent', 'draft', '{x}', '${USER}');
+      `)
+      await db.query(WRITE_DECISION_SQL, [
+        WS,
+        sent,
+        variant,
+        'x',
+        'acct-7',
+        null,
+        null,
+        'announced',
+        null,
+        new Date('2030-01-01T09:30:00.000Z').toISOString(),
+      ])
+      await db.query(WRITE_DECISION_SQL, [
+        WS,
+        sent,
+        variant,
+        'x',
+        'acct-7',
+        null,
+        null,
+        'dispatched',
+        null,
+        null,
+      ])
+      const r = await db.query<{ post_title: string }>(ANNOUNCED_FOR_PERSON_SQL, [WS, 50])
+      expect(r.rows.map((x) => x.post_title)).not.toContain('Already sent')
+    })
+
+    it("never shows another workspace's announcements", async () => {
+      const r = await db.query(ANNOUNCED_FOR_PERSON_SQL, [OTHER, 50])
+      expect(r.rows).toHaveLength(0)
     })
   })
 })

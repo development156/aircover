@@ -7,6 +7,7 @@ import type { AutopilotRefusal } from '@/lib/loop/autopilot-refusals'
 import type { AnnouncedPost } from './dispatch-due'
 import {
   ACTIVE_BRAIN_SQL,
+  ANNOUNCED_FOR_PERSON_SQL,
   ARM_FOR_PUBLISH_SQL,
   CANCEL_ANNOUNCEMENT_SQL,
   AUTOPILOT_CANDIDATES_SQL,
@@ -264,4 +265,40 @@ export async function cancelAnnouncement(
 ): Promise<boolean> {
   const r = await getPool().query(CANCEL_ANNOUNCEMENT_SQL, [workspaceId, postId, variantId])
   return r.rows.length > 0
+}
+
+/** One post autopilot has announced, in the words a person recognises. */
+export interface AnnouncedForPerson {
+  postId: string
+  variantId: string
+  channel: Channel
+  /** The title the person wrote. Never an id. */
+  postTitle: string
+  /** When the window closes. In the past for one the sweep has not reached. */
+  dispatchAfter: Date
+  announcedAt: Date
+}
+
+export async function readAnnouncedForPerson(
+  workspaceId: string,
+  limit = 50,
+): Promise<AnnouncedForPerson[]> {
+  const r = await getPool().query(ANNOUNCED_FOR_PERSON_SQL, [workspaceId, limit])
+  return (
+    r.rows as {
+      post_id: string
+      variant_id: string
+      channel: Channel
+      post_title: string
+      dispatch_after: string | Date
+      announced_at: string | Date
+    }[]
+  ).map((row) => ({
+    postId: row.post_id,
+    variantId: row.variant_id,
+    channel: row.channel,
+    postTitle: row.post_title,
+    dispatchAfter: new Date(row.dispatch_after),
+    announcedAt: new Date(row.announced_at),
+  }))
 }
