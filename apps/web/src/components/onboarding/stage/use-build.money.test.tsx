@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 import { useBuild } from './use-build'
-import { DEFAULT_COLORS, DEFAULT_DATA, type OnboardingData } from './store'
+import { DEFAULT_DATA, type OnboardingData } from './store'
 import type { DoorOutcome } from './door-outcome'
 
 /**
@@ -43,7 +43,7 @@ vi.mock('@/app/actions/theme', () => ({ saveWorkspaceTheme }))
 const DOOR: DoorOutcome = { kind: 'none' }
 
 function data(): OnboardingData {
-  return { ...DEFAULT_DATA, colors: { ...DEFAULT_COLORS }, name: 'Chai & Chapters' }
+  return { ...DEFAULT_DATA, name: 'Chai & Chapters' }
 }
 
 function build() {
