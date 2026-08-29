@@ -222,7 +222,19 @@ export function PostCard({
           <LiveStatusBadge postId={post.id} intent={post.intent} variants={variantStates} />
           {/* Icon-only. The row keeps the control and loses the standing verb;
               the accessible name still reads "Delete {title}". */}
-          <DeletePostButton postId={post.id} title={displayTitle} compact />
+          <DeletePostButton
+            postId={post.id}
+            title={displayTitle}
+            compact
+            // A PERMALINK is the evidence, not the intent. `post.intent` says
+            // what the author committed to; a permalink is the platform's own
+            // receipt that something is actually out there — the same rule
+            // `variant-status.ts` states for this field ("its presence is what
+            // makes it real"). The dialog uses this to decide whether deleting
+            // here leaves a live post standing somewhere else, and a claim that
+            // strong has to rest on evidence rather than on a status column.
+            liveElsewhere={variantStates.some((row) => row.permalink)}
+          />
         </div>
       </div>
 
