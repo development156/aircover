@@ -95,10 +95,24 @@ describe('the posts grid fold', () => {
     // Tailwind's defaults to `initial` and defines only `narrow` and `wide`, so
     // `sm:grid-cols-2` is a class that matches nothing and the grid quietly
     // stays one column. Asserting the names catches that at the source.
+    //
+    // ── AND THE FIRST ASSERTION HERE USED TO BE INERT ────────────────────────
+    // It read `toContain('grid')`, and `grid` is a substring of `gap-grid`, of
+    // `grid-cols-1` and of `space-y-grid`. An audit replaced the whole class
+    // list with `flex flex-col gap-grid narrow:grid-cols-2 wide:grid-cols-4` —
+    // a real stack regression, the exact defect the paragraph above says this
+    // test exists to catch — and all seven tests stayed green. The commit's own
+    // mutation only went red because it happened to delete the breakpoint
+    // classes too. So the display class is now read as a WHOLE TOKEN, and the
+    // two displays that would silently replace it are named and refused.
     const list = container.querySelector('ul')
-    expect(list?.className).toContain('grid')
-    expect(list?.className).toContain('narrow:grid-cols-2')
-    expect(list?.className).toContain('wide:grid-cols-4')
+    const classes = (list?.className ?? '').split(/\s+/)
+    expect(classes).toContain('grid')
+    expect(classes).not.toContain('flex')
+    expect(classes).not.toContain('space-y-grid')
+    expect(classes).toContain('grid-cols-1')
+    expect(classes).toContain('narrow:grid-cols-2')
+    expect(classes).toContain('wide:grid-cols-4')
   })
 
   test('keeps a hidden tile out of the accessibility tree entirely', () => {

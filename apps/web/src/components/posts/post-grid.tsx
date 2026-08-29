@@ -92,7 +92,10 @@ export function PostGrid({
           onClick={() => setExpanded((current) => !current)}
           aria-expanded={expanded}
           aria-controls={gridId}
-          className="type-meta surface-ring rounded-input px-3 py-2 text-muted transition-micro hover:bg-s2 hover:text-ink"
+          // `max-narrow:min-h-[44px]`: this project's touch floor is 44px and
+          // the button measured 40. The compact delete control on the same card
+          // already carries this; a new control must not be the exception.
+          className="type-meta surface-ring max-narrow:min-h-[44px] rounded-input px-3 py-2 text-muted transition-micro hover:bg-s2 hover:text-ink"
         >
           {expanded ? (
             'Show fewer'
