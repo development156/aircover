@@ -5,6 +5,9 @@ import { createMesh, planWeekTask } from '@sahoda/mesh'
 import { MESH_TASK_ACTION, toChannelSet, type AutonomyLevel, type Channel } from '@sahoda/shared'
 
 import { previewCost, priceBrief, cycleCost } from '@/lib/loop/cost'
+import { countConfirmedFields } from '@/lib/brand/confirmed-count'
+import { RING_DENOMINATOR } from '@/lib/brand/fields'
+import { LOOP_FACTS_SQL } from '@/lib/cron/loop-facts-sql'
 import { assess, explain, type LoopFacts, type LoopRefusalReason } from '@/lib/loop/eligibility'
 import { planningWeekFor, reflectionWindow } from '@/lib/loop/iso-week'
 import { isLoopRef, newLoopCycleRef } from '@/lib/loop/object-ref'
@@ -114,27 +117,8 @@ export async function runScheduledLoopCycles(
         open_cycle_status: string | null
         connections: { platform: string; status: string }[] | null
         dial: { channel: Channel; level: AutonomyLevel }[] | null
-      }>(
-        `select w.id as workspace_id,
-                s.paused,
-                s.weekly_budget_credits,
-                b.balance_total - b.balance_held as available_credits,
-                c.id     as open_cycle_id,
-                c.status as open_cycle_status,
-                (select coalesce(json_agg(json_build_object('platform', k.platform, 'status', k.status)), '[]')
-                   from connections k where k.workspace_id = w.id) as connections,
-                (select coalesce(json_agg(json_build_object('channel', d.channel, 'level', d.level)), '[]')
-                   from loop_autonomy d where d.workspace_id = w.id) as dial
-           from workspaces w
-           left join loop_settings  s on s.workspace_id = w.id
-           left join credit_balances b on b.workspace_id = w.id
-           left join loop_cycles    c on c.workspace_id = w.id
-                                     and c.iso_year = $1 and c.iso_week = $2
-                                     and c.status not in ('cancelled', 'failed')
-          order by w.id
-          limit $3`,
-        [week.isoYear, week.isoWeek, MAX_WORKSPACES_PER_TICK + 1],
-      )
+        brain_payload: unknown
+      }>(LOOP_FACTS_SQL, [week.isoYear, week.isoWeek, MAX_WORKSPACES_PER_TICK + 1])
     ).rows
 
     const considered = rows.slice(0, MAX_WORKSPACES_PER_TICK)
@@ -174,6 +158,15 @@ export async function runScheduledLoopCycles(
           ? { id: row.open_cycle_id, status: row.open_cycle_status ?? 'unknown' }
           : null,
         dial: row.dial ?? [],
+        // `brain_payload` is null when no ACTIVE brand_memory row exists, which
+        // is exactly what `brain_not_resolved` means. The confirmed count uses
+        // the same function /brain's ring uses, so the cron and the screen
+        // cannot report different fractions of one brain.
+        brain: {
+          resolved: row.brain_payload !== null && row.brain_payload !== undefined,
+          confirmed: countConfirmedFields(row.brain_payload),
+          total: RING_DENOMINATOR,
+        },
       }
 
       const verdict = assess(facts)
@@ -294,6 +287,9 @@ async function planOneWorkspace(
   }
   await store.setCycleStatus(cycleId, workspaceId, 'planning', {
     reflectSkipped: reflection.skippedNoHistory,
+    // Null when a learning WAS produced. Storing a reason then would be a
+    // record of a refusal that did not happen.
+    reflectReason: reflection.reason,
   })
 
   // ── PLAN — the only paid step, and the last one this route reaches. ─────
