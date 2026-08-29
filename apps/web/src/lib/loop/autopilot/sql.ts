@@ -401,3 +401,32 @@ export const AUTOPILOT_WORKSPACES_SQL = `select distinct workspace_id
  where level = 3
  order by workspace_id
  limit $1`
+
+/**
+ * One post's whole autopilot history, oldest first.
+ *
+ * ── WHY THE WHOLE HISTORY AND NOT THE LATEST ROW ─────────────────────────────
+ * The table is append-only: a cancellation is a new row rather than an edit, so
+ * the truth about a post is the sequence. `autopilotStatus` needs all of it to
+ * tell a stopped post from a pending one, and asking the database for "the
+ * latest" would push that judgement into SQL where the ordering rule is harder
+ * to see and impossible to unit test.
+ *
+ * Ordered here anyway, and ordered AGAIN in the reader. Not belt and braces:
+ * this ORDER BY is what makes the query's own output readable, and the sort in
+ * `autopilotStatus` is what makes the function correct for any caller,
+ * including one that assembles rows from somewhere else. A test forces the
+ * second by handing it rows out of order.
+ *
+ * Parameters: $1 workspace_id, $2 post_id, $3 variant_id.
+ */
+export const POST_AUTOPILOT_HISTORY_SQL = `select decision,
+       refusal_reason,
+       dispatch_after,
+       created_at,
+       actor
+  from loop_autopilot_log
+ where workspace_id = $1
+   and post_id = $2
+   and variant_id = $3
+ order by created_at asc`

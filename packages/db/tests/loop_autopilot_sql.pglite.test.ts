@@ -5,6 +5,7 @@ import { bootFullSchema } from './helpers/pglite-tenant'
 
 import {
   ACTIVE_BRAIN_SQL,
+  POST_AUTOPILOT_HISTORY_SQL,
   ANNOUNCED_FOR_PERSON_SQL,
   CANCEL_ANNOUNCEMENT_SQL,
   ARM_FOR_PUBLISH_SQL,
@@ -862,6 +863,82 @@ describe('the autopilot dispatcher SQL against the real schema', () => {
 
     it("never shows another workspace's announcements", async () => {
       const r = await db.query(ANNOUNCED_FOR_PERSON_SQL, [OTHER, 50])
+      expect(r.rows).toHaveLength(0)
+    })
+  })
+
+  describe("one post's whole autopilot history", () => {
+    const post = 'da000000-0000-4000-8000-0000000000da'
+    const variant = 'db000000-0000-4000-8000-0000000000db'
+
+    beforeAll(async () => {
+      await db.query(WRITE_DECISION_SQL, [
+        WS,
+        post,
+        variant,
+        'x',
+        'acct-3',
+        null,
+        null,
+        'announced',
+        null,
+        new Date('2030-01-01T09:30:00.000Z').toISOString(),
+      ])
+      await db.query(CANCEL_ANNOUNCEMENT_SQL, [WS, post, variant])
+    }, 120_000)
+
+    it('returns every row, oldest first, with the actor on each', async () => {
+      const r = await db.query<{ decision: string; actor: string }>(POST_AUTOPILOT_HISTORY_SQL, [
+        WS,
+        post,
+        variant,
+      ])
+      expect(r.rows.map((x) => x.decision)).toEqual(['announced', 'cancelled'])
+      expect(r.rows.map((x) => x.actor)).toEqual(['autopilot', 'person'])
+    })
+
+    it('carries the window on the announcement and null on the cancellation', async () => {
+      const r = await db.query<{ decision: string; dispatch_after: string | null }>(
+        POST_AUTOPILOT_HISTORY_SQL,
+        [WS, post, variant],
+      )
+      expect(r.rows[0]?.dispatch_after).not.toBeNull()
+      expect(r.rows[1]?.dispatch_after).toBeNull()
+    })
+
+    it('a post autopilot never touched returns NO ROWS, which is not a refusal', async () => {
+      const untouched = 'dc000000-0000-4000-8000-0000000000dc'
+      const r = await db.query(POST_AUTOPILOT_HISTORY_SQL, [WS, untouched, variant])
+      expect(r.rows).toHaveLength(0)
+    })
+
+    it('does not mix in another VARIANT of the same post', async () => {
+      // Two variants of one post are two different things to send, and two
+      // different things to stop. Merging their histories would show a
+      // cancellation over a variant nobody cancelled.
+      const other = 'dd000000-0000-4000-8000-0000000000dd'
+      await db.query(WRITE_DECISION_SQL, [
+        WS,
+        post,
+        other,
+        'gbp',
+        'acct-3',
+        null,
+        null,
+        'announced',
+        null,
+        new Date('2030-01-01T09:30:00.000Z').toISOString(),
+      ])
+      const r = await db.query<{ decision: string }>(POST_AUTOPILOT_HISTORY_SQL, [
+        WS,
+        post,
+        variant,
+      ])
+      expect(r.rows).toHaveLength(2)
+    })
+
+    it("never reads another workspace's rows", async () => {
+      const r = await db.query(POST_AUTOPILOT_HISTORY_SQL, [OTHER, post, variant])
       expect(r.rows).toHaveLength(0)
     })
   })
