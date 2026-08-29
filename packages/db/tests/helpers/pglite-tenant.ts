@@ -313,6 +313,34 @@ const SHAPE_OVERRIDES: Readonly<Record<string, Readonly<Record<string, string>>>
   asset_smart_folders: {
     query: `'{"mode": "all", "rules": [{"field": "description", "is": "missing"}]}'::jsonb`,
   },
+  /**
+   * The first override whose problem is not a CHECK at all: it is a FOREIGN KEY,
+   * and a composite one.
+   *
+   * `studio_exports` links a design to the asset it became, and BOTH links are
+   * paired with `workspace_id` — `(design_id, workspace_id)` and
+   * `(asset_id, workspace_id)` — so a row cannot attach across tenants. The
+   * ladder invents uuids, and an invented uuid satisfies neither, so the table
+   * went unseeded and the isolation suite reported it as unreadable by its own
+   * owner.
+   *
+   * A scalar subquery is the smallest thing that works: it BORROWS the rows the
+   * seeder has already made for this workspace. That is safe because
+   * `tenantTables` returns alphabetically and both `assets` and `studio_designs`
+   * sort before `studio_exports`, so both are present by the time this runs.
+   * `%WORKSPACE%` keeps each row inside its own tenant, which is the whole point
+   * of the composite keys being tested.
+   *
+   * `content_sha256` is here because `check (content_sha256 ~ '^[0-9a-f]{64}$')`
+   * is a shape no ladder rung produces. The same literal serves both workspaces:
+   * the unique key is `(design_id, content_sha256)` and the design differs per
+   * tenant, so there is no collision to design around.
+   */
+  studio_exports: {
+    design_id: `(select id from studio_designs where workspace_id = '%WORKSPACE%' limit 1)`,
+    asset_id: `(select id from assets where workspace_id = '%WORKSPACE%' limit 1)`,
+    content_sha256: `'${'0123456789abcdef'.repeat(4)}'`,
+  },
 }
 
 function candidates(

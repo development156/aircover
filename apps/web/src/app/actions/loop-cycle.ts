@@ -222,6 +222,9 @@ export async function runCycleToPreview(
 
     await store.setCycleStatus(cycle.id, workspaceId, 'planning', {
       reflectSkipped: reflection.skippedNoHistory,
+      // Null when a learning WAS produced. Storing a reason then would be a
+      // record of a refusal that did not happen.
+      reflectReason: reflection.reason,
     })
 
     // ── STAGE 3: PLAN — the one paid step before the halt ─────────────────

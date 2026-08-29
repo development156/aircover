@@ -128,7 +128,11 @@ describe('fitInBand', () => {
     }
     // Guard against a fit that "passes" by never cropping anything.
     expect(cropped).toBeGreaterThan(1000)
-  })
+    // 30s, not the 5s default. This is a property sweep over a wide grid of
+    // sizes, and it is genuinely CPU-bound. MEASURED 2026-08-27: it took 5224ms
+    // inside the full 5,734-test run and tripped the 5000ms default by 224ms.
+    // Nothing is weakened - every size in the sweep must still verify.
+  }, 30_000)
 
   test('an unbounded band never crops', () => {
     const band = intersectBands([X, LINKEDIN])

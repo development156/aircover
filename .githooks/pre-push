@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+#
+# Refuse a push to a shared branch from a lane that may only READ them.
+#
+# ── WHY THIS EXISTS ──────────────────────────────────────────────────────────
+# `wt-karunesh` is a build-and-try lane owned by someone who does not write
+# code. It may pull from anywhere and do anything to itself. It may NOT write to
+# `wt-core` (what the other lanes integrate into) or `wt-web` (what customers
+# get). Founder's ruling, 28 August 2026.
+#
+# That rule was first written as a sentence in a role card. A sentence is not a
+# control: a session that has been asked to "push it" at midnight will push it.
+# This puts the rule where the push happens.
+#
+# ── HOW IT DECIDES ───────────────────────────────────────────────────────────
+# The lane is named by `git config sahoda.owner`, which `/kickoff` pins at the
+# start of every session. Nothing here inspects the branch you happen to be on,
+# because a harness can move you to a `claude/...` branch you did not choose —
+# the OWNER is the durable fact.
+#
+# ── HOW TO INSTALL ───────────────────────────────────────────────────────────
+#   git config core.hooksPath .githooks
+#
+# `scripts/cloud-setup.sh` does it for cloud sessions.
+#
+# ── WHAT IT DOES NOT DO ──────────────────────────────────────────────────────
+# It cannot stop someone who edits this file, unsets the config, or pushes from
+# a clone that never installed the hook. It is a guard against habit and against
+# an obliging assistant, not against a determined person. The durable control is
+# GitHub branch protection, which this does not replace.
+
+set -euo pipefail
+
+OWNER="$(git config sahoda.owner 2>/dev/null || true)"
+
+# Only this lane is restricted. Every other lane pushes as before.
+if [ "$OWNER" != "karunesh" ]; then
+  exit 0
+fi
+
+PROTECTED='^refs/heads/(wt-core|wt-web|main)$'
+BLOCKED=''
+
+# pre-push receives: <local ref> <local sha> <remote ref> <remote sha>
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  [ -z "${remote_ref:-}" ] && continue
+  if printf '%s' "$remote_ref" | grep -Eq "$PROTECTED"; then
+    BLOCKED="$BLOCKED ${remote_ref#refs/heads/}"
+  fi
+done
+
+if [ -n "$BLOCKED" ]; then
+  cat >&2 <<MSG
+
+  ─────────────────────────────────────────────────────────────────────────
+  This push was stopped, and nothing was sent.
+
+  You were about to write to:$BLOCKED
+
+  Those are shared. "wt-core" is where everyone's work is combined, and
+  "wt-web" is the live product your customers use. Your lane can read from
+  both, and can never write to either.
+
+  Your own branch is yours completely — push to it as often as you like:
+
+      git push origin wt-karunesh
+
+  When your work is ready for the others, ask Divas to bring it in.
+  ─────────────────────────────────────────────────────────────────────────
+
+MSG
+  exit 1
+fi
+
+exit 0
