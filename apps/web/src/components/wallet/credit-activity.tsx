@@ -142,8 +142,15 @@ export function CreditActivity({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="type-h3 text-ink">Credit activity</h2>
+          {/* The founder's own sentence, asked for three times and used
+              verbatim. An earlier draft substituted "Every grant, hold, charge
+              and refund, newest first, with what caused it" — more specific,
+              and a substitution nobody requested. Specificity is worth having
+              where a vaguer line would hide something; here it hid nothing,
+              because the table below states every one of those words in its own
+              rows. The instruction wins. */}
           <p className="type-sm mt-0.5 max-w-[70ch] text-muted">
-            Every grant, hold, charge and refund, newest first, with what caused it.
+            Track how your credits are being used across your account.
           </p>
         </div>
         <label className="flex shrink-0 items-center gap-2 type-sm text-muted">
