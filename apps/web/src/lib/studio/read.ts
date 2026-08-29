@@ -2,6 +2,7 @@ import 'server-only'
 
 import { StudioDesignSchema, type StudioDesign } from '@sahoda/shared'
 
+import { signMediaPreviews } from '@/lib/posts/media-url'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { activeWorkspaceRead } from '@/lib/workspaces'
 
@@ -88,6 +89,79 @@ export async function readDesign(id: string): Promise<DesignRead> {
     // there and we cannot read it, and telling somebody their work is missing
     // when it is merely unreadable is the worse of the two wrong answers.
     return parsed.success ? { status: 'ok', design: parsed.data } : { status: 'unreadable' }
+  } catch {
+    return { status: 'unreadable' }
+  }
+}
+
+/**
+ * THE PICTURES A DESIGN CAN USE.
+ *
+ * The library's own live images, newest first, with a signed preview URL each.
+ * Signed URLs are for the PICKER, which is ordinary HTML; the renderer never
+ * sees one. A design stores an id and the bytes are resolved server-side at
+ * render time (`lib/studio/images.ts` argues why).
+ *
+ * ── FOUR ANSWERS, NOT TWO ───────────────────────────────────────────────────
+ * "no workspace", "we could not read your library", "your library has no
+ * pictures" and "here they are" are four different situations, and the middle
+ * two are the pair that gets conflated. A failed read shown as an empty library
+ * tells a person to go and upload photos they already have.
+ */
+export type StudioPhoto = { id: string; title: string | null; url: string | null }
+
+export type PhotoListRead =
+  { status: 'ok'; photos: StudioPhoto[] } | { status: 'no-workspace' } | { status: 'unreadable' }
+
+/** How many pictures the picker offers. The library screen is where a full one is browsed. */
+const PHOTO_LIMIT = 60
+
+export async function readStudioPhotos(): Promise<PhotoListRead> {
+  const workspace = await activeWorkspaceRead()
+  if (workspace.status === 'none') return { status: 'no-workspace' }
+  if (workspace.status !== 'ok') return { status: 'unreadable' }
+
+  try {
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase
+      .from('assets')
+      .select('id, title, storage_path')
+      .eq('workspace_id', workspace.workspace.id)
+      .eq('kind', 'image')
+      // Trashed files are excluded IN SQL rather than after the fact, so the
+      // limit above counts pictures a person can actually choose.
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .limit(PHOTO_LIMIT)
+
+    if (error || !data) return { status: 'unreadable' }
+
+    const rows = data.flatMap((row) =>
+      typeof row.id === 'string' && typeof row.storage_path === 'string'
+        ? [
+            {
+              id: row.id,
+              storage_path: row.storage_path,
+              title: typeof row.title === 'string' ? row.title : null,
+            },
+          ]
+        : [],
+    )
+
+    const signed = await signMediaPreviews(rows)
+    const urls = new Map(signed.map((preview) => [preview.id, preview.url]))
+
+    // A picture whose URL could not be signed is LISTED, with no thumbnail. The
+    // file is really there and choosing it works: the renderer reads bytes, not
+    // this URL. Dropping it would hide a usable photo over a preview.
+    return {
+      status: 'ok',
+      photos: rows.map((row) => ({
+        id: row.id,
+        title: row.title,
+        url: urls.get(row.id) ?? null,
+      })),
+    }
   } catch {
     return { status: 'unreadable' }
   }
