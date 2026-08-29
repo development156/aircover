@@ -58,6 +58,27 @@ export const MIN_GROUPS = 2
 export const MIN_LIFT = 0.25
 
 /**
+ * Distinct days the window must span before a comparison is worth making.
+ *
+ * ── THE GATE THE OTHER FOUR CANNOT COVER ─────────────────────────────────────
+ * Three posts per arm, two arms, a leader mean over ten and a lift over a
+ * quarter can ALL be satisfied by measurements taken on a single day. That is
+ * one afternoon: a post that happened to go out when somebody's audience was
+ * awake, a platform's reporting still settling, one share by one person with a
+ * large following. Every gate above counts POSTS, and none of them can tell six
+ * posts across six days from six posts across one.
+ *
+ * Three is the same floor the rest of the product already uses for the same
+ * reason: below three measured days there is no chart, because two points are a
+ * straight line between them and say nothing the number does not.
+ *
+ * `measured_on` is the day, so this counts distinct calendar days rather than
+ * rows: a post measured hourly for a day is one day of evidence, not
+ * twenty-four.
+ */
+export const MIN_MEASURED_DAYS = 3
+
+/**
  * The leader's own mean must reach this before a ratio between means means
  * anything.
  *
@@ -85,6 +106,8 @@ export type NoLearningReason =
   | 'too_few_posts'
   /** Enough posts, but they are all on one channel — there is no comparison. */
   | 'single_group'
+  /** Enough posts, but they were all measured inside too short a window. */
+  | 'too_few_days'
   /** A comparison was possible and the gap was not big enough to be worth saying. */
   | 'difference_too_small'
   /** The numbers involved are too small for a ratio between them to mean anything. */
@@ -186,6 +209,17 @@ export function reflect(
     return { learnings: [], reason: 'single_group', skippedNoHistory: false }
   }
 
+  // ── GATE 2b: the window must be wide enough to be a week, not an afternoon ─
+  // AFTER the post gates, deliberately. With too few posts the binding
+  // constraint is that the customer has not published enough, and telling them
+  // to wait would be the wrong instruction; with enough posts across one day,
+  // waiting is exactly the remedy. Same doctrine as the eligibility reasons:
+  // report the thing that has to be fixed first.
+  const days = windowDays(relevant)
+  if (days < MIN_MEASURED_DAYS) {
+    return { learnings: [], reason: 'too_few_days', skippedNoHistory: false }
+  }
+
   const leader = eligible[0]
   const runnerUp = eligible[1]
   // `noUncheckedIndexedAccess` is on, and it is right to insist: the length
@@ -221,10 +255,47 @@ export function reflect(
         lift: Math.round(lift * 10) / 10,
         postIds: [...leader.postIds, ...runnerUp.postIds],
         sampleSize: leader.n + runnerUp.n,
-        windowDays: windowDays(relevant),
+        windowDays: days,
       },
     ],
     reason: null,
     skippedNoHistory: false,
+  }
+}
+
+/**
+ * WHAT THE CYCLE SUMMARY SAYS ABOUT REFLECT, ONE SENTENCE PER REASON.
+ *
+ * ── WHY THESE ARE SIX SENTENCES AND NOT ONE ──────────────────────────────────
+ * "Sahoda had nothing to reflect on" and "Sahoda reflected and found nothing
+ * worth saying" are different claims about a customer's business, and only one
+ * of them is an admission that this product has no history for them yet. The
+ * screen used to make the second claim in every case except `no_history`,
+ * because the reason was not stored.
+ *
+ * Each says what was MEASURED and what was not, and none of them offers a
+ * remedy that cannot work: none of these states is fixed by pressing anything,
+ * so none of them asks a person to.
+ *
+ * `null` is returned for a reason this build does not know, which is what a
+ * cycle written before `reflect_reason` existed carries. A sentence invented
+ * for an unrecognised value would be a claim no query behind it made.
+ */
+export function reflectSentence(reason: string | null): string | null {
+  switch (reason) {
+    case 'no_history':
+      return 'It had nothing to reflect on. No post of yours has been measured yet, so there was nothing to learn from.'
+    case 'too_few_posts':
+      return 'It read your numbers and left them alone. Too few of your posts have been measured for a comparison to mean anything.'
+    case 'single_group':
+      return 'It read your numbers and left them alone. Everything measured so far is on one channel, so there was nothing to compare it with.'
+    case 'too_few_days':
+      return 'It read your numbers and left them alone. Everything measured so far falls inside a couple of days, which is too short a stretch to tell a pattern from a good afternoon.'
+    case 'numbers_too_small':
+      return 'It read your numbers and left them alone. The figures involved are still small enough that the difference between them could be one person opening a post.'
+    case 'difference_too_small':
+      return 'It compared your channels and found them close enough that the gap is not worth acting on.'
+    default:
+      return null
   }
 }

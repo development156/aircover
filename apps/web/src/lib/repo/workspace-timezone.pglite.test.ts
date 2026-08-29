@@ -31,7 +31,13 @@ describe('workspaces.timezone', () => {
 
   beforeAll(async () => {
     db = await bootFullSchema()
-  })
+    // 60s, not the 10s default. This hook boots a real Postgres before the
+    // suite runs. MEASURED 2026-08-27 in the full 5,734-test run: "Hook timed
+    // out in 10000ms" with ZERO tests failed and the skip count jumping - the
+    // signature of a starved worker, not a broken assertion. It passes alone
+    // every time. Sibling PGlite suites already budget explicitly (zernio
+    // webhook-* at 120_000); these two were left on the default.
+  }, 60_000)
 
   beforeEach(async () => {
     await db.exec('begin')
@@ -103,9 +109,22 @@ describe('workspaces.timezone', () => {
 describe('the three intake columns', () => {
   let db: PGlite
 
+  /**
+   * The SAME 60s budget as the block above, and for the same reason. `eb5224bf`
+   * raised that one and left this one on the 10s default, which is why the file
+   * kept failing after the fix that was supposed to settle it.
+   *
+   * MEASURED 2026-08-28, full `@sahoda/web` run: "Hook timed out in 10000ms" on
+   * THIS block — the default, not the 60s the file appears to carry — with zero
+   * tests failed and the whole file green in isolation, 34 of 34.
+   *
+   * Two describes, two `beforeAll`s, two Postgres boots. Budgeting a file means
+   * budgeting every hook in it; a per-file reading of that commit misses the
+   * sibling, and the failure then looks like a different bug each run.
+   */
   beforeAll(async () => {
     db = await bootFullSchema()
-  })
+  }, 60_000)
 
   beforeEach(async () => {
     await db.exec('begin')

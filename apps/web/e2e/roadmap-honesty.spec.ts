@@ -5,7 +5,27 @@ import { expect, test } from './fixtures/seeded-user'
 import { leaveOnboarding } from './fixtures/compose'
 
 /**
- * THE ONE ROADMAP SECTION SHOWS NO FIGURE ABOUT THE READER'S BUSINESS.
+ * THE FIVE ROADMAP SECTIONS SHOW NO FIGURE ABOUT THE READER'S BUSINESS.
+ *
+ * ── /studio LEFT ON 2026-08-28, BECAUSE IT WAS BUILT ────────────────────────
+ * It was the only entry, and removing it would have emptied the list and made
+ * the scan below iterate nothing while reporting green — the exact failure mode
+ * this file exists to catch. So the list was REPOINTED at the roadmap screens
+ * that are still drawings rather than left empty.
+ *
+ * The five `/ads/*` screens quote no price at all (MEASURED: no `creditCost`
+ * call in any of them), so each carries an EMPTY allow-list: they may show no
+ * figure whatsoever. `/radar` is deliberately NOT here — it quotes
+ * `creditCost('radar_scan')` and carries no roadmap banner, because it was
+ * built, and it left this list earlier for the same reason `/studio` has now.
+ *
+ * `/studio` renders saved rows: a gallery, a preview drawn by the same function
+ * that writes the exported PNG, and an editor. It cannot say "coming soon"
+ * because that sentence became false. What replaced this guard for that screen
+ * is NARROWER and stronger, because it asserts PROVENANCE rather than a
+ * permitted set of digits: `app/(app)/studio/page.test.tsx` requires the four
+ * kinds of nothing to stay distinguishable, and has been watched fail against a
+ * read failure that claimed the person had no designs.
  *
  * ── THE NUMBER IN THAT SENTENCE IS PART OF THE TEST, AND IT HAD DRIFTED ─────
  * It read SEVEN while `ALLOWED` held six: `/brain/audience` left in the same
@@ -179,7 +199,14 @@ const ALLOWED: ReadonlyArray<readonly [string, readonly number[]]> = [
   // THE PER-SCAN PRICE IT QUOTES IS NOW UNCHECKED BY THIS FILE. That is the cost
   // of the removal and it is stated rather than absorbed: `/radar` invents no
   // figure today, and nothing here will notice if it starts.
-  ['/studio', [price('carousel')]],
+  // Each allows NOTHING: these five quote no price, so any digit on them is one
+  // they invented. `/studio` used to sit here allowing `price('carousel')`; it
+  // was built on 2026-08-28 and no longer quotes a figure at all.
+  ['/ads', []],
+  ['/ads/creative', []],
+  ['/ads/targeting', []],
+  ['/ads/budget', []],
+  ['/ads/performance', []],
   // `/brain/audience` IS NOT IN THIS LIST ANY MORE, and the removal is the point
   // rather than a loosening. This guard exists to stop screens that are DRAWINGS
   // from inventing figures. That tab is no longer a drawing: it reads
@@ -232,6 +259,15 @@ test.describe('the roadmap sections invent nothing @smoke', () => {
       .click()
     await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
     await leaveOnboarding(page)
+
+    // ── A SCAN OVER AN EMPTY LIST IS NOT A PASS ──────────────────────────
+    // If the last roadmap screen is ever built, this loop iterates zero times
+    // and reports green forever, which is the failure mode it exists to catch.
+    // It says so instead. Retire this file, or give it a route.
+    expect(
+      ALLOWED.length,
+      'every roadmap section has been built, so this scan guards nothing. Retire this file or add a route.',
+    ).toBeGreaterThan(0)
 
     const problems: string[] = []
 

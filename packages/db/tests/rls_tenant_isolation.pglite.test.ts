@@ -125,6 +125,13 @@ const EXPECTED_OPERATOR_ONLY = [
   // still reads exactly their own observations and an operator reads all of
   // them. This guard failing is what made the operator policy a decision.
   'marketing_observations',
+  // Added 2026-08-28 with migration 20260828060000, and this guard failing is
+  // again what made it a decision. `marketing_pass_runs` is the record of the
+  // brain having LOOKED, so it inherits the reason above verbatim: the store is
+  // hidden from customers, /admin is the only window, and an operator who
+  // cannot see which workspaces the Sunday pass reached cannot tell a pass that
+  // skipped a tenant from one that examined it and found nothing.
+  'marketing_pass_runs',
 ]
 
 /**
@@ -371,6 +378,14 @@ describe('every append-only table refuses a direct mutation', () => {
     // `knowledge_documents` deliberately has NO trigger — a document is a living
     // row — so it is correctly absent from this list.
     'knowledge_chunks',
+    // Added deliberately 2026-08-28, which is what this list's own failure
+    // message asks for. `loop_autopilot_log` records what autopilot decided
+    // BEFORE it acted, on the one path where nobody was watching. A cancellation
+    // is a new row rather than an edit, so the fact that a post was going out at
+    // 09:00 stays true after somebody stops it — an audit trail that can rewrite
+    // its own history is not one
+    // (20260828130000_loop_autopilot_log.sql).
+    'loop_autopilot_log',
     'ops_audit_log',
     'post_metric_snapshots',
     'post_publish_logs',

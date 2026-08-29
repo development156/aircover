@@ -19,13 +19,29 @@ import type { BrowserContext } from '@playwright/test'
  *
  * ── THE TWO THINGS THAT MATTER, BOTH LEARNED THE HARD WAY ───────────────────
  *
- * 1 · LOOPBACK MUST NOT BE INTERCEPTED.
- *    Chromium reaches `http://127.0.0.1` fine even in the sandbox. Routing the
- *    app's own requests through Node gains nothing and cost a real failure: the
- *    Clerk ticket redirect to `http://127.0.0.1:PORT/sign-in?__clerk_ticket=…`
- *    was intercepted, the refetch did not reproduce it, and the abort surfaced
- *    as `net::ERR_FAILED` on a LOCALHOST url — which reads like a dead server,
- *    not like an over-eager router.
+ * 1 · LOOPBACK IS INTERCEPTED TOO, AND A LOOPBACK ERROR IS USUALLY A LIE.
+ *    This note used to say the opposite: loopback goes straight to Chromium,
+ *    because Chromium reaches `http://127.0.0.1` fine. The first half is true.
+ *    The conclusion was wrong, and it cost two days of chasing a phantom.
+ *
+ *    MEASURED 2026-08-27, through a logging TCP proxy in front of the dev
+ *    server. Chromium loads a static server on `127.0.0.1:3198` with 200 and
+ *    the Next dev server on `127.0.0.1:3100` with ERR_CONNECTION_RESET, so the
+ *    fault looks like loopback, or like Next. It is neither. The request
+ *    REACHES Next; Clerk's middleware answers
+ *
+ *      307 → https://<fapi>.clerk.accounts.dev/v1/client/handshake?…
+ *
+ *    and Chromium follows THAT hop on its own socket, which is the network that
+ *    does not work. Playwright reports the failure against the URL the
+ *    navigation started at, so an https reset is printed as
+ *    `net::ERR_CONNECTION_RESET at http://127.0.0.1:3100/sign-in`.
+ *
+ *    So the rule is symmetric with note 5: whoever can make the hop, makes it.
+ *    Every request goes through Node; the chain is handed BACK to Chromium the
+ *    moment its next hop is loopback, and picked up again the moment that hop
+ *    redirects out. Node carries the browser's own `Cookie` header on each
+ *    request, so the app sees the same session Chromium does.
  *
  * 2 · IT MUST USE NODE'S OWN fetch, NEVER Playwright's APIRequestContext.
  *    `request.newContext()` looks independent and is not. Inside the test
@@ -181,20 +197,30 @@ function isLoopback(rawUrl: string): boolean {
 }
 
 /**
- * Route every non-loopback request in `context` through Node. Idempotent and
- * safe to call when not needed — it installs nothing unless asked.
+ * Route every request in `context` through Node, loopback included (note 1),
+ * handing each hop back to Chromium the moment its target is loopback (note 5).
+ * Idempotent and safe to call when not needed: it installs nothing unless asked.
  */
 export async function installNodeTransport(context: BrowserContext): Promise<void> {
   if (!nodeTransportRequested()) return
 
+  /** Put this response's Set-Cookie headers into the browser's jar. */
+  const applyCookies = async (resp: Response, forUrl: string): Promise<void> => {
+    const setCookies = resp.headers.getSetCookie()
+    if (setCookies.length === 0) return
+    const parsed = setCookies
+      .map((c) => parseSetCookie(c, forUrl))
+      .filter((c): c is NonNullable<typeof c> => c !== null)
+    if (parsed.length === 0) return
+    try {
+      await context.addCookies(parsed)
+    } catch (e) {
+      console.error(`[node-transport] addCookies failed :: ${String(e).slice(0, 120)}`)
+    }
+  }
+
   await context.route('**/*', async (route) => {
     const req = route.request()
-
-    // See note 1 above. Loopback goes straight to Chromium, untouched.
-    if (isLoopback(req.url())) {
-      await route.continue()
-      return
-    }
 
     try {
       // Clerk's bot protection needs `__clerk_testing_token` on every FAPI call.
@@ -223,17 +249,78 @@ export async function installNodeTransport(context: BrowserContext): Promise<voi
       const post = method === 'GET' || method === 'HEAD' ? null : req.postDataBuffer()
       const body = post ? new Uint8Array(post) : undefined
 
-      // Node's OWN fetch. See note 2 — this is the whole point of the helper.
-      const resp = await fetch(url, {
-        method,
+      /**
+       * ── THE CHAIN IS FOLLOWED IN NODE, ONE HOP AT A TIME ──────────────────
+       * Note 5 above ruled out `redirect: 'manual'` — handing a 3xx back makes
+       * Playwright follow it on the BROWSER's socket without re-entering this
+       * route, straight onto the network that does not work. It ruled that out
+       * correctly, and it named this as the fix if a flow ever needed it:
+       * "follow the chain manually in Node".
+       *
+       * A flow does. MEASURED 2026-08-27, every Clerk-authenticated spec:
+       *
+       *   TypeError: fetch failed | cause: redirect count exceeded
+       *
+       * `redirect: 'follow'` chases the WHOLE chain inside Node, and the Clerk
+       * handshake's chain comes back to the app on loopback. Node fetches that
+       * hop with no browser cookie jar, so the app sees no session, redirects to
+       * Clerk again, and the two bounce until Node's 20-redirect ceiling. Every
+       * signed-in spec died on it, and the message named neither the loop nor
+       * the host.
+       *
+       * ── SO THE RULE IS ABOUT WHERE THE NEXT HOP GOES, NOT ABOUT REDIRECTS ──
+       * A remote hop is ours: Chromium cannot reach it, so Node follows.
+       * A LOOPBACK hop is the browser's: Chromium reaches it perfectly well and
+       * is the only party holding the session cookies. So the 3xx is handed back
+       * the moment its target is loopback, and Chromium takes it from there.
+       *
+       * That is not a softening of note 5. Note 5 is about handing back a hop
+       * Chromium cannot make; this hands back only the hop it can.
+       */
+      let current = url
+      let hopMethod = method
+      let hopBody = body
+      let resp = await fetch(current, {
+        method: hopMethod,
         headers,
-        body,
-        // See note 5. Chromium follows redirects itself and re-enters this
-        // handler, so every hop's cookies are applied in order.
-        // See note 5. Node MUST follow; handing a 3xx back is fatal.
-        redirect: 'follow',
+        body: hopBody,
+        redirect: 'manual',
         signal: AbortSignal.timeout(30_000),
       })
+
+      for (let hop = 0; hop < 20; hop += 1) {
+        const location =
+          resp.status >= 300 && resp.status < 400 ? resp.headers.get('location') : null
+        if (location === null) break
+
+        const next = new URL(location, current).toString()
+
+        /**
+         * Cookies from THIS hop, before moving on. Note 5 recorded the loss of
+         * intermediate-hop cookies as an accepted cost of `follow`; following by
+         * hand removes the cost rather than accepting it, and Clerk's handshake
+         * is precisely a flow that sets one mid-chain.
+         */
+        await applyCookies(resp, current)
+
+        // The browser's hop. Hand the 3xx back and stop — see above.
+        if (isLoopback(next)) break
+
+        // 303 always becomes GET; 301 and 302 do so for anything but GET/HEAD,
+        // which is what every agent does in practice. 307 and 308 preserve both.
+        if (resp.status === 303 || (resp.status !== 307 && resp.status !== 308)) {
+          hopMethod = 'GET'
+          hopBody = undefined
+        }
+        current = next
+        resp = await fetch(current, {
+          method: hopMethod,
+          headers,
+          body: hopBody,
+          redirect: 'manual',
+          signal: AbortSignal.timeout(30_000),
+        })
+      }
 
       const out: Record<string, string> = {}
       resp.headers.forEach((v, k) => {
@@ -243,27 +330,32 @@ export async function installNodeTransport(context: BrowserContext): Promise<voi
       const outBody = Buffer.from(await resp.arrayBuffer())
       // See note 4. Do this BEFORE fulfilling, so the cookie is in the jar by
       // the time the page reacts to the response.
-      const setCookies = resp.headers.getSetCookie()
-      if (setCookies.length > 0) {
-        const parsed = setCookies
-          .map((c) => parseSetCookie(c, url))
-          .filter((c): c is NonNullable<typeof c> => c !== null)
-        if (parsed.length > 0) {
-          try {
-            await context.addCookies(parsed)
-          } catch (e) {
-            console.error(`[node-transport] addCookies failed :: ${String(e).slice(0, 120)}`)
-          }
-        }
-      }
+      await applyCookies(resp, current)
 
       await route.fulfill({ status: resp.status, headers: out, body: outBody })
     } catch (err) {
       // Say WHY. A silently aborted request surfaces 30 seconds later as a
       // timeout on an unrelated assertion, which is how this helper's first two
       // defects hid for a full day.
+      /**
+       * ── AND SAY WHY *THAT* HAPPENED, WHICH `String(err)` DOES NOT ──────────
+       * Node's fetch reports every network failure as the same five words:
+       * `TypeError: fetch failed`. The reason — DNS, TLS, a reset, a proxy
+       * refusal — is on `err.cause` and nowhere else, and stringifying the error
+       * throws it away. MEASURED 2026-08-27: a Clerk handshake aborted with that
+       * exact message while Node fetched the SAME host from the same box with a
+       * 400, and the log could not tell the two apart.
+       *
+       * That is the defect this catch block was written to prevent, one level
+       * further in.
+       */
+      const cause = (err as { cause?: unknown }).cause
+      const why =
+        cause === undefined
+          ? ''
+          : ` | cause: ${String((cause as Error)?.message ?? cause).slice(0, 160)}`
       console.error(
-        `[node-transport] ABORT ${req.method()} ${req.url().slice(0, 90)} :: ${String(err).slice(0, 140)}`,
+        `[node-transport] ABORT ${req.method()} ${req.url().slice(0, 90)} :: ${String(err).slice(0, 140)}${why}`,
       )
       await route.abort()
     }

@@ -15,6 +15,9 @@ function facts(over: Partial<LoopFacts> = {}): LoopFacts {
     settings: { paused: false, weeklyBudgetCredits: 150 },
     connections: [{ platform: 'instagram', status: 'active' }],
     availableCredits: 1260,
+    // A resolved brain with every field confirmed. Each test below breaks one
+    // thing, and the brain is not the thing unless the test says it is.
+    brain: { resolved: true, confirmed: 15, total: 15 },
     planningWeek: { isoYear: 2026, isoWeek: 35 },
     openCycle: null,
     dial: [{ channel: 'instagram', level: 1 }],

@@ -137,6 +137,55 @@ export async function saveObservation(
 }
 
 /**
+ * Record that the pass LOOKED at this workspace, and what it found nothing of.
+ *
+ * The counterpart to `saveObservation`, and the far more common outcome. Every
+ * decline reason the pass computes used to end its life in an HTTP response, so
+ * a customer with an empty report could not tell a product that is working and
+ * waiting from a cron that stopped months ago. docs/55 step 10.
+ *
+ * Same upsert shape as `saveObservation` and for the same reason: the cron is
+ * retryable, so a second run of one Sunday must update the row rather than grow
+ * a second one. `xmax = 0` distinguishes the insert from the update, which the
+ * runner reports and a test asserts.
+ *
+ * The caller passes `declines` already collapsed to one reason per kind. It is
+ * an object rather than a list because a kind cannot decline twice in one pass,
+ * and the database refuses any other JSON shape.
+ */
+export async function savePassRun(
+  workspaceId: string,
+  computedOn: string,
+  declines: Readonly<Record<string, string>>,
+  written: number,
+): Promise<{ inserted: boolean }> {
+  const r = await getPool().query<{ inserted: boolean }>(
+    `insert into marketing_pass_runs (workspace_id, computed_on, declines, written)
+     values ($1, $2::date, $3::jsonb, $4)
+     on conflict (workspace_id, computed_on) do update
+       set declines = excluded.declines,
+           written = excluded.written,
+           updated_at = now()
+     returning (xmax = 0) as inserted`,
+    [workspaceId, computedOn, JSON.stringify(declines), written],
+  )
+  return { inserted: r.rows[0]?.inserted === true }
+}
+
+/**
+ * When the pass last looked at this workspace, and what it was waiting for.
+ *
+ * Read over the RLS-scoped client by `lib/brain/read.ts`, not here: this file
+ * writes over the owner connection. Kept beside the writer so the column list
+ * and the upsert above cannot drift apart unnoticed.
+ */
+export interface PassRunRow {
+  computedOn: string
+  declines: Readonly<Record<string, string>>
+  written: number
+}
+
+/**
  * Every workspace with at least one published post.
  *
  * The floor is deliberately at the database rather than in the runner: a

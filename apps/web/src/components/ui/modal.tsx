@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import { X } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -40,6 +40,18 @@ export function Modal({
   className?: string
 }) {
   const ref = useRef<HTMLDialogElement>(null)
+  /**
+   * ── THE TITLE ID IS PER-INSTANCE, AND IT WAS NOT ─────────────────────────
+   * This was the literal string `modal-title`, which is correct exactly while
+   * one Modal exists in the document. The dialog renders whether or not it is
+   * open, so a screen with EIGHT of them — /posts, where every tile now carries
+   * its own delete dialog — put eight `id="modal-title"` nodes in one document.
+   * `aria-labelledby` resolves to the first match, so every one of those dialogs
+   * would announce the first card's title: press delete on the eighth post and
+   * a screen reader names the first. Silent, and wrong in the one place being
+   * wrong is expensive.
+   */
+  const titleId = useId()
 
   useEffect(() => {
     const el = ref.current
@@ -61,7 +73,7 @@ export function Modal({
   return (
     <dialog
       ref={ref}
-      aria-labelledby="modal-title"
+      aria-labelledby={titleId}
       // A click that lands on the DIALOG itself is a click on the backdrop:
       // the panel below stops propagation, so this cannot fire from inside.
       onClick={(e) => {
@@ -114,7 +126,7 @@ export function Modal({
       >
         <div className="flex flex-none items-start gap-3 border-b border-line-soft p-4">
           <div className="min-w-0 flex-1">
-            <h2 id="modal-title" className="type-h3">
+            <h2 id={titleId} className="type-h3">
               {title}
             </h2>
             {description ? <p className="type-sm mt-0.5 text-muted">{description}</p> : null}

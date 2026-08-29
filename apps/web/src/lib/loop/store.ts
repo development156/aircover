@@ -156,22 +156,60 @@ export async function openCycle(input: {
  */
 const NOT_TERMINAL = `status not in ('cancelled', 'failed')`
 
-/** True when a row moved. False means a terminal status refused the write. */
+/** Postgres says this when a column named in a statement does not exist. */
+const UNDEFINED_COLUMN = '42703'
+
+function isMissingColumn(error: unknown): boolean {
+  return (error as { code?: unknown } | null)?.code === UNDEFINED_COLUMN
+}
+
+/**
+ * True when a row moved. False means a terminal status refused the write.
+ *
+ * ── THE reflect_reason COLUMN IS WRITTEN THROUGH A FALLBACK ──────────────────
+ * `20260828100000_loop_reflect_reason.sql` adds it, and migrations here are
+ * applied by hand rather than by a deploy. A statement naming a column that is
+ * not there yet raises 42703, and this is the statement that moves a cycle from
+ * one stage to the next — so an unapplied migration would not cost a sentence
+ * on a screen, it would strand every cycle in the stage it was in.
+ *
+ * The same shape apps/jobs/src/metrics/store.ts uses for its missing history
+ * table: try the full form, fall back on the specific code, and never on any
+ * other error. Once the migration is applied the fallback is dead weight that
+ * costs one failed statement per process and can be removed.
+ */
 export async function setCycleStatus(
   cycleId: string,
   workspaceId: string,
   status: string,
-  extra: { failureReason?: string; reflectSkipped?: boolean } = {},
+  extra: { failureReason?: string; reflectSkipped?: boolean; reflectReason?: string | null } = {},
 ): Promise<boolean> {
-  const r = await getPool().query(
-    `update loop_cycles
+  const args = [
+    cycleId,
+    workspaceId,
+    status,
+    extra.failureReason ?? null,
+    extra.reflectSkipped ?? null,
+  ]
+  const tail = `where id = $1 and workspace_id = $2 and ${NOT_TERMINAL}`
+  const head = `update loop_cycles
         set status = $3,
             failure_reason = coalesce($4, failure_reason),
-            reflect_skipped_no_history = coalesce($5, reflect_skipped_no_history)
-      where id = $1 and workspace_id = $2 and ${NOT_TERMINAL}`,
-    [cycleId, workspaceId, status, extra.failureReason ?? null, extra.reflectSkipped ?? null],
-  )
-  return (r.rowCount ?? 0) > 0
+            reflect_skipped_no_history = coalesce($5, reflect_skipped_no_history)`
+
+  try {
+    const r = await getPool().query(
+      `${head},
+            reflect_reason = coalesce($6, reflect_reason)
+      ${tail}`,
+      [...args, extra.reflectReason ?? null],
+    )
+    return (r.rowCount ?? 0) > 0
+  } catch (error) {
+    if (!isMissingColumn(error)) throw error
+    const r = await getPool().query(`${head}\n      ${tail}`, args)
+    return (r.rowCount ?? 0) > 0
+  }
 }
 
 /**
