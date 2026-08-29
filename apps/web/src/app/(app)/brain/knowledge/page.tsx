@@ -9,7 +9,7 @@ import { WhatToGive } from '@/components/knowledge/what-to-give'
 import { EmptyState } from '@/components/empty-state'
 import { buttonVariants } from '@/components/ui/button'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
-import { readLibrary, searchLibrary } from '@/lib/knowledge/store'
+import { countPendingLibrarySuggestions, readLibrary, searchLibrary } from '@/lib/knowledge/store'
 import { creditCost, MESH_TASK_ACTION } from '@sahoda/shared'
 
 export const metadata = { title: 'Knowledge' }
@@ -105,10 +105,26 @@ export default async function BrainKnowledgePage({
     )
   }
 
-  // Searched only when asked. A page load with no query runs no search rather
-  // than running an empty one and rendering "nothing matched ''".
-  const search = query ? await searchLibrary(query) : null
   const indexed = library.documents.filter((d) => d.status === 'indexed').length
+
+  /**
+   * TOGETHER, not one after the other. `read-waterfall.test.ts` caught this as a
+   * ninth sequential read the first time it was written, which is the guard
+   * working: neither of these needs the other's answer, and a page that awaits
+   * them in turn is slower by a whole round trip for no reason.
+   *
+   * Searched only when asked. A page load with no query runs no search rather
+   * than running an empty one and rendering "nothing matched ''".
+   *
+   * `waiting` is what an earlier read already produced and nobody has answered.
+   * Read on the server so a press costs no round trip, and `null` when the count
+   * did not answer, which the confirm panel treats as a re-run rather than as
+   * permission to spend.
+   */
+  const [search, waiting] = await Promise.all([
+    query ? searchLibrary(query) : Promise.resolve(null),
+    indexed > 0 ? countPendingLibrarySuggestions() : Promise.resolve(0),
+  ])
 
   return (
     <Shell action>
@@ -122,7 +138,10 @@ export default async function BrainKnowledgePage({
           library is a button that can only disappoint, and the empty state
           already asks for the one thing that fixes it. */}
       {indexed > 0 ? (
-        <ResolveFromLibrary cost={creditCost(MESH_TASK_ACTION['brand_extract'])} />
+        <ResolveFromLibrary
+          cost={creditCost(MESH_TASK_ACTION['brand_extract'])}
+          waiting={waiting}
+        />
       ) : null}
 
       {/* GUIDANCE WHILE IT IS STILL SPARSE, and gone once it is not. Under four
