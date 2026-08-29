@@ -34,6 +34,7 @@ import {
 import { PhotoPicker } from '@/components/studio/photo-picker'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { DELETE_AT_REST, DELETE_CANCEL, describeDesignDelete } from '@/lib/studio/delete-copy'
 import type { PhotoListRead } from '@/lib/studio/read'
 
 /**
@@ -109,6 +110,15 @@ export function DesignEditor({
   const [isTemplate, setIsTemplate] = useState(design.is_template)
   const [templateNote, setTemplateNote] = useState<string | null>(null)
   const [flagging, startFlag] = useTransition()
+  /**
+   * Whether Delete has been pressed once.
+   *
+   * `deleteDesign` is a hard delete with no trash behind it, and this used to
+   * be one press of a button sitting beside Save in an editor somebody is
+   * typing in. `delete-copy.ts` argues why asking is not the same as inventing
+   * a consequence.
+   */
+  const [armedToDelete, setArmedToDelete] = useState(false)
 
   const template = templateById(doc.templateId)
   const preset = presetById(design.preset_id)
@@ -198,6 +208,12 @@ export function DesignEditor({
       </p>
     )
   }
+
+  /** What the confirmation says, from facts this editor already holds. */
+  const deletePrompt = describeDesignDelete({
+    pageCount: doc.pages.length,
+    isTemplate,
+  })
 
   /** The text blocks, so each box knows the budget its own layout allows. */
   const textBlocks = new Map<string, TextBlock>(
@@ -361,6 +377,13 @@ export function DesignEditor({
   }
 
   function remove() {
+    // The first press only arms it. The sentence a person reads before the
+    // second one names what goes and what stays.
+    if (!armedToDelete) {
+      setNote(null)
+      setArmedToDelete(true)
+      return
+    }
     startSave(async () => {
       const result = await deleteDesign(design.id)
       if (result.ok) {
@@ -513,15 +536,33 @@ export function DesignEditor({
               Add all <span className="num">{doc.pages.length}</span> slides
             </Button>
           ) : null}
-          <Button variant="ghost" onClick={remove} disabled={saving || exporting}>
-            Delete
+          <Button
+            variant="ghost"
+            onClick={remove}
+            disabled={saving || exporting}
+            data-guide="studio-delete"
+          >
+            {armedToDelete ? deletePrompt.confirm : DELETE_AT_REST}
           </Button>
+          {/* A way out that is not the destructive button, and it is only
+              present while there is something to back out of. */}
+          {armedToDelete ? (
+            <Button variant="secondary" onClick={() => setArmedToDelete(false)} disabled={saving}>
+              {DELETE_CANCEL}
+            </Button>
+          ) : null}
           {note === null ? null : (
             <span role="status" className="type-sm text-muted">
               {note}
             </span>
           )}
         </div>
+
+        {!armedToDelete ? null : (
+          <p role="alert" className="surface-ring rounded-card bg-s2 px-3 py-3 type-sm text-muted">
+            {deletePrompt.detail}
+          </p>
+        )}
 
         {exported === null ? null : (
           <p role="status" className="surface-ring rounded-card bg-s2 px-3 py-3 type-sm text-muted">
