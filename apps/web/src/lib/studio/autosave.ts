@@ -122,6 +122,33 @@ export function canonicalKey(draft: DesignDraft): string {
   return JSON.stringify(canonical({ ...draft, title: draft.title.trim() }))
 }
 
+/**
+ * Why this draft cannot be saved yet, or `null` when it can.
+ *
+ * ── AN AUTOSAVE TURNS A BAD MESSAGE INTO A BAD MESSAGE EVERY 1.2 SECONDS ────
+ * MEASURED against `TitleSchema` in `app/actions/studio.ts`
+ * (`z.string().trim().min(1).max(80)`): an empty name is REFUSED, and so is one
+ * that is only spaces. The refusal that comes back is `REFUSALS.malformed`,
+ * "this design could not be saved because part of it was not readable", which
+ * is wrong twice over. The name is not unreadable, it is absent; and the person
+ * is not told which part, so there is nothing they can act on.
+ *
+ * Before the autosave this was one confusing message per press of Save. After
+ * it, clearing the name box would have retried the same failing write every
+ * pause in typing for as long as the box stayed empty. So the draft is checked
+ * HERE, the write is not attempted, and the sentence names the box.
+ *
+ * This is deliberately not a second copy of the schema. It checks the one
+ * condition a person can reach by typing, in the editor, where it can be said
+ * plainly; the schema stays the authority and still refuses everything else.
+ */
+export function describeDraftBlock(draft: DesignDraft): string | null {
+  if (draft.title.trim() === '') {
+    return 'Give this design a name and Sahoda will save it. Everything you have typed is still on this screen.'
+  }
+  return null
+}
+
 /** Where a save has got to. `at` is the moment the row came back, not the moment it was sent. */
 export type SaveState =
   { kind: 'idle' } | { kind: 'saving' } | { kind: 'saved' } | { kind: 'failed'; message: string }
@@ -140,7 +167,15 @@ export type SaveState =
  * separates "this design is gone" from "we could not reach the database", and
  * flattening those into one house sentence would lose the distinction.
  */
-export function describeSaveState(state: SaveState, dirty: boolean): string | null {
+export function describeSaveState(
+  state: SaveState,
+  dirty: boolean,
+  blocked: string | null = null,
+): string | null {
+  // First, because it is the only one the person can act on and because while
+  // it holds no write is attempted at all: reporting "not saved yet" here would
+  // be true and useless.
+  if (blocked !== null) return blocked
   if (state.kind === 'failed') {
     return `${state.message} Your words are still on this screen. Keep this tab open and press Save design to try again.`
   }

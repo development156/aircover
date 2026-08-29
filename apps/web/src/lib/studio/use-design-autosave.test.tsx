@@ -35,10 +35,14 @@ const save = vi.fn()
 /** A harness that starts clean and is made dirty by pressing "type". */
 function Harness() {
   const [text, setText] = useState('one')
+  const [blank, setBlank] = useState(false)
   const autosave = useDesignAutosave({
     // A trailing space the server trims, so "what was sent" and "what came
     // back" are genuinely different documents once anything is typed.
-    draft: { ...draftOf(text), title: text === 'one' ? 'A poster' : 'A poster ' },
+    draft: {
+      ...draftOf(text),
+      title: blank ? '' : text === 'one' ? 'A poster' : 'A poster ',
+    },
     initial: draftOf('one'),
     save,
   })
@@ -47,6 +51,9 @@ function Harness() {
       <button type="button" onClick={() => setText('two')}>
         type
       </button>
+      <button type="button" onClick={() => setBlank(true)}>
+        clear the name
+      </button>
       {/* Something to press that is not a link and not an edit. */}
       <button type="button" onClick={() => undefined}>
         poke
@@ -54,6 +61,7 @@ function Harness() {
       {/* Stands in for "All designs": a plain forward link. */}
       <a href="/studio">All designs</a>
       <span data-testid="dirty">{autosave.dirty ? 'dirty' : 'clean'}</span>
+      <span data-testid="blocked">{autosave.blocked ?? 'none'}</span>
     </div>
   )
 }
@@ -146,5 +154,20 @@ describe('useDesignAutosave', () => {
     await user.click(screen.getByRole('link', { name: 'All designs' }))
     await waitFor(() => expect(save).toHaveBeenCalledTimes(1))
     expect(screen.getByTestId('dirty')).toHaveTextContent('dirty')
+  })
+
+  /**
+   * The write is not attempted at all. MEASURED: `TitleSchema` refuses an empty
+   * name, and the server's answer names nothing the person can act on, so with
+   * an autosave it would arrive every 1.2 seconds until the box was filled.
+   */
+  test('an empty name stops the write rather than retrying a refusal', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await user.click(screen.getByRole('button', { name: 'clear the name' }))
+    expect(screen.getByTestId('blocked')).not.toHaveTextContent('none')
+
+    await user.click(screen.getByRole('link', { name: 'All designs' }))
+    expect(save).not.toHaveBeenCalled()
   })
 })

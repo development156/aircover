@@ -249,7 +249,7 @@ export function DesignEditor({
   }
 
   /** What the save status line says, or nothing when there is nothing to say. */
-  const saveSaid = describeSaveState(autosave.state, dirty)
+  const saveSaid = describeSaveState(autosave.state, dirty, autosave.blocked)
 
   /** What the confirmation says, from facts this editor already holds. */
   const deletePrompt = describeDesignDelete({
@@ -591,7 +591,7 @@ export function DesignEditor({
               it no longer is, is the only thing standing between a few minutes
               of typing and losing it: the design is written down whenever
               somebody stops typing and on every way out of this screen. */}
-          <Button onClick={save} loading={saving} disabled={!dirty}>
+          <Button onClick={save} loading={saving} disabled={!dirty || autosave.blocked !== null}>
             Save design
           </Button>
           <Button
@@ -636,7 +636,11 @@ export function DesignEditor({
           {saveSaid === null ? null : (
             <span
               role="status"
-              className={`type-sm ${autosave.state.kind === 'failed' ? 'text-ink' : 'text-muted'}`}
+              className={`type-sm ${
+                autosave.state.kind === 'failed' || autosave.blocked !== null
+                  ? 'text-ink'
+                  : 'text-muted'
+              }`}
             >
               {saveSaid}
             </span>
