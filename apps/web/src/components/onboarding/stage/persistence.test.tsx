@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import {
   clearState,
-  DEFAULT_COLORS,
   DEFAULT_DATA,
   loadState,
   saveState,
@@ -15,7 +14,7 @@ const WS = 'ws_1111'
 const OTHER = 'ws_2222'
 
 function data(patch: Partial<OnboardingData> = {}): OnboardingData {
-  return { ...DEFAULT_DATA, colors: { ...DEFAULT_COLORS }, ...patch }
+  return { ...DEFAULT_DATA, ...patch }
 }
 
 beforeEach(() => {
@@ -100,9 +99,11 @@ describe('a saved blob is untrusted input', () => {
   it('keeps the default colours when the saved ones are junk', () => {
     window.localStorage.setItem(
       storageKey(WS),
-      JSON.stringify({ step: '4', data: { colors: { Primary: 99 } } }),
+      JSON.stringify({ step: '4', data: { palette: [99, 'oklch(0.5 0.2 20)'] } }),
     )
-    expect(loadState(WS)?.data.colors.Primary).toBe(DEFAULT_COLORS.Primary)
+    // A non-string in the saved palette is dropped rather than carried into a
+    // CSS value, and the readable one beside it survives.
+    expect(loadState(WS)?.data.palette).toEqual(['oklch(0.5 0.2 20)'])
   })
 })
 
