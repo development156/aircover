@@ -6,6 +6,7 @@ import type { Channel } from '@sahoda/shared'
 import type { AutopilotRefusal } from '@/lib/loop/autopilot-refusals'
 import type { AnnouncedPost } from './dispatch-due'
 import {
+  AUTOPILOT_CANDIDATES_SQL,
   AUTOPILOT_SETTINGS_SQL,
   DIAL_SQL,
   PENDING_ANNOUNCEMENTS_SQL,
@@ -152,4 +153,51 @@ export async function writeDecision(row: DecisionRow): Promise<string> {
     row.dispatchAfter ? row.dispatchAfter.toISOString() : null,
   ])
   return (r.rows[0] as { id: string }).id
+}
+
+/** One row of the candidate scan, before either verdict has been computed. */
+export interface CandidateRow {
+  postId: string
+  variantId: string
+  channel: Channel
+  body: string
+  /** `post_variants.last_error`, untyped jsonb. Read defensively by the caller. */
+  lastError: unknown
+  briefId: string | null
+  cycleId: string | null
+}
+
+/**
+ * The posts autopilot may consider, this workspace only.
+ *
+ * ── WHY THIS RETURNS ROWS AND NOT AutopilotCandidate ─────────────────────────
+ * An `AutopilotCandidate` carries `gateFlagged`, `fitsChannel`, `accountId` and
+ * a price. None of those is a column: the first two are verdicts computed from
+ * the body, the third comes from the connection the post would publish through,
+ * and the fourth is a lookup in pricing.config.json. Returning a half-filled
+ * `AutopilotCandidate` with those defaulted would be the same defect as a
+ * default of `''` on an account id — a value nobody decided, travelling as
+ * though somebody had.
+ */
+export async function readCandidateRows(workspaceId: string, limit = 100): Promise<CandidateRow[]> {
+  const r = await getPool().query(AUTOPILOT_CANDIDATES_SQL, [workspaceId, limit])
+  return (
+    r.rows as {
+      post_id: string
+      variant_id: string
+      channel: Channel
+      body: string
+      last_error: unknown
+      brief_id: string | null
+      cycle_id: string | null
+    }[]
+  ).map((row) => ({
+    postId: row.post_id,
+    variantId: row.variant_id,
+    channel: row.channel,
+    body: row.body,
+    lastError: row.last_error,
+    briefId: row.brief_id,
+    cycleId: row.cycle_id,
+  }))
 }
