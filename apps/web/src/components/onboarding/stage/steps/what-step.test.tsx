@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
 import { useState } from 'react'
 
-import { DEFAULT_COLORS, DEFAULT_DATA, type OnboardingData } from '../store'
+import { DEFAULT_DATA, type OnboardingData } from '../store'
 import { WhatStep } from './what-step'
 
 /**
@@ -26,7 +26,8 @@ import { WhatStep } from './what-step'
 function Harness({ onPatch }: { onPatch?: (next: Partial<OnboardingData>) => void }) {
   const [data, setData] = useState<OnboardingData>({
     ...DEFAULT_DATA,
-    colors: { ...DEFAULT_COLORS },
+    palette: [],
+    logoName: '',
   })
   return (
     <WhatStep
@@ -129,24 +130,14 @@ describe('the Closest fit chips', () => {
     // Save and exit persists `category` verbatim, so a resumed session arrives
     // with a typed trade and no memory of which chip produced it. The step has
     // to recognise its own value rather than render six chips and no box.
-    render(
-      <WhatStep
-        data={{ ...DEFAULT_DATA, colors: { ...DEFAULT_COLORS }, category: 'wedding photography' }}
-        patch={vi.fn()}
-      />,
-    )
+    render(<WhatStep data={{ ...DEFAULT_DATA, category: 'wedding photography' }} patch={vi.fn()} />)
 
     expect(screen.getByLabelText(OTHER_LABEL)).toHaveValue('wedding photography')
     expect(screen.getByRole('button', { name: 'Other' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   test('does not mistake a named chip for a typed trade', () => {
-    render(
-      <WhatStep
-        data={{ ...DEFAULT_DATA, colors: { ...DEFAULT_COLORS }, category: 'Agency' }}
-        patch={vi.fn()}
-      />,
-    )
+    render(<WhatStep data={{ ...DEFAULT_DATA, category: 'Agency' }} patch={vi.fn()} />)
 
     expect(screen.queryByLabelText(OTHER_LABEL)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Agency' })).toHaveAttribute('aria-pressed', 'true')
