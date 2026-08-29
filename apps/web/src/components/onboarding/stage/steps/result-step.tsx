@@ -76,11 +76,19 @@ export function ResultStep({
     ['Audience', data.audience || '—'],
     ['Website', websiteCell(door, data.site)],
     [
-      'Primary',
-      <>
-        <span className="bb__sw" style={{ background: data.colors.Primary }} />
-        {data.colors.Primary}
-      </>,
+      /* The colour Brand Skin will actually use, which is the FIRST extracted
+         one — `brandSkinVars` reads `colors[0]` as the primary. An empty palette
+         means no logo, or one nothing could be read from, and the dash is this
+         product's absence mark rather than a guess at a colour. */
+      'Brand colour',
+      data.palette[0] ? (
+        <>
+          <span className="bb__sw" style={{ background: data.palette[0] }} />
+          {data.logoName || data.palette[0]}
+        </>
+      ) : (
+        '—'
+      ),
     ],
     ['Knowledge', knowledge ? `${knowledge} source${knowledge === 1 ? '' : 's'}` : 'None yet'],
     [
