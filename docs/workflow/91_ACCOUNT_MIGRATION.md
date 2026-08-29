@@ -127,9 +127,14 @@ turbo cannot.
 
 ## Cloud sessions in the new account
 
-`scripts/cloud-setup.sh` runs automatically and already does the browser install
-and `core.hooksPath`. You paste the env values into the cloud session's
-environment settings once.
+Put **`bash setup.sh`** in the environment's **Setup script** field — the
+repo-root wrapper, never `scripts/cloud-setup.sh` directly. A branch without that
+script makes bash exit 127, and the harness then refuses to start the session at
+all; `setup.sh` delegates when it can and always exits 0, so a misconfigured
+environment boots and says what is wrong instead of dying. It does the browser
+install and `core.hooksPath`. You paste the env values into the cloud session's
+environment settings once, and `SAHODA_LANE_OWNER` is one of them — without it
+the push block that keeps a karunesh lane out of `wt-core` and `wt-web` is off.
 
 Each person then starts with:
 
@@ -138,6 +143,8 @@ Each person then starts with:
 /kickoff owner:jiban    , branch: wt-jiban    , /lead-design
 /kickoff owner:girija   , branch: wt-girija   , /lead-research
 /kickoff owner:karunesh , branch: wt-karunesh , /lead-expert
+/kickoff owner:karunesh , branch: wt-karunesh2 , /lead-expert
+/kickoff owner:karunesh , branch: wt-karunesh3 , /lead-expert
 ```
 
 `/kickoff` **restores context and stops.** It does not start work — deliberately,
