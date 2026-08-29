@@ -119,6 +119,14 @@ supabase/.temp/
 # rule the CLAUDE.md block above states and then follows.
 !/apps/web/REQUESTS.md
 
+# The account-transfer bundle (scripts/account-export.sh). These are the rule
+# files a Claude Code ACCOUNT carries and git does not — 21 of them, with zero
+# copies anywhere else in this repo. Without this negation `*.md` above silently
+# swallows every one, `git add` reports nothing, and the export looks like it
+# worked while transferring an empty folder. That is exactly what happened on
+# the first run. `account-export.sh` now refuses if what it wrote is unstageable.
+!/ops/account-transfer/**/*.md
+
 # Playwright storageState for local visual verification — never commit a session.
 .auth/
 

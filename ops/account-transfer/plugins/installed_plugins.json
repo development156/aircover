@@ -1,0 +1,273 @@
+{
+  "version": 2,
+  "plugins": {
+    "superpowers@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0",
+        "version": "6.3.0",
+        "installedAt": "2026-06-17T19:18:57.193Z",
+        "lastUpdated": "2026-08-12T19:30:14.092Z",
+        "gitCommitSha": "b62616fc12f6a007c6fd5118146821d748da0d33"
+      }
+    ],
+    "frontend-design@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/frontend-design/ed404106fcd8",
+        "version": "ed404106fcd8",
+        "installedAt": "2026-06-25T15:08:00.400Z",
+        "lastUpdated": "2026-08-29T06:17:19.397Z",
+        "gitCommitSha": "f9cb226d81172f53a1787cc3ba90dc9ab51aa169"
+      }
+    ],
+    "security-guidance@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/security-guidance/2.0.7",
+        "version": "2.0.7",
+        "installedAt": "2026-06-25T15:09:02.630Z",
+        "lastUpdated": "2026-08-13T02:56:32.382Z"
+      }
+    ],
+    "feature-dev@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/feature-dev/ed404106fcd8",
+        "version": "ed404106fcd8",
+        "installedAt": "2026-06-25T15:09:22.802Z",
+        "lastUpdated": "2026-08-29T06:17:19.398Z",
+        "gitCommitSha": "f9cb226d81172f53a1787cc3ba90dc9ab51aa169"
+      }
+    ],
+    "code-simplifier@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/code-simplifier/1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2026-06-25T15:09:32.366Z",
+        "lastUpdated": "2026-06-25T15:09:32.366Z"
+      }
+    ],
+    "claude-md-management@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/claude-md-management/1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2026-06-25T15:09:48.795Z",
+        "lastUpdated": "2026-06-25T15:09:48.795Z"
+      }
+    ],
+    "claude-code-setup@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/claude-code-setup/1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2026-06-25T15:10:04.060Z",
+        "lastUpdated": "2026-06-25T15:10:04.060Z"
+      }
+    ],
+    "ralph-loop@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/ralph-loop/1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2026-06-25T15:10:15.113Z",
+        "lastUpdated": "2026-06-25T15:10:15.113Z"
+      }
+    ],
+    "commit-commands@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/commit-commands/ed404106fcd8",
+        "version": "ed404106fcd8",
+        "installedAt": "2026-06-25T15:10:38.753Z",
+        "lastUpdated": "2026-08-29T06:17:19.391Z",
+        "gitCommitSha": "f9cb226d81172f53a1787cc3ba90dc9ab51aa169"
+      }
+    ],
+    "agent-sdk-dev@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/agent-sdk-dev/ed404106fcd8",
+        "version": "ed404106fcd8",
+        "installedAt": "2026-06-25T15:11:02.799Z",
+        "lastUpdated": "2026-08-29T06:17:19.389Z",
+        "gitCommitSha": "f9cb226d81172f53a1787cc3ba90dc9ab51aa169"
+      }
+    ],
+    "brightdata-plugin@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/brightdata-plugin/1.8.0",
+        "version": "1.8.0",
+        "installedAt": "2026-06-25T15:12:29.679Z",
+        "lastUpdated": "2026-06-25T15:12:29.679Z",
+        "gitCommitSha": "8d427e9871566efe3f0a1c8888f98b6fe8288831"
+      }
+    ],
+    "remember@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/remember/0.20.0",
+        "version": "0.20.0",
+        "installedAt": "2026-06-25T15:13:23.249Z",
+        "lastUpdated": "2026-08-13T02:56:40.026Z",
+        "gitCommitSha": "f1a00382598ef627c858d9eed6438047b072ba41"
+      }
+    ],
+    "code-review@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/code-review/ed404106fcd8",
+        "version": "ed404106fcd8",
+        "installedAt": "2026-07-17T20:26:26.351Z",
+        "lastUpdated": "2026-08-29T06:17:19.387Z",
+        "gitCommitSha": "f9cb226d81172f53a1787cc3ba90dc9ab51aa169"
+      }
+    ],
+    "browser-use@claude-plugins-official": [
+      {
+        "scope": "project",
+        "projectPath": "/home/divas/Documents/GitHub/sahodalabs",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/browser-use/a25f0a262928-035549a4",
+        "version": "a25f0a262928-035549a4",
+        "installedAt": "2026-08-22T20:13:54.398Z",
+        "lastUpdated": "2026-08-22T20:13:54.398Z",
+        "gitCommitSha": "a25f0a262928bcbb62071432636d943ed9f2b6aa"
+      }
+    ],
+    "chrome-devtools-mcp@claude-plugins-official": [
+      {
+        "scope": "project",
+        "projectPath": "/home/divas/Documents/GitHub/sahodalabs",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/chrome-devtools-mcp/1.7.0",
+        "version": "1.7.0",
+        "installedAt": "2026-08-22T20:14:28.366Z",
+        "lastUpdated": "2026-08-22T20:14:28.366Z",
+        "gitCommitSha": "614b4ebe23196dc0c657671ee52e7138f6d09017"
+      },
+      {
+        "scope": "user",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/chrome-devtools-mcp/1.7.0",
+        "version": "1.7.0",
+        "installedAt": "2026-08-24T10:37:12.390Z",
+        "lastUpdated": "2026-08-24T10:37:12.390Z",
+        "gitCommitSha": "614b4ebe23196dc0c657671ee52e7138f6d09017"
+      }
+    ],
+    "context7@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/context7/ed404106fcd8",
+        "version": "ed404106fcd8",
+        "installedAt": "2026-08-24T10:30:41.269Z",
+        "lastUpdated": "2026-08-29T06:17:19.390Z"
+      }
+    ],
+    "playwright@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/playwright/ed404106fcd8",
+        "version": "ed404106fcd8",
+        "installedAt": "2026-08-24T10:30:48.711Z",
+        "lastUpdated": "2026-08-29T06:17:19.393Z"
+      }
+    ],
+    "vercel@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/vercel/0.45.1",
+        "version": "0.45.1",
+        "installedAt": "2026-08-24T10:30:59.530Z",
+        "lastUpdated": "2026-08-24T10:30:59.530Z",
+        "gitCommitSha": "19606ac163fef2f8f967fa14ae13522d68efeccd"
+      }
+    ],
+    "github@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/github/ed404106fcd8",
+        "version": "ed404106fcd8",
+        "installedAt": "2026-08-24T10:31:04.503Z",
+        "lastUpdated": "2026-08-29T06:17:19.394Z"
+      }
+    ],
+    "supabase@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/supabase/0.1.15",
+        "version": "0.1.15",
+        "installedAt": "2026-08-24T10:31:13.270Z",
+        "lastUpdated": "2026-08-24T10:31:13.270Z",
+        "gitCommitSha": "8629243d1cd72309b533090a4c742f21747d02fa"
+      }
+    ],
+    "skill-creator@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/skill-creator/ed404106fcd8",
+        "version": "ed404106fcd8",
+        "installedAt": "2026-08-24T10:36:10.849Z",
+        "lastUpdated": "2026-08-29T06:17:19.392Z"
+      }
+    ],
+    "pyright-lsp@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/pyright-lsp/1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2026-08-24T10:36:25.563Z",
+        "lastUpdated": "2026-08-24T10:36:25.563Z"
+      }
+    ],
+    "plugin-dev@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/plugin-dev/ed404106fcd8",
+        "version": "ed404106fcd8",
+        "installedAt": "2026-08-24T10:36:48.763Z",
+        "lastUpdated": "2026-08-29T06:17:19.395Z"
+      }
+    ],
+    "playground@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/playground/ed404106fcd8",
+        "version": "ed404106fcd8",
+        "installedAt": "2026-08-24T10:37:00.650Z",
+        "lastUpdated": "2026-08-29T06:17:19.396Z"
+      }
+    ],
+    "resend@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/resend/1.0.5",
+        "version": "1.0.5",
+        "installedAt": "2026-08-24T10:38:00.635Z",
+        "lastUpdated": "2026-08-24T10:38:00.635Z",
+        "gitCommitSha": "d63dcfdc07910a91c0c21555d0841b5d5518065a"
+      }
+    ],
+    "sentry@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/sentry/1.3.2",
+        "version": "1.3.2",
+        "installedAt": "2026-08-24T10:38:19.282Z",
+        "lastUpdated": "2026-08-24T10:38:19.282Z",
+        "gitCommitSha": "27e0a5086980ba4ffe790993732dce71a7a0b116"
+      }
+    ],
+    "mattpocock-skills@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/home/divas/.claude/plugins/cache/claude-plugins-official/mattpocock-skills/1.2.3",
+        "version": "1.2.3",
+        "installedAt": "2026-08-24T10:38:37.820Z",
+        "lastUpdated": "2026-08-24T10:38:37.820Z",
+        "gitCommitSha": "0ab1b63a410a03d3627979a109c8695de27af954"
+      }
+    ]
+  }
+}
