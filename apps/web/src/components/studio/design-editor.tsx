@@ -16,7 +16,9 @@ import {
   type TextBlock,
 } from '@sahoda/shared'
 
-import { deleteDesign, saveDesign } from '@/app/actions/studio'
+import Link from 'next/link'
+
+import { deleteDesign, exportDesign, saveDesign } from '@/app/actions/studio'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 
@@ -47,6 +49,13 @@ export function DesignEditor({ design, palette }: { design: StudioDesign; palett
   const [saving, startSave] = useTransition()
   const [note, setNote] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
+  const [exporting, startExport] = useTransition()
+  /**
+   * What the last export did, and where the file went. Held apart from `note`
+   * because it carries a LINK: "already in your library" with nowhere to go is
+   * a sentence about a file the person then has to hunt for.
+   */
+  const [exported, setExported] = useState<{ message: string; href: string | null } | null>(null)
 
   const template = templateById(doc.templateId)
   const preset = presetById(design.preset_id)
@@ -109,6 +118,38 @@ export function DesignEditor({ design, palette }: { design: StudioDesign; palett
         return
       }
       setNote(result.message)
+    })
+  }
+
+  /**
+   * Turn this design into a file in the library.
+   *
+   * ── SAVE FIRST, ALWAYS ──────────────────────────────────────────────────────
+   * The export is drawn on the SERVER from the SAVED row, so exporting with
+   * unsaved edits on screen would hand back a picture of the previous version
+   * and say nothing about it. Saving first is not a convenience here, it is what
+   * makes "this is the picture that exports" true.
+   */
+  function exportToLibrary() {
+    setNote(null)
+    setExported(null)
+    startExport(async () => {
+      if (dirty) {
+        const saved = await saveDesign({ id: design.id, title, presetId: design.preset_id, doc })
+        if (!saved.ok) {
+          setNote(saved.message)
+          return
+        }
+        setDirty(false)
+      }
+
+      const result = await exportDesign({ designId: design.id })
+      if (!result.ok) {
+        setNote(result.message)
+        return
+      }
+      setExported({ message: result.message, href: '/assets' })
+      router.refresh()
     })
   }
 
@@ -179,7 +220,16 @@ export function DesignEditor({ design, palette }: { design: StudioDesign; palett
           <Button onClick={save} loading={saving} disabled={!dirty && note === null}>
             Save design
           </Button>
-          <Button variant="ghost" onClick={remove} disabled={saving}>
+          <Button
+            variant="secondary"
+            onClick={exportToLibrary}
+            loading={exporting}
+            disabled={saving}
+            data-guide="studio-export"
+          >
+            Add to library
+          </Button>
+          <Button variant="ghost" onClick={remove} disabled={saving || exporting}>
             Delete
           </Button>
           {note === null ? null : (
@@ -188,6 +238,24 @@ export function DesignEditor({ design, palette }: { design: StudioDesign; palett
             </span>
           )}
         </div>
+
+        {exported === null ? null : (
+          <p role="status" className="surface-ring rounded-card bg-s2 px-3 py-3 type-sm text-muted">
+            {exported.message}{' '}
+            {exported.href === null ? null : (
+              <Link
+                href={exported.href}
+                className="underline transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
+                Open your library
+              </Link>
+            )}
+          </p>
+        )}
+
+        <p className="type-sm text-muted">
+          Adding a design to your library costs nothing. Sahoda draws it, so no credits are spent.
+        </p>
       </section>
 
       <section aria-labelledby="editor-preview" className="flex flex-col gap-3">
