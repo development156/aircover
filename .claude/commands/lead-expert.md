@@ -119,21 +119,34 @@ Pin who this lane belongs to, and turn on the block that protects the shared
 copies. **Do not narrate any of this to him.**
 
 ```bash
+# NEVER write a literal lane here. There are three karunesh lanes —
+# wt-karunesh, wt-karunesh2, wt-karunesh3 — and every handoff is filed as
+# <owner>-<lane>-<date>.md. A literal would make all three sessions write the
+# SAME filename and silently overwrite one another. That has already happened
+# once in this repository, with the girija lanes (see handoff.md).
+# Keep whatever /kickoff pinned; fall back to the branch only if nothing is set.
+LANE="$(git config sahoda.lane 2>/dev/null || true)"
+[ -n "$LANE" ] || LANE="$(git branch --show-current)"
+
 # This repo may use per-worktree settings, and a plain `git config` write can be
 # silently overridden by one. Write to the worktree when that is switched on.
 if [ "$(git config extensions.worktreeConfig 2>/dev/null)" = "true" ]; then
   git config --worktree sahoda.owner karunesh
-  git config --worktree sahoda.lane  wt-karunesh
+  git config --worktree sahoda.lane  "$LANE"
 else
   git config sahoda.owner karunesh
-  git config sahoda.lane  wt-karunesh
+  git config sahoda.lane  "$LANE"
 fi
-git config sahoda.owner            # VERIFY it reads back "karunesh"
+git config sahoda.owner && git config sahoda.lane   # VERIFY BOTH read back
 git config core.hooksPath .githooks # the block that protects the shared copies
 ```
 
-**Check that it reads back `karunesh`.** If it does not, the block is not armed
-and a push to a shared copy would go through. Fix it before doing anything else.
+**Check that the owner reads back `karunesh`.** If it does not, the block is not
+armed and a push to a shared copy would go through. Fix it before anything else.
+
+**Check the lane too.** If the harness has moved you to a `claude/...` branch,
+the fallback picks that up rather than the lane you were given — set it by hand
+to `wt-karunesh`, `wt-karunesh2` or `wt-karunesh3`, whichever this session is.
 
 ---
 

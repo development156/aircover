@@ -174,13 +174,17 @@ else
   ok "$ROUTES routes, this is the current product"
 fi
 case "$BRANCH" in
-  wt-girija|wt-jiban|wt-divas) ok "on a working lane" ;;
+  wt-divas|wt-divas2|wt-divas3|\
+  wt-jiban|wt-jiban2|wt-jiban3|\
+  wt-girija|wt-girija2|wt-girija3|\
+  wt-karunesh|wt-karunesh2|wt-karunesh3) ok "on a working lane" ;;
   wt-core|wt-web)
     bad "$BRANCH is a shared branch and is NOT a working lane."
     echo "         Everyone shares one GitHub account, so nothing stops you"
-    echo "         committing here. Switch to wt-girija, wt-jiban or wt-divas."
+    echo "         committing here. Switch to your own lane — wt-divas,"
+    echo "         wt-jiban, wt-girija or wt-karunesh, each with a 2 and a 3."
     ;;
-  *) gap "$BRANCH is not one of the three named lanes" ;;
+  *) gap "$BRANCH is not one of the twelve named lanes" ;;
 esac
 
 # ── Is somebody else already working this lane? ──────────────────────────────

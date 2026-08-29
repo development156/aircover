@@ -7,6 +7,10 @@ import { CommandPalette } from '@/components/shell/command-palette'
 import { CreditChip } from '@/components/shell/credit-chip'
 import { ThemeToggle } from '@/components/shell/theme-toggle'
 import { WorkspaceSwitcher } from '@/components/shell/workspace-switcher'
+import { BrandMark } from '@/components/shell/brand-mark'
+import { readBrandLogo, type BrandLogo } from '@/lib/brand/logo'
+import { activeThemeTokens } from '@/lib/brand/read-theme'
+import type { ThemeTokens } from '@sahoda/shared'
 import { readBrain, type BrainRead } from '@/lib/brand/read-brain'
 import { readBalance, type BalanceRead } from '@/lib/wallet/read'
 import {
@@ -76,6 +80,21 @@ export async function Topbar() {
   const workspaces = workspacesRead.status === 'ok' ? workspacesRead.workspaces : []
   const active = resolveActiveWorkspace(workspaces, activeSlug)
 
+  /**
+   * THE BRAND MARK'S TWO INPUTS, together, and only once the workspace is known.
+   *
+   * Both are cached per render: the layout already read the theme for Brand
+   * Skin, so this costs no second query, and the logo is one signed link. A
+   * workspace that has neither renders the chip in Sahoda's own colour, which is
+   * the truthful thing to show when a customer has not given us a brand.
+   */
+  const [logo, theme] = active
+    ? await Promise.all([
+        softRead<BrandLogo | null>('brand_logo', () => readBrandLogo(active.id), null),
+        softRead<ThemeTokens | null>('brand_theme', () => activeThemeTokens(active.id), null),
+      ])
+    : [null, null]
+
   return (
     <header
       data-guide="topbar.root"
@@ -113,6 +132,17 @@ export async function Topbar() {
           written: the switcher's trigger now carries its own `max-w-[16ch]
           truncate` (`7ch` below 700px), so this slot is bounded by its control at
           every width and can no longer be the thing that overflows. */}
+      {/* THE BRAND, BESIDE THE WORKSPACE IT BELONGS TO. Founder's ruling,
+          2026-08-29: the logo goes here, and it is the control that changes the
+          brand colour rather than a decoration. */}
+      <BrandMark
+        logoUrl={logo?.url ?? null}
+        primary={theme?.primary ?? null}
+        /* Whether there is anything to switch TO. A workspace that has never
+           given Sahoda a brand gets the panel on a press rather than a toggle
+           that reports a change which did not happen. */
+        hasTheme={theme !== null}
+      />
       <div className="shrink-0">
         <WorkspaceSwitcher
           workspaces={workspaces}
