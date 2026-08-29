@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { PLAN_CATALOG } from '@sahoda/shared'
 
+import { planOfferRows } from '@/lib/billing/plan-offer-rows'
 import { PlanOfferModal } from './plan-offer-modal'
 
 /**
@@ -12,6 +13,10 @@ import { PlanOfferModal } from './plan-offer-modal'
  * is the other half: given that it is mounted, does it open, does it stay shut
  * once closed, does it come back after a new sign-in, and does it show the real
  * catalog rather than a written copy of it.
+ *
+ * The plan rows come from the REAL `planOfferRows()`, the same builder the page
+ * calls, so the prices these assertions read are the catalog's and not a fixture
+ * agreeing with itself.
  *
  * ── THE CHECKOUT ACTION IS MOCKED, AND NOTHING ELSE IS ───────────────────────
  * `startCheckout` is a `'use server'` export that opens a real Cashfree order.
@@ -23,20 +28,10 @@ vi.mock('@/app/actions/wallet', () => ({
   startCheckout: (planId: unknown) => startCheckout(planId),
 }))
 
-/**
- * `useAuth` is the seam the component reads the session id through, and it is
- * the seam these tests drive. Mocking it rather than wrapping every render in a
- * ClerkProvider keeps the sign-in the tests describe under their own control:
- * "the same session" and "a new session" are one line apart here.
- */
-let sessionId: string | null = null
-vi.mock('@clerk/nextjs', () => ({ useAuth: () => ({ sessionId }) }))
-
 const KEY = 'sahoda.plan-offer-dismissed'
 const SESSION = 'sess_alpha'
 
 beforeEach(() => {
-  sessionId = SESSION
   startCheckout.mockReset()
   window.localStorage.clear()
   // `<dialog>` is not implemented in jsdom; the primitive only calls these two.
@@ -59,14 +54,14 @@ const noDialog = (): boolean => screen.queryByRole('dialog', { hidden: true }) =
 
 describe('when it opens', () => {
   it('opens by itself for a session that has not closed it', async () => {
-    render(<PlanOfferModal />)
+    render(<PlanOfferModal sessionKey={SESSION} plans={planOfferRows()} />)
     await waitFor(() => expect(dialog().open).toBe(true))
     expect(screen.getByRole('heading', { name: 'Choose the right plan for you' })).toBeVisible()
   })
 
   it('stays shut for the session that already closed it', async () => {
     window.localStorage.setItem(KEY, SESSION)
-    render(<PlanOfferModal />)
+    render(<PlanOfferModal sessionKey={SESSION} plans={planOfferRows()} />)
     // Give the mount effect every chance to open it before concluding it did not.
     await Promise.resolve()
     expect(noDialog()).toBe(true)
@@ -79,29 +74,15 @@ describe('when it opens', () => {
     // should meet it again. Only a key scoped to the sign-in can tell these two
     // apart.
     window.localStorage.setItem(KEY, 'sess_yesterday')
-    render(<PlanOfferModal />)
+    render(<PlanOfferModal sessionKey={SESSION} plans={planOfferRows()} />)
     await waitFor(() => expect(dialog().open).toBe(true))
-  })
-
-  it('stays shut until Clerk has resolved a session', async () => {
-    /**
-     * `useAuth()` returns `sessionId: undefined` for the moment before Clerk
-     * hydrates. Opening then would flash the dialog on every page load, and
-     * closing it in that moment would file the dismissal under a key that is
-     * about to be replaced — so the person would meet it again immediately, in
-     * the same sign-in, which is the one thing the brief rules out.
-     */
-    sessionId = null
-    render(<PlanOfferModal />)
-    await Promise.resolve()
-    expect(noDialog()).toBe(true)
   })
 
   it('opens when localStorage throws, rather than staying silent', async () => {
     const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
       throw new Error('storage disabled')
     })
-    render(<PlanOfferModal />)
+    render(<PlanOfferModal sessionKey={SESSION} plans={planOfferRows()} />)
     await waitFor(() => expect(dialog().open).toBe(true))
     getItem.mockRestore()
   })
@@ -110,7 +91,7 @@ describe('when it opens', () => {
 describe('when it closes', () => {
   it('closes on the X and records the dismissal against this session', async () => {
     const user = userEvent.setup()
-    render(<PlanOfferModal />)
+    render(<PlanOfferModal sessionKey={SESSION} plans={planOfferRows()} />)
     await waitFor(() => expect(dialog().open).toBe(true))
 
     await user.click(screen.getByRole('button', { name: 'Close' }))
@@ -123,7 +104,7 @@ describe('when it closes', () => {
     // `Modal` funnels Escape through the element's own `close` event. If that
     // path did not record, a person who pressed Escape would meet the dialog
     // again on the next visit to the dashboard in the same sign-in.
-    render(<PlanOfferModal />)
+    render(<PlanOfferModal sessionKey={SESSION} plans={planOfferRows()} />)
     await waitFor(() => expect(dialog().open).toBe(true))
 
     dialog().dispatchEvent(new Event('close'))
@@ -134,7 +115,7 @@ describe('when it closes', () => {
 
 describe('what it shows', () => {
   beforeEach(async () => {
-    render(<PlanOfferModal />)
+    render(<PlanOfferModal sessionKey={SESSION} plans={planOfferRows()} />)
     await waitFor(() => expect(dialog().open).toBe(true))
   })
 
@@ -213,7 +194,7 @@ describe('choosing a plan', () => {
   it('starts a checkout for the plan that was pressed, through the existing action', async () => {
     const user = userEvent.setup()
     startCheckout.mockResolvedValue({ ok: false, message: 'Checkout is not connected here.' })
-    render(<PlanOfferModal />)
+    render(<PlanOfferModal sessionKey={SESSION} plans={planOfferRows()} />)
     await waitFor(() => expect(dialog().open).toBe(true))
 
     await user.click(screen.getByRole('button', { name: 'Choose Growth' }))
@@ -224,7 +205,7 @@ describe('choosing a plan', () => {
   it('says what happened when checkout refuses, and says nothing was charged', async () => {
     const user = userEvent.setup()
     startCheckout.mockResolvedValue({ ok: false, message: 'Checkout is not connected here.' })
-    render(<PlanOfferModal />)
+    render(<PlanOfferModal sessionKey={SESSION} plans={planOfferRows()} />)
     await waitFor(() => expect(dialog().open).toBe(true))
 
     await user.click(screen.getByRole('button', { name: 'Choose Starter' }))
@@ -239,7 +220,7 @@ describe('choosing a plan', () => {
     // to pay looking at a dashboard with no explanation and no way back.
     const user = userEvent.setup()
     startCheckout.mockResolvedValue({ ok: false, message: 'No.' })
-    render(<PlanOfferModal />)
+    render(<PlanOfferModal sessionKey={SESSION} plans={planOfferRows()} />)
     await waitFor(() => expect(dialog().open).toBe(true))
 
     await user.click(screen.getByRole('button', { name: 'Choose Studio' }))
@@ -257,7 +238,7 @@ describe('choosing a plan', () => {
       sessionId: 'order_1',
       planId: 'growth',
     })
-    render(<PlanOfferModal />)
+    render(<PlanOfferModal sessionKey={SESSION} plans={planOfferRows()} />)
     await waitFor(() => expect(dialog().open).toBe(true))
 
     await user.click(screen.getByRole('button', { name: 'Choose Growth' }))

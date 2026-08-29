@@ -96,12 +96,12 @@ vi.mock('@/app/actions/posts', () => ({ createPost: vi.fn() }))
  * proving nothing about the offer. A read that fails quietly into the answer you
  * were hoping for is the worst kind of green.
  *
- * `useAuth` and `startCheckout` are the dialog's own two seams: the first is
- * what scopes a dismissal to a sign-in, the second is a `'use server'` export
- * that opens a real payment order.
+ * `auth` and `startCheckout` are the other two: the first scopes a dismissal to
+ * a sign-in and pulls `server-only`, which throws in this environment; the
+ * second is a `'use server'` export that opens a real payment order.
  */
 vi.mock('@/lib/billing/read', () => ({ readSubscription: vi.fn() }))
-vi.mock('@clerk/nextjs', () => ({ useAuth: () => ({ sessionId: 'sess_test' }) }))
+vi.mock('@clerk/nextjs/server', () => ({ auth: async () => ({ sessionId: 'sess_test' }) }))
 vi.mock('@/app/actions/wallet', () => ({ startCheckout: vi.fn() }))
 
 const balanceRead = vi.mocked(readBalance)
@@ -439,13 +439,21 @@ describe('the landing rule on the page that lands', () => {
  * matter.
  */
 describe('the plan offer on the dashboard', () => {
-  const offerHeading = () =>
-    screen.queryByRole('heading', { name: 'Choose the right plan for you' })
+  const OFFER = 'Choose the right plan for you'
+  const offerHeading = () => screen.queryByRole('heading', { name: OFFER })
+  /**
+   * AWAITED, because the dialog is fetched on demand. `plan-offer-mount.tsx`
+   * loads it with `next/dynamic` so its weight stays out of /home's first load,
+   * and the budget that decision came from is recorded there. A synchronous
+   * lookup finds nothing and would read as "the page does not mount the offer",
+   * which is the opposite of what it means.
+   */
+  const findOffer = () => screen.findByRole('heading', { name: OFFER })
 
   test('a workspace on Free is offered the plans', async () => {
     render(await HomePage())
 
-    expect(offerHeading()).toBeInTheDocument()
+    expect(await findOffer()).toBeInTheDocument()
   })
 
   test('a workspace on a paid plan is NOT', async () => {
@@ -458,6 +466,10 @@ describe('the plan offer on the dashboard', () => {
 
     render(await HomePage())
 
+    // Absence needs no wait: when the decision is `silent` the page renders no
+    // mount at all, so there is no chunk on its way. The positive cases above
+    // prove the awaited form does resolve, which is what stops this from being
+    // a test that passes because the dialog is merely slow.
     expect(offerHeading()).toBeNull()
   })
 
@@ -500,6 +512,6 @@ describe('the plan offer on the dashboard', () => {
     render(await HomePage())
 
     expect(screen.getByTestId('home-get-started')).toBeInTheDocument()
-    expect(offerHeading()).toBeInTheDocument()
+    expect(await findOffer()).toBeInTheDocument()
   })
 })

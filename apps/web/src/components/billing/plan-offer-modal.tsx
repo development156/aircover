@@ -1,12 +1,11 @@
 'use client'
 
 import { useCallback, useEffect, useState, useTransition } from 'react'
-import { useAuth } from '@clerk/nextjs'
-import type { DisplayCurrency, FxRates, PlanId } from '@sahoda/shared'
 
 import { startCheckout } from '@/app/actions/wallet'
-import { CheckoutResult } from '@/components/wallet/top-up-panel'
+import { CheckoutResult } from '@/components/wallet/checkout-result'
 import { Modal } from '@/components/ui/modal'
+import type { PlanOfferRow } from '@/lib/billing/plan-offer-rows'
 import type { CheckoutState } from '@/lib/wallet/checkout-state'
 
 import { PlanOfferCards } from './plan-offer-cards'
@@ -30,13 +29,24 @@ import { PlanOfferCards } from './plan-offer-cards'
  * signing out does not clear one, so the next sign-in in the same browser stays
  * silent.
  *
- * So the stored value is the CLERK SESSION ID, read here with `useAuth()` rather
- * than passed down from the page — `auth()` on the server pulls `server-only`
- * into the dashboard's render for one string the browser already holds, and it
- * broke four of /home's own tests when it was tried. Dismissing records "not
- * again for session X"; signing out and back in mints session Y, which does not
- * match, and the offer returns. One key, overwritten rather than accumulated, so it cannot
- * grow. `localStorage` rather than `sessionStorage` deliberately: a second tab
+ * So the stored value is the CLERK SESSION ID. Dismissing records "not again for
+ * session X"; signing out and back in mints session Y, which does not match, and
+ * the offer returns. One key, overwritten rather than accumulated, so it cannot
+ * grow.
+ *
+ * ── AND IT ARRIVES AS A PROP, BECAUSE `useAuth()` COSTS 230 kB ───────────────
+ * This read the id itself with `useAuth()` from `@clerk/nextjs`, which is tidier
+ * and was measured to be very expensive: /home is a route with no other Clerk
+ * CLIENT component on it, so that one hook pulled Clerk's browser SDK into the
+ * dashboard's bundle. `scripts/perf/js-budget.mjs` failed the build at
+ * **900.8 kB against a 670.8 kB budget, +230.0 kB** — on the most visited screen
+ * in the product.
+ *
+ * `auth()` on the SERVER costs the browser nothing: the page already renders on
+ * the server and the id travels as a string in the payload. The reason it was
+ * moved to the client in the first place was that `auth()` broke four of /home's
+ * own tests, and that was a test-harness problem with a test-harness fix (mock
+ * the module), not a reason to ship a quarter of a megabyte. `localStorage` rather than `sessionStorage` deliberately: a second tab
  * in the same sign-in is the same session and must stay quiet, and the session
  * id already does the expiring that `sessionStorage` would have done crudely.
  *
@@ -68,31 +78,27 @@ function writeDismissed(sessionKey: string): void {
 }
 
 export interface PlanOfferModalProps {
-  currency?: DisplayCurrency | null
-  fx?: FxRates | null
+  /**
+   * The current Clerk session id, resolved on the server by the page. Required,
+   * and the page renders nothing at all when it has none: a dismissal filed
+   * under a key that is not a sign-in cannot come back at the next one, which is
+   * the whole behaviour asked for.
+   */
+  sessionKey: string
+  /**
+   * The cards' content, built on the server. Not read from `PLAN_CATALOG` here:
+   * a value import from `@sahoda/shared` in this client tree cost /home 89.2 kB
+   * and failed the build. See `lib/billing/plan-offer-rows.ts`.
+   */
+  plans: readonly PlanOfferRow[]
 }
 
-export function PlanOfferModal({ currency = null, fx = null }: PlanOfferModalProps) {
-  /**
-   * NOT A PROP. A `sessionKey` prop was written first so the tests could pass
-   * one in, and it was removed: a parameter that only a test ever supplies is a
-   * second way for the component to behave, and the one the customer gets is
-   * then the one nothing exercises. The tests mock `useAuth` instead, which is
-   * the same seam the app uses.
-   */
-  const { sessionId } = useAuth()
-  /**
-   * Until Clerk has resolved, `sessionId` is undefined and there is no key to
-   * compare a dismissal against. Opening then would mean opening once per page
-   * load for the split second before it resolves, and closing it would record
-   * the dismissal under a key that is about to change. So the dialog stays shut
-   * until there is a real session to scope it to.
-   */
-  const key = sessionId ?? null
+export function PlanOfferModal({ sessionKey, plans }: PlanOfferModalProps) {
+  const key = sessionKey
   const [open, setOpen] = useState(false)
-  const [busyPlanId, setBusyPlanId] = useState<PlanId | null>(null)
+  const [busyPlanId, setBusyPlanId] = useState<string | null>(null)
   /** The plan the last attempt was for, so a retry retries THAT one and not a default. */
-  const [lastPlanId, setLastPlanId] = useState<PlanId | null>(null)
+  const [lastPlanId, setLastPlanId] = useState<string | null>(null)
   const [result, setResult] = useState<CheckoutState | null>(null)
   const [, startTransition] = useTransition()
 
@@ -106,7 +112,7 @@ export function PlanOfferModal({ currency = null, fx = null }: PlanOfferModalPro
    * animate from.
    */
   useEffect(() => {
-    if (key !== null && readDismissed() !== key) setOpen(true)
+    if (readDismissed() !== key) setOpen(true)
   }, [key])
 
   /**
@@ -116,11 +122,11 @@ export function PlanOfferModal({ currency = null, fx = null }: PlanOfferModalPro
    * screens later.
    */
   const close = useCallback(() => {
-    if (key !== null) writeDismissed(key)
+    writeDismissed(key)
     setOpen(false)
   }, [key])
 
-  function choose(planId: PlanId) {
+  function choose(planId: string) {
     setResult(null)
     setLastPlanId(planId)
     setBusyPlanId(planId)
@@ -213,12 +219,17 @@ export function PlanOfferModal({ currency = null, fx = null }: PlanOfferModalPro
           Prices are per month, in rupees. Nothing is charged until a payment completes.
         </p>
 
-        <PlanOfferCards currency={currency} fx={fx} busyPlanId={busyPlanId} onChoose={choose} />
+        <PlanOfferCards plans={plans} busyPlanId={busyPlanId} onChoose={choose} />
 
         {/* The result of pressing a plan, in the SAME component the wallet uses.
             It is the one place that knows how to tell a live session from a
             sandbox order from a failure, and a second opinion about that here is
             how one of the two starts calling a fixture a purchase.
+
+            It is imported from its OWN module, not from the wallet panel it used
+            to live in. That import cost 236.5 kB on /home and failed the build
+            on `js-budget`: one component out of that file drags the whole panel
+            with it. See `checkout-result.tsx`.
 
             ── AND NOTHING NAVIGATES ON ITS OWN ─────────────────────────────
             A live session used to be followed with `window.location.assign`,
