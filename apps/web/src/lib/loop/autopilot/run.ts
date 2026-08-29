@@ -44,6 +44,8 @@ export interface AutopilotTickReport {
   refused: number
   refusalsByReason: Partial<Record<string, number>>
   dispatched: number
+  /** Stopped by the kill switch. NOT a refusal: no guardrail judged the post. */
+  cancelled: number
   waiting: number
   /** A publish that threw AFTER its row was written. The row stands. */
   publishFailed: number
@@ -55,6 +57,7 @@ export async function runAutopilotTick(deps: AutopilotTickDeps): Promise<Autopil
     refused: 0,
     refusalsByReason: {},
     dispatched: 0,
+    cancelled: 0,
     waiting: 0,
     publishFailed: 0,
   }
@@ -122,6 +125,16 @@ export async function runAutopilotTick(deps: AutopilotTickDeps): Promise<Autopil
     if (decision.kind === 'refuse') {
       await deps.write({ ...base, decision: 'refused', refusalReason: decision.reason })
       countRefusal(decision.reason)
+      continue
+    }
+
+    if (decision.kind === 'cancel') {
+      // A cancellation row, not a refusal. No `refusalReason`: the log's CHECK
+      // only demands one for `refused`, and a cancellation's explanation is
+      // the ACTOR column — which defaults to 'autopilot' here and is what stops
+      // the screen telling a customer they pressed a button they never saw.
+      await deps.write({ ...base, decision: 'cancelled' })
+      report.cancelled += 1
       continue
     }
 

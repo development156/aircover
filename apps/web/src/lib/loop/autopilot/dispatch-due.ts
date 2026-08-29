@@ -57,6 +57,21 @@ export type DueDecision =
   | { kind: 'wait'; post: AnnouncedPost; reason: AutopilotRefusal | 'already-dispatched' }
   /** A terminal refusal worth a row of its own. */
   | { kind: 'refuse'; post: AnnouncedPost; reason: AutopilotRefusal }
+  /**
+   * STOPPED, not refused — and the difference reaches the customer.
+   *
+   * The kill switch does not fail a guardrail check; it withdraws permission
+   * for everything at once, which is the same act as a person pressing stop and
+   * belongs in the log as `decision = 'cancelled'`.
+   *
+   * Writing it as a refusal was a real defect and it shipped: the row carried
+   * `refusal_reason = 'CANCELLED'`, and `autopilotStatus` renders a refusal by
+   * looking that name up in AUTOPILOT_REFUSAL_COPY — whose sentence began
+   * "You stopped this post". The customer had not touched it. A cancellation
+   * row instead carries the actor, and the actor is what decides whether the
+   * sentence says "you" or "Sahoda".
+   */
+  | { kind: 'cancel'; post: AnnouncedPost }
 
 /**
  * Decide one announced post.
@@ -74,7 +89,7 @@ export function decideDue(post: AnnouncedPost, world: DueWorld): DueDecision {
   if (world.isCancelled(post.postId, post.variantId)) {
     return { kind: 'wait', post, reason: AUTOPILOT_REFUSALS.CANCELLED }
   }
-  if (world.killed) return { kind: 'refuse', post, reason: AUTOPILOT_REFUSALS.CANCELLED }
+  if (world.killed) return { kind: 'cancel', post }
   if (world.levelFor(post.channel) !== AUTOPILOT_LEVEL) {
     return { kind: 'refuse', post, reason: AUTOPILOT_REFUSALS.NOT_AUTOPILOT_CHANNEL }
   }
