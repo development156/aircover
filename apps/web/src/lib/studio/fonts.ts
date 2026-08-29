@@ -44,13 +44,24 @@ import path from 'node:path'
  *       `instrumentation.ts`, which Next executes at server start before any
  *       request is handled, and not lazily inside the exporter.
  *
- * ── WHAT THIS DOES NOT GIVE YOU ─────────────────────────────────────────────
+ * ── WHAT THIS DOES AND DOES NOT GIVE YOU ────────────────────────────────────
  * The renderer does per-character fallback across the whole set, so asking for
  * one family and getting another's glyphs for characters it lacks is normal and
- * correct. This makes the fonts PRESENT and their names resolvable. It does not,
- * and cannot, make the browser preview and the server export use the same
- * typeface: the browser resolves against the reader's machine. `svg.ts`'s header
- * carries that narrower claim and it is still the true one.
+ * correct. This makes the fonts PRESENT and their names resolvable.
+ *
+ * An earlier version of this header said it "does not, and cannot, make the
+ * browser preview and the server export use the same typeface". That was true
+ * when it was written and is now WRONG: `globals.css` declares these same files
+ * to the browser by their real family names, from `/fonts/...`, so both sides
+ * load the same bytes. See `studioFontsDir` below for why one copy under
+ * `public/` does both jobs.
+ *
+ * What is still not guaranteed, and is the honest remainder:
+ *   · a character outside these two families is drawn by whatever each side
+ *     falls back to, and those sets differ;
+ *   · `font-display: swap` means a reader on a slow link sees a fallback for a
+ *     moment before the real face arrives, so a screenshot taken in that window
+ *     is not the export.
  */
 
 /** The families bundled beside this app, by the name a template asks for. */
