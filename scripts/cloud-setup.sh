@@ -138,8 +138,14 @@ if [ -n "${SAHODA_LANE_OWNER:-}" ]; then
 elif [ -n "$(git config sahoda.owner 2>/dev/null)" ]; then
   ok "owner = $(git config sahoda.owner)"
 else
-  gap "SAHODA_LANE_OWNER not set. Handoffs will be filed under the branch id."
-  echo "         Set it in this environment's variables (girija | jiban | divas)"
+  bad "SAHODA_LANE_OWNER not set."
+  echo "         Two things break, and the second one is not obvious:"
+  echo "           1. handoffs are filed under a branch id nobody can read"
+  echo "           2. .githooks/pre-push keys on THIS value, so a karunesh"
+  echo "              lane with it unset can push to wt-core and wt-web."
+  echo "              The block is off. It does not announce itself."
+  echo "         Set it in this environment's variables:"
+  echo "           girija | jiban | divas | karunesh"
   echo "         or run: git config sahoda.owner <name>"
 fi
 
