@@ -53,3 +53,15 @@ apps/web/playwright-report/
 .remember/
 .playwright-mcp/
 .claude/worktrees/
+test-results/
+
+# ── AN EXPORT KIT OF SOMEBODY ELSE'S FILES ──────────────────────────────────
+# `ops/account-transfer/` is a transfer kit: sanitised settings, a plugin
+# inventory and a COPIED third-party rule set. Prettier wants to reformat all
+# 24 of them — inserting blank lines into markdown it did not write — which is
+# the same corruption `.agents/skills/humanizer/` is excluded for above: a
+# verbatim copy that is reformatted is no longer a verbatim copy.
+#
+# It arrived from wt-core on 2026-08-29 and turned `prettier --check .` red
+# everywhere it landed, this lane included. Excluded rather than rewritten.
+ops/account-transfer/

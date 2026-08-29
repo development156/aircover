@@ -9,6 +9,8 @@ import {
   type ChannelSet,
 } from '@sahoda/shared'
 
+import { countConfirmedFields } from '@/lib/brand/confirmed-count'
+import { RING_DENOMINATOR } from '@/lib/brand/fields'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { activeWorkspaceRead } from '@/lib/workspaces'
 
@@ -68,8 +70,37 @@ const PLANNABLE: readonly string[] = ['x', 'gbp', 'linkedin', 'instagram']
  */
 
 export interface LoopSnapshot {
+  /**
+   * Whether a `loop_settings` ROW EXISTS — i.e. whether anybody has ever turned
+   * the Loop on here.
+   *
+   * `paused` could not carry this. A missing row read as `paused: false`, which
+   * is the same value as "switched on and running", so the screen could not
+   * tell a customer who has never opened the Loop from one whose week is about
+   * to be planned. `never_enabled` is the reason most of this fleet is in:
+   * MEASURED 2026-08-28, 5 of 33 production workspaces have a row at all.
+   */
+  enabled: boolean
   paused: boolean
   weeklyBudgetCredits: number
+  /**
+   * Credits this workspace can actually spend — total minus held.
+   *
+   * Read here rather than inferred, because the alternative is a screen that
+   * offers to plan a week the workspace cannot pay for and discovers it only
+   * after the cycle has opened and the ledger has taken a hold.
+   */
+  availableCredits: number
+  /**
+   * The Brand Brain: whether one is resolved, and how much of it a person has
+   * actually agreed to.
+   *
+   * Read here because the Loop's verdict depends on it and because the number
+   * is printed. `confirmed` counts `field_meta` entries marked confirmed, out
+   * of the same 15 the ring on /brain uses — one denominator, so the two
+   * screens cannot report different fractions of the same brain.
+   */
+  brain: { resolved: boolean; confirmed: number; total: number }
   /** Only the levels a person actually chose. A missing channel is not L1 — it is unset. */
   dial: Map<Channel, AutonomyLevel>
   connected: ChannelSet
@@ -98,6 +129,12 @@ export interface LoopCycleView {
   spentCredits: number
   budgetCredits: number | null
   reflectSkippedNoHistory: boolean
+  /**
+   * Why Reflect produced no learning, or null when it produced one — or when
+   * the cycle predates the column. Those two nulls are the same value and the
+   * screen must not turn either into a claim.
+   */
+  reflectReason: string | null
   failureReason: string | null
   startedAt: string
   reportedAt: string | null
@@ -127,6 +164,12 @@ export interface PendingLearning {
 
 /** The default a workspace that has never opened this screen is running at. */
 export const UNSET_SNAPSHOT: Omit<LoopSnapshot, 'dial' | 'connected' | 'lapsed'> = {
+  // Never turned on, and no credits read. Both are the honest default for a
+  // workspace this snapshot was never built for — and `enabled: false` is what
+  // makes `never_enabled` the reason rather than a silently un-paused Loop.
+  enabled: false,
+  availableCredits: 0,
+  brain: { resolved: false, confirmed: 0, total: RING_DENOMINATOR },
   paused: false,
   weeklyBudgetCredits: DEFAULT_WEEKLY_BUDGET_CREDITS,
   cycle: null,
@@ -173,51 +216,66 @@ export async function readLoop(): Promise<LoopRead> {
 export async function readLoopSnapshot(workspaceId: string): Promise<LoopSnapshot | null> {
   const supabase = createServerSupabase()
 
-  const [settingsRes, dialRes, connRes, cycleRes, learnRes] = await Promise.all([
-    supabase
-      .from('loop_settings')
-      .select('paused, weekly_budget_credits')
-      .eq('workspace_id', workspaceId)
-      .maybeSingle(),
-    supabase.from('loop_channel_autonomy').select('channel, level').eq('workspace_id', workspaceId),
-    supabase
-      .from('connections')
-      .select('platform, status')
-      .eq('workspace_id', workspaceId)
-      // BOTH vocabularies, deliberately. `connected` and `lapsed` below are
-      // derived from these same rows, so narrowing this to 'active' alone would
-      // make `lapsed` permanently empty while every test still passed.
-      //
-      // What it used to carry was 'connected', which `connections.status` cannot
-      // hold — check (status in ('active','expired','revoked','error')),
-      // 20260718000005_connections.sql:9 — so it matched no row on any
-      // workspace and the screen read that as "you have no channels". A bad
-      // INSERT raises 23514; a bad WHERE is a valid query that finds nothing.
-      //
-      // The members are written out rather than spread from LIVE_STATUS /
-      // LAPSED_STATUS: both guards that pin this
-      // (lib/connections/status-vocabulary.test.ts,
-      // lib/repo/check-constraints.test.ts) read the SOURCE TEXT, so a constant
-      // makes this query invisible to them — the file drops out of the very
-      // list that is supposed to be watching it. MEASURED: with the spread here
-      // both scanners reported this file as carrying no comparison at all.
-      .in('status', ['active', 'expired', 'revoked', 'error']),
-    supabase
-      .from('loop_cycles')
-      .select('*')
-      .eq('workspace_id', workspaceId)
-      .order('started_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from('memory_events')
-      .select('id, diff, created_at')
-      .eq('workspace_id', workspaceId)
-      .eq('status', 'pending')
-      .eq('source', 'insight')
-      .order('created_at', { ascending: false })
-      .limit(3),
-  ])
+  const [settingsRes, dialRes, connRes, cycleRes, brainRes, balanceRes, learnRes] =
+    await Promise.all([
+      supabase
+        .from('loop_settings')
+        .select('paused, weekly_budget_credits')
+        .eq('workspace_id', workspaceId)
+        .maybeSingle(),
+      supabase
+        .from('loop_channel_autonomy')
+        .select('channel, level')
+        .eq('workspace_id', workspaceId),
+      supabase
+        .from('connections')
+        .select('platform, status')
+        .eq('workspace_id', workspaceId)
+        // BOTH vocabularies, deliberately. `connected` and `lapsed` below are
+        // derived from these same rows, so narrowing this to 'active' alone would
+        // make `lapsed` permanently empty while every test still passed.
+        //
+        // What it used to carry was 'connected', which `connections.status` cannot
+        // hold — check (status in ('active','expired','revoked','error')),
+        // 20260718000005_connections.sql:9 — so it matched no row on any
+        // workspace and the screen read that as "you have no channels". A bad
+        // INSERT raises 23514; a bad WHERE is a valid query that finds nothing.
+        //
+        // The members are written out rather than spread from LIVE_STATUS /
+        // LAPSED_STATUS: both guards that pin this
+        // (lib/connections/status-vocabulary.test.ts,
+        // lib/repo/check-constraints.test.ts) read the SOURCE TEXT, so a constant
+        // makes this query invisible to them — the file drops out of the very
+        // list that is supposed to be watching it. MEASURED: with the spread here
+        // both scanners reported this file as carrying no comparison at all.
+        .in('status', ['active', 'expired', 'revoked', 'error']),
+      supabase
+        .from('loop_cycles')
+        .select('*')
+        .eq('workspace_id', workspaceId)
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from('brand_memory')
+        .select('payload')
+        .eq('workspace_id', workspaceId)
+        .eq('status', 'active')
+        .maybeSingle(),
+      supabase
+        .from('credit_balances')
+        .select('balance_total, balance_held')
+        .eq('workspace_id', workspaceId)
+        .maybeSingle(),
+      supabase
+        .from('memory_events')
+        .select('id, diff, created_at')
+        .eq('workspace_id', workspaceId)
+        .eq('status', 'pending')
+        .eq('source', 'insight')
+        .order('created_at', { ascending: false })
+        .limit(3),
+    ])
 
   // ── FOUR OF THE FIVE, AND WHY `memory_events` IS NOT ONE OF THEM ──────────
   // A failed read makes the snapshot a guess only where the screen turns the
@@ -236,7 +294,14 @@ export async function readLoopSnapshot(workspaceId: string): Promise<LoopSnapsho
   //
   // `maybeSingle` reports a missing row as `data: null, error: null`, so this
   // catches transport and RLS faults without mistaking an empty table for one.
-  for (const res of [settingsRes, dialRes, connRes, cycleRes]) {
+  // `credit_balances` joins the four: the number it carries is printed as the
+  // customer's own balance and is compared against a price before a spend. A
+  // failed read defaulting to zero would tell somebody with 1,196 credits to
+  // top up, which is both false and a dead end.
+  // `brand_memory` joins them for the same reason: a failed read defaulting to
+  // "no brain" would tell a customer with a resolved brain to go and build one,
+  // and send them to a screen that would show them the brain they already have.
+  for (const res of [settingsRes, dialRes, connRes, cycleRes, brainRes, balanceRes]) {
     if (res.error) return null
   }
 
@@ -276,6 +341,7 @@ export async function readLoopSnapshot(workspaceId: string): Promise<LoopSnapsho
         spentCredits: (raw.spent_credits as number) ?? 0,
         budgetCredits: (raw.budget_credits as number | null) ?? null,
         reflectSkippedNoHistory: Boolean(raw.reflect_skipped_no_history),
+        reflectReason: (raw.reflect_reason as string | null) ?? null,
         failureReason: (raw.failure_reason as string | null) ?? null,
         startedAt: raw.started_at as string,
         reportedAt: (raw.reported_at as string | null) ?? null,
@@ -310,7 +376,18 @@ export async function readLoopSnapshot(workspaceId: string): Promise<LoopSnapsho
   }
 
   return {
+    enabled: settingsRes.data !== null,
+    brain: {
+      resolved: brainRes.data !== null,
+      confirmed: countConfirmedFields(brainRes.data?.payload),
+      total: RING_DENOMINATOR,
+    },
     paused: Boolean(settingsRes.data?.paused),
+    availableCredits: Math.max(
+      0,
+      ((balanceRes.data?.balance_total as number | undefined) ?? 0) -
+        ((balanceRes.data?.balance_held as number | undefined) ?? 0),
+    ),
     weeklyBudgetCredits:
       (settingsRes.data?.weekly_budget_credits as number | undefined) ??
       DEFAULT_WEEKLY_BUDGET_CREDITS,

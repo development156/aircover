@@ -2432,7 +2432,10 @@ lead · who on the team owns it · any figure about conversion — **there is no
 **Group:** Publish, first of four. Label *Planner*, hint *"The schedule, week by
 week"*. **One of the four phone bottom-bar tabs**, to the right of the create button.
 
-**Header:** *Planner* / *"Plan, schedule and stay ahead."*
+**Header:** *Planner* / *"Everything for your content week, in one place. Plan it,
+approve it, and watch it go out."* — set in a banner with a decorative calendar
+motif behind it, masked out under the copy. Beside the copy: the view control.
+Below it, when nothing is connected, the one-line connect note.
 
 **What a person does here.** Looks at what they have committed to post and when. They
 can **hand the week over** — one click drafts five posts and puts a time on each —

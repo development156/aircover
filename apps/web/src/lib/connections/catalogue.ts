@@ -471,3 +471,14 @@ export const READINESS_LABEL: Readonly<Record<Readiness, string>> = {
   'connect-only': 'Connect only',
   'not-built': 'Coming soon',
 }
+
+/**
+ * The offer rule lives in `./offer`, which has no imports.
+ *
+ * Re-exported here because every reader already asks the catalogue this
+ * question and moving the import site would have been a wider change than the
+ * one that made it necessary. Defined ONCE, in the module that can be imported
+ * without the catalogue behind it — see `offer.ts` for the 807 bytes that
+ * prompted the split.
+ */
+export { HIDDEN_FROM_OFFER, isOfferedForConnect } from './offer'
