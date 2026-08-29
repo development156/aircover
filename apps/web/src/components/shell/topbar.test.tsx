@@ -43,6 +43,16 @@ vi.mock('@/lib/wallet/read', () => ({
 
 // The Brand Brain ring is the fourth shell read, and it obeys the same rule as
 // the other three: it may degrade, it may not throw past this component.
+/* The brand mark's two reads. Both are `server-only`, which throws the moment a
+   client module graph touches them, and the topbar now imports both beside a
+   'use client' component. Mocked here for the same reason every other read in
+   this file is: this suite is about the SHELL's degradation, not about them. */
+vi.mock('@/lib/brand/logo', () => ({ readBrandLogo: vi.fn(async () => null) }))
+/* `BrandMark` is a client component and calls `useRouter`, which needs a mounted
+   app router that a server-component render has no way to provide. Its own suite
+   covers its behaviour; here it only needs to not take the shell down. */
+vi.mock('@/components/shell/brand-mark', () => ({ BrandMark: () => null }))
+vi.mock('@/lib/brand/read-theme', () => ({ activeThemeTokens: vi.fn(async () => null) }))
 vi.mock('@/lib/brand/read-brain', () => ({
   readBrain: vi.fn(),
 }))

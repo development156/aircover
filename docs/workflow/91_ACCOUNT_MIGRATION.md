@@ -138,6 +138,8 @@ Each person then starts with:
 /kickoff owner:jiban    , branch: wt-jiban    , /lead-design
 /kickoff owner:girija   , branch: wt-girija   , /lead-research
 /kickoff owner:karunesh , branch: wt-karunesh , /lead-expert
+/kickoff owner:karunesh , branch: wt-karunesh2 , /lead-expert
+/kickoff owner:karunesh , branch: wt-karunesh3 , /lead-expert
 ```
 
 `/kickoff` **restores context and stops.** It does not start work — deliberately,
