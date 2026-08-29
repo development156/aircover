@@ -138,8 +138,14 @@ if [ -n "${SAHODA_LANE_OWNER:-}" ]; then
 elif [ -n "$(git config sahoda.owner 2>/dev/null)" ]; then
   ok "owner = $(git config sahoda.owner)"
 else
-  gap "SAHODA_LANE_OWNER not set. Handoffs will be filed under the branch id."
-  echo "         Set it in this environment's variables (girija | jiban | divas)"
+  bad "SAHODA_LANE_OWNER not set."
+  echo "         Two things break, and the second one is not obvious:"
+  echo "           1. handoffs are filed under a branch id nobody can read"
+  echo "           2. .githooks/pre-push keys on THIS value, so a karunesh"
+  echo "              lane with it unset can push to wt-core and wt-web."
+  echo "              The block is off. It does not announce itself."
+  echo "         Set it in this environment's variables:"
+  echo "           girija | jiban | divas | karunesh"
   echo "         or run: git config sahoda.owner <name>"
 fi
 
@@ -174,13 +180,17 @@ else
   ok "$ROUTES routes, this is the current product"
 fi
 case "$BRANCH" in
-  wt-girija|wt-jiban|wt-divas) ok "on a working lane" ;;
+  wt-divas|wt-divas2|wt-divas3|\
+  wt-jiban|wt-jiban2|wt-jiban3|\
+  wt-girija|wt-girija2|wt-girija3|\
+  wt-karunesh|wt-karunesh2|wt-karunesh3) ok "on a working lane" ;;
   wt-core|wt-web)
     bad "$BRANCH is a shared branch and is NOT a working lane."
     echo "         Everyone shares one GitHub account, so nothing stops you"
-    echo "         committing here. Switch to wt-girija, wt-jiban or wt-divas."
+    echo "         committing here. Switch to your own lane — wt-divas,"
+    echo "         wt-jiban, wt-girija or wt-karunesh, each with a 2 and a 3."
     ;;
-  *) gap "$BRANCH is not one of the three named lanes" ;;
+  *) gap "$BRANCH is not one of the twelve named lanes" ;;
 esac
 
 # ── Is somebody else already working this lane? ──────────────────────────────
