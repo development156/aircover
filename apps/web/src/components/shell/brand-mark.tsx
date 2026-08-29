@@ -130,7 +130,14 @@ export function BrandMark({
         <div
           role="dialog"
           aria-label="Your brand colour"
-          className="surface-ring-firm absolute top-[calc(100%+8px)] left-0 z-10 w-[280px] rounded-card bg-surface p-3 shadow-pop"
+          /* `absolute`, `z-15`, matching the workspace switcher beside it. The
+             topbar carries `glass`, and `backdrop-filter` makes it a containing
+             block AND a stacking context: a `fixed` child would be trapped
+             inside it (the palette trap, apps/web/CLAUDE.md) and a lower z would
+             let a sibling in the same row cover this panel. Absolute is correct
+             here because this hangs off its button rather than covering the
+             viewport. */
+          className="surface-ring-firm absolute top-[calc(100%+8px)] left-0 z-15 w-[280px] rounded-card bg-surface p-3 shadow-pop"
         >
           <p className="type-sm text-ink">Your brand colour</p>
           <p className="type-xs mt-1 text-muted">
