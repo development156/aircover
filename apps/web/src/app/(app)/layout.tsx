@@ -3,6 +3,8 @@ import { Toaster } from 'sonner'
 import { hasDeferredOnboarding } from '@/lib/onboarding/defer'
 import { landingDecision } from '@/lib/onboarding/landing'
 import { onboardingStateRead } from '@/lib/onboarding/read-onboarding-state'
+import { activeThemeTokens } from '@/lib/brand/read-theme'
+import { skinCss } from '@/lib/brand/skin-css'
 import { activeWorkspaceRead } from '@/lib/workspaces'
 
 import { FirstRun } from '@/components/home/first-run'
@@ -62,8 +64,6 @@ async function decideLanding(): Promise<'through' | 'first-run'> {
  * control, the one at the end of the list, on exactly one device.
  */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const landing = await decideLanding()
-
   /**
    * Only the phone's FAB needs this, and only to decide whether to paint the
    * loudest control on a 390px screen.
@@ -73,10 +73,35 @@ export default async function AppLayout({ children }: { children: React.ReactNod
    * account and 'unreadable' is a question that did not get an answer. Only the
    * first may change what is rendered.
    */
+  const landing = await decideLanding()
+
+  /**
+   * BRAND SKIN, APPLIED. Everything below this line existed and nothing called
+   * it: a workspace could upload a logo, have its colours extracted, guarded,
+   * derived and stored, and watch the product stay Sahoda orange for ever.
+   *
+   * Read HERE, on the server, in the same pass that renders the page. Setting
+   * these from an effect would paint our orange first and the customer's brand a
+   * frame later, which is the flash `docs/26` forbids. A workspace with no theme
+   * produces an empty string and `tokens.css` stands untouched.
+   *
+   * The read is scoped to the CURRENT workspace and not to the account: RLS
+   * confines it to the caller's memberships, which for somebody in two
+   * workspaces is not the same thing, and an unfiltered read would paint one
+   * workspace in the other's brand. `read-theme.ts` records that exact defect
+   * happening on /sites.
+   */
   const workspace = await activeWorkspaceRead()
+
+  const skin =
+    workspace.status === 'ok' ? skinCss(await activeThemeTokens(workspace.workspace.id)) : ''
 
   return (
     <div className="grid min-h-dvh grid-cols-[auto_1fr] max-narrow:grid-cols-1">
+      {/* A workspace with no theme emits no element at all, so the default
+          palette is the absence of this rather than a second rule overriding
+          the first. */}
+      {skin ? <style data-brand-skin="">{skin}</style> : null}
       {/* THE GRADIENT GROUND — fixed, behind everything, out of every hit-test.
           It is `aria-hidden` and empty because it carries no information: a
           decorative layer that a screen reader announces is noise, and one that
