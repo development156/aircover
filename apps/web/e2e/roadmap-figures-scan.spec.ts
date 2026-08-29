@@ -6,7 +6,7 @@ import { useTheme } from './helpers/ux-shot'
  * WHAT NUMBER, IF ANY, REACHED EACH ROADMAP SCREEN.
  *
  * `roadmap-honesty.spec.ts` owns the PROPERTY for the two routes still on its
- * list (/radar, /studio) and holds each to an allowlist of real prices. This
+ * list (/radar) and holds each to an allowlist of real prices. This
  * file is the wider EVIDENCE sweep the `wt-page-rest` brief asks for: it visits
  * every screen with an unbuilt section and prints every standalone run of digits
  * rendered inside `#main`, so "no invented figures" is a reading rather than an
@@ -32,7 +32,6 @@ const ROADMAP = [
   '/ads/targeting',
   '/ads/budget',
   '/ads/performance',
-  '/studio',
   '/radar',
 ] as const
 
@@ -74,7 +73,8 @@ test('@smoke no roadmap screen renders a figure about the reader’s business', 
     ['7', 'an ordinal'],
     // VERIFIED against pricing.config.json, not guessed: this draft first said
     // "the 8 MB upload cap", which is a different real number that happens to
-    // share the digit. `carousel` is 8 credits, and that is what /studio quotes.
+    // share the digit. (`/studio` quoted `carousel` at 8 credits until it was
+    // built on 2026-08-28; it quotes no figure now and has left this scan.)
     ['8', 'creditCost("carousel") = 8 — a price from pricing.config.json'],
     ['9', 'an ordinal'],
     ['16', 'an aspect ratio component (16:9)'],

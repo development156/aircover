@@ -279,3 +279,138 @@ single item.**
 **Read the skip counts, not the exit code: 220 tests did not run** in the local
 leg. `/(app)/assets` measured **827620** against its **822072** budget, inside
 the harness's 8 kB slack with about 2.6 kB left.
+
+---
+
+# Session 2 — divas — wt-divas3 — 2026-08-27
+
+**Branch** `claude/divas-kickoff-xdoxoa` at `41e32276`. Lane `wt-divas3`. Pushed: **yes**, 0 unpushed at the time of writing.
+PR [#18](https://github.com/development156/sahodalabs/pull/18) → `wt-core`, draft.
+
+> The header of Session 1 says this file is rewritten in place and never gains a
+> `## Session 2`. That was true of Session 1 writing about itself. This IS a
+> second session, with a cleared context and no memory of the first, so the
+> append rule applies and the header's claim is superseded from here down.
+
+## What shipped
+
+**Nothing. No product code was written in this session.** MEASURED: the only
+commit newer than Session 1's own handoff commit `adbcb9dd` is the merge
+`41e32276`, "merge wt-core before handing `claude/divas-kickoff-xdoxoa` over",
+authored 2026-08-27 16:22:09 +0000, whose second parent is `1bb51630` on
+`wt-core`. Its diff against `adbcb9dd` is 12 files, +730 / -481, and every line
+of it came from `wt-core`, not from here.
+
+| What the merge brought in from `wt-core` | Lines |
+| --- | --- |
+| `apps/web/e2e/helpers/node-transport.ts` (new) | +274 |
+| `scripts/browser-run.mjs` (new) | +199 |
+| `scripts/sandbox-probe.mjs` (new) | +185 |
+| `scripts/auto-handoff.mjs` + its test (**deleted** — the Stop hook) | -472 |
+| `.claude/commands/{handoff,kickoff}.md`, `.claude/settings.json`, `.gitignore`, `e2e/fixtures/seeded-user.ts`, `e2e/onboarding-boot-video.spec.ts`, `docs/workflow/handoffs/README.md` | the rest |
+
+The value this session added is the section below: **`41e32276` had never been
+tested.** Session 1's gate, local and CI both, ran on `afca6f98` — one commit
+before the merge. A merge commit that no leg has ever seen is an unverified
+commit, whatever colour its parents were.
+
+## What was NOT done, and why
+
+- **No product work, and none was asked for.** The session opened with `/clear`
+  and the only instruction given was `/handoff`.
+- **Playwright `test:smoke` — UNRUN, not passed.** Two independent reasons,
+  both MEASURED. `apps/web/.env.local` is absent, so `e2e/global-setup.ts`
+  throws on the missing Clerk names before any spec loads; and REQUESTS §25's
+  finding still stands for this sandbox. UNRUN is not a failure and it is not a
+  pass.
+- **`packages/db`'s live-database legs did not all reach a database.** See the
+  Gate section: DNS for the Supabase host does not resolve from this sandbox on
+  the second run.
+- **No push to `wt-core`.** `41e32276` is not green on a full local run in this
+  sandbox for environment reasons I could not clear, so I did not put it into
+  the one gated branch in the system.
+
+## Shared surfaces touched
+
+**None by this session.** MEASURED: no file was edited except
+`docs/workflow/handoffs/divas-wt-divas3-2026-08-27.md` (this text) and
+`ops/state/qa.pending.json` (written by the repo's own QA hook when my gate run
+failed, not by hand).
+
+The merge `41e32276` did carry shared surfaces in from `wt-core`, and a lane
+pulling `wt-core` gets them regardless of this lane:
+
+- **`scripts/auto-handoff.mjs` and `scripts/lib/auto-handoff.test.mjs` are
+  deleted.** Anything that invoked the Stop-hook skeleton writer is now calling
+  a file that does not exist. This is the removal the `/handoff` command
+  documents.
+- **`apps/web/e2e/helpers/node-transport.ts` is new** and `e2e/fixtures/seeded-user.ts`
+  changed. Any lane with in-flight e2e work merges against these.
+
+## Contract, migration or money
+
+**None in this session.** MEASURED: `packages/shared` untouched,
+`packages/db/supabase/migrations` untouched, `pricing.config.json` untouched,
+no ledger path touched. The merge added no migration either — the 12 changed
+paths are listed above and none is under `migrations/`.
+
+## Guards written, and the mutation that proved each
+
+**None written, so none proved.** Writing a guard was not part of this session,
+and I will not claim a mutation I did not watch go red.
+
+One guard was, however, **observed failing without my provoking it**, which is
+the same evidence: `src/components/assets/asset-library.test.tsx:233` went red
+in the full-suite run and green in isolation. That is a real assertion doing
+real work, and the next section says what it means.
+
+## Anything retracted
+
+**Session 1's "PASS" does not extend to `41e32276`.** Session 1 measured its
+gate honestly and on the right SHA, `afca6f98`; nothing it wrote is wrong. But
+the branch has moved one commit since, and the head this lane is handing over is
+**not** the head anyone tested. That is a scope correction, not a defect found.
+
+**MEASURED, not inferred:** I ran the legs myself; the outputs are below.
+
+## What the next session in THIS lane should pick up
+
+1. **Get `41e32276` a real green, in CI, not here.** Dispatch the `gate.yml`
+   workflow against `claude/divas-kickoff-xdoxoa` at this SHA. Session 1 proved
+   that route works: job 98584261042 on `afca6f98`, 11m 19s, all 13 steps green.
+   Both failures I saw locally are things CI does not have, so I expect it green
+   — that expectation is INFERRED and the CI run is what settles it.
+2. **Then decide about `wt-core`.** Do not push `41e32276` onward until step 1
+   is green on that exact SHA.
+3. **`asset-library.test.tsx:233` is timing-sensitive and worth one look.** It
+   is a `waitFor` on `unfileAssets` after an Undo click. It failed once in a
+   4m38s whole-repo run and passed on its own in 8.55s, so the assertion is
+   sound and the wait is what is thin. Do not delete it and do not widen the
+   timeout blindly: make the test await the state it actually depends on.
+
+## Gate
+
+Every leg below was run **in this session, on `41e32276`**, with a clean tree.
+Both `turbo` invocations report **0 cached, 27 total** — no leg is a replay.
+
+| Leg | Result | Real output |
+| --- | --- | --- |
+| `turbo run typecheck lint test --force` (whole repo) | **FAIL** | exit 1. `Tasks: 26 successful, 27 total`, `Cached: 0 cached, 27 total`, 4m38.411s. `Failed: @sahoda/web#test` |
+| ↳ every leg except `@sahoda/web#test` | **PASS** | 26 of 27, typecheck and lint included, across all packages |
+| ↳ `@sahoda/web` test, run 1 | **FAIL, 1 test** | `1 failed \| 5150 passed \| 13 skipped (5164)`, 224.85s. The one: `asset-library.test.tsx:233`, `waitFor` on `unfileAssets` after Undo |
+| ↳ that file alone, immediately after | **PASS** | `1 passed (1)`, `34 passed (34)`, 8.55s. Green in isolation, red under full-suite load |
+| ↳ `@sahoda/web` test, run 2 (whole leg, forced) | **FAIL, 2 tests, DIFFERENT ones** | `2 failed \| 5151 passed \| 11 skipped (5164)`, 138.62s. `asset-library` passed this time |
+| ↳ the run-2 failures | **environment** | both in `src/lib/privacy/export-drift.test.ts`, one message: `Error: getaddrinfo ENOTFOUND db.rloztdhzfliyvpvxsgjl.supabase.co`. No DNS for the Supabase host from this sandbox |
+| `prettier --check .` (repo root, repo's pinned binary) | **PASS** | exit 0, `All matched files use Prettier code style!` |
+| Playwright `test:smoke` | **UNRUN, not passed** | `apps/web/.env.local` absent; `e2e/global-setup.ts` throws on the missing Clerk names |
+
+**Read the two runs together, not either alone.** Grouped by error message
+there are exactly two groups, and neither is a defect in the merge: one
+`waitFor` that is load-sensitive and passes alone, and one DNS name that does
+not resolve in this sandbox. Run 1 and run 2 failed on **disjoint** tests, which
+is the signature of environment and timing, not of code. The skip counts moved
+with it — 13 skipped in run 1, 11 in run 2 — because `export-drift` skips when
+it cannot see a database and fails when it half-can.
+
+**The honest one-line summary: `41e32276` is UNVERIFIED, not red.** No leg has
+shown a defect in it, and no leg in this sandbox can show it clean either.

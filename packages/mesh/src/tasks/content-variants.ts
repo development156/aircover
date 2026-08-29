@@ -71,6 +71,7 @@ function buildMessages(
   _ctx: MeshContext,
   brand?: ChatMessage,
   knowledge?: ChatMessage,
+  market?: ChatMessage,
 ): ChatMessage[] {
   const user = [
     'Canonical post:',
@@ -83,8 +84,11 @@ function buildMessages(
   ].join('\n')
   return [
     { role: 'system', content: SYSTEM },
+    // Brand ABOVE market. docs/51 RULING 1, enforced by reading order; a test
+    // pins it, because an ordering is a convention a refactor can reverse.
     ...(brand ? [brand] : []),
     ...(knowledge ? [knowledge] : []),
+    ...(market ? [market] : []),
     { role: 'user', content: user },
   ]
 }
@@ -96,4 +100,12 @@ export const contentVariantsTask: MeshTaskSpec<ContentVariantsInput, ContentVari
   // The canonical body only. The channel limits are our own framing and would
   // just widen the query with words like "hashtags" that match every passage.
   knowledgeQuery: (input) => input.body,
+  /**
+   * Reads the brain for the reason `channel_return` exists: this task writes one
+   * variant PER CHANNEL, and the one observation that knows a customer's
+   * channels differ is the one measuring what each returns. Cutting a caption
+   * for Instagram and for LinkedIn identically is the default this is meant to
+   * end.
+   */
+  wantsMarketContext: true,
 }

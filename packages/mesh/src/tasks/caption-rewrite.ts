@@ -85,11 +85,17 @@ function buildMessages(
   _ctx: MeshContext,
   brand?: ChatMessage,
   knowledge?: ChatMessage,
+  market?: ChatMessage,
 ): ChatMessage[] {
   return [
     { role: 'system', content: `${SYSTEM_BASE} ${DIRECTIVES[input.instruction]} ${PROSE_RULES}` },
+    // Brand ABOVE market, always. docs/51 RULING 1: when the two hemispheres
+    // disagree the Brand Brain wins, and reading order is the cheapest way to
+    // say so to a model. Anyone reordering these two lines is changing a
+    // founder ruling rather than tidying an array; a test pins it.
     ...(brand ? [brand] : []),
     ...(knowledge ? [knowledge] : []),
+    ...(market ? [market] : []),
     { role: 'user', content: target(input) },
   ]
 }
@@ -102,4 +108,18 @@ export const captionRewriteTask: MeshTaskSpec<CaptionRewriteInput, CaptionRewrit
   // Retrieved against the same text the model is asked to rewrite, so a caption
   // about the tasting menu draws the passage about the tasting menu.
   knowledgeQuery: target,
+  /**
+   * The second task to read the Marketing Brain, and the first that WRITES.
+   *
+   * `plan_week` was deliberately the only reader while the wire was unproven,
+   * so any change in quality was attributable to one place. That has held, and
+   * planning is the wrong end of the pipe to stop at: the plan decides what
+   * gets made, and this decides how it reads. An observation saying shorter
+   * posts earn more attention should reach the function that shortens them.
+   *
+   * It cannot leak: `market-context.ts` forbids quoting an observation back to
+   * the reader, and every claim it carries is arithmetic over the customer's
+   * own posts rather than anything a model produced.
+   */
+  wantsMarketContext: true,
 }

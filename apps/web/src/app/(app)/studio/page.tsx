@@ -1,147 +1,123 @@
 import Link from 'next/link'
-import { Layers, Palette, Quote, Type } from 'lucide-react'
-import { creditCost } from '@sahoda/shared'
+import { Palette } from 'lucide-react'
 
+import { EmptyState } from '@/components/empty-state'
 import { PageTitle } from '@/components/page-title'
-import { InertButton, InertChip, RoadmapBanner } from '@/components/roadmap/inert'
-import { InertMediaSlot, InertPanel, InertRow, NotRunningNote } from '@/components/roadmap/parts'
-import { creditWord } from '@/lib/credit-words'
+import { DesignPreview } from '@/components/studio/design-preview'
+import { StartDesign } from '@/components/studio/start-design'
+import { activeThemeTokens } from '@/lib/brand/read-theme'
+import { describePaletteFallback, studioPalette } from '@/lib/studio/palette'
+import { describeUnreadableDesigns, studioEmptiness } from '@/lib/studio/emptiness'
+import { readDesigns } from '@/lib/studio/read'
+import { activeWorkspaceRead } from '@/lib/workspaces'
 
 export const metadata = { title: 'Studio' }
 
 /**
- * STUDIO — templates that are locked to your brand, and a canvas that is not there.
+ * STUDIO — designs a person makes, keeps and comes back to.
  *
- * ── THE ONE DECISION WORTH RECORDING ─────────────────────────────────────────
- * FSD M3.4: "no free canvas in v1 — predictable output, low support burden".
- * That is not a shortcut, it is the product position. A free canvas produces
- * off-brand output the customer then blames the brand system for, and it
- * generates the support load of a design tool for a company that is not one.
- * Editable text and image SLOTS in a locked layout produce something on-brand
- * every time, which is what somebody running a shop between customers needs.
+ * ── THIS SCREEN USED TO BE A DRAWING OF ITSELF ──────────────────────────────
+ * Until 2026-08-28 it rendered inert tiles and said "nothing here renders yet",
+ * which was true. Founder's ruling that day made it live. Every design below is
+ * a row, and every preview is drawn by the SAME function that writes the
+ * exported PNG — not a picture of a design, the design.
  *
- * If a later session is asked for drag-and-drop layers, the reason it is absent
- * is here rather than in a doc nobody opens.
+ * ── THE PRODUCT POSITION IS UNCHANGED, AND IT IS WORTH RESTATING ────────────
+ * FSD 3.4: editable text and image SLOTS in a locked layout, no free canvas.
+ * That is not a shortcut, it is the trade: you cannot move a box, and nothing
+ * you export can come out off-brand. The document schema enforces it rather
+ * than a comment — there is nowhere in a saved design to put a position.
  *
- * ── THE SLOTS ARE DRAWN AT THEIR REAL PROPORTIONS ────────────────────────────
- * A carousel slide is square, a story is 9:16, a quote card is 4:5. On a
- * template screen the SHAPE is the information — it is what makes "one idea,
- * three placements" legible without a word — so `InertMediaSlot` pins one height
- * and derives each width from the aspect, keeping the row on a flat baseline.
- *
- * ── PRICES YES, GALLERY NUMBERS NO ───────────────────────────────────────────
- * The export price is in pricing.config.json and is a fact about Sahoda. There
- * is no template count, no "used 1,200 times", and no popularity ordering:
- * there are no templates rendered and no exports have happened.
+ * ── THREE READS, THREE DIFFERENT SENTENCES ─────────────────────────────────
+ * An empty gallery is NOT no workspace and NOT a read that failed. Flattening
+ * them is how a studio holding forty designs tells its owner it is empty.
  */
+export default async function StudioPage() {
+  const workspace = await activeWorkspaceRead()
 
-const KINDS = ['All', 'Posts', 'Carousels', 'Quote cards', 'Stories'] as const
+  // The theme read needs the workspace id, so it cannot join the same batch.
+  // `activeWorkspaceRead` is `cache`d, so asking again costs nothing.
+  const [designs, tokens] = await Promise.all([
+    readDesigns(),
+    workspace.status === 'ok' ? activeThemeTokens(workspace.workspace.id) : Promise.resolve(null),
+  ])
 
-const SHAPES = [
-  { label: 'Feed post', aspect: '1 / 1' },
-  { label: 'Portrait post', aspect: '4 / 5' },
-  { label: 'Story', aspect: '9 / 16' },
-  { label: 'Wide card', aspect: '16 / 9' },
-] as const
+  const resolved = studioPalette(tokens)
+  const emptiness = studioEmptiness(designs)
+  const paletteNote = describePaletteFallback(resolved)
 
-export default function StudioPage() {
   return (
     <div className="space-y-grid">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <PageTitle sub="Make the picture, not just the caption. Templates that already know your colours, your type and your logo.">
-          Studio
-        </PageTitle>
-        <InertButton primary>New design</InertButton>
-      </div>
+      <PageTitle sub="Make the picture, not just the caption. Layouts that already know your colours, your type and your logo.">
+        Studio
+      </PageTitle>
 
-      <RoadmapBanner what="Studio will render carousels, quote cards and post images from templates locked to your brand." />
+      {paletteNote === null ? null : (
+        <p className="surface-ring rounded-card bg-s2 px-3 py-3 type-sm text-muted">
+          {paletteNote}
+        </p>
+      )}
 
-      <div className="flex flex-wrap gap-1.5">
-        {KINDS.map((kind, index) => (
-          <InertChip key={kind} on={index === 0}>
-            {kind}
-          </InertChip>
-        ))}
-      </div>
+      <StartDesign />
 
-      <p className="surface-ring rounded-card bg-s2 px-3 py-3 type-sm text-muted">
-        Nothing is saved yet. There is no gallery behind these filters &mdash; see below.
-      </p>
-
-      <section aria-labelledby="studio-shapes" className="flex flex-col gap-3">
-        <div>
-          <h2 id="studio-shapes" className="type-h2">
-            The shapes it makes
-          </h2>
-          <p className="type-body mt-1 max-w-[68ch] text-muted">
-            One idea, cropped and re-laid-out for each place it has to fit. Same rule your captions
-            already follow: a separate version per channel, not one stretched to fit them all.
-          </p>
-        </div>
-        <div className="grid gap-3 wide:grid-cols-4 max-wide:grid-cols-2">
-          {SHAPES.map((shape) => (
-            <InertMediaSlot key={shape.label} label={shape.label} aspect={shape.aspect} />
-          ))}
-        </div>
-      </section>
-
-      <section aria-labelledby="studio-editor" className="flex flex-col gap-3">
-        <h2 id="studio-editor" className="type-h2">
-          What you can change, and what you cannot
+      <section aria-labelledby="studio-designs" className="flex flex-col gap-3">
+        <h2 id="studio-designs" className="type-h2">
+          Your designs
         </h2>
-        <div className="grid gap-3 wide:grid-cols-2">
-          <InertPanel
-            title="Yours to edit"
-            what="The parts that carry your message. Everything here is a field, not a layer."
-          >
-            <div className="grid gap-2">
-              <InertRow
-                icon={Type}
-                name="The words"
-                note="Headline, body and the call to action, each with a length the layout can actually hold."
-              />
-              <InertRow
-                icon={Quote}
-                name="The picture"
-                note="From your library, from your phone, or generated, then dropped into a slot that already knows its crop."
-              />
-              <InertRow
-                icon={Layers}
-                name="The slides"
-                note="Two to ten, reordered, duplicated or dropped. A carousel is a sequence, so the order is yours."
-              />
-            </div>
-          </InertPanel>
 
-          <InertPanel
-            title="Locked to your brand"
-            what="The parts that keep every design looking like it came from the same business."
-          >
-            <div className="grid gap-2">
-              <InertRow
-                icon={Palette}
-                name="Colour and type"
-                note="Read from your Brand Brain and checked for contrast before it renders, the same guard the app itself passes through."
-              />
-              <InertRow
-                icon={Layers}
-                name="Layout and spacing"
-                note="Fixed by the template. This is the trade: you cannot move a box, and nothing you export can come out off-brand."
-              />
+        {emptiness.kind === 'no-workspace' ? (
+          <EmptyState
+            icon={Palette}
+            title={emptiness.title}
+            body={emptiness.body}
+            tip="Everything you make in Sahoda is kept per workspace, so two businesses never share a library."
+          />
+        ) : emptiness.kind === 'unreadable' ? (
+          <p role="alert" className="surface-ring rounded-card bg-s2 px-3 py-3 type-sm text-muted">
+            {emptiness.message}
+          </p>
+        ) : emptiness.kind === 'empty' ? (
+          <EmptyState
+            icon={Palette}
+            title={emptiness.title}
+            body={emptiness.body}
+            tip="A design is saved as you go, so you can close this and come back to it."
+          />
+        ) : (
+          <>
+            <div className="grid gap-3 wide:grid-cols-4 max-wide:grid-cols-2">
+              {designs.status === 'ok' &&
+                designs.designs.map((design) => (
+                  <Link
+                    key={design.id}
+                    href={`/studio/${design.id}`}
+                    className="group flex flex-col gap-2 rounded-card transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  >
+                    <DesignPreview
+                      templateId={design.doc.templateId}
+                      page={design.doc.pages[0]!}
+                      presetId={design.preset_id}
+                      palette={resolved.palette}
+                      className="transition-micro group-hover:opacity-90"
+                    />
+                    <span className="type-body font-[550] group-hover:underline group-hover:underline-offset-2">
+                      {design.title}
+                    </span>
+                    <span className="type-sm text-muted">
+                      {design.doc.pages.length === 1
+                        ? '1 page'
+                        : `${design.doc.pages.length} pages`}
+                    </span>
+                  </Link>
+                ))}
             </div>
-            <p className="type-sm text-muted">
-              {/* "FSD M3.4" used to be in this sentence. A customer does not
-                  have the FSD and cannot look it up, and a spec reference in
-                  user-facing copy is the implementation jargon CLAUDE.md's copy
-                  style names as the one thing that actually gets caught here.
-                  Caught by roadmap-honesty.spec.ts, which was looking for
-                  invented figures and found the "4". The reasoning stays in the
-                  file's docstring, where the reader who needs it is looking. */}
-              There is no free canvas and no layer panel. Predictable output beats an open editor
-              for a business with no designer.
-            </p>
-          </InertPanel>
-        </div>
+            {describeUnreadableDesigns(emptiness.unreadable) === null ? null : (
+              <p className="surface-ring rounded-card bg-s2 px-3 py-2 type-sm text-muted">
+                {describeUnreadableDesigns(emptiness.unreadable)}
+              </p>
+            )}
+          </>
+        )}
       </section>
 
       <section aria-labelledby="studio-cost" className="surface-ring rounded-card bg-surface p-4">
@@ -149,37 +125,11 @@ export default function StudioPage() {
           Exports are free, because the renderer is ours
         </h2>
         <p className="type-body mt-1 max-w-[68ch] text-muted">
-          A PNG or JPEG costs nothing &mdash; drawing it is our own code, not a model call, so there
-          is nothing to charge for. Only the parts that call a model cost credits: a generated image
-          into a slot at its usual price, and a carousel at{' '}
-          <span className="num">{creditCost('carousel')}</span> {creditWord(creditCost('carousel'))}
-          .
-        </p>
-        {/* The spec also prices a short MP4 slideshow. That price is NOT in
-            pricing.config.json, and a credit figure this app prints must come
-            from that file or from nowhere — so the slideshow is named without
-            one rather than quoted from a document the ledger does not read. */}
-        <p className="type-sm mt-2 text-muted">
-          A short video slideshow will be priced too. Its rate is not set in the price list yet, so
-          this page does not quote one.
+          A PNG or JPEG costs nothing. Drawing it is our own code, not a model call, so there is
+          nothing to charge for. Only the parts that call a model cost credits, and none of them are
+          here yet.
         </p>
       </section>
-
-      {/* THE `templates` TABLE IS READ, AND IT IS NOT THIS.
-          `lib/templates/read.ts` powers the composer's saved starting points —
-          WORDS, a caption you keep and reuse. Studio is a renderer for pictures.
-          Two different things under one English word, and a reader who has used
-          the composer's templates would fairly wonder why this page says there
-          are none. So the note names both and says which one is missing. */}
-      <NotRunningNote>
-        Nothing here renders yet. There is no gallery of designs to browse and no picture saved to
-        your library &mdash; the starting points you can save in the composer are captions, not
-        layouts. Pictures you already have live in{' '}
-        <Link href="/assets" className="font-[550] text-accent underline underline-offset-2">
-          Assets
-        </Link>
-        , and that part works today.
-      </NotRunningNote>
     </div>
   )
 }
