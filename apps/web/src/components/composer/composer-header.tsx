@@ -2,29 +2,29 @@
 
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
+import type { Channel, ChannelSet } from '@sahoda/shared'
 
+import { ChannelPicker } from '@/components/posts/channel-picker'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 export interface ComposerHeaderProps {
   title: string
   onTitleChange: (title: string) => void
+  channels: ChannelSet
+  onChannelsChange: (channels: ChannelSet) => void
+  connected?: ReadonlySet<Channel>
 }
 
 /**
  * The two decisions that apply to the whole post: what to call it, and where it
  * is going.
  *
- * ── THE CHANNEL ROW USED TO LIVE HERE, AND NO LONGER DOES ────────────────────
- * This file argued that channels must never be a step: the deleted five-step
- * wizard made changing your mind halfway through writing into a navigation.
- * Founder's ruling, 2026-08-28, reverses the placement — the screen is a
- * sequence, write first — and the picker moved to its own numbered section
- * below the writing pane. See `lib/posts/composer-steps.ts`.
- *
- * The half of the old argument worth keeping is kept there: this is not a
- * wizard, nothing is hidden, and once a step is reachable it stays reachable.
- * Changing your mind is still a scroll.
+ * ── THE CHANNEL ROW IS AT THE TOP AND IT IS NEVER A STEP ─────────────────────
+ * The deleted wizard made channels step 1 of 5, which meant changing your mind
+ * halfway through writing was a navigation. Here it is a row of toggles that sits
+ * above the work the whole time: picking one opens its version, dropping one
+ * closes it, and neither loses a word of anything else.
  *
  * The title is a plain `Input` rather than a borderless display-weight field.
  * docs/26 §5 forbids hand-writing a font shorthand and §10 lists the primitives
@@ -44,7 +44,13 @@ export interface ComposerHeaderProps {
  * treatment `radar/[id]` and the inbox threads use, so the product has one way
  * of returning from a detail screen rather than three.
  */
-export function ComposerHeader({ title, onTitleChange }: ComposerHeaderProps) {
+export function ComposerHeader({
+  title,
+  onTitleChange,
+  channels,
+  onChannelsChange,
+  connected,
+}: ComposerHeaderProps) {
   return (
     <div className="space-y-4">
       <Link
@@ -64,6 +70,13 @@ export function ComposerHeader({ title, onTitleChange }: ComposerHeaderProps) {
           onChange={(event) => onTitleChange(event.target.value)}
         />
       </div>
+
+      <ChannelPicker
+        selected={channels}
+        onChange={onChannelsChange}
+        connected={connected}
+        hideLabel={false}
+      />
     </div>
   )
 }

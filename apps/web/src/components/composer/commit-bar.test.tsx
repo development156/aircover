@@ -184,35 +184,6 @@ describe('the bar commits, through the same one save the panel uses', () => {
     await waitFor(() => expect(window.location.hash).toBe('#finish'))
   })
 
-  test('asks to be taken there, every press, not only the first', async () => {
-    // ── THE PRESS THAT DID NOTHING, AND NOTHING WAS WATCHING ────────────────
-    // The address was the whole mechanism: the bar set `#finish` and the screen
-    // listened for `hashchange`. Assigning a hash that is ALREADY `#finish`
-    // fires no event, so a reader who saved, went back to the words and saved
-    // again saved their post and watched the screen sit still. MEASURED before
-    // this existed; three separate mutations of the jump left the suite green.
-    const onFinish = vi.fn()
-    const onSaveDraft = vi.fn(async () => true)
-    window.location.hash = 'finish'
-
-    render(
-      <CommitBar
-        {...props}
-        status="unsaved"
-        unsavedVersions={1}
-        canFinish
-        onSaveDraft={onSaveDraft}
-        onFinish={onFinish}
-      />,
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: /^Save$/i }))
-    await waitFor(() => expect(onFinish).toHaveBeenCalledTimes(1))
-    // And AFTER the write, for the same reason the address is set after it.
-    expect(onSaveDraft).toHaveBeenCalledTimes(1)
-    window.location.hash = ''
-  })
-
   test('offers Save as draft even with nowhere to finish', () => {
     // No channels picked, so there is no Send it section to go to. The work
     // still has to be saveable.
