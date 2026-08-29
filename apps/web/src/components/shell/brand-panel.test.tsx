@@ -30,6 +30,28 @@ vi.mock('@/app/actions/assets', () => ({ uploadAsset }))
 vi.mock('@/lib/brand/color-extract', () => ({ extractPalette }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
 
+const onUseBrand = vi.fn()
+const onToggleSkin = vi.fn()
+
+/**
+ * The panel is rendered by `BrandMark`, which owns the switch. Every render here
+ * goes through this so a prop added there cannot leave these tests passing
+ * against a shape the component no longer receives.
+ */
+function panel(props: Partial<React.ComponentProps<typeof BrandPanel>> = {}) {
+  return (
+    <BrandPanel
+      logoUrl="https://example.test/logo.png"
+      skinOn={false}
+      hasTheme
+      onToggleSkin={onToggleSkin}
+      onUseBrand={onUseBrand}
+      onClose={vi.fn()}
+      {...props}
+    />
+  )
+}
+
 const GREY = 'oklch(0.8 0.01 250)'
 const BLUE = 'oklch(0.5 0.18 250)'
 
@@ -49,7 +71,7 @@ beforeEach(() => {
 
 describe('the brand mark', () => {
   it('is a dialog naming what it is for', () => {
-    render(<BrandPanel logoUrl="https://example.test/logo.png" onClose={vi.fn()} />)
+    render(panel())
 
     expect(screen.getByRole('dialog', { name: /brand colour/i })).toBeInTheDocument()
   })
@@ -59,7 +81,7 @@ describe('the brand mark', () => {
    * primary, which is what `saveWorkspaceTheme`'s first element means.
    */
   it('makes the colour a person picks the primary one', async () => {
-    render(<BrandPanel logoUrl="https://example.test/logo.png" onClose={vi.fn()} />)
+    render(panel())
 
     const swatches = await screen.findAllByRole('button', { name: /use this colour/i })
     expect(swatches).toHaveLength(2)
@@ -71,7 +93,7 @@ describe('the brand mark', () => {
 
   /** The colours it did not pick stay available, in order, behind the new one. */
   it('keeps the rest of the palette after the chosen colour', async () => {
-    render(<BrandPanel logoUrl="https://example.test/logo.png" onClose={vi.fn()} />)
+    render(panel())
 
     const swatches = await screen.findAllByRole('button', { name: /use this colour/i })
     await userEvent.click(swatches[1]!)
@@ -85,20 +107,62 @@ describe('the brand mark', () => {
    */
   it('offers to replace the logo when its colours cannot be read', async () => {
     extractPalette.mockReturnValue([])
-    render(<BrandPanel logoUrl="https://example.test/logo.png" onClose={vi.fn()} />)
+    render(panel())
 
     expect(await screen.findByText(/could not read the colours/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /replace logo/i })).toBeInTheDocument()
   })
 
   it('invites a logo when the workspace has none', async () => {
-    render(<BrandPanel logoUrl={null} onClose={vi.fn()} />)
+    render(panel({ logoUrl: null, hasTheme: false }))
 
     expect(screen.getByRole('button', { name: /add a logo/i })).toBeInTheDocument()
   })
 
+  /**
+   * ── THE WAY OUT, WHERE SOMEBODY LOOKING FOR IT WILL FIND IT ────────────────
+   * Pressing the logo does this too. It is repeated here because a person who
+   * opened the menu to fix an unreadable screen should not have to guess that
+   * the way out is a button they already walked past, and because this is the
+   * only place that can say which state they are in.
+   */
+  it('says which colours are on and offers the other', async () => {
+    render(panel({ skinOn: true }))
+
+    expect(screen.getByText(/your brand colours are on/i)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /use sahoda colours/i }))
+    expect(onToggleSkin).toHaveBeenCalledTimes(1)
+  })
+
+  it('offers the brand when Sahoda colours are on', () => {
+    render(panel({ skinOn: false }))
+
+    expect(screen.getByText(/sahoda colours are on/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /use my colours/i })).toBeInTheDocument()
+  })
+
+  /** With no brand stored there is nothing to switch to, so nothing claims there is. */
+  it('offers no switch when the workspace has no brand', () => {
+    render(panel({ logoUrl: null, hasTheme: false }))
+
+    expect(screen.queryByText(/colours are on/i)).toBeNull()
+  })
+
+  /**
+   * CHOOSING A COLOUR IS ASKING FOR IT. Saving it against a switch the person
+   * has not met would mean picking a colour and watching nothing happen.
+   */
+  it('applies the brand when a colour is chosen', async () => {
+    render(panel())
+
+    const swatches = await screen.findAllByRole('button', { name: /use this colour/i })
+    await userEvent.click(swatches[1]!)
+
+    expect(onUseBrand).toHaveBeenCalledTimes(1)
+  })
+
   it('spends nothing and writes nothing just by being opened', async () => {
-    render(<BrandPanel logoUrl="https://example.test/logo.png" onClose={vi.fn()} />)
+    render(panel())
     await screen.findAllByRole('button', { name: /use this colour/i })
 
     expect(saveWorkspaceTheme).not.toHaveBeenCalled()
