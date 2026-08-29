@@ -289,3 +289,92 @@ Run from the repo root, unpiped. Two forced runs: the first on `1debd3f3`
 **The forced run is the one that counts.** The 2.4-second run is recorded
 because a cached green is the exact shape of a lie this repository has been
 bitten by, and deleting it would hide that it happened.
+
+---
+
+## The logo was uploaded, stored, and invisible (`ba47a1a3`)
+
+The founder reported a red square where the topbar logo should be, and a
+second thing at the same time: the product had gone the colour of his logo
+everywhere. Two defects, one screen, fixed together.
+
+### 1 · The title every caller set was dropped on the floor
+
+`uploadAsset` read `file.name` and nothing else. Three call sites had been
+setting a `title` field on the form the whole time:
+
+| caller | field it set | what was stored |
+| ------ | ------------ | --------------- |
+| `use-build.ts` (signup logo step) | `Logo` | the file name |
+| `brand-panel.tsx` ("Replace logo") | `Logo` | the file name |
+| `use-build.ts` (URL sources) | the source key | the file name |
+
+`readBrandLogo` finds the workspace logo with `.eq('title', 'Logo')`. There
+was never a row carrying it, for anybody, so the topbar rendered its colour
+chip for ever while the file sat in the library under whatever the customer
+had called it. **Nothing reported a failure anywhere** — the upload succeeded,
+the theme saved, the colours were right, and the one thing that pointed back
+at the file was never written.
+
+The rule is now `lib/assets/title.ts`: caller wins, file name is the fallback,
+blank in either position is nothing said. Pure, so its six guards execute
+rather than describe.
+
+### 2 · Brand Skin repainted the product, and only the mark should
+
+Founder's ruling, same day: *"Day/Night Theme Toggle should apply Sahoda Brand
+Theme. Only the Left Brand Logo should apply Brand Skin."* This reverses the
+scope shipped hours earlier in `47e2a935`, and the reason is on the record: it
+emitted `:root:root`, which hands all seven themeable tokens to an automatic
+read of one PNG. A grey-and-white logo made the whole interface washed out,
+which is how the ruling arrived. The light and dark palettes are designed and
+their contrast steps measured; that is not a decision to hand to a colour
+histogram.
+
+`skinCss` now takes a scope, defaulting to `SKIN_SCOPE = '[data-brand-skin]'`,
+and `brand-mark.tsx` is the only element carrying it. The attribute selector
+is 0,1,0 against `tokens.css`'s bare `:root` at 0,0,1, so the brand wins
+inside the mark with no `!important`.
+
+**The regression is one character away at all times** — `:root` compiles,
+renders, and silently puts it back — so `skinIsGlobal` names the failure and
+a guard asserts it in both directions.
+
+The panel's copy went with it. "Every button and link follows it" was true for
+a few hours and became a lie the moment the scope narrowed; it now names the
+two places the colour actually reaches.
+
+### Mutation
+
+| mutation | result |
+| -------- | ------ |
+| `assetTitle` falls back to the file name only | **RED** |
+| `SKIN_SCOPE` back to `:root:root` | **RED** |
+| the mark loses `data-brand-skin` | **RED** |
+| all three at once | **RED**, 5 tests in 3 files |
+| all three reverted | **PASS**, 359 tests in 36 files |
+
+### Gate
+
+| leg | result |
+| --- | ------ |
+| `pnpm gate`, first run | **FAIL, and NOT this change.** Root vitest, `a stale baseline entry cannot sit there forever`. Reproduced on `0cd3e40c` with the tree stashed, so **the trunk was already red**. Three stale entries removed by the test's own `--update-baseline`; the ratchet shrinks 65 → 62 |
+| `turbo typecheck lint test` | **PASS**, 8 of 9 tasks; the ninth is smoke, below |
+| `test:smoke` | **UNRUN.** `clerkSetup()` cannot reach Clerk's API from this sandbox. Environment, not the suite |
+| `prettier --check .` | **PASS** |
+| `pnpm --filter @sahoda/web build` | **PASS.** `js-budget ok: 82 routes within budget` |
+
+**Run locally before promoting, every time.** The previous promotion was
+reported as done while three production builds had errored on the js-budget,
+and Vercel had quietly kept serving the old one.
+
+### Still open
+
+- **A logo uploaded BEFORE this fix is still not findable.** The row carries
+  the file name. Re-uploading through the topbar's "Replace logo" writes a
+  correct row; nothing backfills the old ones, and a backfill would need a
+  guess about which image is the logo. Say this to anyone who uploaded early.
+- **There is still no `workspaces.logo_asset_id`.** Finding the logo by title
+  is a known compromise, written down in `lib/brand/logo.ts`. A customer who
+  titles some other picture `Logo` by hand would see it in the topbar. Visible,
+  reversible, costs nothing, and a column is a founder decision.
