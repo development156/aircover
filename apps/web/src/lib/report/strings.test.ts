@@ -15,6 +15,15 @@ import { BANNED_WORDS, REPORT } from './strings'
  * `impressions` is on the list and IS a real column value in the metric store.
  * That is the point: the word may live in the database and must never reach the
  * page, which is why this scans the report's own files rather than the codebase.
+ *
+ * ── WHAT IT CANNOT SEE ──────────────────────────────────────────────────────
+ * Every string this page renders that was not written here. A learning summary
+ * comes from a model and is stored in `memory_events`; a post title is typed by
+ * the customer; a channel arrives as a database enum. All three reach the page
+ * verbatim and no file scan can reach any of them. It is also blind to copy
+ * that lives in a component outside `components/report`, to a word assembled
+ * from pieces at runtime, and to a banned word inside a template literal's
+ * interpolation, since it reads the source text and not the value.
  */
 const HERE = new URL('.', import.meta.url).pathname
 const COMPONENTS = join(HERE, '..', '..', 'components', 'report')
