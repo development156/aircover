@@ -174,8 +174,10 @@ root, from `$HOME`, from `/tmp`, from `/`, and with no `setup.sh` anywhere.
 
 ## The five rules that must survive the move
 
-1. **Never push to `wt-web`.** That is the live product. Only a proven `wt-core`
-   is promoted, deliberately.
+1. **No lane writes `wt-web` or `main`** — enforced since 30 August 2026 by
+   `.githooks/pre-push`, for every owner and for an unset one. That is the live
+   product. Only a proven `wt-core` is promoted, and it costs a typed
+   acknowledgement: `SAHODA_PROMOTE=wt-web git push origin wt-core:wt-web`.
 2. **Never run `supabase db push`.** Production is `rloztdhzfliyvpvxsgjl` and
    there is no staging.
 3. **Never execute a publish.** It posts to a real customer's feed.
