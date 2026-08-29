@@ -6,6 +6,7 @@ import { AutoPublishNote } from '@/components/posts/auto-publish-note'
 import { LiveChannelChips } from '@/components/posts/live/live-channel-chips'
 import type { VariantStatusRow } from '@/lib/posts/variant-status'
 import { DeletePostButton } from '@/components/posts/delete-post-button'
+import { MediaPeek, type MediaPeekItem } from '@/components/posts/media-peek'
 import { MetricStrip } from '@/components/posts/metric-strip'
 import { LiveStatusBadge } from '@/components/posts/live/live-status-badge'
 import type { ChannelMetrics } from '@/lib/analytics/post-metrics'
@@ -97,6 +98,16 @@ export interface PostCardProps {
    * nothing rather than zeroes, the same rule the strip itself follows.
    */
   metrics?: readonly ChannelMetrics[]
+  /**
+   * Photos attached to this post, already signed by the page.
+   *
+   * Absent and empty mean the same thing HERE and deliberately so: the card
+   * renders nothing either way, because "no photo" and "the page did not ask"
+   * both leave the tile with nothing honest to draw. The distinction that DOES
+   * matter — a photo that exists and could not be fetched — is carried inside
+   * each item as a null url, and `MediaPeek` marks it rather than hiding it.
+   */
+  media?: readonly MediaPeekItem[]
   /** One instant for the whole list, read on the server. See `AutoPublishNote`. */
   now: Date
 }
@@ -108,6 +119,7 @@ export function PostCard({
   now,
   variantStates,
   metrics,
+  media = [],
 }: PostCardProps) {
   const heading = displayTitleOf(post)
   const displayTitle = heading.text
@@ -269,6 +281,8 @@ export function PostCard({
           compact && 'mt-auto pt-3',
         )}
       >
+        <MediaPeek items={media} postTitle={displayTitle} />
+
         {channels.length > 0 ? (
           /* Live: this is where the platform link appears, the moment the
                permalink lands on the variant row. */
