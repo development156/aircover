@@ -1,13 +1,18 @@
 # Handoff — girija — wt-girija2 — 2026-08-29
 
-**Branch** `wt-girija2` at `b57f93ca`. Lane `wt-girija2`. Pushed: **yes**, and
+**Branch** `wt-girija2` at `2e9cb6e7`. Lane `wt-girija2`. Pushed: **yes**, and
 landed on `wt-core`. No PR: the lane merges directly, and `wt-core` now carries
 this work.
 
-**Two gated steps and one feature, all on the founder's explicit instruction:**
-six migrations applied to production, `wt-core` promoted to `wt-web` **twice**,
-and the signup door now seeds the knowledge library with the website it already
-reads. Both promotions are live and serving.
+**Live:** <https://app.sahodalabs.com>
+**This lane's preview:**
+<https://sahodalabs-git-wt-girija2-development-4417s-projects.vercel.app>
+
+**Two gated steps and two changes, all on the founder's explicit instruction:**
+six migrations applied to production, `wt-core` promoted to `wt-web` **three
+times**, the signup door now seeds the knowledge library with the website it
+already reads, and `/brain/knowledge` had a **Tone Setup**. All three promotions
+are live and serving.
 
 > **This file was EXTENDED in place, not appended to with a `## Session 2`.**
 > It is one continuous session: three questions, then the promotion, then the
@@ -21,7 +26,7 @@ reads. Both promotions are live and serving.
 
 ## What shipped
 
-One feature from this lane's own hand, and two promotions of the trunk.
+Two changes from this lane's own hand, and three promotions of the trunk.
 
 | # | What | Proof | Covered by |
 | - | ---- | ----- | ---------- |
@@ -33,6 +38,28 @@ One feature from this lane's own hand, and two promotions of the trunk.
 | 6 | **The signup door seeds the library with the site it already read** | `b57f93ca`, `apps/web/src/lib/onboarding/seed-library.ts`, called from `app/api/onboarding/door/route.ts:89` | `seed-library.test.ts`, **10 tests**, three mutations below |
 | 7 | `createThenIndex` / `indexFromSource` moved to a shared `server-only` module | `apps/web/src/lib/knowledge/ingest.ts`; `actions/knowledge.ts` now imports them | the four existing knowledge suites, 31 tests, unchanged and green |
 | 8 | Second promotion: `wt-core` `b57f93ca` → `wt-web`, fast-forward, **0 migrations** | `28aae473..b57f93ca` | Vercel `dpl_9eG9LighuvE54Qs4LsGUAKdLENsV`, **READY**, 2m07s |
+| 9 | **Tone Setup on `/brain/knowledge`** | `2e9cb6e7`; new `components/knowledge/what-to-give.tsx`, plus `page.tsx`, `resolve-from-library.tsx`, `status-view.ts` | `what-to-give.test.tsx`, **5 tests**, two mutations below |
+| 10 | `CLAUDE.md` gains a **Tone Setup** section, so the instruction has a fixed meaning | `CLAUDE.md`, above the five copy rules | prose |
+| 11 | Third promotion: `wt-core` `2e9cb6e7` → `wt-web`, fast-forward, **0 migrations** | `b57f93ca..2e9cb6e7` | Vercel `dpl_9tbtSwYcE7eVyGvGELthzJyfewXq`, **READY**, 2m07s |
+
+**Item 9, what actually changed.** The screen named the parts and never the
+capability. MEASURED and the two figures are one defect: three documents across
+33 workspaces ever, and one of the three an Instagram login wall stored as 74
+characters and badged exactly like a rate card. Nothing said what to put in it.
+
+| surface | was | now |
+| ------- | --- | --- |
+| lead paragraph | "The documents Sahoda has read… and the passages you can search. Resolve your Brand Brain from them" | "Give Sahoda the documents that hold your real prices, policies and promises. It reads them once and quotes them back when it writes for you, instead of guessing." |
+| badge | `Indexed` | **`Ready to quote`** |
+| resolve panel | "Let your library teach the Brand Brain" | "Turn these into what Sahoda knows about you" |
+| count | "2 of 2 ready to quote from" | "2 of 2 Sahoda can quote from" |
+| empty state | "Give Sahoda something to read" | "Stop Sahoda guessing your prices" |
+| empty-state tip | first person, and about resolving | third person, and about quoting a figure when it rewrites a post |
+| new | — | `WhatToGive`: four documents each paired with what it unlocks, plus the warning about login pages and picture menus |
+
+`WhatToGive` renders while `documents.length < 4` and disappears after. **Four
+and not one**, because every seeded workspace now starts with exactly one
+document, which is the case that still needs the prompt.
 
 **Item 6, stated exactly.** The door already crawls up to five pages and hands
 the text to `brand_extract`, then discarded it. It is now also written to the
@@ -65,7 +92,8 @@ build**, checked side by side, so it is Clerk's middleware and not a regression.
   the one a person can reach.** `MIN_SEED_CHARS = 200` guards the seed nobody
   asked for. The library's own URL door still accepts any page with one
   non-whitespace character (`read-source.ts:90` is untouched), so a person can
-  still add a login wall by hand and see it badged `Indexed`. Deliberate: the
+  still add a login wall by hand and see it badged `Ready to quote`, which the
+  Tone Setup made a WARMER lie than `Indexed` was. Deliberate: the
   automatic path must be more cautious than the chosen one, and widening the
   manual door's floor is a separate change with its own copy. Design in "Next
   session".
@@ -93,6 +121,7 @@ build**, checked side by side, so it is Clerk's middleware and not a regression.
 | `apps/web/src/app/actions/knowledge.ts` | `indexFromSource` and `createThenIndex` **moved out** to `lib/knowledge/ingest.ts`; `KnowledgeActionState` moved with them and is **re-exported** from the old path | **Nobody breaks.** `components/knowledge/add-document.tsx:8` imports the type from `@/app/actions/knowledge` and still resolves. Both functions were module-private, so no caller existed outside the file |
 | `apps/web/src/lib/knowledge/ingest.ts` | **New** `server-only` module. The one path for every door | A fifth door must call this, not copy it |
 | `apps/web/src/app/api/onboarding/door/route.ts` | One `await` added AFTER the `done` line is written | A lane changing the door stream must keep the seed after `done`: the customer's screen moves on at that line and the seed must not delay it |
+| `apps/web/src/lib/knowledge/status-view.ts` | The indexed badge reads **`Ready to quote`**, was `Indexed` | Grepped: **no test and no e2e spec asserted the string `Indexed`**, so nothing broke. A lane writing one should assert the CLAIM, not this wording |
 
 **Why the move was NOT an export from the action file:** every export of a
 `'use server'` file is a callable endpoint. Exporting these two to share them
@@ -156,8 +185,13 @@ Four mutations, every one applied, run, and WATCHED go red, then restored.
 | 2 | `MIN_SEED_CHARS` 200 → 40, the PDF door's floor | **RED, 2 of 10.** `refuses a login wall…` and `the floor is 200 characters…`. The first uses the REAL production string, all 74 characters of it, and asserts its length so the case cannot rot |
 | 3 | `return result.ok ? 'seeded' : 'failed'` → `return 'seeded'` | **RED, 1 of 10.** `reports a refused document as failed rather than seeded` |
 | 4 | The `catch` in `seedLibraryFromSite` changed from `return 'failed'` to `throw error` | **RED, 1 of 10.** `never throws, whatever the library does` — the guard that keeps a library row from breaking somebody's signup |
+| 5 | All four `unlocks` clauses in `WhatToGive` blanked, leaving bare document types | **RED, 1 of 5.** `pairs every document with the thing it lets Sahoda do`. The guard asserts BOTH halves per item, because a list of categories alone passes a naive text check |
+| 6 | The login-wall and picture-menu warning deleted from `WhatToGive` | **RED, 1 of 5.** `warns about the two things that fail while looking like they worked` |
 
-**Ten new guards** in `apps/web/src/lib/onboarding/seed-library.test.ts`.
+**Fifteen new guards**: ten in `apps/web/src/lib/onboarding/seed-library.test.ts`,
+five in `apps/web/src/components/knowledge/what-to-give.test.tsx`. The second
+file also pins the third person and the no-dash ruling on this block, so a later
+rewrite cannot quietly reintroduce either.
 
 ---
 
@@ -216,10 +250,14 @@ The real figure is in the Gate section.
 4. **The QA logger records scratch-folder and mutation runs as product
    failures.** Three separate false `fail` rows in one session. It should record
    the working directory, or refuse a run whose config path is outside the repo.
-5. **"Sahoda never trains on it"** on `/brain/knowledge` (`page.tsx:175`) has no
-   enforcement anywhere in `packages/mesh` — grepped for `data_collection`,
-   `allow_training`, `zdr`, `retention`; three unrelated hits. It is a vendor
-   contract claim wearing a product guarantee's clothes. Prove it or soften it.
+5. **"Sahoda never trains on it" is GONE, and that is a decision to revisit,
+   not a closed item.** It was removed in `2e9cb6e7` because nothing in
+   `packages/mesh` enforces it (grepped `data_collection`, `allow_training`,
+   `zdr`, `retention`; three unrelated hits). What replaces it states what IS
+   enforced plus what actually happens: nothing is shared with another business,
+   and a few matching passages go to the model at the moment it writes. **If the
+   supplier contract does back the stronger claim, put it back** with that on
+   the record. The founder was told, and did not object.
 6. **Retrieval is filter-then-truncate, not rank-then-take** — the five passages
    are five of the matches, not the best five (`knowledge-context.ts:60-65`).
    A `ts_rank` RPC is the fix and belongs to the db lane.
@@ -240,6 +278,8 @@ Run from the repo root, unpiped. Two forced runs: the first on `1debd3f3`
 | `@sahoda/mesh` knowledge-context, mutated | **FAIL as intended**, 1 of 14. Restored: **PASS**, 14 of 14 |
 | `seed-library` + knowledge suites, direct | **PASS.** 4 files, **31 tests**, 1.83s |
 | `seed-library`, three mutations | **FAIL as intended**: 2, 1, 1 of 10. Restored: **PASS**, 10 of 10 |
+| `--force`, on the tone-setup tree (`2e9cb6e7`) | **PASS.** `27 successful, 27 total`, `Cached: 0`, **5m37.7s**. `@sahoda/web`: **476 files passed, 3 skipped; 6,038 tests passed, 13 skipped, 0 failed**. +1 file and +5 tests against the previous run, which is `what-to-give.test.tsx` exactly |
+| `--force`, FIRST attempt on that tree | **FAIL, and mine.** `@sahoda/web#lint`: design lint, `hardcoded spacing — NEW in 1 file(s)`, two `mt-[3px]` in `what-to-give.tsx` against a baseline of 0. Fixed with the existing `mt-icon-nudge` token. **`@sahoda/publishing:typecheck` and `@sahoda/shared:test` also printed failures in that run and were CANCELLATIONS, not defects** — turbo stops the fan-out on the first failure, the whole run was 5.07s, and all 27 pass on the re-run. Recorded because "three packages red at once" is the shape that gets misread as an environment fault |
 | `npx prettier --check .` | **PASS.** `All matched files use Prettier code style!` |
 | `test:smoke` / Playwright | **UNRUN, never passed.** Probe verdict `LOCAL_ONLY`; Chromium reaches loopback only. The onboarding e2e specs, which are the ones that would exercise the seed, are among the unrun |
 | First production build | **READY**, 2m31s, `dpl_CDjgLHuVu6y5Xp2zU5UM413yfXzn`, at `28aae473` |

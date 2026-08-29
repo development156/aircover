@@ -186,6 +186,20 @@ paragraph — three or four sentences, no jargon, no file paths. The test: could
 someone who has never opened this codebase tell whether it went well? **Plain
 is not vaguer** — keep every figure exact.
 
+**Always give a link to look at, after every change.** Founder's ruling,
+2026-08-29. A change nobody can open is a claim. Every report that touched a
+screen ends with the URL, unasked:
+
+- **The lane's own preview**, which always points at that branch's newest build:
+  `https://sahodalabs-git-<lane>-development-4417s-projects.vercel.app`
+- **And `https://app.sahodalabs.com`** when the change was promoted, said as
+  such, because those are two different things and only one of them is what
+  customers see.
+
+Name the screen, not just the host, so the link lands where the change is. Say
+plainly when a build is still running or failed rather than giving a URL that
+will show the previous version.
+
 **End with exactly two things:** what you did NOT do and why, then anything
 needing a decision — one line each, or "nothing needs a decision".
 
