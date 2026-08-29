@@ -15,6 +15,7 @@ import { chargeFailureState, FAILURE_REASON } from '@/lib/posts/charge-failure'
 import { buildEvidenceSet, chunkForIngestion, MAX_CHUNKS_PER_DOCUMENT } from '@sahoda/research'
 
 import { describeImpact } from '@/lib/knowledge/delete-impact'
+import { createThenIndex, indexFromSource, type KnowledgeActionState } from '@/lib/knowledge/ingest'
 import { knowledgeFailure, type KnowledgeFailureCode } from '@/lib/knowledge/failure-copy'
 import {
   MAX_UPLOAD_BYTES,
@@ -77,12 +78,7 @@ import { credits as creditsPhrase } from '@/lib/credit-words'
 /** The bucket `assets` already uses, and whose tenant policies already cover us. */
 const BUCKET = 'media'
 
-export interface KnowledgeActionState {
-  ok: boolean
-  message: string
-  /** Set when a document row exists, so the screen can scroll to it. */
-  documentId?: string
-}
+export type { KnowledgeActionState } from '@/lib/knowledge/ingest'
 
 const SIGNED_OUT: KnowledgeActionState = { ok: false, message: 'Sign in to add to your library.' }
 
@@ -97,131 +93,6 @@ const SIGNED_OUT: KnowledgeActionState = { ok: false, message: 'Sign in to add t
  */
 function knowledgeObjectPath(workspaceId: string, documentId: string): string {
   return `${workspaceId}/knowledge/${documentId}.pdf`
-}
-
-/**
- * Read the source, then index it — or record why not, in one place.
- *
- * Shared by all three doors and by the retry, so a failure is written the same
- * way whichever way it was reached. The alternative is four call sites that
- * drift, and the one used least is the one that ends up leaving a document at
- * "Processing" forever.
- */
-async function indexFromSource(
-  documentId: string,
-  read: SourceRead,
-): Promise<KnowledgeActionState> {
-  const supabase = createServerSupabase()
-
-  const fail = async (
-    code: KnowledgeFailureCode,
-    extra?: { passages?: number; limit?: number },
-  ): Promise<KnowledgeActionState> => {
-    const { message } = knowledgeFailure(code, extra)
-    const { error } = await supabase.rpc('fail_knowledge_document', {
-      p_document_id: documentId,
-      p_code: code,
-      p_detail: message,
-    })
-    if (error) {
-      // The read failed AND we could not record that it failed. Say both rather
-      // than reporting the first as if the row now explains itself.
-      return {
-        ok: false,
-        documentId,
-        message: `${message} Sahoda could not save that outcome either, so this document may still say it is being read.`,
-      }
-    }
-    return { ok: false, documentId, message }
-  }
-
-  if (!read.ok) return fail(read.code)
-
-  const chunked = chunkForIngestion(read.text)
-  if (!chunked.ok) {
-    return fail(chunked.code, { passages: chunked.chunks, limit: MAX_CHUNKS_PER_DOCUMENT })
-  }
-
-  /**
-   * The count of spans `neutralize` ACTUALLY REWROTE, produced by building the
-   * evidence set this document would produce. Not a scorer's opinion, and not a
-   * safety verdict — see `neutralizeCounting`. Built here rather than at resolve
-   * time so the observation is stored with the document and the screen can show
-   * it without re-reading every passage.
-   */
-  const preview = buildEvidenceSet(
-    chunked.chunks.map((text, ordinal) => ({
-      id: `${documentId}:${ordinal}`,
-      documentId,
-      documentTitle: '',
-      ordinal,
-      text,
-    })),
-    chunked.chunks.length,
-  )
-
-  const { error } = await supabase.rpc('index_knowledge_document', {
-    p_document_id: documentId,
-    p_chunks: chunked.chunks,
-    p_content_sha256: null,
-    p_addressed_instructions: preview.addressed.length,
-    p_instruction_samples: preview.addressed.slice(0, 5).map((span) => ({
-      kind: span.kind,
-      found: span.found.slice(0, 200),
-    })),
-  })
-
-  if (error) {
-    reportServerError(new Error(error.message), { action: 'knowledge.index' })
-    return fail('interrupted')
-  }
-
-  revalidatePath('/brain/knowledge')
-  revalidatePath('/home')
-  return {
-    ok: true,
-    documentId,
-    message: `Read and indexed. That is ${chunked.chunks.length} ${chunked.chunks.length === 1 ? 'passage' : 'passages'} Sahoda can now quote from.`,
-  }
-}
-
-/** Register the row, then read it. Every door does these two things. */
-async function createThenIndex(
-  input: {
-    workspaceId: string
-    title: string
-    sourceKind: 'pdf' | 'text' | 'url'
-    sourceRef: string
-    storagePath?: string | null
-    mime?: string | null
-    bytes?: number | null
-  },
-  read: () => Promise<SourceRead>,
-): Promise<KnowledgeActionState> {
-  const supabase = createServerSupabase()
-  const created = await supabase.rpc('create_knowledge_document', {
-    p_workspace_id: input.workspaceId,
-    p_title: input.title,
-    p_source_kind: input.sourceKind,
-    p_source_ref: input.sourceRef,
-    p_storage_path: input.storagePath ?? null,
-    p_mime: input.mime ?? null,
-    p_bytes: input.bytes ?? null,
-  })
-
-  if (created.error || !created.data?.id) {
-    reportServerError(new Error(created.error?.message ?? 'no document returned'), {
-      action: 'knowledge.create',
-      workspaceId: input.workspaceId,
-    })
-    return { ok: false, message: 'Sahoda could not add that to your library just now. Try again.' }
-  }
-
-  const documentId = created.data.id as string
-  await supabase.rpc('start_knowledge_indexing', { p_document_id: documentId })
-  revalidatePath('/brain/knowledge')
-
-  return indexFromSource(documentId, await read())
 }
 
 /** Add a PDF. The bytes travel through here, so nothing is stored unparsed. */

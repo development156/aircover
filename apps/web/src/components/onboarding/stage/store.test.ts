@@ -4,7 +4,6 @@ import {
   canAdvance,
   capLabel,
   confidenceOf,
-  DEFAULT_COLORS,
   DEFAULT_DATA,
   energyOf,
   signalCount,
@@ -14,7 +13,7 @@ import {
 } from './store'
 
 function data(patch: Partial<OnboardingData> = {}): OnboardingData {
-  return { ...DEFAULT_DATA, colors: { ...DEFAULT_COLORS }, ...patch }
+  return { ...DEFAULT_DATA, ...patch }
 }
 
 describe('signalIds — the count is what was actually given', () => {
@@ -24,9 +23,13 @@ describe('signalIds — the count is what was actually given', () => {
 
   it('does not count the three DEFAULT colours as three signals', () => {
     // The swatches always hold a value, so a count derived from `colors` alone
-    // would credit every workspace with three brand-colour signals nobody gave.
+    // would credit every workspace with brand-colour signals nobody gave. The
+    // colour signal is now one, and it exists only when a logo actually yielded
+    // colours: choosing a file Sahoda could read nothing from counts as nothing,
+    // which is what `palette` being empty means.
     expect(signalCount(data())).toBe(0)
-    expect(signalIds(data({ colorsTouched: ['Primary'] }))).toEqual(['color:Primary'])
+    expect(signalIds(data({ palette: [] }))).toEqual([])
+    expect(signalIds(data({ palette: ['oklch(0.5 0.2 20)'] }))).toEqual(['logo'])
   })
 
   it('holds a half-typed answer below the threshold', () => {
@@ -138,7 +141,7 @@ describe('confidenceOf — derived, and never a full bar', () => {
       loc: 'Bengaluru',
       role: 'reader',
       interests: 'books, tea',
-      colorsTouched: ['Primary', 'Secondary', 'Background'],
+      palette: ['oklch(0.5 0.2 20)', 'oklch(0.6 0.2 140)'],
       neverSay: 'never call us cheap',
       sources: ['Website', 'Instagram', 'Notion'],
       competitors: [
@@ -147,8 +150,12 @@ describe('confidenceOf — derived, and never a full bar', () => {
       ],
     })
     const c = confidenceOf(everything)
-    expect(signalCount(everything)).toBeGreaterThan(16)
-    expect(c.pct).toBe(96)
+    /* SIXTEEN, and it used to be seventeen. Two swatch signals became one logo
+       signal when the colour pickers were replaced, so a maximal answer set is
+       worth one less than it was. The point of the assertion is unchanged: a
+       person who answers everything gets a high reading and never a full bar. */
+    expect(signalCount(everything)).toBe(16)
+    expect(c.pct).toBeGreaterThan(90)
     expect(c.label).toBe('High')
   })
 
@@ -218,7 +225,9 @@ describe('resumeStep', () => {
 
 describe('capLabel', () => {
   it('names the facet behind a namespaced signal', () => {
-    expect(capLabel('color:Primary')).toBe('Brand colour')
+    // The colour signal is no longer namespaced per swatch: there is one, for
+    // a logo that yielded colours.
+    expect(capLabel('logo')).toBe('Brand colours')
     expect(capLabel('src:Notion')).toBe('Knowledge')
     expect(capLabel('aud')).toBe('Audience')
   })

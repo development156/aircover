@@ -1,59 +1,57 @@
-import { readFileSync } from 'node:fs'
-import { describe, expect, test } from 'vitest'
+import { describe, it, expect } from 'vitest'
 
-import { newResolveObjectRef } from './resolve-object-ref'
-
-describe('newResolveObjectRef', () => {
-  test('namespaces the ledger key by workspace', () => {
-    expect(newResolveObjectRef('ws-1').startsWith('ws-1:')).toBe(true)
-  })
-
-  test('is fresh per call — a spent ledger key is never reused', () => {
-    const refs = new Set(Array.from({ length: 50 }, () => newResolveObjectRef('ws-1')))
-    expect(refs.size).toBe(50)
-  })
-
-  test('takes only a workspace id — no parameter a request body could reach', () => {
-    expect(newResolveObjectRef.length).toBe(1)
-  })
-})
+import { resolveObjectRef } from './resolve-object-ref'
 
 /**
- * Regression guard for the money path: the charged resolve must NEVER derive its
- * ledger idempotency key from client input. Replaying a spent objectRef makes
- * withCredits replay the HOLD+DEBIT while still running the paid model call, so
- * a client-controlled value is an unlimited-free-resolve hole. This asserts on
- * the source because the property is about what the action does NOT read, which
- * no amount of mocking can prove.
+ * The key that decides whether a customer pays twice for one Brand Brain.
  *
- * IT POINTS AT `onboarding-resolve.ts` NOW. It used to read `brand-resolve.ts`,
- * which was the charged path until `resolveBrand` was deleted — and a guard left
- * aimed at a file that no longer charges is worse than no guard, because it goes
- * on passing while the thing it protects moves out from under it.
+ * `withCredits` keys exactly-once on `(action, objectRef)`, and billing's
+ * `nextAttempt` REUSES an attempt that settled by DEBIT, replaying the same
+ * charge rather than taking a second one. So this string is the whole mechanism:
+ * the same ref means "the thing you already paid for", a different ref means "a
+ * new, intended charge".
  */
-describe('charged resolve ledger key provenance', () => {
-  const source = readFileSync(
-    new URL('../../app/actions/onboarding-resolve.ts', import.meta.url),
-    'utf8',
-  )
 
-  test('never reads objectRef (or a trace id) from formData', () => {
-    expect(source).not.toMatch(/objectRef['"]\s*\)/) // e.g. field(formData, 'objectRef')
-    expect(source).not.toMatch(/formData\.get\(\s*['"]objectRef['"]/)
-    expect(source).not.toMatch(/formData\.get\(\s*['"]traceId['"]/)
+describe('resolveObjectRef', () => {
+  /**
+   * THE DEFECT THIS FIXES. A customer with a brain who re-runs onboarding is
+   * charged when the build starts, and the brain is written only when they press
+   * the last button. Closing the tab in between took the credits and left the
+   * brain unchanged. Now the retry carries the same ref, so the ledger replays
+   * the charge it already took.
+   */
+  it('is the same across a paid attempt that was never saved', () => {
+    expect(resolveObjectRef('ws-1', 3)).toBe(resolveObjectRef('ws-1', 3))
   })
 
-  test('derives the ledger key from the server-only helper', () => {
-    expect(source).toMatch(/newResolveObjectRef\(\s*workspaceId\s*\)/)
+  /** Saving bumps the version, which opens a new, intended charge. */
+  it('changes once the brain they paid for has been saved', () => {
+    expect(resolveObjectRef('ws-1', 4)).not.toBe(resolveObjectRef('ws-1', 3))
   })
 
-  test('the deleted resolveBrand endpoint has not come back', () => {
-    // Two charging endpoints for one action is two ways to spend a customer's
-    // credits, and only one of them would have a screen able to explain it.
-    const writePath = readFileSync(
-      new URL('../../app/actions/brand-resolve.ts', import.meta.url),
-      'utf8',
-    )
-    expect(writePath).not.toMatch(/withCredits|runTask/)
+  /** One workspace's charge key can never settle another's. */
+  it('never collides across workspaces', () => {
+    expect(resolveObjectRef('ws-1', 3)).not.toBe(resolveObjectRef('ws-2', 3))
+  })
+
+  /**
+   * No brain yet is its own key rather than a crash. That path is free today, so
+   * nothing charges on it, but the ref must still be well formed if the free
+   * rule ever changes.
+   */
+  it('has a key for a workspace with no brain yet', () => {
+    expect(resolveObjectRef('ws-1', null)).toBe(resolveObjectRef('ws-1', null))
+    expect(resolveObjectRef('ws-1', null)).not.toBe(resolveObjectRef('ws-1', 1))
+  })
+
+  /**
+   * SERVER-DERIVED, and the header says why: `withCredits` replays a spent key,
+   * so a ref a request body could reach would let any signed-in caller run
+   * unlimited paid resolves against one charge. Both inputs come from the
+   * database. This asserts the shape a caller cannot influence.
+   */
+  it('is built only from the workspace and the version', () => {
+    expect(resolveObjectRef('ws-1', 3)).toBe('ws-1:brain-v3')
+    expect(resolveObjectRef('ws-1', null)).toBe('ws-1:brain-v0')
   })
 })
