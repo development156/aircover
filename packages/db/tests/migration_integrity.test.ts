@@ -191,3 +191,72 @@ describe.skipIf(!hasLedgerEnv)('applied migrations created what they declare', (
     }
   })
 })
+
+/**
+ * ── TWO MIGRATIONS MAY NOT CLAIM THE SAME INSTANT ────────────────────────────
+ *
+ * `20260828100000_loop_reflect_reason.sql` and `20260828100000_studio_designs.sql`
+ * were written by two lanes on the same day and carry the SAME timestamp. Nothing
+ * in this repository noticed, which is the actual defect: the ordering between
+ * them is then decided by whatever the applier happens to sort by, and a pair
+ * that is independent today stops being independent the moment one of them
+ * depends on the other's table.
+ *
+ * ── WHY THE EXISTING PAIR IS AN EXCEPTION AND NOT A RENAME ───────────────────
+ * Renaming a migration is safe only while it is UNAPPLIED. Once applied, the
+ * filename is a row in `supabase_migrations.schema_migrations`, and renaming it
+ * makes the applier treat it as a new migration and run it a second time.
+ *
+ * Whether these two are applied CANNOT BE ESTABLISHED from a sandbox: the
+ * Supabase MCP server is down (`CONNECTION_CLOSED`, MEASURED 2026-08-29) and
+ * `db.<ref>.supabase.co` resolves AAAA-only with no IPv6 route from here, so
+ * there is no path to the catalog that would answer it. Renaming on a guess is
+ * the one action here that could break production, so it is not taken. A person
+ * with database access resolves the pair; this guard makes sure no THIRD one
+ * joins them quietly in the meantime.
+ *
+ * ── THE EXCEPTION INVALIDATES ITSELF ─────────────────────────────────────────
+ * The third test below fails if the known pair STOPS colliding. An allowance
+ * that outlives the thing it allows is how a guard rots into a rubber stamp,
+ * so removing the collision forces removing the exception in the same commit.
+ */
+const KNOWN_TIMESTAMP_COLLISION = '20260828100000'
+
+function timestampsOf(files: string[]): Map<string, string[]> {
+  const byStamp = new Map<string, string[]>()
+  for (const name of files) {
+    const stamp = name.slice(0, 14)
+    byStamp.set(stamp, [...(byStamp.get(stamp) ?? []), name])
+  }
+  return byStamp
+}
+
+describe('no two migrations share a timestamp', () => {
+  it('scans a plausible number of migrations, so an empty scan cannot excuse everything', () => {
+    // The guard that stops this whole describe becoming vacuous. A glob that
+    // silently matched nothing would make every assertion below pass.
+    expect(migrationFiles().length).toBeGreaterThan(80)
+  })
+
+  it('finds no collision other than the one already known', () => {
+    const collisions = [...timestampsOf(migrationFiles()).entries()]
+      .filter(([, names]) => names.length > 1)
+      .filter(([stamp]) => stamp !== KNOWN_TIMESTAMP_COLLISION)
+      .map(([stamp, names]) => `${stamp}: ${names.join(', ')}`)
+
+    expect(
+      collisions,
+      'Two migrations claim the same instant. Their order is then whatever the ' +
+        'applier sorts by. Bump one timestamp before it is applied anywhere.',
+    ).toEqual([])
+  })
+
+  it('the known collision is still a collision, so the exception cannot outlive it', () => {
+    const names = timestampsOf(migrationFiles()).get(KNOWN_TIMESTAMP_COLLISION) ?? []
+    expect(
+      names.length,
+      `${KNOWN_TIMESTAMP_COLLISION} no longer collides. Delete KNOWN_TIMESTAMP_COLLISION ` +
+        'in the same commit that resolved it.',
+    ).toBeGreaterThan(1)
+  })
+})
