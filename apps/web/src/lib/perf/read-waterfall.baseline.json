@@ -5,33 +5,82 @@
   },
   {
     "route": "/(app)/ads",
-    "awaits": ["decideLanding", "activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "activeThemeTokens",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/ads/budget",
-    "awaits": ["decideLanding", "activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "activeThemeTokens",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/ads/creative",
-    "awaits": ["decideLanding", "activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "activeThemeTokens",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/ads/performance",
-    "awaits": ["decideLanding", "activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "activeThemeTokens",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/ads/targeting",
-    "awaits": ["decideLanding", "activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "activeThemeTokens",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/analytics",
-    "awaits": ["decideLanding", "activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "activeThemeTokens",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/approvals",
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -44,6 +93,7 @@
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -56,6 +106,7 @@
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -69,6 +120,7 @@
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -81,6 +133,7 @@
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -90,13 +143,22 @@
   },
   {
     "route": "/(app)/brain/competitors",
-    "awaits": ["decideLanding", "activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "activeThemeTokens",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/brain/identity",
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -109,12 +171,12 @@
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
       "read",
-      "readLibrary",
-      "searchLibrary"
+      "readLibrary"
     ]
   },
   {
@@ -122,6 +184,7 @@
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -135,6 +198,7 @@
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -147,6 +211,7 @@
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -159,6 +224,7 @@
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -172,6 +238,7 @@
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -185,17 +252,34 @@
   },
   {
     "route": "/(app)/create",
-    "awaits": ["decideLanding", "activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "activeThemeTokens",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/create/post",
-    "awaits": ["decideLanding", "activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "activeThemeTokens",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/home",
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -208,6 +292,7 @@
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -220,6 +305,7 @@
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -229,13 +315,22 @@
   },
   {
     "route": "/(app)/inbox/comments/[accountId]/[platformPostId]",
-    "awaits": ["decideLanding", "activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "activeThemeTokens",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/inbox/reviews",
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -245,17 +340,34 @@
   },
   {
     "route": "/(app)/inbox/threads/[accountId]/[conversationId]",
-    "awaits": ["decideLanding", "activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "activeThemeTokens",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/leads",
-    "awaits": ["decideLanding", "activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "activeThemeTokens",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/loop",
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -268,6 +380,7 @@
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -280,6 +393,7 @@
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -293,6 +407,7 @@
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -306,6 +421,7 @@
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -323,6 +439,7 @@
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -335,6 +452,7 @@
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -347,6 +465,7 @@
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -356,13 +475,22 @@
   },
   {
     "route": "/(app)/report",
-    "awaits": ["decideLanding", "activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "activeThemeTokens",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/settings",
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -375,6 +503,7 @@
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -384,13 +513,22 @@
   },
   {
     "route": "/(app)/settings/plan",
-    "awaits": ["decideLanding", "activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "activeThemeTokens",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/settings/profile",
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -403,6 +541,7 @@
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -421,6 +560,7 @@
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -433,6 +573,7 @@
     "awaits": [
       "decideLanding",
       "activeWorkspaceRead",
+      "activeThemeTokens",
       "getOpsAdmin",
       "read",
       "soft",
@@ -442,7 +583,15 @@
   },
   {
     "route": "/(app)/wallet",
-    "awaits": ["decideLanding", "activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "activeThemeTokens",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(auth)/sign-in/[[...sign-in]]",

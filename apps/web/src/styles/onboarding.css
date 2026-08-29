@@ -573,22 +573,40 @@
   margin-bottom: 22px;
 }
 
+/*  A FIELD MUST LOOK LIKE A FIELD.
+    Founder's ruling, 2026-08-29, against step 02: an underline on a dark ground
+    with a faint placeholder reads as a paragraph, so "Say it in a few words" and
+    "No discounts, never call us cheap" looked like copy somebody had written
+    rather than boxes waiting for an answer. Two of the four things that screen
+    asks for were invisible as questions.
+
+    The fill and the ring are what make it an object. The travelling underline
+    below stays: it was never the problem, it just had nothing to travel along.  */
 .inp {
   width: 100%;
   font-size: var(--onb-fs-input);
   font-weight: 450;
   letter-spacing: -0.02em;
-  padding: 10px 2px 13px;
-  background: none;
-  border-bottom: 1.5px solid var(--onb-hairline);
-  transition: border-color var(--onb-d-el) var(--onb-ease);
+  padding: 12px 14px 13px;
+  background: var(--onb-paper);
+  border: 1.5px solid var(--onb-hairline-strong);
+  border-radius: var(--r-md);
+  transition:
+    border-color var(--onb-d-el) var(--onb-ease),
+    background-color var(--onb-d-el) var(--onb-ease);
 }
 
+/*  Readable, not decorative. `--ink-faint` is the absence tone; a prompt telling
+    somebody WHAT to type has to be legible or the field is a blank box again.  */
 .inp::placeholder {
-  color: var(--ink-faint);
+  color: var(--onb-muted);
+}
+.inp:hover {
+  border-color: var(--onb-orange-2);
 }
 .inp:focus {
-  border-bottom-color: var(--onb-orange);
+  border-color: var(--onb-orange);
+  outline: none;
 }
 
 /*  The travelling underline. A second rule scales in from the left on
@@ -597,9 +615,11 @@
 .field::after {
   content: '';
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  /*  Inset to the box. Flush with 0 it drew straight across the rounded corners
+      of the field this rule now sits under.                                    */
+  left: 10px;
+  right: 10px;
+  bottom: 1.5px;
   height: 1.5px;
   background: var(--onb-orange);
   transform: scaleX(0);
@@ -618,17 +638,25 @@
   font-weight: 450;
   line-height: 1.42;
   letter-spacing: -0.02em;
-  padding: 10px 2px 13px;
+  padding: 12px 14px 13px;
   resize: none;
-  border-bottom: 1.5px solid var(--onb-hairline);
-  transition: border-color var(--onb-d-el) var(--onb-ease);
+  background: var(--onb-paper);
+  border: 1.5px solid var(--onb-hairline-strong);
+  border-radius: var(--r-md);
+  transition:
+    border-color var(--onb-d-el) var(--onb-ease),
+    background-color var(--onb-d-el) var(--onb-ease);
 }
 
 .ta::placeholder {
-  color: var(--ink-faint);
+  color: var(--onb-muted);
+}
+.ta:hover {
+  border-color: var(--onb-orange-2);
 }
 .ta:focus {
-  border-bottom-color: var(--onb-orange);
+  border-color: var(--onb-orange);
+  outline: none;
 }
 
 .field--sm .inp {
