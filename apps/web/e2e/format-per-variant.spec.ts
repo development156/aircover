@@ -1,10 +1,4 @@
-import {
-  bootstrapWorkspace,
-  openPart,
-  saveVersionButton,
-  startPost,
-  versionBox,
-} from './fixtures/compose'
+import { bootstrapWorkspace, saveVersionButton, startPost, versionBox } from './fixtures/compose'
 import { adminClient, expect, test } from './fixtures/seeded-user'
 
 /**
@@ -88,9 +82,6 @@ test.describe('two channels, two bodies, two limits, two formats @smoke', () => 
     // ── RELOADED ─────────────────────────────────────────────────────────────
     await page.reload()
     await expect(page.locator('[data-composer]')).toBeVisible({ timeout: 60_000 })
-    // A reload comes back on the WORDS, which is where a writer returning to a
-    // draft wants to be. The per-platform cards are one press down the rail.
-    await openPart(page, 2)
     await expect(versionBox(page, 'X')).toHaveValue(X_BODY)
     await expect(versionBox(page, 'LinkedIn')).toHaveValue(LI_BODY)
     await expect(page.locator('[data-variant-format="x"]')).toHaveValue('text')
@@ -170,13 +161,8 @@ test.describe('relink never loses written words @smoke', () => {
     const OWN = 'Open till 9. Chai on the house after 8.'
     const xCard = page.locator('[data-version-card="x"]')
 
-    // The words and the platform's own copy are two different parts of the
-    // screen now, and this test is exactly about the relationship between them,
-    // so it moves between the two rather than pretending they are one page.
-    await openPart(page, 1)
     await page.getByLabel('Your post').fill(POST)
     // Typing into the channel detaches it — this is the state relink exists for.
-    await openPart(page, 2)
     await versionBox(page, 'X').fill(OWN)
     await saveVersionButton(page, 'x', 'X').click()
     // Wait for the CARD to say it is saved, not for a bar to change wording.
@@ -184,9 +170,7 @@ test.describe('relink never loses written words @smoke', () => {
 
     // The post moves on. X does not follow it, because X is its own now.
     const NEW_POST = 'Closed tomorrow for Ganesh Chaturthi.'
-    await openPart(page, 1)
     await page.getByLabel('Your post').fill(NEW_POST)
-    await openPart(page, 2)
     await expect(versionBox(page, 'X')).toHaveValue(OWN)
 
     // ── RELINK ───────────────────────────────────────────────────────────────

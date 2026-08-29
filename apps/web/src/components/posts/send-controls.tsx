@@ -163,23 +163,13 @@ export function SendControls({
           know that will press Save first out of caution and wonder what the
           other one skipped. */}
       <p className="type-meta text-muted" data-send-note>
-        {/* ── TWO REASONS NOTHING CAN GO OUT, AND THEY ARE NOT THE SAME ────────
-            "Connect an account" is useless advice to somebody who has connected
-            three and picked none, and it is the state this panel is easiest to
-            reach in: a post whose channels were all unticked keeps this part
-            reachable, because a part already earned never shuts under the
-            cursor. Each sentence names the remedy that can actually work. */}
-        {channels.length === 0
+        {live.length === 0
           ? unsavedVersions > 0
-            ? 'Save as draft writes the post and every version you have written. Nothing goes out until you choose a platform.'
-            : 'Nothing goes out until you choose a platform.'
-          : live.length === 0
-            ? unsavedVersions > 0
-              ? 'Save as draft writes the post and every version you have written. Nothing goes out until a channel is connected.'
-              : 'Nothing goes out until a channel is connected.'
-            : unsavedVersions > 0
-              ? 'Both of these save the post and every version you have written first. Send now then goes out for real.'
-              : 'Send now goes out for real. Nothing is sent until you confirm it.'}
+            ? 'Save as draft writes the post and every version you have written. Nothing goes out until a channel is connected.'
+            : 'Nothing goes out until a channel is connected.'
+          : unsavedVersions > 0
+            ? 'Both of these save the post and every version you have written first. Send now then goes out for real.'
+            : 'Send now goes out for real. Nothing is sent until you confirm it.'}
       </p>
 
       {saveResult === 'ok' ? (

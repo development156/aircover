@@ -2,7 +2,6 @@ import type { Page } from '@playwright/test'
 
 import { adminClient, expect, signInSecondContext, test } from './fixtures/seeded-user'
 import { seedFlowWorkspace, workspaceIdFor, DIVERGED } from './helpers/flow-seed'
-import { openPart } from './fixtures/compose'
 
 /**
  * WHAT HAPPENS TO A FLOW WHEN THE PERSON DOES NOT WALK IT FORWARDS.
@@ -202,14 +201,9 @@ test.describe('the composer, arrived at sideways', () => {
   test('a reload keeps both channels, both bodies and both limits', async ({ page, signedIn }) => {
     const postId = await seeded(page, signedIn.clerkUserId)
     await page.goto(`/posts/${postId}`)
-    // The composer opens on the words; the per-platform cards are one press
-    // down the rail, and a reload puts it back there — which is the whole
-    // subject of this test, so it goes through the rail on both sides.
-    await openPart(page, 2)
     await expect(page.locator('[data-version-card="x"]')).toBeVisible({ timeout: 60_000 })
 
     await page.reload()
-    await openPart(page, 2)
 
     await expect(page.locator('[data-version-card="x"]')).toBeVisible({ timeout: 60_000 })
     await expect(page.locator('[data-version-card="linkedin"]')).toBeVisible()
@@ -235,12 +229,10 @@ test.describe('the composer, arrived at sideways', () => {
     try {
       await second.goto(`/posts/${postId}`)
       await expect(second.locator('[data-composer]')).toBeVisible({ timeout: 60_000 })
-      await openPart(second, 2)
       await expect(second.locator('[data-version-card="x"]')).toBeVisible()
       // The first tab is untouched by the second opening. This asserts the
       // READ side only: the concurrent WRITE case is docs/23's own subject and
       // `concurrent-edit.spec.ts` owns it.
-      await openPart(page, 2)
       await expect(page.locator('[data-version-card="x"]')).toBeVisible()
     } finally {
       await second.context().close()

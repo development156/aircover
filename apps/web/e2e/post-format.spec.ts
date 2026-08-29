@@ -1,4 +1,4 @@
-import { bootstrapWorkspace, openPart, startPost } from './fixtures/compose'
+import { bootstrapWorkspace, startPost } from './fixtures/compose'
 import { adminClient, expect, test } from './fixtures/seeded-user'
 
 /**
@@ -93,9 +93,6 @@ test.describe('the format reaches the row @smoke', () => {
 
     // And it survives a reload rather than living in React state.
     await page.reload()
-    // A reload lands on the words; the kind-of-post control is on the platform
-    // part, one press down the rail.
-    await openPart(page, 2)
     await expect(page.locator('[data-variant-format="x"]')).toHaveValue('text')
 
     // Clearing is a real answer too: a writer who picked by accident must be able to
@@ -129,7 +126,6 @@ test.describe('the format reaches the row @smoke', () => {
     // again — with publishing now holding the post to a claim they had removed.
     // The row exists, so its silence is its own.
     await page.reload()
-    await openPart(page, 2)
     await expect(page.locator('[data-variant-format="x"]')).toHaveValue('')
     await expect
       .poll(
