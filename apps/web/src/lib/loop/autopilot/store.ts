@@ -302,3 +302,15 @@ export async function readAnnouncedForPerson(
     announcedAt: new Date(row.announced_at),
   }))
 }
+
+/**
+ * Run a statement that selects `workspace_id` and return the ids.
+ *
+ * Takes the SQL rather than naming one, because the caller decides WHICH
+ * workspaces it means and the statements all live in ./sql.ts where a real
+ * Postgres adjudicates them. Nothing here builds a query string.
+ */
+export async function readWorkspaceIds(sql: string, limit: number): Promise<string[]> {
+  const r = await getPool().query(sql, [limit])
+  return (r.rows as { workspace_id: string }[]).map((row) => row.workspace_id)
+}
