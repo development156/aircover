@@ -4,8 +4,23 @@ import { CalendarDays } from 'lucide-react'
 
 import { EmptyState } from '@/components/empty-state'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
-import { PageTitle } from '@/components/page-title'
 import { PlanWeekPanel } from '@/components/planner/plan-week-panel'
+import { PlannerHero } from '@/components/planner/planner-hero'
+import { OffGridNote } from '@/components/planner/off-grid-note'
+import { PlannerToolbar } from '@/components/planner/planner-toolbar'
+import { PlannerMiniCalendar } from '@/components/planner/planner-mini-calendar'
+import { PlannerUpcoming } from '@/components/planner/planner-upcoming'
+import {
+  applyFilter,
+  isFiltered,
+  matchesTab,
+  parseDate,
+  parseQuery,
+  parseTab,
+  upcoming,
+  PLANNER_TABS,
+  type PlannerTab,
+} from '@/lib/planner/filters'
 import { PlannerRow } from '@/components/planner/planner-row'
 import { ViewToggle, type PlannerView } from '@/components/planner/view-toggle'
 import { WeekTimeline } from '@/components/planner/week-timeline'
@@ -30,9 +45,21 @@ export const metadata = { title: 'Planner' }
 export default async function PlannerPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; week?: string }>
+  searchParams: Promise<{
+    view?: string
+    week?: string
+    tab?: string
+    date?: string
+    q?: string
+  }>
 }) {
-  const { view: rawView, week: rawWeek } = await searchParams
+  const {
+    view: rawView,
+    week: rawWeek,
+    tab: rawTab,
+    date: rawDate,
+    q: rawQuery,
+  } = await searchParams
   // LIST is the default on purpose: approve and reschedule live on list rows,
   // and the seeded approve.first_tour targets `planner.approve` on THIS route —
   // defaulting to the week grid would put the tour's anchor (and Alpha item 7's
@@ -115,11 +142,75 @@ export default async function PlannerPage({
 
   const shown = posts.map(forDisplay)
 
-  // No date at all, or a date this window does not cover.
+  // ── WHAT THE READER NARROWED THE PLAN TO ──────────────────────────────────
+  // All three live in the URL, for the reason `flow-journeys.spec.ts` already
+  // pins for `?view=`: "The view lives in the URL rather than in state… moving
+  // it into React state would be an easy, invisible regression." It also means
+  // the whole toolbar and the whole calendar cost this route no client JS.
+  const filter = {
+    tab: parseTab(rawTab),
+    query: parseQuery(rawQuery),
+    dateKey: parseDate(rawDate),
+  }
+  const narrowed = isFiltered(filter)
+  /** Carried on every filter link. `null` for this week, so the URL stays clean. */
+  const weekParam = weekOffset === 0 ? null : String(weekOffset)
 
-  const offGrid = shown.filter(
-    (p) => p.scheduled_at === null || !windowKeys.has(istDayKey(new Date(p.scheduled_at))),
-  ).length
+  /**
+   * Where "see them in the list" goes. It keeps the tab, the search and the
+   * picked date, because the count in that sentence was measured against them:
+   * sending the reader to an UNFILTERED list would show a different number of
+   * posts from the one the sentence has just promised.
+   */
+  const listCarry = {
+    view: 'list',
+    ...(filter.tab === 'all' ? {} : { tab: filter.tab }),
+    ...(filter.query === '' ? {} : { q: filter.query }),
+    ...(filter.dateKey === null ? {} : { date: filter.dateKey }),
+  }
+  const visible = applyFilter(shown, filter)
+
+  // ── EACH COUNT IS WHAT THAT TAB WOULD SHOW, GIVEN THE OTHER TWO FILTERS ────
+  // Not the count of the whole page, and not the count of what is already
+  // showing. The first was wrong and shipped for an hour: with `?q=chai` the All
+  // tab read 4 above a list of 1, which is a figure no query produced. The
+  // second is wrong differently — it reads 0 on every tab you are not standing
+  // on, which is the opposite of what a count is for.
+  //
+  // So: apply the search and the picked date, then count each tab within that.
+  // Stand on any tab and its own number is exactly the number of rows beneath it.
+  const beforeTab = applyFilter(shown, { ...filter, tab: 'all' })
+  const tabCounts = Object.fromEntries(
+    PLANNER_TABS.map((tab) => [tab, beforeTab.filter((p) => matchesTab(p, tab)).length]),
+  ) as Record<PlannerTab, number>
+
+  // Five, not three: the founder's brief says "next 3-5", and five fills the
+  // rail beside the calendar without needing its own scroller.
+  const next = upcoming(shown, now, 5)
+
+  // ── WHAT THE CHOSEN VIEW CAN ACTUALLY DRAW ────────────────────────────────
+  // Keyed to the days the view RENDERS, not to the week. The week's keys were
+  // the wrong set and it left a hole a click could reach: on `?view=day` the
+  // timeline draws today's column only, so picking tomorrow in the calendar
+  // showed an empty day, while `offGrid` measured against the whole week said 0
+  // and printed nothing. A screen that renders nothing and explains nothing is
+  // the failure `no-impossible-remedy.spec.ts` exists to catch, one state along.
+  const drawnKeys =
+    view === 'month'
+      ? new Set(
+          Array.from({ length: MONTH_GRID_DAYS }, (_, i) =>
+            istDayKey(new Date(firstGridDay(now).getTime() + i * 86_400_000)),
+          ),
+        )
+      : view === 'day'
+        ? new Set(window.days.filter(isToday).map(istDayKey))
+        : windowKeys
+
+  const offGrid = visible.filter((p) => {
+    if (p.scheduled_at === null) return true
+    const at = new Date(p.scheduled_at)
+    return Number.isNaN(at.getTime()) || !drawnKeys.has(istDayKey(at))
+  }).length
 
   return (
     <PublishStateProvider initial={liveSeed}>
@@ -144,103 +235,197 @@ export default async function PlannerPage({
           existed only to fight the old order and would now be six classes
           keeping two identical sequences in step. */}
       <div className="space-y-grid">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <PageTitle sub="Plan, schedule and stay ahead.">Planner</PageTitle>
-          {posts.length > 0 ? <ViewToggle active={view} /> : null}
+        <div className="enter">
+          <PlannerHero context={<ConnectFirstNote connections={connected} />}>
+            {posts.length > 0 ? <ViewToggle active={view} /> : null}
+          </PlannerHero>
         </div>
 
-        <ConnectFirstNote connections={connected} />
+        {/* THE FIGURES DESCRIBE THE WHOLE PLAN, NEVER THE FILTER. They sit
+            ABOVE the toolbar and they are how the reader decides which filter to
+            pick — a "Needs approval" figure that dropped to 0 because you
+            searched for "chai" would remove the very reason to clear the search.
+            So they read `shown`, and the tab counts below read the filtered set.
+            The two are different questions and are deliberately different
+            numbers; an earlier comment here claimed they could never disagree,
+            which was false the moment a search existed. */}
+        {posts.length > 0 ? (
+          <div className="enter-step" style={{ '--i': 1 } as React.CSSProperties}>
+            <PlannerSummary posts={shown} now={now} />
+          </div>
+        ) : null}
 
-        {/* Counts of the posts on this page, so the tiles and the grid below can
-            never disagree about how many there are. */}
-        {posts.length > 0 ? <PlannerSummary posts={shown} /> : null}
+        {/* ── THE PLAN, AND THE RAIL BESIDE IT ────────────────────────────────
+            One column until 1180, two above it. `wide` and not `narrow` on
+            purpose: the middle band (700-1179) already gives the shell a 72px
+            icon rail, and taking a further 300px out of a 1024px viewport
+            leaves the plan itself under 600px — which is the width the founder's
+            brief calls "content remains primary" and this would not be.
 
-        <div>
-          {read.status === 'unreadable' ? (
-            <p className="rounded-input bg-warn-bg px-3 py-2.5 text-[13px] text-warn">
-              Couldn&rsquo;t load your plan just now &mdash; reload to see it. Nothing has been
-              lost.
-            </p>
-          ) : read.status === 'no-workspace' ? (
-            <EmptyState
-              icon={CalendarDays}
-              title="Create a workspace to plan a week"
-              body="A plan belongs to a workspace and you don't have one yet. Nothing failed. There is simply no week to fill until one exists."
-              action={<CreateWorkspaceButton variant="primary" />}
-            />
-          ) : posts.length === 0 ? (
-            <EmptyState
-              icon={CalendarDays}
-              title="Your week shows up here"
-              /* Not "up there". MEASURED at 390: the Plan my week control the
+            DOM order is reading order: the plan first, the calendar after. On a
+            phone that is exactly what the brief asks for ("calendar moves below
+            content"), so there is no per-band reordering here at all. */}
+        <div className="flex flex-col gap-grid wide:flex-row wide:items-start">
+          <div className="min-w-0 flex-1 space-y-3">
+            {read.status === 'unreadable' ? (
+              <p className="rounded-input bg-warn-bg px-3 py-2.5 type-sm text-warn">
+                Couldn&rsquo;t load your plan just now &mdash; reload to see it. Nothing has been
+                lost.
+              </p>
+            ) : read.status === 'no-workspace' ? (
+              <EmptyState
+                icon={CalendarDays}
+                title="Create a workspace to plan a week"
+                body="A plan belongs to a workspace and you don't have one yet. Nothing failed. There is simply no week to fill until one exists."
+                action={<CreateWorkspaceButton variant="primary" />}
+              />
+            ) : posts.length === 0 ? (
+              <EmptyState
+                icon={CalendarDays}
+                title="Your week shows up here"
+                /* Not "up there". MEASURED at 390: the Plan my week control the
                  sentence points at is roughly 400px BELOW this text, because the
                  two-column desktop layout stacks on a phone. With exactly two
                  breakpoints (docs/26 §9.1) any direction word is a claim about
                  one of them; naming the control instead survives every reflow. */
-              body="Plan my week drafts five posts and places them across your coming week."
-              tip="Add goals first if you have a push this week. The plan bends toward them."
-            />
-          ) : view === 'month' ? (
-            // 42 IST days from the Monday on or before the 1st — `bucketWeek`
-            // already buckets any run of consecutive days, so the calendar needed
-            // no second date implementation to drift from the first.
-            <MonthGrid
-              buckets={bucketWeek(shown, firstGridDay(now), MONTH_GRID_DAYS)}
-              monthAnchor={now}
-            />
-          ) : view === 'week' || view === 'day' ? (
-            <div className="space-y-3">
-              <WeekNav days={window.days} offset={weekOffset} view={view} />
-              <WeekTimeline
-                days={view === 'day' ? window.days.filter(isToday) : window.days}
-                posts={shown}
-                variantStates={variantStates}
-                today={now}
+                body="Plan my week drafts five posts and places them across your coming week."
+                tip="Add goals first if you have a push this week. The plan bends toward them."
               />
-              {/* WHAT THE TIMELINE STRUCTURALLY CANNOT SHOW, SAID RATHER THAN
-                  DROPPED. A post with no `scheduled_at` has no minute to sit at,
-                  and one scheduled outside this window belongs to another week.
-                  Rendering `WeekGrid` underneath would have covered them — and
-                  would also have redrawn every post already on the timeline, so
-                  the week appeared twice. The note names the count and points at
-                  List, the one view that can show them without inventing a date
-                  for them. */}
-              {offGrid > 0 ? (
-                <p className="type-meta text-muted">
-                  {offGrid === 1 ? '1 post is' : `${offGrid} posts are`} not on this week&rsquo;s
-                  grid, with no date yet or a date outside it.{' '}
-                  <Link
-                    href={{ pathname: '/planner', query: { view: 'list' } }}
-                    className="card-link text-accent"
+            ) : (
+              <>
+                {/* The toolbar sits above EVERY view, not just the list: a tab or a
+                  search that vanished when you clicked Month would read as the
+                  filter having been discarded. */}
+                <PlannerToolbar
+                  active={filter.tab}
+                  counts={tabCounts}
+                  query={filter.query}
+                  view={view}
+                  dateKey={filter.dateKey}
+                  week={weekParam}
+                />
+
+                {/* ── NOTHING LEFT AFTER FILTERING IS A DIFFERENT SENTENCE ──────
+                  "Your week shows up here" is the claim for a workspace with no
+                  posts. Saying it to someone who has eight drafts and typed
+                  "chai" would be false, and the remedy it offers — plan a week —
+                  is not the remedy for a search that matched nothing.
+                  `no-impossible-remedy.spec.ts` exists for exactly this class. */}
+                {narrowed && visible.length === 0 ? (
+                  <p className="surface-ring rounded-card bg-surface px-4 py-8 text-center type-sm text-muted">
+                    No post matches this filter.{' '}
+                    <Link
+                      href={{ pathname: '/planner', query: { view } }}
+                      className="font-[650] text-accent underline underline-offset-2"
+                    >
+                      Show everything
+                    </Link>
+                  </p>
+                ) : view === 'month' ? (
+                  // 42 IST days from the Monday on or before the 1st — `bucketWeek`
+                  // already buckets any run of consecutive days, so the calendar needed
+                  // no second date implementation to drift from the first.
+                  <div className="space-y-3">
+                    <MonthGrid
+                      buckets={bucketWeek(visible, firstGridDay(now), MONTH_GRID_DAYS)}
+                      monthAnchor={now}
+                    />
+                    {/* The month grid had no such note at all, so a picked date
+                        outside its 42 days rendered a calendar with nothing on it
+                        and no sentence saying why. */}
+                    <OffGridNote count={offGrid} carry={listCarry} />
+                  </div>
+                ) : view === 'week' || view === 'day' ? (
+                  <div className="space-y-3">
+                    {/* The filters ride along. Stepping a week used to emit
+                        `{ view, week }` and nothing else, so "Next week" silently
+                        cleared the tab and the search the reader was looking at. */}
+                    <WeekNav
+                      days={window.days}
+                      offset={weekOffset}
+                      view={view}
+                      filters={{
+                        ...(filter.tab === 'all' ? {} : { tab: filter.tab }),
+                        ...(filter.query === '' ? {} : { q: filter.query }),
+                        ...(filter.dateKey === null ? {} : { date: filter.dateKey }),
+                      }}
+                    />
+                    <WeekTimeline
+                      days={view === 'day' ? window.days.filter(isToday) : window.days}
+                      posts={visible}
+                      variantStates={variantStates}
+                      today={now}
+                    />
+                    {/* WHAT THE VIEW STRUCTURALLY CANNOT SHOW, SAID RATHER THAN
+                        DROPPED. A post with no `scheduled_at` has no minute to sit
+                        at, and one scheduled outside the drawn days belongs to
+                        another window. Rendering `WeekGrid` underneath would have
+                        covered them — and would also have redrawn every post already
+                        on the timeline, so the week appeared twice. The note names
+                        the count and points at List, the one view that can show them
+                        without inventing a date for them. */}
+                    <OffGridNote count={offGrid} carry={listCarry} />
+                  </div>
+                ) : (
+                  <ul
+                    /* One surface with hairline dividers, not forty bordered cards.
+                 Same information, a fraction of the ink — and `divide-y` puts
+                 the rule BETWEEN rows, so neither the first nor the last carries
+                 a stray edge against the card's own ring. */
+                    className="surface-ring divide-y divide-line-soft overflow-hidden rounded-card bg-surface"
+                    data-guide="planner.list"
                   >
-                    See them in List
-                  </Link>
-                  .
-                </p>
-              ) : null}
-            </div>
-          ) : (
-            <ul className="space-y-2" data-guide="planner.list">
-              {shown.map((post) => (
-                <li key={post.id}>
-                  {/* `autoPublish` was computed here and never passed, so every row
+                    {visible.map((post) => (
+                      <li key={post.id}>
+                        {/* `autoPublish` was computed here and never passed, so every row
                   defaulted to false and read "Won't post itself — scheduled
                   auto-publish isn't live yet" while the dispatcher was on. The
                   default under-promises, which was the safe direction right up
                   until the rail went live. It is also what `PlannerReschedule`
                   needs before it can warn about an unconnected channel. */}
-                  <PlannerRow
-                    post={post}
-                    now={now}
-                    connected={connectedChannels}
-                    autoPublish={autoPublish}
-                    variantStates={variantStates.get(post.id) ?? []}
-                    campaigns={campaignsByPost?.get(post.id)}
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
+                        <PlannerRow
+                          post={post}
+                          now={now}
+                          connected={connectedChannels}
+                          autoPublish={autoPublish}
+                          variantStates={variantStates.get(post.id) ?? []}
+                          campaigns={campaignsByPost?.get(post.id)}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* ── THE RAIL ────────────────────────────────────────────────────
+              300px at `wide`, full width below it, and `sticky` only where
+              there is a viewport tall enough to make sticking useful. It holds
+              the two questions the list cannot answer at a glance: which days
+              of the month carry work, and what is actually next.
+
+              It is rendered only when the workspace HAS posts. A calendar with
+              no dots and an "Upcoming" heading over nothing are two more cards
+              explaining an absence the empty state already states once, which
+              is the exact shape docs/37 §16 names as the v4 failure. */}
+          {posts.length > 0 ? (
+            <aside
+              className="enter-step flex w-full shrink-0 flex-col gap-3 wide:sticky wide:top-6 wide:w-[300px]"
+              style={{ '--i': 2 } as React.CSSProperties}
+            >
+              <PlannerMiniCalendar
+                posts={shown}
+                now={now}
+                selected={filter.dateKey}
+                view={view}
+                tab={filter.tab === 'all' ? null : filter.tab}
+                query={filter.query}
+                week={weekParam}
+              />
+              {next.length > 0 ? <PlannerUpcoming posts={next} /> : null}
+            </aside>
+          ) : null}
         </div>
 
         {/* AFTER the plan, at every width. It is an offer to SPEND 20 credits,
