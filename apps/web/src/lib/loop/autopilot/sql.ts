@@ -208,3 +208,50 @@ export const AUTOPILOT_CANDIDATES_SQL = `select p.id            as post_id,
    )
  order by b.priority asc, v.created_at asc
  limit $2`
+
+/**
+ * DISPATCH — hand the post to the publish path that already exists.
+ *
+ * ── AUTOPILOT DOES NOT PUBLISH. IT SCHEDULES. ────────────────────────────────
+ * This is the most important design decision in the dispatcher and it belongs
+ * in writing. The obvious shape is for autopilot to call the adapter itself.
+ * That would mean a SECOND publish path, and the first one already runs, in
+ * order: Constraint Engine, then the refusal gate, then
+ * `assert_account_for_scheduled_post`, then the adapter. Every one of those is
+ * proven, and the account assertion is verified against production with five
+ * hostile calls.
+ *
+ * A second path would inherit none of it. It would be the code with nobody
+ * watching, which is precisely the code that must reuse the guards rather than
+ * re-implement them.
+ *
+ * So "dispatched" means: the post becomes `scheduled` with a `scheduled_at` of
+ * now, and the existing sweep picks it up on its next tick exactly as it would
+ * a post a person scheduled by hand. `isDispatchable` is the one definition of
+ * eligibility in this product and it admits `approved` and `scheduled` with a
+ * real time; this writes both halves.
+ *
+ * ── AND THE KILL SWITCH STILL REACHES IT ─────────────────────────────────────
+ * The kill switch cancels scheduled posts scoped through `loop_briefs`, and an
+ * autopilot candidate is by definition linked to a brief — the candidate scan
+ * joins through one. So a post armed here is cancellable by the same switch
+ * that cancels everything else the Loop scheduled, with no new code.
+ *
+ * ── THE GUARD IN THE WHERE CLAUSE ────────────────────────────────────────────
+ * `status in ('idea','draft','review','approved')` refuses to re-arm anything
+ * already in flight or finished. `publishing` is the one that matters: that
+ * post is being sent right now, and moving it back to `scheduled` would put it
+ * in front of the sweep a second time and publish it twice. The statement
+ * returns the id, so a caller can tell a real arming from a refused one rather
+ * than assuming it worked.
+ *
+ * Parameters: $1 workspace_id, $2 post_id.
+ */
+export const ARM_FOR_PUBLISH_SQL = `update posts
+   set status = 'scheduled',
+       scheduled_at = now(),
+       updated_at = now()
+ where id = $2
+   and workspace_id = $1
+   and status in ('idea', 'draft', 'review', 'approved')
+returning id`

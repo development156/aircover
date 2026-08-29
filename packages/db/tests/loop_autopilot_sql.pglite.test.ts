@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { bootFullSchema } from './helpers/pglite-tenant'
 
 import {
+  ARM_FOR_PUBLISH_SQL,
   AUTOPILOT_CANDIDATES_SQL,
   AUTOPILOT_SETTINGS_SQL,
   DIAL_SQL,
@@ -529,6 +530,71 @@ describe('the autopilot dispatcher SQL against the real schema', () => {
 
       const theirs = await db.query(AUTOPILOT_CANDIDATES_SQL, [OTHER, 50])
       expect(theirs.rows).toHaveLength(0)
+    })
+  })
+
+  describe('arming a post for the publish path that already exists', () => {
+    const armed = 'ab000000-0000-4000-8000-0000000000ab'
+
+    beforeAll(async () => {
+      await db.exec(`
+        insert into posts (id, workspace_id, title, status, channels, created_by)
+          values ('${armed}', '${WS}', 'To be armed', 'draft', '{x}', '${USER}');
+      `)
+    }, 120_000)
+
+    it('moves a draft to scheduled with a real time, which is what isDispatchable needs', async () => {
+      const r = await db.query<{ id: string }>(ARM_FOR_PUBLISH_SQL, [WS, armed])
+      expect(r.rows).toHaveLength(1)
+
+      const after = await db.query<{ status: string; scheduled_at: string | null }>(
+        `select status, scheduled_at from posts where id = $1`,
+        [armed],
+      )
+      expect(after.rows[0]?.status).toBe('scheduled')
+      // Both halves matter: isDispatchable refuses a dispatchable status with a
+      // null time, so arming the status alone would produce a post that looks
+      // scheduled on a screen and is never picked up.
+      expect(after.rows[0]?.scheduled_at).not.toBeNull()
+    })
+
+    it('REFUSES a post that is already publishing, which would otherwise go out twice', async () => {
+      const flying = 'ac000000-0000-4000-8000-0000000000ac'
+      await db.exec(`
+        insert into posts (id, workspace_id, title, status, channels, created_by, scheduled_at)
+          values ('${flying}', '${WS}', 'In flight', 'publishing', '{x}', '${USER}', now());
+      `)
+      const r = await db.query(ARM_FOR_PUBLISH_SQL, [WS, flying])
+      // No row returned means nothing was armed, and the caller can tell.
+      expect(r.rows).toHaveLength(0)
+      const after = await db.query<{ status: string }>(`select status from posts where id = $1`, [
+        flying,
+      ])
+      expect(after.rows[0]?.status).toBe('publishing')
+    })
+
+    it('REFUSES a post that already published', async () => {
+      const done = 'ad000000-0000-4000-8000-0000000000ad'
+      await db.exec(`
+        insert into posts (id, workspace_id, title, status, channels, created_by)
+          values ('${done}', '${WS}', 'Already out', 'published', '{x}', '${USER}');
+      `)
+      const r = await db.query(ARM_FOR_PUBLISH_SQL, [WS, done])
+      expect(r.rows).toHaveLength(0)
+    })
+
+    it("never arms another workspace's post", async () => {
+      const theirs = 'ae000000-0000-4000-8000-0000000000ae'
+      await db.exec(`
+        insert into posts (id, workspace_id, title, status, channels, created_by)
+          values ('${theirs}', '${OTHER}', 'Not ours', 'draft', '{x}', '${USER}');
+      `)
+      const r = await db.query(ARM_FOR_PUBLISH_SQL, [WS, theirs])
+      expect(r.rows).toHaveLength(0)
+      const after = await db.query<{ status: string }>(`select status from posts where id = $1`, [
+        theirs,
+      ])
+      expect(after.rows[0]?.status).toBe('draft')
     })
   })
 })

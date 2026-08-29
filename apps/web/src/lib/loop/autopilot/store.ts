@@ -6,6 +6,7 @@ import type { Channel } from '@sahoda/shared'
 import type { AutopilotRefusal } from '@/lib/loop/autopilot-refusals'
 import type { AnnouncedPost } from './dispatch-due'
 import {
+  ARM_FOR_PUBLISH_SQL,
   AUTOPILOT_CANDIDATES_SQL,
   AUTOPILOT_SETTINGS_SQL,
   DIAL_SQL,
@@ -210,4 +211,21 @@ export async function readCandidateRows(workspaceId: string, limit = 100): Promi
     briefId: row.brief_id,
     cycleId: row.cycle_id,
   }))
+}
+
+/**
+ * Hand one post to the publish path that already exists, and report whether it
+ * actually moved.
+ *
+ * ── THE BOOLEAN IS THE POINT ─────────────────────────────────────────────────
+ * The statement carries its own guard: a post already `publishing` or
+ * `published` is not re-armed, because putting it in front of the sweep a
+ * second time publishes it twice. So `false` is not an error — it is the
+ * database refusing correctly, and the caller must be able to tell that from
+ * success rather than assuming the write landed. The dispatch and hold sweeps
+ * take the same line with their own guarded writes.
+ */
+export async function armForPublish(workspaceId: string, postId: string): Promise<boolean> {
+  const r = await getPool().query(ARM_FOR_PUBLISH_SQL, [workspaceId, postId])
+  return r.rows.length > 0
 }
