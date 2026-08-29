@@ -57,6 +57,12 @@ const store = vi.hoisted(() => ({
   featuredBy: new Map<string, FeaturedPost[]>(),
   readingsBy: new Map<string, AudienceReading[]>(),
   saved: [] as Array<{ workspaceId: string; claim: string; computedOn: string }>,
+  runs: [] as Array<{
+    workspaceId: string
+    computedOn: string
+    declines: Record<string, string>
+    written: number
+  }>,
   inserted: true,
   throwFor: new Set<string>(),
 }))
@@ -101,6 +107,15 @@ vi.mock('./store', () => ({
       computedOn: observation.computedOn,
     })
     return { inserted: store.inserted }
+  },
+  savePassRun: async (
+    workspaceId: string,
+    computedOn: string,
+    declines: Record<string, string>,
+    written: number,
+  ) => {
+    store.runs.push({ workspaceId, computedOn, declines, written })
+    return { inserted: true }
   },
 }))
 
@@ -147,6 +162,7 @@ describe('runMarketingBrainPass', () => {
     store.featuredBy = new Map()
     store.readingsBy = new Map()
     store.saved = []
+    store.runs = []
     store.inserted = true
     store.throwFor = new Set()
   })
@@ -317,6 +333,64 @@ describe('runMarketingBrainPass', () => {
     expect(result.inserted).toBe(2)
     expect(store.saved.map((s) => s.claim).join(' ')).toContain('Instagram')
     expect(store.saved.map((s) => s.claim).join(' ')).toContain('Linkedin')
+  })
+
+  // ── THE RECORD OF HAVING LOOKED ───────────────────────────────────────────
+
+  it("files this workspace's own reasons, not the whole run's tally", async () => {
+    store.workspaces = ['ws-a']
+
+    await runMarketingBrainPass(new Date('2026-03-08T00:00:00Z'))
+
+    expect(store.runs).toHaveLength(1)
+    const run = store.runs[0]!
+    expect(run.workspaceId).toBe('ws-a')
+    expect(run.computedOn).toBe('2026-03-08')
+    expect(run.written).toBe(0)
+    // Keyed by kind alone. `result.declined` prefixes the kind because it merges
+    // every workspace; this row IS one workspace, so the prefix would be noise a
+    // screen has to parse back off.
+    expect(run.declines['tone_drift']).toBe('no_posts')
+    expect(run.declines['channel_return']).toBe('no_metrics')
+  })
+
+  it('counts what it wrote, so a row is the complete account of the pass', async () => {
+    store.workspaces = ['ws-a']
+    store.postsBy.set('ws-a', drifter('a'))
+
+    await runMarketingBrainPass(new Date('2026-03-08T00:00:00Z'))
+
+    const run = store.runs[0]!
+    expect(run.written).toBe(1)
+    // The kind that spoke is absent from the declines, so "written plus
+    // declines" accounts for every computer and nothing is unexplained.
+    expect(run.declines['tone_drift']).toBeUndefined()
+  })
+
+  it('writes NO row for a workspace whose reads threw', async () => {
+    // The guarantee in one test: a missing row means "we could not look", so a
+    // broken reader can never render on a customer's screen as patience.
+    store.workspaces = ['ws-a', 'ws-b']
+    store.throwFor = new Set(['ws-a'])
+
+    const result = await runMarketingBrainPass(new Date('2026-03-08T00:00:00Z'))
+
+    expect(result.failed).toBe(1)
+    expect(store.runs.map((r) => r.workspaceId)).toEqual(['ws-b'])
+  })
+
+  it("does not carry one workspace's reasons into the next", async () => {
+    // The counter and the map are reused across the loop, so a leak here would
+    // tell a workspace with no connected account that it was waiting on posts
+    // it does not have — a sentence about somebody else's business.
+    store.workspaces = ['ws-a', 'ws-b']
+    store.postsBy.set('ws-a', drifter('a'))
+
+    await runMarketingBrainPass(new Date('2026-03-08T00:00:00Z'))
+
+    const b = store.runs.find((r) => r.workspaceId === 'ws-b')!
+    expect(b.written).toBe(0)
+    expect(b.declines['tone_drift']).toBe('no_posts')
   })
 
   it('reports the workspaces it considered, so a pass over none is visible', async () => {
