@@ -418,6 +418,24 @@ export const AUTOPILOT_WORKSPACES_SQL = `select distinct workspace_id
  * including one that assembles rows from somewhere else. A test forces the
  * second by handing it rows out of order.
  *
+ * ── THE TIEBREAKER, AND WHY A BARE `created_at` WAS A DEFECT ─────────────────
+ * `created_at` defaults to `now()`, which is the TRANSACTION timestamp. An
+ * announcement and the cancellation that stops it are two statements that can
+ * land in the same one, and then `order by created_at` alone leaves the two rows
+ * in whatever order the scan returns. MEASURED 2026-08-29 in CI: this query
+ * returned `['cancelled', 'announced']` for a post that was announced and then
+ * cancelled, and the same test had passed locally minutes earlier. A read whose
+ * whole job is to say what happened first cannot be decided by a scan.
+ *
+ * The tiebreaker is the lifecycle, which is not a convention but a fact about
+ * this table: 'dispatched', 'refused' and 'cancelled' all RESOLVE an
+ * announcement, so none of them can precede one for the same post and variant.
+ *
+ * It settles the tie that actually occurs and no more. Two resolving rows
+ * sharing a timestamp would still be unordered between themselves; the cancel
+ * statement's own `not exists` guard is what stops a second one existing, so
+ * this query is not the place that keeps that promise.
+ *
  * Parameters: $1 workspace_id, $2 post_id, $3 variant_id.
  */
 export const POST_AUTOPILOT_HISTORY_SQL = `select decision,
@@ -429,4 +447,5 @@ export const POST_AUTOPILOT_HISTORY_SQL = `select decision,
  where workspace_id = $1
    and post_id = $2
    and variant_id = $3
- order by created_at asc`
+ order by created_at asc,
+          case decision when 'announced' then 0 else 1 end asc`
