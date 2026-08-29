@@ -7,6 +7,7 @@ import type { AutopilotRefusal } from '@/lib/loop/autopilot-refusals'
 import type { AutopilotHistoryRow } from './history-copy'
 import { toAnnouncedForPerson, toAnnouncedPost, toCandidateRow, toHistoryRow } from './row-mappers'
 import type { AnnouncedPost } from './dispatch-due'
+import { decisionParams } from './decision-params'
 import {
   ACTIVE_BRAIN_SQL,
   POST_AUTOPILOT_HISTORY_SQL,
@@ -133,18 +134,10 @@ export interface DecisionRow {
  * how `ops_audit_log` came to hold 16,915 rows that name nothing.
  */
 export async function writeDecision(row: DecisionRow): Promise<string> {
-  const r = await getPool().query(WRITE_DECISION_SQL, [
-    row.workspaceId,
-    row.postId,
-    row.variantId,
-    row.channel,
-    row.accountId,
-    row.briefId ?? null,
-    row.cycleId ?? null,
-    row.decision,
-    row.refusalReason ?? null,
-    row.dispatchAfter ? row.dispatchAfter.toISOString() : null,
-  ])
+  // Bound through `decisionParams`, which the pglite suite also uses, so the
+  // order of these ten is checked against a real Postgres rather than against
+  // a type that sees five uuid strings as interchangeable.
+  const r = await getPool().query(WRITE_DECISION_SQL, decisionParams(row))
   return (r.rows[0] as { id: string }).id
 }
 
