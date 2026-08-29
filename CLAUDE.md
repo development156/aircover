@@ -75,6 +75,38 @@ The mechanical patterns (AI vocabulary, filler, signposting, servility, emoji, r
 
 Empty states and errors state the CLAIM precisely: "we never asked" and "we asked and got nothing" are different sentences, and `lib/inbox/emptiness.ts` exists to keep eight of them apart. Its tests assert the claim (`not a reading of your reviews`, `nothing was charged`) and the forbidden claim (`not.toMatch(/\bno reviews\b/)`), never the wording — so rewrite the sentence freely and keep the guarantee.
 
+## Tone Setup
+
+**"Do a Tone Setup on X" is a standing instruction with a fixed meaning.** Founder's
+ruling, 2026-08-29, given against `/brain/knowledge`, whose lead paragraph named the
+parts (documents, passages, "Resolve your Brand Brain") and never said what any of it
+unlocks.
+
+It means: **that section is screaming tech instead of answering "what customer
+capability does this unlock?"** — the CPO tone. Rewrite it so a shop owner learns three
+things without asking: **why this exists, how it helps them, and how to use it well.**
+
+Four moves, in this order:
+
+1. **Lead with the capability, not the mechanism.** "The documents Sahoda has read and
+   the passages you can search" is an inventory of our parts. "Give Sahoda the documents
+   that hold your real prices, so it stops guessing them" is what the reader gets.
+2. **Name the best practice on the screen.** A feature nobody knows what to put into
+   stays empty: three documents across 33 workspaces was the measurement that produced
+   this ruling. Say what to give it, each paired with what that unlocks.
+3. **Warn about the failure that looks like success**, before it costs somebody a
+   minute. A login wall indexed cleanly and was badged identically to a real rate card.
+4. **Every label a customer reads is a capability.** "Indexed" → "Ready to quote".
+   Badges, counts and headings are copy, not chrome.
+
+**It never licenses overclaiming.** The five rules below still bind, and a Tone Setup is
+the likeliest place to break rule 1: a warmer sentence that is true in fewer cases is a
+defect, not an improvement. Narrow the claim to what actually ships — `caption_rewrite`
+and `content_variants` read the library; the weekly plan and the site builder do not,
+so the copy says "when it rewrites a post" and not "everywhere". **And if the old copy
+promised something the code cannot keep, the Tone Setup is when it goes**: the same pass
+removed "never trains on it", which nothing in `packages/mesh` enforced.
+
 **Five rules that outrank the skill.** They exist because this product's sentences were built to be exact.
 
 1. **A sentence must never become vaguer than the truth it replaces.** If a rewrite is less specific, or true in fewer cases, it is a defect and not a style improvement. "Publishing key isn't set in this environment", `InboxEmptiness`'s six remedies and /analytics separating "no account connected" from "read failed" are precise on purpose. Print the before and the after and say what the claim is, per string.
@@ -153,6 +185,20 @@ report in plain language, or keep the detail and add a short `In plain terms`
 paragraph — three or four sentences, no jargon, no file paths. The test: could
 someone who has never opened this codebase tell whether it went well? **Plain
 is not vaguer** — keep every figure exact.
+
+**Always give a link to look at, after every change.** Founder's ruling,
+2026-08-29. A change nobody can open is a claim. Every report that touched a
+screen ends with the URL, unasked:
+
+- **The lane's own preview**, which always points at that branch's newest build:
+  `https://sahodalabs-git-<lane>-development-4417s-projects.vercel.app`
+- **And `https://app.sahodalabs.com`** when the change was promoted, said as
+  such, because those are two different things and only one of them is what
+  customers see.
+
+Name the screen, not just the host, so the link lands where the change is. Say
+plainly when a build is still running or failed rather than giving a URL that
+will show the previous version.
 
 **End with exactly two things:** what you did NOT do and why, then anything
 needing a decision — one line each, or "nothing needs a decision".

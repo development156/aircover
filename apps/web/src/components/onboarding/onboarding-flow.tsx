@@ -97,7 +97,7 @@ export function OnboardingFlow({
   )
 
   /**
-   * The money guard. `newResolveObjectRef` mints a FRESH ledger key per call, so
+   * The money guard. Each call reaches the ledger on its own, so
    * two dispatches are two charges — and React's action queue does not drop the
    * second, it runs it once the first settles (MEASURED: two same-tick dispatches
    * on an ungated control invoke the action twice). A ref, not render state: it
