@@ -5,6 +5,7 @@ import { EmptyState } from '@/components/empty-state'
 import { PageTitle } from '@/components/page-title'
 import { DesignPreview } from '@/components/studio/design-preview'
 import { StartDesign } from '@/components/studio/start-design'
+import { StartingPoints } from '@/components/studio/starting-points'
 import { activeThemeTokens } from '@/lib/brand/read-theme'
 import { describePaletteFallback, studioPalette } from '@/lib/studio/palette'
 import { describeUnreadableDesigns, studioEmptiness } from '@/lib/studio/emptiness'
@@ -37,9 +38,13 @@ export default async function StudioPage() {
 
   // The theme read needs the workspace id, so it cannot join the same batch.
   // `activeWorkspaceRead` is `cache`d, so asking again costs nothing.
-  const [designs, tokens] = await Promise.all([
+  // The starting points are a third INDEPENDENT read rather than a filter over
+  // the first: `readDesigns` excludes them in SQL, so the two lists never share
+  // rows and a cap applied to one cannot silently shorten the other.
+  const [designs, tokens, templates] = await Promise.all([
     readDesigns(),
     workspace.status === 'ok' ? activeThemeTokens(workspace.workspace.id) : Promise.resolve(null),
+    readDesigns({ templates: true }),
   ])
 
   const resolved = studioPalette(tokens)
@@ -59,6 +64,8 @@ export default async function StudioPage() {
       )}
 
       <StartDesign />
+
+      <StartingPoints read={templates} palette={resolved.palette} />
 
       <section aria-labelledby="studio-designs" className="flex flex-col gap-3">
         <h2 id="studio-designs" className="type-h2">

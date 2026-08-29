@@ -36,6 +36,7 @@ import {
   type PageExport,
 } from '@/lib/studio/export-copy'
 import { imageDataUri, resolvePageImages } from '@/lib/studio/images'
+import { TEMPLATE_KEPT, TEMPLATE_REFUSALS, TEMPLATE_RELEASED } from '@/lib/studio/template-copy'
 import { studioPalette } from '@/lib/studio/palette'
 import { rasterisePng } from '@/lib/studio/raster'
 import type {
@@ -44,6 +45,7 @@ import type {
   ExportDesignState,
   ExportPagesState,
   SaveDesignState,
+  TemplateFlagState,
 } from '@/lib/studio/state'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { activeWorkspaceRead, workspaceForWrite } from '@/lib/workspaces'
@@ -626,4 +628,111 @@ export async function designPhoto(assetId: unknown): Promise<DesignPhotoState> {
   const dataUri = await imageDataUri(id.data, workspace.workspace.id)
   if (dataUri === null) return { ok: false, message: PHOTO_REFUSAL }
   return { ok: true, dataUri }
+}
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * A CUSTOMER'S OWN STARTING POINTS.
+ *
+ * `template-copy.ts` carries the product argument. What matters here is that
+ * these are two DIFFERENT acts and neither pretends to be the other: keeping a
+ * design as a starting point MOVES it between shelves and copies nothing;
+ * starting from one COPIES it and leaves the original alone.
+ */
+
+/**
+ * Keep this design as a starting point, or stop.
+ *
+ * A one-column update rather than a `saveDesign` round trip, and that is not
+ * tidiness: `saveDesign` writes the whole row from what the browser holds, so
+ * using it here would push the editor's in-memory document back over the stored
+ * one as a side effect of ticking a box. Someone with an older tab open would
+ * silently overwrite a newer save.
+ */
+export async function setDesignTemplate(input: unknown): Promise<TemplateFlagState> {
+  const parsed = z.object({ designId: z.uuid(), isTemplate: z.boolean() }).safeParse(input)
+  if (!parsed.success) return { ok: false, message: TEMPLATE_REFUSALS.notFound }
+
+  const workspace = await workspaceForWrite()
+  if (!workspace.ok) return { ok: false, message: workspace.message }
+
+  try {
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase
+      .from('studio_designs')
+      .update({ is_template: parsed.data.isTemplate })
+      .eq('id', parsed.data.designId)
+      .eq('workspace_id', workspace.workspace.id)
+      .select('is_template')
+      .single()
+
+    if (error || !data) return { ok: false, message: TEMPLATE_REFUSALS.flagFailed }
+
+    // The value that LANDED, read back, rather than the one that was asked for.
+    // A toggle that shows what it requested is a toggle that lies on the day the
+    // write is refused.
+    const isTemplate = data.is_template === true
+
+    revalidatePath('/studio')
+    return {
+      ok: true,
+      isTemplate,
+      message: isTemplate ? TEMPLATE_KEPT : TEMPLATE_RELEASED,
+    }
+  } catch (error) {
+    reportServerError(error, { action: 'setDesignTemplate' })
+    return { ok: false, message: TEMPLATE_REFUSALS.flagFailed }
+  }
+}
+
+/**
+ * Start a new design from one of this workspace's own starting points.
+ *
+ * ── A COPY, AND THE ORIGINAL IS NOT TOUCHED ────────────────────────────────
+ * The whole document is carried over: the words, and the asset ids of the
+ * pictures. The two rows are independent from this moment, so editing the copy
+ * never changes the starting point. Nothing is charged and no model is called.
+ *
+ * The pictures are referenced rather than duplicated, which is deliberate: two
+ * designs pointing at one photograph is what the library is for, and copying
+ * bytes would bill a person twice for the same file. It also means trashing
+ * that photograph affects both, which is the same thing that was already true
+ * of any two designs using one picture.
+ */
+export async function startFromTemplate(designId: unknown): Promise<SaveDesignState> {
+  const id = z.uuid().safeParse(designId)
+  if (!id.success) return { ok: false, message: TEMPLATE_REFUSALS.notFound }
+
+  const workspace = await workspaceForWrite()
+  if (!workspace.ok) return { ok: false, message: workspace.message }
+
+  try {
+    const supabase = createServerSupabase()
+    const read = await supabase
+      .from('studio_designs')
+      .select('*')
+      .eq('workspace_id', workspace.workspace.id)
+      .eq('id', id.data)
+      .maybeSingle()
+
+    if (read.error) return { ok: false, message: TEMPLATE_REFUSALS.unreadable }
+    if (!read.data) return { ok: false, message: TEMPLATE_REFUSALS.notFound }
+
+    const source = StudioDesignSchema.safeParse(read.data)
+    if (!source.success) return { ok: false, message: TEMPLATE_REFUSALS.unreadable }
+
+    // Written through `saveDesign` rather than a second insert, so the copy
+    // passes the same template and preset checks a new design does. A starting
+    // point saved before a layout was retired must not produce a design nobody
+    // can open.
+    return saveDesign({
+      title: source.data.title,
+      presetId: source.data.preset_id,
+      doc: source.data.doc,
+      isTemplate: false,
+    })
+  } catch (error) {
+    reportServerError(error, { action: 'startFromTemplate' })
+    return { ok: false, message: TEMPLATE_REFUSALS.copyFailed }
+  }
 }

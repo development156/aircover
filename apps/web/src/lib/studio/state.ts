@@ -61,3 +61,13 @@ export type DesignPhotoState = { ok: true; dataUri: string } | { ok: false; mess
 export type ExportPagesState =
   | { ok: true; pages: import('./export-copy').PageExport[]; message: string }
   | { ok: false; message: string }
+
+/**
+ * Keeping a design as a starting point, or putting it back.
+ *
+ * Carries the design so the editor can redraw from the row rather than assume
+ * the write did what it asked for. `isTemplate` is the value that ACTUALLY
+ * landed, which is the only one worth showing a toggle.
+ */
+export type TemplateFlagState =
+  { ok: true; isTemplate: boolean; message: string } | { ok: false; message: string }
