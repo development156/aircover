@@ -78,7 +78,7 @@ test.describe('@smoke the Marketing Brain', () => {
     await expect(page.getByRole('heading', { name: 'CMO Report', level: 1 })).toBeVisible({
       timeout: 30_000,
     })
-    const block = page.getByRole('heading', { name: 'What Sahoda noticed' })
+    const block = page.getByRole('heading', { name: 'What I noticed on my own' })
     await expect(block).toBeVisible()
     // It names the FLOOR, so the reader knows what would change it.
     await expect(page.getByText(/takes a run of posts, not a few/i)).toBeVisible()

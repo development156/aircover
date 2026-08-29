@@ -80,5 +80,6 @@
   "/(app)/settings": 686187,
   "/(app)/settings/plan": 734347,
   "/(app)/inbox/comments": 608759,
-  "/(app)/studio/[id]": 730511
+  "/(app)/studio/[id]": 730511,
+  "/(app)/report/loading": 604060
 }
