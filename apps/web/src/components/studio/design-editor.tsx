@@ -29,6 +29,7 @@ import {
   exportDesign,
   exportDesignPages,
   saveDesign,
+  setDesignTemplate,
 } from '@/app/actions/studio'
 import { PhotoPicker } from '@/components/studio/photo-picker'
 import { Button } from '@/components/ui/button'
@@ -98,6 +99,16 @@ export function DesignEditor({
    * would make two people editing the same carousel fight over the view.
    */
   const [pageAt, setPageAt] = useState(0)
+  /**
+   * Whether this design is one of the workspace's starting points.
+   *
+   * Seeded from the row and then held from what each write READ BACK, never
+   * from what the press asked for: a toggle that flips optimistically is a
+   * toggle that lies the first time the write is refused.
+   */
+  const [isTemplate, setIsTemplate] = useState(design.is_template)
+  const [templateNote, setTemplateNote] = useState<string | null>(null)
+  const [flagging, startFlag] = useTransition()
 
   const template = templateById(doc.templateId)
   const preset = presetById(design.preset_id)
@@ -276,6 +287,22 @@ export function DesignEditor({
       return next
     })
     setDirty(true)
+  }
+
+  /** Keep this design as a starting point, or put it back among the designs. */
+  function toggleTemplate() {
+    setNote(null)
+    setTemplateNote(null)
+    startFlag(async () => {
+      const result = await setDesignTemplate({ designId: design.id, isTemplate: !isTemplate })
+      if (!result.ok) {
+        setTemplateNote(result.message)
+        return
+      }
+      setIsTemplate(result.isTemplate)
+      setTemplateNote(result.message)
+      router.refresh()
+    })
   }
 
   function save() {
@@ -511,6 +538,41 @@ export function DesignEditor({
         <p className="type-sm text-muted">
           Adding a design to your library costs nothing. Sahoda draws it, so no credits are spent.
         </p>
+
+        {/* ── A STARTING POINT ────────────────────────────────────────────────
+            The consequence is named BEFORE the press, not after: keeping a
+            design moves it out of "your designs", and a person who was not told
+            watches it vanish from the list they were looking at and reads that
+            as deletion. */}
+        <div
+          className="surface-ring flex flex-col gap-2 rounded-card bg-surface p-3"
+          data-guide="studio-template-flag"
+        >
+          <h3 className="type-h3">
+            {isTemplate ? 'This is a starting point' : 'Keep this as a starting point'}
+          </h3>
+          <p className="type-sm max-w-[68ch] text-muted">
+            {isTemplate
+              ? 'It sits under your starting points rather than your designs, and every new design made from it begins with these words and pictures. Nothing was copied: this is the same design.'
+              : 'It moves out of your designs and into your starting points, where you can begin a new design from it whenever you like. Nothing is copied and nothing is deleted.'}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={toggleTemplate}
+              loading={flagging}
+              disabled={saving || exporting}
+            >
+              {isTemplate ? 'Put it back in your designs' : 'Keep as a starting point'}
+            </Button>
+            {templateNote === null ? null : (
+              <span role="status" className="type-sm text-muted">
+                {templateNote}
+              </span>
+            )}
+          </div>
+        </div>
       </section>
 
       <section aria-labelledby="editor-preview" className="flex flex-col gap-3">
