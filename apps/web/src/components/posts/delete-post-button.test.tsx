@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { DeletePostButton } from './delete-post-button'
@@ -14,7 +14,8 @@ vi.mock('next/navigation', () => ({
     prefetch: vi.fn(),
   }),
 }))
-vi.mock('sonner', () => ({ toast: vi.fn() }))
+const toastMock = vi.fn()
+vi.mock('sonner', () => ({ toast: (...args: unknown[]) => toastMock(...args) }))
 vi.mock('@/app/actions/posts', () => ({ deletePost: vi.fn() }))
 
 const { deletePost } = await import('@/app/actions/posts')
@@ -34,6 +35,7 @@ beforeEach(() => {
   }
   deleteMock.mockReset()
   refresh.mockReset()
+  toastMock.mockReset()
 })
 afterEach(cleanup)
 
@@ -160,14 +162,78 @@ describe('deleting a post', () => {
     await waitFor(() => expect(screen.getByText(/The post is still here/)).toBeVisible())
     expect(refresh).not.toHaveBeenCalled()
 
-    // ── AND THE DIALOG MUST BE GONE, WHICH `toBeVisible` CANNOT TELL YOU ─────
-    // The error renders on the CARD, behind the dialog. jsdom has no top layer
-    // and no inertness, so with the dialog still open `toBeVisible()` passes
-    // while a real browser puts the dialog over the message and makes it
-    // unfocusable: MEASURED in Chromium, `elementFromPoint` over the error
-    // returns the <dialog>. An audit mutation removed the close-on-failure and
-    // every test stayed green. This is the assertion that goes red for it.
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    // ── THE REASON MUST BE INSIDE THE DIALOG, AND THIS ASSERTION IS REVERSED
+    // It used to require the opposite: the dialog GONE, with the reason on the
+    // card behind it. That closed a real hole — jsdom has no top layer, so an
+    // error drawn under an open dialog passes `toBeVisible()` while Chromium
+    // puts the dialog over it — and opened a worse one. The card's header column
+    // is `flex-none`, so it takes its max-content width, and the card has no
+    // `overflow-hidden`: MEASURED in Chromium at 1440 in the four-column grid, a
+    // 326px tile and a 458px error box, overhanging by 209px onto the tile
+    // beside it. That is the exact defect the dialog was introduced to fix,
+    // moved from the prompt to the failure message.
+    //
+    // So the claim is retargeted rather than dropped, and it is the SAME claim:
+    // the reader can see and reach the reason. It is now satisfied by the top
+    // layer instead of by closing.
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toBeInTheDocument()
+    expect(within(dialog).getByText(/The post is still here/)).toBeVisible()
+    // And the second press is a decision, not a repeat of the same one.
+    expect(within(dialog).getByRole('button', { name: /for good$/ })).toHaveTextContent('Try again')
+  })
+
+  /**
+   * ── THE FOUR BELOW WERE ADDED BECAUSE AN AUDIT REMOVED EACH ONE AND EVERY
+   *    TEST IN THIS FILE STAYED GREEN ─────────────────────────────────────────
+   * Focus return, the disabled Cancel, the confirmation toast and the in-flight
+   * lock on the confirm button. All four are in the component's comments as
+   * deliberate decisions, and a deliberate decision nothing watches is a
+   * decision that survives until somebody tidies it away.
+   */
+
+  test('hands focus back to the bin when the dialog closes', async () => {
+    const user = userEvent.setup()
+    render(<DeletePostButton postId="p1" title="Beta Launch" compact />)
+
+    const trigger = screen.getByRole('button', { name: /^Delete Beta Launch$/ })
+    await user.click(trigger)
+    await user.click(screen.getByRole('button', { name: 'Keep it' }))
+
+    // Without this the caret drops to <body> and a keyboard user restarts from
+    // the top of the page, every time they change their mind.
+    await waitFor(() => expect(document.activeElement).toBe(trigger))
+  })
+
+  test('locks the whole dialog while the delete is in flight', async () => {
+    const user = userEvent.setup()
+    // A delete that never settles, so the in-flight state can be read.
+    deleteMock.mockImplementation(() => new Promise(() => {}))
+    render(<DeletePostButton postId="p1" title="Beta Launch" compact />)
+
+    await user.click(screen.getByRole('button', { name: /^Delete Beta Launch$/ }))
+    await user.click(screen.getByRole('button', { name: /for good$/ }))
+
+    // All three exits, because the component owns only the first. An audit
+    // pressed Escape here and the dialog vanished while the request kept
+    // running, then a success toast landed on a page that had moved on.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Keep it' })).toBeDisabled())
+    expect(screen.getByRole('button', { name: 'Close' })).toBeDisabled()
+    // And the confirm cannot be pressed twice into the same request.
+    expect(screen.getByRole('button', { name: /for good$/ })).toBeDisabled()
+  })
+
+  test('says so when the post is gone', async () => {
+    const user = userEvent.setup()
+    deleteMock.mockResolvedValue({ ok: true })
+    render(<DeletePostButton postId="p1" title="Beta Launch" compact />)
+
+    await user.click(screen.getByRole('button', { name: /^Delete Beta Launch$/ }))
+    await user.click(screen.getByRole('button', { name: /for good$/ }))
+
+    // The tile disappears on the refresh, and a tile that simply vanishes with
+    // no word reads as a page glitch rather than as the thing you just asked for.
+    await waitFor(() => expect(toastMock).toHaveBeenCalledWith('Deleted the post.'))
   })
 
   test('backing out deletes nothing', async () => {

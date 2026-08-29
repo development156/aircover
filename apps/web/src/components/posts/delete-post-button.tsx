@@ -109,18 +109,30 @@ export function DeletePostButton({
     startTransition(async () => {
       const result = await deletePost(postId)
       if (!result.ok) {
-        // The dialog closes and the reason surfaces on the card. Keeping the
-        // dialog open with an error inside it would leave the primary button
-        // sitting there inviting a second identical attempt.
+        // ── THE REASON STAYS IN THE DIALOG, AND THIS IS A REVERSAL ──────────
+        // It used to close the dialog and print the reason on the CARD, on the
+        // reasoning that an open dialog leaves the primary button inviting an
+        // identical second attempt. That reasoning was about the button and
+        // ignored where the sentence lands: the inline error sat in the card's
+        // header column, which is `flex-none` — shrink zero, so it takes its
+        // max-content width — inside a card with no `overflow-hidden`. MEASURED
+        // in Chromium at 1440 in the four-column grid: a 326px tile and a 458px
+        // error box, overhanging by 209px and painting over the tile beside it.
+        // That is the ORIGINAL DEFECT, moved from the prompt to the failure
+        // message, and it would have shipped as the fix for itself.
+        //
+        // The dialog is the top layer and cannot overflow anything, so the
+        // reason belongs there. The retry worry is answered by naming it: the
+        // button reads "Try again", so a second press is a decision rather than
+        // a repeat, and the reason it failed is on screen while it is made.
         setError(result.message)
-        close()
         return
       }
       toast('Deleted the post.')
       setOpen(false)
       // The action revalidates /posts; refresh pulls the new server render and
       // keeps `pending` true until it lands, so the tile cannot look stale.
-      void 0
+      router.refresh()
     })
   }
 
@@ -131,7 +143,12 @@ export function DeletePostButton({
         type="button"
         variant="ghost"
         size="sm"
-        onClick={() => setOpen(true)}
+        // Cleared on OPEN, not on close: a dialog reopened later must not show
+        // the reason a previous attempt failed as though it were about this one.
+        onClick={() => {
+          setError(null)
+          setOpen(true)
+        }}
         data-guide="posts.delete"
         aria-label={`Delete ${title}`}
         // The touch floor is a TOKEN class, not a literal 44 — docs/26 §9.
@@ -140,10 +157,6 @@ export function DeletePostButton({
         <Trash2 size={15} strokeWidth={1.8} aria-hidden />
         {compact ? null : 'Delete'}
       </Button>
-
-      {error ? (
-        <InlineError className="text-left">{error} The post is still here. Try again.</InlineError>
-      ) : null}
 
       {/* ── MOUNTED ONLY ONCE OPENED ──────────────────────────────────────
           `Modal` renders its `<dialog>`, and therefore its `<h2>` title, whether
@@ -157,6 +170,11 @@ export function DeletePostButton({
         <Modal
           open
           onClose={close}
+          // The dialog owns the X and the Escape key; a call site cannot reach
+          // either. Without this, Escape mid-delete dismissed the dialog while
+          // the request kept running, next to a "Keep it" the same code path
+          // deliberately disables.
+          busy={pending}
           // The title names the post, so the dialog is answerable without reading
           // the body — and a screen reader announces WHICH post on open.
           title={`Delete “${title}”?`}
@@ -175,7 +193,7 @@ export function DeletePostButton({
                 // never just "Delete" with no idea which post is one press away.
                 aria-label={`Delete ${title} for good`}
               >
-                {pending ? 'Deleting…' : 'Delete for good'}
+                {pending ? 'Deleting…' : error ? 'Try again' : 'Delete for good'}
               </Button>
             </div>
           }
@@ -213,8 +231,8 @@ export function DeletePostButton({
                  MEASURED in `deletePost`: it touches no ledger, so there is no
                  refund to describe and none to promise. */}
           <p className="type-body text-muted">
-            This removes the post from Sahoda: the draft, every channel version and its schedule.
-            Photos stay in your library. This cannot be undone.
+            This removes the post from Sahoda: the draft, every channel version, its schedule and
+            anything recorded about how it did. Photos stay in your library. This cannot be undone.
           </p>
           {liveElsewhere ? (
             <p className="type-body mt-3 text-muted">
@@ -226,6 +244,13 @@ export function DeletePostButton({
             If Sahoda wrote or improved anything in this post, those credits were spent when the
             work was done. Deleting it does not bring them back.
           </p>
+          {/* The failure, where it cannot overflow anything. `InlineError`
+              carries the alert role, so the reason is announced rather than
+              merely drawn — the dialog is already open when it appears, so
+              nothing else would announce it. */}
+          {error ? (
+            <InlineError className="mt-3 text-left">{error} The post is still here.</InlineError>
+          ) : null}
         </Modal>
       ) : null}
     </div>
