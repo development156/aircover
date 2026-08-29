@@ -28,8 +28,14 @@ nobody had asked for.
 
 ## 0 · If the cloud Setup script never ran, run it here
 
-`scripts/cloud-setup.sh` belongs in the cloud environment's **Setup script**
-field. Leave that field empty and none of it happens: no `.env` files, no
+**`bash setup.sh`** is what belongs in the cloud environment's **Setup script**
+field — the repo-root wrapper, not `scripts/cloud-setup.sh` directly. Pointing
+the field at the script itself kills any session whose branch does not carry it:
+bash exits 127, the harness calls that "Setup script failed" and refuses to start
+Claude Code at all. That happened on the wt-karunesh2 and wt-karunesh3
+environments on 2026-08-30. `setup.sh` delegates when it can and always exits 0.
+
+Leave that field empty and none of it happens: no `.env` files, no
 `pnpm install`, no browser, `core.hooksPath` unset so **both git guards are
 silently off**, and git authored as the personal account — which makes **Vercel
 refuse the deployment**. Ten live sessions were created that way on 2026-08-29,
