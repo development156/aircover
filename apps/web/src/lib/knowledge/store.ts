@@ -322,3 +322,57 @@ export async function readCitedPassages(
 
   return out
 }
+
+/**
+ * How many suggestions from a PREVIOUS library read are still waiting.
+ *
+ * ── WHY THIS NUMBER EXISTS ──────────────────────────────────────────────────
+ * "Read my library" spends 50 credits, and MEASURED against
+ * `20260822000200_propose_memory_event.sql`: it has no dedupe, no unique key and
+ * no `on conflict`. A second press does not refresh the suggestions from the
+ * first, it writes another set BESIDE them and charges again. Two accidental
+ * presses cost 100 credits and leave the resolution console holding each
+ * suggestion twice.
+ *
+ * So the button asks before spending, and this is the fact it asks with: it can
+ * say what is already waiting rather than a general warning about credits.
+ *
+ * ── WHY IT COUNTS EVIDENCE AND NOT SOURCE ───────────────────────────────────
+ * `memory_events.source = 'insight'` has TWO writers: this feature and the
+ * Loop's reflect stage (`lib/loop/store.ts:423`), and the table has no column
+ * naming which one wrote a row. Counting by source would tell somebody the
+ * library owes them suggestions the Loop actually produced. A library proposal
+ * carries a `documentId` in `evidence_refs`; a Loop patch carries a
+ * `loop_cycle_id` in `diff`. This counts the first and nothing else.
+ *
+ * `null` is "the read did not answer", never zero. The caller must not turn a
+ * failed read into "nothing is waiting", because that is the one wrong answer
+ * that removes the warning.
+ */
+export async function countPendingLibrarySuggestions(): Promise<number | null> {
+  try {
+    const workspace = await readActiveWorkspace()
+    if (workspace.status !== 'ok') return workspace.status === 'none' ? 0 : null
+
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase
+      .from('memory_events')
+      .select('evidence_refs')
+      .eq('status', 'pending')
+
+    if (error) return null
+
+    return (data ?? []).filter((row) => {
+      const refs = (row as { evidence_refs?: unknown }).evidence_refs
+      return (
+        Array.isArray(refs) && refs.some((r) => isRecord(r) && typeof r.documentId === 'string')
+      )
+    }).length
+  } catch {
+    return null
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
