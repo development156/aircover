@@ -73,3 +73,58 @@ describe('PageTitle', () => {
     expect(trailed.firstElementChild!.className).toContain('min-w-0')
   })
 })
+
+/**
+ * ── THE ACTIONS SLOT ─────────────────────────────────────────────────────────
+ * Three screens built the title-plus-action row by hand before this prop
+ * existed, and they had already drifted apart: /campaigns aligned it with
+ * `items-start`, /posts with `items-center`, and /assets nested the title inside
+ * a second wrapper so its description was a sibling of the heading rather than
+ * the component's own `sub`. The prop exists so the row is one decision.
+ *
+ * The assertions below are mostly about the case that did NOT change, for the
+ * same reason the `min-w-0` guard above is: thirty-two of the thirty-five call
+ * sites pass no action, and a wrapper added unconditionally would be a layout
+ * change on every one of them that no test on those screens would see.
+ */
+describe('PageTitle actions', () => {
+  it('puts the action on the title row', () => {
+    render(
+      <PageTitle sub="A sentence." actions={<button type="button">Create post</button>}>
+        Posts
+      </PageTitle>,
+    )
+
+    expect(screen.getByRole('button', { name: 'Create post' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Posts')
+  })
+
+  it('adds no wrapper to the thirty-two call sites that pass no action', () => {
+    // The heading block must still be the OUTERMOST element when there is no
+    // action, byte-for-byte with what those screens rendered before this prop.
+    const { container: plain } = render(<PageTitle sub="A sentence.">Wallet</PageTitle>)
+    expect(plain.firstElementChild!.className).not.toContain('justify-between')
+    expect(plain.firstElementChild!.querySelector('h1')).not.toBeNull()
+
+    const { container: acted } = render(
+      <PageTitle actions={<button type="button">Go</button>}>Wallet</PageTitle>,
+    )
+    expect(acted.firstElementChild!.className).toContain('justify-between')
+  })
+
+  it('renders no action row when the screen passes null', () => {
+    // Every one of the three call sites passes a CONDITIONAL: the empty state
+    // owns the create affordance when there is nothing to list, so the slot is
+    // handed `null` on exactly the screens where a second primary would be the
+    // bug. `null` must behave as "no action", not as "an empty action row".
+    const { container } = render(<PageTitle actions={null}>Posts</PageTitle>)
+    expect(container.firstElementChild!.className).not.toContain('justify-between')
+  })
+
+  it('holds the description to a readable measure', () => {
+    // 70ch on a 1320px band. Without it /admin/brain's three-sentence
+    // description sets as one full-width line.
+    render(<PageTitle sub="A sentence.">Wallet</PageTitle>)
+    expect(screen.getByText('A sentence.').className).toContain('max-w-[70ch]')
+  })
+})
