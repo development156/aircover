@@ -2,11 +2,13 @@
 
 import Link from 'next/link'
 import { useState, useTransition } from 'react'
-import { Check, Lock } from 'lucide-react'
+import { ChevronRight, Lock } from 'lucide-react'
 import { AUTONOMY_LEVELS, type AutonomyLevel, type Channel } from '@sahoda/shared'
 
 import { setChannelAutonomy } from '@/app/actions/loop-dial'
+import { ChannelLogo } from '@/components/connections/channel-logo'
 import { CHANNEL_LABELS } from '@/components/posts/channel-label'
+import type { CatalogueChannel } from '@/lib/connections/catalogue'
 
 /**
  * THE AUTONOMY DIAL — four levels of how much Sahoda may do without asking, and
@@ -19,9 +21,17 @@ import { CHANNEL_LABELS } from '@/components/posts/channel-label'
  * thing this is climbing towards) or a dead fourth cell repeats once per
  * channel, which is four pieces of noise to make one point.
  *
- * Split, the ladder says it once, in the place a reader goes to understand the
- * levels — and the picker offers the three levels that exist, with no gap where
- * a fourth was removed.
+ * ── THE PICKER IS DRAWN AS THE FLOW IT ACTUALLY IS ───────────────────────────
+ * Three equal tiles side by side said these were three alternatives, like a
+ * plan on a pricing page. They are not: each level is the previous one plus one
+ * more thing Sahoda may do, and the order is the order a post travels —
+ * suggest, then draft, then publish once approved. Drawing it as a chain with
+ * arrows makes the picker say what the ladder underneath has to explain, and it
+ * makes the chosen level read as HOW FAR rather than as WHICH.
+ *
+ * The stages beyond the chosen one are not disabled — they are perfectly
+ * choosable, and dimming them would say they were unavailable. They are simply
+ * unmarked: everything up to the mark is Sahoda's, everything past it is yours.
  *
  * ── L3 IS A `div`. IT IS NOT A DISABLED BUTTON. ──────────────────────────────
  * A `<button disabled>` is still announced as a button: a screen reader offers
@@ -30,11 +40,6 @@ import { CHANNEL_LABELS } from '@/components/posts/channel-label'
  * that attribute describes a control that EXISTS and is momentarily unavailable,
  * which would be a different and untrue claim. The L3 rung is prose with a lock
  * beside it, and the prose says why.
- *
- * ── WHY A LADDER AND NOT A SLIDER (wt-ia's reasoning, still right) ────────────
- * A slider's positions are interchangeable points on a continuum; these are not.
- * Each level adds a specific permission AND carries a specific precondition, and
- * a slider has nowhere to put a precondition.
  */
 
 /** The rungs, split by whether a person can actually stand on one. */
@@ -73,7 +78,7 @@ export function AutonomyDial({ connected, lapsed = [], chosen, defaultLevel }: A
       </div>
 
       {connected.length === 0 ? (
-        <p className="surface-ring rounded-card bg-surface p-4 type-body text-muted">
+        <p className="surface-ring rounded-card bg-surface p-5 type-body text-muted max-narrow:p-4">
           {lapsed.length > 0 ? (
             <>
               Your {lapsed.map((c) => CHANNEL_LABELS[c]).join(', ')}{' '}
@@ -95,7 +100,7 @@ export function AutonomyDial({ connected, lapsed = [], chosen, defaultLevel }: A
           )}
         </p>
       ) : (
-        <ul className="grid gap-2">
+        <ul className="surface-ring divide-y divide-line-soft rounded-card bg-surface shadow-card">
           {connected.map((channel) => (
             <ChannelDial
               key={channel}
@@ -108,9 +113,17 @@ export function AutonomyDial({ connected, lapsed = [], chosen, defaultLevel }: A
       )}
 
       {/* The ladder: reference material, and the only place L3 appears. */}
-      <details className="surface-ring rounded-card bg-surface p-4">
-        <summary className="type-h3 cursor-pointer text-ink">What each level means</summary>
-        <ol className="mt-3 grid gap-2">
+      <details className="surface-ring group rounded-card bg-surface">
+        <summary className="type-h3 flex cursor-pointer items-center justify-between gap-3 p-5 text-ink max-narrow:p-4">
+          What each level means
+          <ChevronRight
+            size={16}
+            strokeWidth={2}
+            aria-hidden
+            className="shrink-0 text-muted transition-micro group-open:rotate-90"
+          />
+        </summary>
+        <ol className="grid gap-4 px-5 pb-5 max-narrow:px-4 max-narrow:pb-4">
           {STORABLE.map((level) => (
             <li key={level.code} className="grid gap-x-4 gap-y-1 narrow:grid-cols-[52px_1fr]">
               <span className="type-eyebrow num self-start text-muted">{level.code}</span>
@@ -129,7 +142,7 @@ export function AutonomyDial({ connected, lapsed = [], chosen, defaultLevel }: A
           {UNREACHABLE.map((level) => (
             <li
               key={level.code}
-              className="grid gap-x-4 gap-y-1 rounded-input bg-subtle p-3 narrow:grid-cols-[52px_1fr]"
+              className="grid gap-x-4 gap-y-1 rounded-input bg-s2 p-3 narrow:grid-cols-[52px_1fr]"
             >
               <span className="type-eyebrow num flex items-center gap-1.5 self-start text-muted">
                 <Lock size={12} strokeWidth={2} aria-hidden />
@@ -185,58 +198,75 @@ function ChannelDial({
   }
 
   return (
-    <li className="surface-ring rounded-card bg-surface p-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h3 className="type-h3 text-ink">{CHANNEL_LABELS[channel]}</h3>
-        {level === undefined ? (
-          <span className="type-sm text-muted">
-            Not set, running at {AUTONOMY_LEVELS[defaultLevel]?.name.toLowerCase()}
-          </span>
-        ) : null}
+    <li className="grid items-start gap-x-6 gap-y-3 p-5 max-narrow:p-4 wide:grid-cols-[200px_1fr]">
+      <div className="flex items-center gap-2.5">
+        <ChannelLogo channel={channel as CatalogueChannel} size={20} />
+        <div className="min-w-0">
+          <h3 className="type-h3 text-ink">{CHANNEL_LABELS[channel]}</h3>
+          {level === undefined ? (
+            <p className="type-sm text-muted">
+              Not set, running at {AUTONOMY_LEVELS[defaultLevel]?.name.toLowerCase()}
+            </p>
+          ) : null}
+        </div>
       </div>
 
-      <fieldset className="mt-3" disabled={pending}>
-        <legend className="sr-only">How much Sahoda may do for {CHANNEL_LABELS[channel]}</legend>
-        <div className="grid gap-1.5 narrow:grid-cols-3">
-          {STORABLE.map((option) => {
-            const active = level !== undefined && option.level === current
-            return (
-              <label
-                key={option.code}
-                className={[
-                  'flex cursor-pointer items-start gap-2 rounded-input p-2.5 transition-colors',
-                  'focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent',
-                  active ? 'bg-accent-subtle text-ink' : 'bg-subtle text-muted hover:text-ink',
-                ].join(' ')}
-              >
-                <input
-                  type="radio"
-                  name={name}
-                  className="sr-only"
-                  checked={active}
-                  onChange={() => pick(option.level as AutonomyLevel)}
-                />
-                <span
-                  aria-hidden
-                  className="mt-icon-nudge flex size-3.5 shrink-0 items-center justify-center"
-                >
-                  {active ? <Check size={13} strokeWidth={2.5} className="text-accent" /> : null}
-                </span>
-                <span className="min-w-0">
-                  <span className="type-h3 block">{option.name}</span>
-                  <span className="type-sm mt-0.5 block text-muted">{option.may}</span>
-                </span>
-              </label>
-            )
-          })}
-        </div>
-      </fieldset>
+      <div className="min-w-0">
+        <fieldset disabled={pending}>
+          <legend className="sr-only">How much Sahoda may do for {CHANNEL_LABELS[channel]}</legend>
+          <div className="flex items-stretch gap-1.5 max-narrow:flex-col">
+            {STORABLE.map((option, index) => {
+              const active = level !== undefined && option.level === current
+              const reached = level !== undefined && option.level <= current
+              return (
+                <div key={option.code} className="flex min-w-0 flex-1 items-center gap-1.5">
+                  {index > 0 ? (
+                    <ChevronRight
+                      size={14}
+                      strokeWidth={2}
+                      aria-hidden
+                      className={[
+                        'shrink-0 max-narrow:hidden',
+                        reached ? 'text-accent' : 'text-muted',
+                      ].join(' ')}
+                    />
+                  ) : null}
+                  <label
+                    className={[
+                      'flex min-w-0 flex-1 cursor-pointer flex-col gap-0.5 rounded-input p-3 transition-micro',
+                      'focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent',
+                      active
+                        ? 'bg-tint-100 text-ink shadow-[inset_0_0_0_1px_var(--acc)] dark:bg-s2'
+                        : reached
+                          ? 'bg-s2 text-ink'
+                          : 'bg-s2 text-muted hover:text-ink',
+                    ].join(' ')}
+                  >
+                    <input
+                      type="radio"
+                      name={name}
+                      className="sr-only"
+                      checked={active}
+                      onChange={() => pick(option.level as AutonomyLevel)}
+                    />
+                    <span className="flex items-center gap-1.5">
+                      <span className="type-h3">{option.name}</span>
+                      {active ? <span className="type-eyebrow text-accent">Set here</span> : null}
+                    </span>
+                    <span className="type-sm text-muted">{option.may}</span>
+                  </label>
+                </div>
+              )
+            })}
+          </div>
+        </fieldset>
 
-      {error ? (
-        <p role="alert" className="type-sm mt-2 text-danger">
-          {error}
-        </p>
-      ) : null}
+        {error ? (
+          <p role="alert" className="type-sm mt-2 text-danger">
+            {error}
+          </p>
+        ) : null}
+      </div>
     </li>
   )
 }

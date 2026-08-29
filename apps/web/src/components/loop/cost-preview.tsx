@@ -141,7 +141,7 @@ export function CostPreview({ cycleId, briefs, budgetCredits }: CostPreviewProps
                 className={[
                   'flex cursor-pointer items-start gap-3 rounded-input p-3 transition-colors',
                   'focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent',
-                  on ? 'bg-subtle' : 'bg-transparent opacity-60',
+                  on ? 'bg-s2' : 'bg-transparent opacity-60',
                 ].join(' ')}
               >
                 <input
