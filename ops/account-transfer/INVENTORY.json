@@ -1,0 +1,24 @@
+{
+  "exportedAt": "2026-08-29T06:25:01Z",
+  "travelsWithGit": {
+    "commands": 20,
+    "agents": 26,
+    "skills": 22,
+    "githooks": [
+      "pre-commit",
+      "pre-push"
+    ]
+  },
+  "exportedHere": {
+    "ruleFiles": 21,
+    "hasPluginManifest": true,
+    "hasMarketplaces": true,
+    "hasSettings": true
+  },
+  "neverExported": [
+    "apps/web/.env",
+    "apps/web/.env.local",
+    "MCP OAuth tokens",
+    "GitHub bearer token"
+  ]
+}
