@@ -4,7 +4,7 @@ import { describe, expect, test, vi } from 'vitest'
 import { useState } from 'react'
 
 import { SOURCES, UNBUILT_SOURCES } from '../refs'
-import { DEFAULT_COLORS, DEFAULT_DATA, type OnboardingData } from '../store'
+import { DEFAULT_DATA, type OnboardingData } from '../store'
 import { KnowledgeStep } from './knowledge-step'
 
 /**
@@ -25,7 +25,8 @@ import { KnowledgeStep } from './knowledge-step'
 function Harness({ onPatch }: { onPatch?: (next: Partial<OnboardingData>) => void }) {
   const [data, setData] = useState<OnboardingData>({
     ...DEFAULT_DATA,
-    colors: { ...DEFAULT_COLORS },
+    palette: [],
+    logoName: '',
     sourceUrls: {},
   })
   return (

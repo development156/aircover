@@ -41,8 +41,17 @@ export interface StatusView {
 export function statusView(document: KnowledgeDocument): StatusView {
   const status: ShownStatus = document.shownStatus
 
+  /**
+   * "Ready to quote", not "Indexed".
+   *
+   * An index is a thing this product has; being able to quote a customer's own
+   * price back to them is a thing the customer gets. The badge is the only word
+   * on the row that says whether the document WORKED, and "Indexed" answers a
+   * question nobody asked while looking exactly as reassuring on a login wall
+   * as on a rate card.
+   */
   if (status === 'indexed') {
-    return { rung: 'calm', label: 'Indexed', detail: null, retryable: false }
+    return { rung: 'calm', label: 'Ready to quote', detail: null, retryable: false }
   }
 
   if (status === 'pending') {
