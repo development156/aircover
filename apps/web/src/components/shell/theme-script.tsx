@@ -22,11 +22,29 @@
  * the toggle should track their system when it changes, and a stored 'light'
  * must survive an OS that later goes dark.
  */
+/**
+ * ── AND `data-brand-skin`, WHICH IS A DIFFERENT QUESTION ────────────────────
+ * Brand Skin is the customer's own colours over Sahoda's neutrals, and it is a
+ * separate switch from light and dark: the two COMPOSE rather than compete, so
+ * this script answers both independently. `lib/brand/skin-preference.ts` carries
+ * the reasoning and the rule; the key and the attribute name are repeated here
+ * because an inline script cannot import, and `theme-script.test.tsx` asserts
+ * the two copies still agree.
+ *
+ * Absence is off, and every unrecognised value is off, because the safe state is
+ * the readable one. `(app)/layout.tsx` always emits the brand rule scoped to
+ * this attribute, so the switch is one attribute write with no round trip, and
+ * setting it here means the first pixel is already the right brand.
+ */
 const SCRIPT = `(function(){try{
 var s=localStorage.getItem('sahoda-theme');
 var d=s==='dark'||(!s&&window.matchMedia('(prefers-color-scheme: dark)').matches);
 document.documentElement.setAttribute('data-theme',d?'dark':'light');
+if(localStorage.getItem('sahoda-skin')==='on'){document.documentElement.setAttribute('data-brand-skin','on');}
 }catch(e){}})();`
+
+/** Exported for the guard that keeps this string and the module in step. */
+export const THEME_SCRIPT_SOURCE = SCRIPT
 
 export function ThemeScript() {
   // dangerouslySetInnerHTML is the only way to emit a synchronous inline script
