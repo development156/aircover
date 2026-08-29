@@ -1,10 +1,12 @@
 import { ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { auth } from '@clerk/nextjs/server'
 import { creditCost } from '@sahoda/shared'
 
-import { PlanOfferModal } from '@/components/billing/plan-offer-modal'
+import { PlanOfferMount } from '@/components/billing/plan-offer-mount'
 import { planOfferDecision } from '@/lib/billing/plan-offer'
+import { planOfferRows } from '@/lib/billing/plan-offer-rows'
 import { readSubscription } from '@/lib/billing/read'
 
 import { AtAGlance } from '@/components/home/at-a-glance'
@@ -148,6 +150,7 @@ export default async function HomePage() {
     connections,
     knowledgeDocuments,
     subscription,
+    session,
   ] = await Promise.all([
     /**
      * IN THE BATCH, NOT IN FRONT OF IT.
@@ -194,6 +197,15 @@ export default async function HomePage() {
      * on a null workspace without touching the database, like the rest of them.
      */
     readSubscription(),
+    /**
+     * The Clerk session, for the plan offer's dismissal key. In the batch for
+     * the same reason `readSubscription` is: `lib/perf/read-waterfall.test.ts`
+     * counts a bare `await` below this block as a sequential read and refuses
+     * it, and it was right both times — a round trip in front of the dashboard
+     * costs every returning customer, where being in the batch costs only the
+     * accounts on their way into onboarding one throwaway call.
+     */
+    auth(),
   ])
 
   // THE RULING, ACTED ON. Everything above was read in parallel with the
@@ -250,7 +262,10 @@ export default async function HomePage() {
    * converts. The component keeps the props for a caller that wants to pay for
    * them.
    */
-  const offer = planOfferDecision(subscription).kind === 'offer' ? <PlanOfferModal /> : null
+  const offer =
+    session.sessionId !== null && planOfferDecision(subscription).kind === 'offer' ? (
+      <PlanOfferMount sessionKey={session.sessionId} plans={planOfferRows()} />
+    ) : null
 
   /**
    * ── AND A WORKSPACE THAT EXISTS AND HOLDS NOTHING GETS ITS OWN SCREEN TOO ──

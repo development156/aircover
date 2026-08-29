@@ -1,19 +1,10 @@
 'use client'
 
 import { Check, Coins, Sparkles } from 'lucide-react'
-import {
-  PLAN_CATALOG,
-  describePlanPrice,
-  type DisplayCurrency,
-  type FxRates,
-  type PlanCatalogEntry,
-  type PlanId,
-} from '@sahoda/shared'
 
 import { Button } from '@/components/ui/button'
-import { RECOMMENDED_PLAN } from '@/components/wallet/top-up-panel'
+import type { PlanOfferRow } from '@/lib/billing/plan-offer-rows'
 import { cn } from '@/lib/utils'
-import { creditWord } from '@/lib/credit-words'
 
 /**
  * The plan cards inside the offer, and NOTHING about when it opens.
@@ -22,82 +13,24 @@ import { creditWord } from '@/lib/credit-words'
  * without a `<dialog>` around it, and so neither file goes past the 300-line
  * rule. The modal owns the dialog and the dismissal; this owns the reading.
  *
- * ── EVERY FIGURE HERE IS READ OFF `PLAN_CATALOG` ─────────────────────────────
- * Names, prices, credits and limits all come from `packages/shared`. There is
- * not one written price, credit count or feature line in this file. That is the
- * whole reason `top-up-panel.tsx` derives its own list the same way: a
- * hand-written copy of the entitlements is a second source of truth, and the
- * copy is always the one that drifts.
+ * ── IT COMPUTES NOTHING, AND THAT IS A BUDGET DECISION ───────────────────────
+ * Every name, price, credit count and feature line arrives as a prop, built on
+ * the server by `lib/billing/plan-offer-rows.ts`. This file used to read
+ * `PLAN_CATALOG`, `describePlanPrice` and `creditWord` itself, which pulled
+ * `@sahoda/shared` into the browser bundle for /home and failed the build on
+ * `js-budget` by 89.2 kB. The figures are no less catalog-derived for being
+ * derived one process earlier; there is still not one written price in this
+ * feature. See that file for the measurement.
  */
-
-/** `free` has nothing to check out for, so it is never a card. It is stated in the header. */
-export const PAID_PLANS: readonly PlanCatalogEntry[] = Object.values(PLAN_CATALOG)
-  .filter((plan) => plan.priceInr > 0)
-  .sort((a, b) => a.priceInr - b.priceInr)
-
-/**
- * The plan Sahoda points at, IMPORTED rather than restated.
- *
- * This was a second `const RECOMMENDED_PLAN = 'growth'` with a comment saying
- * `plan-offer-cards.test.tsx` kept it in step with the wallet's. No such file
- * existed, so nothing did — two screens could have pointed at different plans
- * and neither would have said so. The bundle argument for copying it does not
- * survive either: `plan-offer-modal.tsx` already imports `CheckoutResult` from
- * that same module, so it is in this chunk regardless.
- *
- * The reason it is `top-up-panel.tsx`'s to own is written there: "Recommended"
- * is a claim about US, true the moment somebody decides it, where "Popular"
- * would be a claim about other customers that nothing in this codebase counts.
- */
-
-const inr = (value: number): string => value.toLocaleString('en-IN')
-
-/**
- * A one-line description, DERIVED FROM THE PRICE ORDER rather than written.
- *
- * The brief asks each card for a short description. Every version of that
- * sentence I could write ("for a growing shop", "for teams that publish daily")
- * is a claim about who a plan suits that nothing here measures, and the sentence
- * would then sit one line above an `Includes` list that says the same thing in
- * facts. So the description says the one thing about a plan that IS true by
- * construction: where it sits among the others. Reorder or reprice the catalog
- * and these sentences follow, because they are computed from it.
- */
-function planPosition(entry: PlanCatalogEntry, all: readonly PlanCatalogEntry[]): string {
-  if (entry.id === all[0]?.id) return 'The smallest paid plan.'
-  if (entry.id === all[all.length - 1]?.id) return 'The largest plan.'
-  return 'The middle plan.'
-}
-
-/**
- * What a plan lifts besides credits, read off `limits`. The same three
- * dimensions `top-up-panel.tsx` shows, and deliberately not `loopLevel` or
- * `twinSize`: those are internal scales, not quantities a person buying a plan
- * can act on.
- */
-export function planIncludes(entry: PlanCatalogEntry): string[] {
-  const { channels, sites, seats } = entry.limits
-  return [
-    `${channels} connected ${channels === 1 ? 'channel' : 'channels'}`,
-    `${sites} published ${sites === 1 ? 'site' : 'sites'}`,
-    `${seats} ${seats === 1 ? 'seat' : 'seats'}`,
-  ]
-}
 
 export interface PlanOfferCardsProps {
-  currency?: DisplayCurrency | null
-  fx?: FxRates | null
+  plans: readonly PlanOfferRow[]
   /** The plan whose checkout is in flight, or null. Disables the whole grid. */
-  busyPlanId: PlanId | null
-  onChoose: (planId: PlanId) => void
+  busyPlanId: string | null
+  onChoose: (planId: string) => void
 }
 
-export function PlanOfferCards({
-  currency = null,
-  fx = null,
-  busyPlanId,
-  onChoose,
-}: PlanOfferCardsProps) {
+export function PlanOfferCards({ plans, busyPlanId, onChoose }: PlanOfferCardsProps) {
   const busy = busyPlanId !== null
 
   return (
@@ -107,8 +40,8 @@ export function PlanOfferCards({
        button. One column on a phone, three from `narrow` up, because there are
        exactly three paid plans and a 2+1 grid orphans the last one. */
     <ul className="grid gap-3 narrow:grid-cols-3">
-      {PAID_PLANS.map((entry, index) => {
-        const recommended = entry.id === RECOMMENDED_PLAN
+      {plans.map((entry, index) => {
+        const recommended = entry.recommended
         return (
           <li
             key={entry.id}
@@ -162,12 +95,10 @@ export function PlanOfferCards({
               </span>
 
               <h3 className="type-h3 text-ink">{entry.name}</h3>
-              <p className="type-sm mt-0.5 text-muted">{planPosition(entry, PAID_PLANS)}</p>
+              <p className="type-sm mt-0.5 text-muted">{entry.position}</p>
 
               <p className="mt-3 flex items-baseline gap-1.5">
-                <span className="type-hero-num num text-ink">
-                  {describePlanPrice(entry.priceInr, currency, fx).display}
-                </span>
+                <span className="type-hero-num num text-ink">{entry.price}</span>
                 <span className="type-sm text-muted">/ month</span>
               </p>
 
@@ -180,8 +111,7 @@ export function PlanOfferCards({
                 />
                 <span className="min-w-0">
                   <span className="block type-body font-semibold text-ink">
-                    <span className="num">{inr(entry.monthlyCredits)}</span>{' '}
-                    {creditWord(entry.monthlyCredits)}
+                    <span className="num">{entry.credits}</span> {entry.creditNoun}
                   </span>
                   <span className="block type-meta text-muted">granted each month</span>
                 </span>
@@ -190,7 +120,7 @@ export function PlanOfferCards({
               <div className="mt-4 border-t border-line-soft pt-4">
                 <p className="type-eyebrow text-ink-mute">What is included</p>
                 <ul className="mt-2.5 space-y-2">
-                  {planIncludes(entry).map((line) => (
+                  {entry.includes.map((line) => (
                     <li key={line} className="flex items-start gap-2.5 type-sm text-muted">
                       {/* The tick is a glyph inside an INSET ring, never a real
                           border: nine bordered circles measured 5,184px2 on the
