@@ -26,10 +26,16 @@ import { Button } from '@/components/ui/button'
  * same `extractPalette` onboarding uses and costs one image load.
  *
  * The signed link is cross-origin, so the canvas can only be read when storage
- * returns permissive CORS headers. If it cannot, the swatches are honestly
- * absent and replacing the logo is offered instead, because that path carries
- * its own bytes and never needs the canvas to cooperate. UNVERIFIED IN A REAL
- * BROWSER at the time of writing: this sandbox has no working one.
+ * returns permissive CORS headers. VERIFIED by the founder in a real browser on
+ * 2026-08-29: the swatches appear. It was shipped as unverified because this
+ * sandbox has no working browser, and that caveat is replaced here rather than
+ * quietly dropped.
+ *
+ * The fallback stays and is not dead weight. Storage CORS is configuration, not
+ * a property of the code: it can change without this file changing. If it ever
+ * does, the swatches are honestly absent and replacing the logo is offered
+ * instead, because that path carries its own bytes and never needs the canvas
+ * to cooperate.
  */
 export function BrandMark({
   logoUrl,
