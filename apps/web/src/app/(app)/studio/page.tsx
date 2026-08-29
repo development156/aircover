@@ -3,6 +3,8 @@ import { Palette } from 'lucide-react'
 
 import { EmptyState } from '@/components/empty-state'
 import { PageTitle } from '@/components/page-title'
+import { describeDesignCard } from '@/lib/studio/card-copy'
+import { CardLine } from '@/components/studio/card-line'
 import { DesignPreview } from '@/components/studio/design-preview'
 import { StartDesign } from '@/components/studio/start-design'
 import { StartingPoints } from '@/components/studio/starting-points'
@@ -110,11 +112,15 @@ export default async function StudioPage() {
                     <span className="type-body font-[550] group-hover:underline group-hover:underline-offset-2">
                       {design.title}
                     </span>
-                    <span className="type-sm text-muted">
-                      {design.doc.pages.length === 1
-                        ? '1 page'
-                        : `${design.doc.pages.length} pages`}
-                    </span>
+                    {/* "1 page" said the document model's word out loud and
+                        counted a thing there was no point counting. See
+                        `card-copy.ts`. */}
+                    <CardLine
+                      line={describeDesignCard({
+                        pageCount: design.doc.pages.length,
+                        presetId: design.preset_id,
+                      })}
+                    />
                   </Link>
                 ))}
             </div>
