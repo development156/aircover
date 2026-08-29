@@ -1,6 +1,13 @@
 import { describe, expect, test } from 'vitest'
 
-import { EXPORT_REFUSALS, EXPORT_STORED, planExport } from './export-copy'
+import {
+  EXPORT_REFUSALS,
+  EXPORT_STORED,
+  describeBatchExport,
+  planExport,
+  titleForPage,
+  type PageExport,
+} from './export-copy'
 
 /**
  * The three outcomes of pressing "add to library", and the CLAIM each makes.
@@ -112,5 +119,125 @@ describe('the sentences the studio uses about an export', () => {
     for (const message of prose) {
       expect(message, message).not.toMatch(/[—–]/)
     }
+  })
+})
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * THE SENTENCE AFTER EXPORTING A WHOLE CAROUSEL.
+ *
+ * Every assertion here is about a CLAIM, checked through a lowercase substring
+ * or a slide number, never through wording. What must hold: a slide that failed
+ * is never described as added, a slide already in the library is never
+ * described as newly stored, and a person can always tell WHICH slides are
+ * where. "Some slides could not be added" is the sentence this exists to
+ * prevent.
+ */
+const stored = (pageIndex: number): PageExport => ({
+  pageIndex,
+  ok: true,
+  outcome: 'stored',
+  assetId: `a${pageIndex}`,
+})
+const already = (pageIndex: number): PageExport => ({
+  pageIndex,
+  ok: true,
+  outcome: 'already',
+  assetId: `a${pageIndex}`,
+})
+const trashed = (pageIndex: number): PageExport => ({
+  pageIndex,
+  ok: true,
+  outcome: 'in-trash',
+  assetId: `a${pageIndex}`,
+})
+const failed = (
+  pageIndex: number,
+  message = 'The headline is too long for its box.',
+): PageExport => ({ pageIndex, ok: false, message })
+
+describe('describeBatchExport', () => {
+  test('one slide gets the single-file sentence, not a count of one', () => {
+    expect(describeBatchExport([stored(0)])).toBe(EXPORT_STORED)
+  })
+
+  test('every slide stored says so once rather than listing them', () => {
+    const message = describeBatchExport([stored(0), stored(1), stored(2)])
+    expect(message).toMatch(/all 3 slides/i)
+    expect(message).toMatch(/added to your library/i)
+  })
+
+  /** THE ONE THAT MATTERS: a failure must never be inside a sentence that claims success. */
+  test('a failed slide is named, with its own reason, and never called added', () => {
+    const message = describeBatchExport([stored(0), stored(1), failed(2)])
+    // The two that worked are claimed, by number.
+    expect(message).toMatch(/slides 1 and 2 were added/i)
+    // The one that did not is claimed as NOT added, by number, with the reason.
+    expect(message).toMatch(/slide 3 was not added/i)
+    expect(message).toContain('The headline is too long for its box.')
+  })
+
+  test('slides counted from 1, because that is what the editor shows', () => {
+    expect(describeBatchExport([stored(0), failed(1)])).toMatch(/slide 2 was not added/i)
+  })
+
+  test('two failures with different reasons do not present one reason as covering both', () => {
+    const message = describeBatchExport([
+      failed(0, 'The headline is too long for its box.'),
+      failed(1, 'A picture could not be read.'),
+    ])
+    expect(message).toMatch(/slides 1 and 2 were not added/i)
+    // Neither reason is attached, because attaching one would make it a claim
+    // about the other slide as well.
+    expect(message).not.toContain('The headline is too long for its box.')
+    expect(message).not.toContain('A picture could not be read.')
+  })
+
+  test('a slide already in the library is not reported as newly stored', () => {
+    const message = describeBatchExport([stored(0), already(1)])
+    expect(message).toMatch(/slide 1 was added/i)
+    expect(message).toMatch(/slide 2 was already there/i)
+    expect(message).toMatch(/nothing was stored twice/i)
+  })
+
+  test('a trashed slide points at the trash rather than claiming the library', () => {
+    const message = describeBatchExport([trashed(0)])
+    expect(message).toMatch(/trash/i)
+    expect(message).toMatch(/restore/i)
+    expect(message).not.toMatch(/added to your library/i)
+  })
+
+  test('all four outcomes at once each keep their own claim', () => {
+    const message = describeBatchExport([stored(0), already(1), trashed(2), failed(3)])
+    expect(message).toMatch(/slide 1 was added/i)
+    expect(message).toMatch(/slide 2 was already there/i)
+    expect(message).toMatch(/slide 3 is in your trash/i)
+    expect(message).toMatch(/slide 4 was not added/i)
+  })
+
+  test('no slides at all is not reported as a success', () => {
+    expect(describeBatchExport([])).not.toMatch(/added to your library/i)
+  })
+})
+
+describe('titleForPage', () => {
+  test('a single-page design keeps its own name', () => {
+    expect(titleForPage('Diwali offer', 0, 1)).toBe('Diwali offer')
+  })
+
+  test('a carousel names each slide by the number the editor shows', () => {
+    expect(titleForPage('Diwali offer', 0, 3)).toBe('Diwali offer (slide 1)')
+    expect(titleForPage('Diwali offer', 2, 3)).toBe('Diwali offer (slide 3)')
+  })
+
+  test('the number survives a long name, because the number is what tells them apart', () => {
+    const long = 'x'.repeat(200)
+    const title = titleForPage(long, 4, 6)
+    expect(title.length).toBeLessThanOrEqual(120)
+    expect(title.endsWith('(slide 5)')).toBe(true)
+  })
+
+  test('a design with no name gets one rather than an empty title', () => {
+    expect(titleForPage('   ', 0, 1)).toBe('Design')
   })
 })

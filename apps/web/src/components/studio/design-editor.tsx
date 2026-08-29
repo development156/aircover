@@ -23,7 +23,13 @@ import {
 
 import Link from 'next/link'
 
-import { deleteDesign, designPhoto, exportDesign, saveDesign } from '@/app/actions/studio'
+import {
+  deleteDesign,
+  designPhoto,
+  exportDesign,
+  exportDesignPages,
+  saveDesign,
+} from '@/app/actions/studio'
 import { PhotoPicker } from '@/components/studio/photo-picker'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -300,7 +306,7 @@ export function DesignEditor({
    * and say nothing about it. Saving first is not a convenience here, it is what
    * makes "this is the picture that exports" true.
    */
-  function exportToLibrary() {
+  function exportToLibrary(everySlide: boolean) {
     setNote(null)
     setExported(null)
     startExport(async () => {
@@ -315,7 +321,9 @@ export function DesignEditor({
 
       // The page being LOOKED AT, not page one. Exporting a slide a person
       // cannot see would hand them a picture of something else.
-      const result = await exportDesign({ designId: design.id, pageIndex: activeIndex })
+      const result = everySlide
+        ? await exportDesignPages(design.id)
+        : await exportDesign({ designId: design.id, pageIndex: activeIndex })
       if (!result.ok) {
         setNote(result.message)
         return
@@ -459,13 +467,25 @@ export function DesignEditor({
           </Button>
           <Button
             variant="secondary"
-            onClick={exportToLibrary}
+            onClick={() => exportToLibrary(false)}
             loading={exporting}
             disabled={saving}
             data-guide="studio-export"
           >
             {doc.pages.length > 1 ? 'Add this slide to your library' : 'Add to library'}
           </Button>
+          {/* Only when there is more than one, because "add all 1 slides" is a
+              button that describes the product as more complicated than it is. */}
+          {doc.pages.length > 1 ? (
+            <Button
+              variant="secondary"
+              onClick={() => exportToLibrary(true)}
+              loading={exporting}
+              disabled={saving}
+            >
+              Add all <span className="num">{doc.pages.length}</span> slides
+            </Button>
+          ) : null}
           <Button variant="ghost" onClick={remove} disabled={saving || exporting}>
             Delete
           </Button>
