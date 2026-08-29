@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 
-import { skinCss, skinVarNames } from './skin-css'
+import { skinCss, skinIsGlobal, skinVarNames, SKIN_SCOPE } from './skin-css'
 import type { ThemeTokens } from '@sahoda/shared'
 
 /**
@@ -100,12 +100,36 @@ describe('skinCss', () => {
   })
 
   /**
-   * Doubled on purpose. `tokens.css` defines these on a bare `:root`, and
-   * matching that exactly would leave the winner to where a build happens to put
-   * a stylesheet.
+   * ── THE RULING THIS FILE NOW EXISTS TO HOLD ───────────────────────────────
+   * Founder's ruling, 2026-08-29: "Day/Night Theme Toggle should apply Sahoda
+   * Brand Theme. Only the Left Brand Logo should apply Brand Skin."
+   *
+   * Brand Skin shipped as `:root:root` for a few hours and repainted every
+   * button, link and tint in the product from an automatic read of one PNG. A
+   * grey-and-white logo made the whole interface washed out. The regression is
+   * ONE CHARACTER away at all times — `:root` compiles, renders, and silently
+   * puts it back — so the guard names the failure rather than the rule text.
    */
-  it('outranks the default palette by specificity rather than by luck', () => {
-    expect(skinCss(TEAL).startsWith(':root:root{')).toBe(true)
+  it('paints only what carries the scope, never the whole document', () => {
+    const css = skinCss(TEAL)
+
+    expect(css.startsWith(`${SKIN_SCOPE}{`)).toBe(true)
+    expect(skinIsGlobal(css)).toBe(false)
+  })
+
+  /** And the guard itself is worth nothing if it cannot see the defect. */
+  it('recognises the global rule it exists to forbid', () => {
+    expect(skinIsGlobal(skinCss(TEAL, ':root:root'))).toBe(true)
+    expect(skinIsGlobal(skinCss(TEAL, 'html'))).toBe(true)
+  })
+
+  /**
+   * The attribute selector is 0,1,0 and `tokens.css`'s bare `:root` is 0,0,1, so
+   * the brand wins inside the mark without an `!important` and without depending
+   * on where a build puts a stylesheet.
+   */
+  it('names an attribute, which is what outranks the default palette', () => {
+    expect(SKIN_SCOPE).toBe('[data-brand-skin]')
   })
 
   /**

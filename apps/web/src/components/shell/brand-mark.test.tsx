@@ -38,6 +38,20 @@ describe('the brand mark', () => {
   })
 
   /**
+   * THE OTHER HALF OF THE SCOPE RULING. `(app)/layout.tsx` emits the workspace's
+   * brand tokens scoped to `[data-brand-skin]`; if no element carries that
+   * attribute the rule matches nothing and the logo mark silently loses the
+   * brand, with no error anywhere. The selector is asserted in
+   * `skin-css.test.ts`; this is the element it has to find.
+   */
+  it('carries the scope the brand tokens are emitted for', () => {
+    render(<BrandMark logoUrl={null} primary={BLUE} />)
+
+    const button = screen.getByRole('button', { name: /your brand/i })
+    expect(button.closest('[data-brand-skin]')).not.toBeNull()
+  })
+
+  /**
    * NOTHING OF THE PANEL IS ON SCREEN UNTIL IT IS ASKED FOR. Rendering it
    * closed would put its markup in every page for a control most visits never
    * touch, which is the defect that failed the production build.

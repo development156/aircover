@@ -35,8 +35,26 @@ import type { ThemeTokens } from '@sahoda/shared'
  * paints Sahoda orange first and the customer's brand a frame later, which is
  * the flash the design canon forbids. `null` returns an empty string, so a
  * workspace with no theme emits nothing at all and `tokens.css` stands.
+ *
+ * ── IT IS SCOPED, AND THAT REVERSES HOW IT FIRST SHIPPED ────────────────────
+ * Founder's ruling, 2026-08-29, the same day: "Day/Night Theme Toggle should
+ * apply Sahoda Brand Theme. Only the Left Brand Logo should apply Brand Skin."
+ *
+ * The first version wrote `:root:root`, which repainted every button, link and
+ * tint in the product in whatever colour was found in the customer's logo. That
+ * is a real cost and it is not one this product should charge: the light and
+ * dark themes are DESIGNED, their contrast steps measured, and handing all seven
+ * tokens to an automatic colour read makes the whole interface a lottery on the
+ * quality of one PNG. A grey-and-white logo turned the product washed out, which
+ * is exactly how the ruling arrived.
+ *
+ * So the brand paints the brand mark, and the theme toggle owns everything else.
+ * `SKIN_SCOPE` is that boundary, in one place, so it cannot drift from the
+ * element that carries the attribute.
  */
-export function skinCss(theme: ThemeTokens | null): string {
+export const SKIN_SCOPE = '[data-brand-skin]'
+
+export function skinCss(theme: ThemeTokens | null, scope: string = SKIN_SCOPE): string {
   if (!theme) return ''
 
   const vars = brandSkinVars([theme.primary, theme.accent])
@@ -45,15 +63,13 @@ export function skinCss(theme: ThemeTokens | null): string {
     .join(';')
 
   /**
-   * `:root:root`, and the repetition is the mechanism rather than a typo.
-   *
-   * `tokens.css` defines these on a bare `:root`. Matching that exactly would
-   * leave the winner to document order, which is a promise about where a build
-   * puts a stylesheet rather than about CSS. Repeating the pseudo-class doubles
-   * the specificity and settles it, with no `!important` and no class that
-   * something else has to remember to add to the element.
+   * An attribute selector outranks the bare `:root` that `tokens.css` writes
+   * these on (0,1,0 against 0,0,1), so the element carrying the attribute and
+   * everything inside it inherits the brand while the rest of the document keeps
+   * Sahoda's. No `!important`, and the winner does not depend on where a build
+   * happens to put a stylesheet.
    */
-  return `:root:root{${body}}`
+  return `${scope}{${body}}`
 }
 
 /**
@@ -66,4 +82,17 @@ export function skinCss(theme: ThemeTokens | null): string {
 export function skinVarNames(theme: ThemeTokens | null): string[] {
   if (!theme) return []
   return Object.keys(brandSkinVars([theme.primary, theme.accent]))
+}
+
+/**
+ * Does this CSS repaint the whole document?
+ *
+ * A guard, exported because the ruling it enforces is one character away from
+ * being lost: `:root` in place of the attribute is a valid selector, compiles,
+ * renders, and silently puts the customer's logo colour back on every button in
+ * the product. Naming the failure gives a test something to assert that a
+ * string comparison against the whole rule would not survive a token change.
+ */
+export function skinIsGlobal(css: string): boolean {
+  return css.startsWith(':root') || css.startsWith('html') || css.startsWith('*')
 }
