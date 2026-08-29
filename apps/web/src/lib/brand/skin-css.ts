@@ -1,4 +1,5 @@
 import { brandSkinVars } from './brand-theme'
+import { SKIN_ATTR } from './skin-preference'
 import type { ThemeTokens } from '@sahoda/shared'
 
 /**
@@ -36,23 +37,28 @@ import type { ThemeTokens } from '@sahoda/shared'
  * the flash the design canon forbids. `null` returns an empty string, so a
  * workspace with no theme emits nothing at all and `tokens.css` stands.
  *
- * ── IT IS SCOPED, AND THAT REVERSES HOW IT FIRST SHIPPED ────────────────────
- * Founder's ruling, 2026-08-29, the same day: "Day/Night Theme Toggle should
- * apply Sahoda Brand Theme. Only the Left Brand Logo should apply Brand Skin."
+ * ── THE SCOPE IS A SWITCH, AND THAT TOOK THREE GOES ─────────────────────────
+ * Founder's ruling, 2026-08-29: Brand Skin is separate from the platform theme
+ * and switches back and forth, "because it will give the user more options if
+ * Brand Skin breaks the readability."
  *
- * The first version wrote `:root:root`, which repainted every button, link and
- * tint in the product in whatever colour was found in the customer's logo. That
- * is a real cost and it is not one this product should charge: the light and
- * dark themes are DESIGNED, their contrast steps measured, and handing all seven
- * tokens to an automatic colour read makes the whole interface a lottery on the
- * quality of one PNG. A grey-and-white logo turned the product washed out, which
- * is exactly how the ruling arrived.
+ * Attempt one wrote `:root:root` — the whole product repainted from an automatic
+ * read of one PNG, with no way out. A grey-and-white logo washed the interface
+ * out and nobody could undo it. Attempt two scoped the rule to the logo mark,
+ * which is safe and useless: it paints nothing, so there is nothing to switch.
  *
- * So the brand paints the brand mark, and the theme toggle owns everything else.
- * `SKIN_SCOPE` is that boundary, in one place, so it cannot drift from the
- * element that carries the attribute.
+ * This is the third and it is the switch itself. The rule is ALWAYS emitted and
+ * applies only while `<html>` carries `data-brand-skin="on"`, which the logo
+ * button writes and `ThemeScript` restores before the first paint. Off is the
+ * default, so a workspace that never asks keeps Sahoda's measured palette.
+ *
+ * `:root[data-brand-skin='on']` is 0,1,1 against `tokens.css`'s bare `:root` at
+ * 0,0,1, so the brand wins while it is on with no `!important` and no dependence
+ * on where a build puts a stylesheet. It says nothing about `data-theme`, which
+ * is why light and dark stay entirely the theme toggle's business: the two
+ * attributes are answers to two different questions and compose freely.
  */
-export const SKIN_SCOPE = '[data-brand-skin]'
+export const SKIN_SCOPE = ":root[data-brand-skin='on']"
 
 export function skinCss(theme: ThemeTokens | null, scope: string = SKIN_SCOPE): string {
   if (!theme) return ''
@@ -62,13 +68,6 @@ export function skinCss(theme: ThemeTokens | null, scope: string = SKIN_SCOPE): 
     .map(([name, value]) => `${name}:${value}`)
     .join(';')
 
-  /**
-   * An attribute selector outranks the bare `:root` that `tokens.css` writes
-   * these on (0,1,0 against 0,0,1), so the element carrying the attribute and
-   * everything inside it inherits the brand while the rest of the document keeps
-   * Sahoda's. No `!important`, and the winner does not depend on where a build
-   * happens to put a stylesheet.
-   */
   return `${scope}{${body}}`
 }
 
@@ -85,14 +84,19 @@ export function skinVarNames(theme: ThemeTokens | null): string[] {
 }
 
 /**
- * Does this CSS repaint the whole document?
+ * Does this CSS repaint the document with no way to switch it off?
  *
- * A guard, exported because the ruling it enforces is one character away from
- * being lost: `:root` in place of the attribute is a valid selector, compiles,
- * renders, and silently puts the customer's logo colour back on every button in
- * the product. Naming the failure gives a test something to assert that a
- * string comparison against the whole rule would not survive a token change.
+ * The regression is one character away at all times: dropping the attribute
+ * leaves `:root`, which is a valid selector that compiles, renders, and silently
+ * puts the customer's logo colour on every button in the product with the switch
+ * disconnected. That is attempt one, back again, and nothing about the page
+ * would look wrong until somebody's brand made it unreadable.
+ *
+ * So the test is "unconditional", not "global": a rule that paints the whole
+ * document is exactly what Brand Skin is FOR, and the thing that makes it safe
+ * is that it is gated on an attribute a person controls.
  */
-export function skinIsGlobal(css: string): boolean {
-  return css.startsWith(':root') || css.startsWith('html') || css.startsWith('*')
+export function skinIsUnconditional(css: string): boolean {
+  const selector = css.slice(0, css.indexOf('{'))
+  return selector !== '' && !selector.includes(SKIN_ATTR)
 }
