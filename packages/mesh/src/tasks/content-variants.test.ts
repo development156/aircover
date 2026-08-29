@@ -94,4 +94,23 @@ describe('contentVariantsTask', () => {
     expect(query).toBe(input.body)
     expect(query).not.toContain('hashtags')
   })
+
+  it('puts the brand block ABOVE the market block, which is the arbitration rule', () => {
+    // docs/51 RULING 1, and reading order is the whole of the enforcement.
+    const brand = { role: 'system' as const, content: 'BRAND', cache: true }
+    const market = { role: 'system' as const, content: 'MEASURED' }
+    const messages = contentVariantsTask.buildMessages(input, ctx, brand, undefined, market)
+    const contents = messages.map((m) => m.content)
+    expect(contents.indexOf('BRAND')).toBeGreaterThan(-1)
+    expect(contents.indexOf('MEASURED')).toBeGreaterThan(contents.indexOf('BRAND'))
+  })
+
+  it('cuts variants without observations when the workspace has none', () => {
+    const messages = contentVariantsTask.buildMessages(input, ctx)
+    expect(messages.some((m) => m.content === 'MEASURED')).toBe(false)
+  })
+
+  it('reads the Marketing Brain, because one variant per channel is its question', () => {
+    expect(contentVariantsTask.wantsMarketContext).toBe(true)
+  })
 })
