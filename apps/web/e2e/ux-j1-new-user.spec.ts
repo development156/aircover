@@ -146,28 +146,49 @@ async function run(page: Page, width: number, theme: Theme): Promise<void> {
   }
   await frame('13-composer-blank')
 
-  const tile = page.locator('[data-channel-tile="instagram"]')
-  if (await present(tile, 5000)) {
-    await tap(c, 'Pick the Instagram channel', tile)
-    await page.waitForURL(/\/posts\/[0-9a-f-]{36}$/, { timeout: 60_000 }).catch(() => {})
-    await page.waitForTimeout(1200)
-  }
-  await frame('14-composer-channel-picked')
-
+  // Step one, then step two. The composer is a numbered sequence: the channel
+  // step is refused until the post says something, so a journey that ticked a
+  // channel on a blank screen was photographing a state a person cannot reach.
   const body = page.getByLabel('Your post')
   if (await present(body, 5000)) {
     await body.fill('Saturday cupping is open again. Five seats, no charge, 9am.')
+    await page.waitForURL(/\/posts\/[0-9a-f-]{36}$/, { timeout: 60_000 }).catch(() => {})
     await page.waitForTimeout(2500)
   }
-  await frame('15-composer-written')
+  await frame('14-composer-written')
+
+  // The composer lists the three parts of a post down the side. The platform
+  // part is refused until something is written, so the journey goes there only
+  // now — and photographing the rail is part of the point.
+  const platformPart = page.locator('[data-rail-step="2"] button')
+  if (await present(platformPart, 5000)) {
+    await tap(c, 'Go to the platform part', platformPart)
+    await page.waitForTimeout(800)
+  }
+  const tile = page.locator('[data-channel-tile="instagram"]')
+  if (await present(tile, 5000)) {
+    await tap(c, 'Pick the Instagram channel', tile)
+    await page.waitForTimeout(1200)
+  }
+  await frame('15-composer-channel-picked')
 
   // ── STOP 8. Schedule it. This is the goal of the journey.
-  const schedule = page.getByRole('button', { name: /schedule/i }).first()
+  const sendPart = page.locator('[data-rail-step="3"] button')
+  if (await present(sendPart, 5000)) {
+    await tap(c, 'Go to the send part', sendPart)
+    await page.waitForTimeout(800)
+  }
+  // ── ANCHORED, BECAUSE THE RAIL ROW ALSO CONTAINS THE WORD ──────────────────
+  // The row that opens this part reads "3 Send it — Schedule it, or send it now",
+  // so a loose /schedule/i matches the row FIRST and this journey would press
+  // the thing it just pressed and photograph a schedule that never opened.
+  // MEASURED: two matches, the rail row in front.
+  const schedule = page.getByRole('button', { name: /^Schedule it/ }).first()
   if (await present(schedule, 5000)) {
     await tap(c, 'Schedule', schedule)
     await page.waitForTimeout(1500)
     await frame('16-schedule-open')
-    const confirm = page.getByRole('button', { name: /schedule|confirm|set time/i }).last()
+    const confirm = page.getByRole('button', { name: /^confirm schedule|^set time/i }).last()
     if (await present(confirm, 4000)) {
       await tap(c, 'Confirm the schedule', confirm)
       await page.waitForTimeout(2500)

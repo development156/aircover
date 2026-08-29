@@ -113,13 +113,22 @@ const POPULATED_STOPS: { route: string; stop: string }[] = [
 /**
  * Frames per (width, theme). Counted, never guessed.
  *
- * 8 onboarding arrivals + 5 empty + 4 populated + 1 composer-on-a-real-post = 18.
+ * 8 onboarding arrivals + 5 empty + 4 populated + 2 composer-on-a-real-post = 19.
  * The count is asserted, because a selector that stopped matching writes fewer
  * frames and reports green — "a harness that cannot tell nothing-broke from
  * nothing-ran", which this repo has shipped twice.
+ *
+ * ── THE COMPOSER IS TWO FRAMES NOW ──────────────────────────────────────────
+ * It lists the three parts of a post down the side and opens on the WORDS, so
+ * the frame named `composer-two-channels` stopped containing two channels the
+ * day the rail landed — and this counter did not notice, because one frame was
+ * still being written. The second frame is the platform part, which is where
+ * the two channels actually are.
  */
 const ONBOARDING_STOPS = 8
-const FRAMES_PER_COMBO = ONBOARDING_STOPS + EMPTY_STOPS.length + POPULATED_STOPS.length + 1
+const COMPOSER_STOPS = 2
+const FRAMES_PER_COMBO =
+  ONBOARDING_STOPS + EMPTY_STOPS.length + POPULATED_STOPS.length + COMPOSER_STOPS
 
 async function run(page: Page, width: number, theme: Theme, clerkUserId: string): Promise<void> {
   await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
@@ -157,7 +166,16 @@ async function run(page: Page, width: number, theme: Theme, clerkUserId: string)
   }
 
   const ms = await timedGoto(page, `/posts/${divergedPostId}`)
-  await frame(page, 'composer-two-channels', width, theme, ms)
+  await frame(page, 'composer-words', width, theme, ms)
+
+  // And the part that actually holds the two channels this stop is named for.
+  await page
+    .locator('[data-rail-step="2"] button')
+    .first()
+    .click()
+    .catch(() => {})
+  await page.waitForTimeout(1200)
+  await frame(page, 'composer-two-channels', width, theme)
 }
 
 for (const width of WIDTHS) {

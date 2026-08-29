@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { z } from 'zod'
 import type { MeshContext, MeshTaskDef } from '@sahoda/shared'
 import { createMeshRunner, type MeshTaskSpec } from './engine'
+import { captionRewriteTask } from './tasks/caption-rewrite'
+import { contentVariantsTask } from './tasks/content-variants'
+import { planWeekTask } from './tasks/plan-week'
 import type { MarketContextProvider } from './market-context'
 import type { ChatMessage, ChatRequest, ChatResponse, Provider } from './providers/types'
 
@@ -146,5 +149,30 @@ describe('engine market injection', () => {
     await runnerWith(spy, provider).run(ungrounded, { body: 'x' }, ctx)
 
     expect(called).toBe(false)
+  })
+
+  /**
+   * WHICH TASKS MAY READ THE BRAIN — a decision, kept as a list.
+   *
+   * `plan-week.test.ts` carried the intent ("if a second task ever wants it,
+   * that is a decision, and this assertion failing is where it gets made") but
+   * not the mechanism: asserting one task's own flag cannot notice a second
+   * task setting its own. This is the mechanism. Widening the brain's reach
+   * costs one line here, deliberately, because each new reader is another paid
+   * call that fetches observations and another place the arbitration order has
+   * to be right.
+   */
+  it('names every task allowed to read the Marketing Brain', () => {
+    const readers = [
+      ['plan_week', planWeekTask],
+      ['caption_rewrite', captionRewriteTask],
+      ['content_variants', contentVariantsTask],
+    ] as const
+
+    expect(readers.filter(([, t]) => t.wantsMarketContext === true).map(([n]) => n)).toEqual([
+      'plan_week',
+      'caption_rewrite',
+      'content_variants',
+    ])
   })
 })

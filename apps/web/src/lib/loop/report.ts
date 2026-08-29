@@ -108,24 +108,31 @@ export async function readCycleLearnings(
   cycleId: string,
 ): Promise<ReportData['learnings']> {
   const supabase = createServerSupabase()
+  // ── THE CYCLE IS FILTERED IN THE DATABASE, NOT AFTER THE LIMIT ─────────────
+  // This read used to take the 20 most recent insight events and THEN keep the
+  // ones belonging to this cycle. A workspace with twenty newer events than its
+  // last cycle's — which is a workspace that has been running a while, not an
+  // unusual one — got an empty learnings block on a report whose cycle really
+  // did propose something. The page would then say Sahoda noticed nothing,
+  // which is a claim about their week that no query established.
+  //
+  // `loop_cycle_id` lives inside the `diff` JSONB, so the filter is `->>` on
+  // the key. The limit stays as a bound on a read that is otherwise unbounded,
+  // but it now bounds the rows that MATCH rather than the rows searched.
   const { data } = await supabase
     .from('memory_events')
     .select('diff, status, applied_memory_version')
     .eq('workspace_id', workspaceId)
     .eq('source', 'insight')
+    .eq('diff->>loop_cycle_id', cycleId)
     .order('created_at', { ascending: false })
     .limit(20)
-  return (data ?? [])
-    .filter((row) => {
-      const diff = (row.diff ?? {}) as Record<string, unknown>
-      return diff.loop_cycle_id === cycleId
-    })
-    .map((row) => {
-      const diff = (row.diff ?? {}) as Record<string, unknown>
-      return {
-        summary: typeof diff.summary === 'string' ? diff.summary : 'Sahoda noticed something.',
-        status: row.status as string,
-        appliedVersion: (row.applied_memory_version as number | null) ?? null,
-      }
-    })
+  return (data ?? []).map((row) => {
+    const diff = (row.diff ?? {}) as Record<string, unknown>
+    return {
+      summary: typeof diff.summary === 'string' ? diff.summary : 'Sahoda noticed something.',
+      status: row.status as string,
+      appliedVersion: (row.applied_memory_version as number | null) ?? null,
+    }
+  })
 }
