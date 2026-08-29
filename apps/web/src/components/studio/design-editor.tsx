@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
+  MAX_CAROUSEL_PAGES,
+  addPage,
   charBudgetFor,
   composeScene,
   describeComposeFailure,
@@ -11,6 +13,8 @@ import {
   slotLabelOf,
   templateById,
   imageIdOf,
+  removePage,
+  slotKeysOf,
   type DesignDocument,
   type Palette,
   type StudioDesign,
@@ -77,11 +81,22 @@ export function DesignEditor({
    */
   const [photoBytes, setPhotoBytes] = useState<Record<string, string>>({})
   const [loadingPhoto, startPhoto] = useTransition()
+  /**
+   * Which slide is being edited. Held here rather than in the document: it is
+   * where this person is looking, not something about the design, and saving it
+   * would make two people editing the same carousel fight over the view.
+   */
+  const [pageAt, setPageAt] = useState(0)
 
   const template = templateById(doc.templateId)
   const preset = presetById(design.preset_id)
 
-  const page = doc.pages[0]
+  // Clamped rather than trusted: removing the last slide leaves `pageAt` past
+  // the end for one render, and an editor that reads `undefined` there shows
+  // the "this design cannot be opened" panel for a design that is perfectly
+  // fine.
+  const activeIndex = Math.min(pageAt, doc.pages.length - 1)
+  const page = doc.pages[activeIndex]
 
   /**
    * Slot to bytes, built fresh from the document every render.
@@ -172,7 +187,9 @@ export function DesignEditor({
     setNote(null)
     setDoc((current) => {
       const pages = current.pages.map((p, index) =>
-        index === 0 ? { ...p, slots: { ...p.slots, [key]: { kind: 'text' as const, text } } } : p,
+        index === activeIndex
+          ? { ...p, slots: { ...p.slots, [key]: { kind: 'text' as const, text } } }
+          : p,
       )
       return { ...current, pages }
     })
@@ -185,7 +202,7 @@ export function DesignEditor({
     setDoc((current) => ({
       ...current,
       pages: current.pages.map((p, index) =>
-        index === 0
+        index === activeIndex
           ? { ...p, slots: { ...p.slots, [key]: { kind: 'image' as const, assetId } } }
           : p,
       ),
@@ -212,9 +229,42 @@ export function DesignEditor({
     setDoc((current) => ({
       ...current,
       pages: current.pages.map((p, index) =>
-        index === 0 ? { ...p, slots: { ...p.slots, [key]: { kind: 'empty' as const } } } : p,
+        index === activeIndex
+          ? { ...p, slots: { ...p.slots, [key]: { kind: 'empty' as const } } }
+          : p,
       ),
     }))
+  }
+
+  /**
+   * Add a slide.
+   *
+   * The new one is opened straight away, because adding a page you then have to
+   * go and find is a press that appears to do nothing on a narrow screen where
+   * the strip has scrolled.
+   */
+  function addSlide() {
+    if (template === null) return
+    setNote(null)
+    setDoc((current) => {
+      const next = addPage(current, slotKeysOf(template))
+      // Unchanged means the cap refused it. The button is disabled there, so
+      // this is the rule underneath the button rather than a second copy of it.
+      if (next !== current) setPageAt(next.pages.length - 1)
+      return next
+    })
+    setDirty(true)
+  }
+
+  /** Remove the slide being edited. The last one cannot go; the button is absent there. */
+  function removeSlide() {
+    setNote(null)
+    setDoc((current) => {
+      const next = removePage(current, activeIndex)
+      if (next !== current) setPageAt(Math.max(0, activeIndex - 1))
+      return next
+    })
+    setDirty(true)
   }
 
   function save() {
@@ -258,7 +308,9 @@ export function DesignEditor({
         setDirty(false)
       }
 
-      const result = await exportDesign({ designId: design.id })
+      // The page being LOOKED AT, not page one. Exporting a slide a person
+      // cannot see would hand them a picture of something else.
+      const result = await exportDesign({ designId: design.id, pageIndex: activeIndex })
       if (!result.ok) {
         setNote(result.message)
         return
@@ -285,6 +337,56 @@ export function DesignEditor({
         <h2 id="editor-fields" className="type-h2">
           What it says
         </h2>
+
+        {/* ── SLIDES ──────────────────────────────────────────────────────────
+            One design can be up to ten slides. The strip is shown even for a
+            single page, because "add a slide" is how a person finds out a
+            carousel is possible at all, and a control that appears only once
+            you already have two is a feature nobody discovers. */}
+        <div className="flex flex-wrap items-center gap-2" data-guide="studio-slides">
+          <ul className="flex flex-wrap items-center gap-1">
+            {doc.pages.map((_, index) => (
+              <li key={index}>
+                <button
+                  type="button"
+                  onClick={() => setPageAt(index)}
+                  aria-current={index === activeIndex ? 'true' : undefined}
+                  className={`surface-ring size-control rounded-sm type-sm num transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                    index === activeIndex
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-s2 text-muted'
+                  }`}
+                >
+                  {index + 1}
+                </button>
+              </li>
+            ))}
+          </ul>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={addSlide}
+            disabled={doc.pages.length >= MAX_CAROUSEL_PAGES || saving || exporting}
+          >
+            Add a slide
+          </Button>
+          {doc.pages.length <= 1 ? null : (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={removeSlide}
+              disabled={saving || exporting}
+            >
+              Remove this slide
+            </Button>
+          )}
+          {doc.pages.length < MAX_CAROUSEL_PAGES ? null : (
+            <span className="type-sm text-muted">
+              <span className="num">{MAX_CAROUSEL_PAGES}</span> slides is as many as Instagram and
+              Facebook will publish.
+            </span>
+          )}
+        </div>
 
         <label className="flex flex-col gap-1">
           <span className="type-sm text-muted">What you call this design</span>
@@ -357,7 +459,7 @@ export function DesignEditor({
             disabled={saving}
             data-guide="studio-export"
           >
-            Add to library
+            {doc.pages.length > 1 ? 'Add this slide to your library' : 'Add to library'}
           </Button>
           <Button variant="ghost" onClick={remove} disabled={saving || exporting}>
             Delete
@@ -411,6 +513,12 @@ export function DesignEditor({
           />
         )}
         <p className="type-sm text-muted">
+          {doc.pages.length > 1 ? (
+            <>
+              Slide <span className="num">{activeIndex + 1}</span> of{' '}
+              <span className="num">{doc.pages.length}</span> &middot;{' '}
+            </>
+          ) : null}
           {preset.label} &middot; <span className="num">{preset.width}</span> by{' '}
           <span className="num">{preset.height}</span> pixels. This is the picture that exports, not
           a preview of it.

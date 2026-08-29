@@ -1,14 +1,17 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, test } from 'vitest'
 
 import {
   DesignDocumentSchema,
   MAX_CAROUSEL_PAGES,
+  addPage,
   assetIdsOf,
   blankDocument,
   imageIdOf,
   isCarousel,
+  removePage,
   slotOf,
   textOf,
+  type DesignDocument,
 } from './document'
 
 const ASSET = '3f1c9a2e-0000-4000-8000-111111111111'
@@ -180,5 +183,87 @@ describe('blankDocument', () => {
 
   it('produces a single-page design, because a new design is not a carousel', () => {
     expect(isCarousel(blankDocument('t', ['a']))).toBe(false)
+  })
+})
+
+/**
+ * ── SLIDES ──────────────────────────────────────────────────────────────────
+ * The two limits are different KINDS of limit and the tests say which: 10 is
+ * what a platform will publish, 1 is what a document is. A guard that only
+ * checked "the number did not change" would pass for either reason.
+ */
+describe('addPage and removePage', () => {
+  const keys = ['headline', 'detail'] as const
+  const doc = (pages: number): DesignDocument => {
+    let out = blankDocument('photo-bottom', keys)
+    for (let i = 1; i < pages; i += 1) out = addPage(out, keys)
+    return out
+  }
+
+  test('a new slide carries every declared slot, empty', () => {
+    const two = addPage(doc(1), keys)
+    expect(two.pages).toHaveLength(2)
+    expect(two.pages[1]!.slots).toEqual({
+      headline: { kind: 'empty' },
+      detail: { kind: 'empty' },
+    })
+  })
+
+  test('adding a slide leaves the earlier ones alone', () => {
+    const one = blankDocument('photo-bottom', keys)
+    const filled: DesignDocument = {
+      ...one,
+      pages: [
+        { slots: { ...one.pages[0]!.slots, headline: { kind: 'text', text: 'Open today' } } },
+      ],
+    }
+    const two = addPage(filled, keys)
+    expect(textOf(two.pages[0]!, 'headline')).toBe('Open today')
+  })
+
+  test('the tenth slide is allowed and the eleventh is refused', () => {
+    const ten = doc(MAX_CAROUSEL_PAGES)
+    expect(ten.pages).toHaveLength(MAX_CAROUSEL_PAGES)
+    const refused = addPage(ten, keys)
+    expect(refused.pages).toHaveLength(MAX_CAROUSEL_PAGES)
+    // Refused by returning the SAME document, so a caller that ignores the
+    // answer cannot corrupt one.
+    expect(refused).toBe(ten)
+  })
+
+  test('a slide in the middle can go, and the rest keep their order', () => {
+    const three = doc(3)
+    const marked: DesignDocument = {
+      ...three,
+      pages: three.pages.map((page, index) => ({
+        slots: { ...page.slots, headline: { kind: 'text', text: `page ${index}` } },
+      })),
+    }
+    const left = removePage(marked, 1)
+    expect(left.pages).toHaveLength(2)
+    expect(left.pages.map((page) => textOf(page, 'headline'))).toEqual(['page 0', 'page 2'])
+  })
+
+  test('the last slide cannot be removed, because a design with no pages is not a design', () => {
+    const one = doc(1)
+    expect(removePage(one, 0)).toBe(one)
+  })
+
+  test('an index that is not a slide changes nothing', () => {
+    const two = doc(2)
+    expect(removePage(two, 5)).toBe(two)
+    expect(removePage(two, -1)).toBe(two)
+    expect(removePage(two, 1.5)).toBe(two)
+  })
+
+  test('every document these produce still parses', () => {
+    const ten = doc(MAX_CAROUSEL_PAGES)
+    expect(DesignDocumentSchema.safeParse(ten).success).toBe(true)
+    expect(DesignDocumentSchema.safeParse(removePage(ten, 0)).success).toBe(true)
+  })
+
+  test('two slides are a carousel and one is a post', () => {
+    expect(isCarousel(doc(1))).toBe(false)
+    expect(isCarousel(doc(2))).toBe(true)
   })
 })

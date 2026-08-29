@@ -161,7 +161,39 @@ export function assetIdsOf(doc: DesignDocument): string[] {
  * exists and is empty" is what the editor needs to draw a box to type into.
  */
 export function blankDocument(templateId: string, slotKeys: readonly string[]): DesignDocument {
+  return { v: 1, templateId, pages: [blankPage(slotKeys)] }
+}
+
+/** One empty page of a template: every declared slot present, none filled. */
+export function blankPage(slotKeys: readonly string[]): DesignPage {
   const slots: Record<string, SlotValue> = {}
   for (const key of slotKeys) slots[key] = { kind: 'empty' }
-  return { v: 1, templateId, pages: [{ slots }] }
+  return { slots }
+}
+
+/**
+ * ── ADDING AND REMOVING SLIDES ──────────────────────────────────────────────
+ *
+ * Both refuse by returning the document UNCHANGED rather than throwing or
+ * returning null. A refused press is not an error a person needs told about:
+ * the button that would go past the limit is disabled, and this is the rule
+ * underneath it rather than a duplicate of it. Returning the same object also
+ * means a caller that ignores the refusal cannot corrupt a document.
+ *
+ * The two limits are not symmetrical and the asymmetry is the product:
+ * `MAX_CAROUSEL_PAGES` is what a PLATFORM enforces (Instagram and Facebook both
+ * cap a carousel at 10, per the Constraint Engine's `maxMediaCount`), so an
+ * eleventh slide could be made and never published. The floor of 1 is what a
+ * DOCUMENT is: a design with no pages is not an empty carousel, it is nothing.
+ */
+export function addPage(doc: DesignDocument, slotKeys: readonly string[]): DesignDocument {
+  if (doc.pages.length >= MAX_CAROUSEL_PAGES) return doc
+  return { ...doc, pages: [...doc.pages, blankPage(slotKeys)] }
+}
+
+/** Remove one slide. The last one cannot go: a design with no pages is not a design. */
+export function removePage(doc: DesignDocument, index: number): DesignDocument {
+  if (doc.pages.length <= MIN_PAGES) return doc
+  if (!Number.isInteger(index) || index < 0 || index >= doc.pages.length) return doc
+  return { ...doc, pages: doc.pages.filter((_, at) => at !== index) }
 }
