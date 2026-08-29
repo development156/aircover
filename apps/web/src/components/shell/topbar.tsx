@@ -135,7 +135,14 @@ export async function Topbar() {
       {/* THE BRAND, BESIDE THE WORKSPACE IT BELONGS TO. Founder's ruling,
           2026-08-29: the logo goes here, and it is the control that changes the
           brand colour rather than a decoration. */}
-      <BrandMark logoUrl={logo?.url ?? null} primary={theme?.primary ?? null} />
+      <BrandMark
+        logoUrl={logo?.url ?? null}
+        primary={theme?.primary ?? null}
+        /* Whether there is anything to switch TO. A workspace that has never
+           given Sahoda a brand gets the panel on a press rather than a toggle
+           that reports a change which did not happen. */
+        hasTheme={theme !== null}
+      />
       <div className="shrink-0">
         <WorkspaceSwitcher
           workspaces={workspaces}

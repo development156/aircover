@@ -43,7 +43,7 @@ packages/       shared (zod contracts, SOURCE OF TRUTH) · db (Supabase+RLS)
 | **Divas** (founder) | `wt-divas`, `2`, `3` | `/advisor` | Owns every ruling. |
 | **Jiban** | `wt-jiban`, `2`, `3` | `/lead-design` | UI/UX. |
 | **Girija** | `wt-girija`, `2`, `3` | `/lead-research` | Research. |
-| **Karunesh** | `wt-karunesh` | `/lead-expert` | **Writes no code, ever.** |
+| **Karunesh** | `wt-karunesh`, `2`, `3` | `/lead-expert` | **Writes no code, ever.** |
 
 Merge priority when lanes collide: **divas > jiban > girija > karunesh.**
 
