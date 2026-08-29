@@ -4,9 +4,11 @@ import { createPgLedgerPort, loadBillingEnv, type PgLedgerPort } from '@sahoda/b
 import type { Channel } from '@sahoda/shared'
 
 import type { AutopilotRefusal } from '@/lib/loop/autopilot-refusals'
+import type { AutopilotHistoryRow } from './history-copy'
 import type { AnnouncedPost } from './dispatch-due'
 import {
   ACTIVE_BRAIN_SQL,
+  POST_AUTOPILOT_HISTORY_SQL,
   ANNOUNCED_FOR_PERSON_SQL,
   ARM_FOR_PUBLISH_SQL,
   CANCEL_ANNOUNCEMENT_SQL,
@@ -313,4 +315,34 @@ export async function readAnnouncedForPerson(
 export async function readWorkspaceIds(sql: string, limit: number): Promise<string[]> {
   const r = await getPool().query(sql, [limit])
   return (r.rows as { workspace_id: string }[]).map((row) => row.workspace_id)
+}
+
+/**
+ * One post's autopilot history, shaped for `autopilotStatus`.
+ *
+ * An empty array is a real answer and not a failure: autopilot has never
+ * decided anything about this post, which `autopilotStatus` reports as
+ * "has not looked at" rather than as a refusal. Those are different facts.
+ */
+export async function readPostAutopilotHistory(
+  workspaceId: string,
+  postId: string,
+  variantId: string,
+): Promise<AutopilotHistoryRow[]> {
+  const r = await getPool().query(POST_AUTOPILOT_HISTORY_SQL, [workspaceId, postId, variantId])
+  return (
+    r.rows as {
+      decision: AutopilotHistoryRow['decision']
+      refusal_reason: string | null
+      dispatch_after: string | Date | null
+      created_at: string | Date
+      actor: string
+    }[]
+  ).map((row) => ({
+    decision: row.decision,
+    refusalReason: row.refusal_reason,
+    dispatchAfter: row.dispatch_after === null ? null : new Date(row.dispatch_after),
+    createdAt: new Date(row.created_at),
+    actor: row.actor,
+  }))
 }
