@@ -128,12 +128,21 @@ export default async function PostsPage({
                posts are in it and in what order. `PostGrid` is a client island
                only because the fold has state — the cards inside it are the
                same server components as before and cost no JS. */
-            <PostGrid data-guide="posts.list">
+            /* Keyed on the filter so the fold RESETS when the bucket changes.
+               `PostFilters` navigates with <Link>, a soft navigation, so an
+               unkeyed grid at the same tree position keeps its expanded state:
+               a reader who opened all of "All" would land on "Drafts" already
+               expanded, with the fold never applied to what they just asked
+               for. */
+            <PostGrid key={active.slug} data-guide="posts.list">
               {shown.map((post, i) => (
                 /* One ladder across the grid — the tiles deal rather than
                    flashing. Capped in CSS at --stagger-cap, so a full page
                    of posts does not take a second and a half to arrive. */
-                <StaggerItem key={post.id} i={i}>
+                /* `h-full` so the wrapper passes the grid row's stretch down
+                   to the card instead of absorbing it — see the tile comment in
+                   post-card.tsx. */
+                <StaggerItem key={post.id} i={i} className="h-full">
                   <PostCard
                     compact
                     post={post}

@@ -166,7 +166,22 @@ export function PostCard({
         // fits and lets it grow when it does not; grid rows stretch their
         // siblings to match, so the grid stays a grid. Tiles are square in the
         // ordinary case and honest in the rest.
-        compact && 'flex flex-col p-4 narrow:aspect-square',
+        // `wide:` and not `narrow:`. The ratio used to begin at 700px, where
+        // the grid has TWO columns — MEASURED in Chromium at 1024px: two 478px
+        // columns, so each tile is a 478x478 square and the eight before the
+        // fold run 1996px down the page. That is more than two screens, on a
+        // common laptop width, for a change whose whole point is that eight fit
+        // on one. The square is worth having only where the grid is four wide.
+        // Between 700 and 1179 the tiles are two-up rectangles that take their
+        // height from their content, which is still far shorter than the
+        // full-width rows they replaced.
+        //
+        // `h-full` because the stretch stops at the grid item. `StaggerItem`
+        // renders a plain div between the <li> and this Card, so without it a
+        // row sized by its tallest tile leaves the others short — MEASURED at
+        // 1180: 365px items holding 268px cards, 97px of dead space under six
+        // of the eight, and those six not square either.
+        compact && 'flex h-full flex-col p-4 wide:aspect-square',
       )}
     >
       <div className="flex items-start justify-between gap-3">
@@ -180,7 +195,12 @@ export function PostCard({
             eight of these ran ~197px each for three lines of content. */}
         <h2
           className={cn(
-            'type-h3 flex items-center gap-2 transition-micro group-hover:text-accent',
+            // `min-w-0` and `break-words`: a flex item's automatic minimum is
+            // its CONTENT, so a title with no space in it (titles derive from
+            // the body's first line, and a pasted link is one) refuses to
+            // shrink and the card paints over its neighbour. MEASURED before
+            // this: 63px of overspill at 1440 and 128px at 1180.
+            'type-h3 flex min-w-0 items-center gap-2 transition-micro group-hover:text-accent',
             heading.source === 'none' && 'font-semibold text-muted',
           )}
         >
@@ -190,7 +210,7 @@ export function PostCard({
           <Link
             href={`/posts/${post.id}`}
             data-guide="posts.card"
-            className="rounded-input after:absolute after:inset-0 after:rounded-card after:content-['']"
+            className="min-w-0 break-words rounded-input after:absolute after:inset-0 after:rounded-card after:content-['']"
           >
             {displayTitle}
           </Link>
