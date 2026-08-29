@@ -334,3 +334,46 @@ select a.workspace_id, a.post_id, a.variant_id, a.channel, a.account_id,
  order by a.created_at desc
  limit 1
 returning id`
+
+/**
+ * WHAT AUTOPILOT IS ABOUT TO SEND — the read behind the screen a person stops
+ * it from.
+ *
+ * ── WHY THIS IS NOT `PENDING_ANNOUNCEMENTS_SQL` ──────────────────────────────
+ * That one answers the dispatcher's question and returns ids. A person needs
+ * the post's TITLE and the channel in words they recognise, and needs them for
+ * announcements whose window is still open as well as ones already past it.
+ * Two readers of the same rows asking different questions is not duplication;
+ * flattening them would make the dispatcher carry a join it does not need on
+ * every tick.
+ *
+ * ── IT SHOWS POSTS WHOSE WINDOW HAS CLOSED, TOO ──────────────────────────────
+ * `CANCEL_ANNOUNCEMENT_SQL` will still stop one of those, because the sweep may
+ * not have reached it. Hiding it here while the cancel still works would be a
+ * screen that withholds a remedy the product has — the opposite of the failure
+ * this codebase usually guards against, and just as dishonest.
+ *
+ * Parameters: $1 workspace_id, $2 row limit.
+ */
+export const ANNOUNCED_FOR_PERSON_SQL = `select a.post_id,
+       a.variant_id,
+       a.channel,
+       a.dispatch_after,
+       a.announced_at,
+       p.title as post_title
+  from loop_autopilot_log a
+  join posts p
+    on p.id = a.post_id
+   and p.workspace_id = a.workspace_id
+ where a.workspace_id = $1
+   and a.decision = 'announced'
+   and not exists (
+     select 1 from loop_autopilot_log later
+      where later.workspace_id = a.workspace_id
+        and later.post_id = a.post_id
+        and later.variant_id = a.variant_id
+        and later.decision in ('dispatched', 'cancelled')
+        and later.created_at >= a.created_at
+   )
+ order by a.dispatch_after asc
+ limit $2`
