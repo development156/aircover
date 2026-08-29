@@ -66,11 +66,16 @@ export function DesignEditor({
   const [dirty, setDirty] = useState(false)
   const [exporting, startExport] = useTransition()
   /**
-   * What the last export did, and where the file went. Held apart from `note`
-   * because it carries a LINK: "already in your library" with nowhere to go is
-   * a sentence about a file the person then has to hunt for.
+   * What the last export did. Held apart from `note` because it carries a LINK:
+   * "already in your library" with nowhere to go is a sentence about a file the
+   * person then has to hunt for.
+   *
+   * The destination is the literal `/assets` rather than a string in state, and
+   * that is not tidiness: `next.config.ts` turns on typed routes, so a `string`
+   * href fails the BUILD while `turbo typecheck` stays green. The trash lives on
+   * that same screen, so one link serves all three outcomes.
    */
-  const [exported, setExported] = useState<{ message: string; href: string | null } | null>(null)
+  const [exported, setExported] = useState<string | null>(null)
   /**
    * The BYTES of each chosen picture, keyed by slot, for the preview.
    *
@@ -315,7 +320,7 @@ export function DesignEditor({
         setNote(result.message)
         return
       }
-      setExported({ message: result.message, href: '/assets' })
+      setExported(result.message)
       router.refresh()
     })
   }
@@ -473,15 +478,13 @@ export function DesignEditor({
 
         {exported === null ? null : (
           <p role="status" className="surface-ring rounded-card bg-s2 px-3 py-3 type-sm text-muted">
-            {exported.message}{' '}
-            {exported.href === null ? null : (
-              <Link
-                href={exported.href}
-                className="underline transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
-                Open your library
-              </Link>
-            )}
+            {exported}{' '}
+            <Link
+              href="/assets"
+              className="underline transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              Open your library
+            </Link>
           </p>
         )}
 
