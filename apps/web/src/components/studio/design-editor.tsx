@@ -27,6 +27,7 @@ import Link from 'next/link'
 import {
   deleteDesign,
   designPhoto,
+  duplicateDesign,
   exportDesign,
   exportDesignPages,
   saveDesign,
@@ -367,6 +368,26 @@ export function DesignEditor({
     })
   }
 
+  /**
+   * Make a second design from this one and open it.
+   *
+   * Saved first for the same reason the export is: the copy is written on the
+   * SERVER from the stored row, so duplicating with unsaved edits on screen
+   * would hand back a copy of the previous version and say nothing about it.
+   */
+  function duplicate() {
+    setNote(null)
+    startExport(async () => {
+      if (!(await autosave.flush())) return
+      const result = await duplicateDesign(design.id)
+      if (!result.ok) {
+        setNote(result.message)
+        return
+      }
+      router.push(`/studio/${result.design.id}`)
+    })
+  }
+
   /** Keep this design as a starting point, or put it back among the designs. */
   function toggleTemplate() {
     setNote(null)
@@ -615,6 +636,15 @@ export function DesignEditor({
               Add all <span className="num">{doc.pages.length}</span> slides
             </Button>
           ) : null}
+          <Button
+            variant="secondary"
+            onClick={duplicate}
+            loading={exporting}
+            disabled={saving || autosave.blocked !== null}
+            data-guide="studio-duplicate"
+          >
+            Duplicate
+          </Button>
           <Button
             variant="ghost"
             onClick={remove}

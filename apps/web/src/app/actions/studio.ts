@@ -35,6 +35,7 @@ import {
   type ExistingCopy,
   type PageExport,
 } from '@/lib/studio/export-copy'
+import { copyTitle } from '@/lib/studio/copy-title'
 import { imageDataUri, resolvePageImages } from '@/lib/studio/images'
 import { TEMPLATE_KEPT, TEMPLATE_REFUSALS, TEMPLATE_RELEASED } from '@/lib/studio/template-copy'
 import { studioPalette } from '@/lib/studio/palette'
@@ -700,6 +701,35 @@ export async function setDesignTemplate(input: unknown): Promise<TemplateFlagSta
  * of any two designs using one picture.
  */
 export async function startFromTemplate(designId: unknown): Promise<SaveDesignState> {
+  return copyOfDesign(designId, (title) => title, 'startFromTemplate')
+}
+
+/**
+ * Duplicate a design, under a name that says it is a duplicate.
+ *
+ * The same copy `startFromTemplate` makes, and the difference is entirely the
+ * NAME. A starting point and the design begun from it live on separate shelves,
+ * so one title on both is unambiguous; a duplicate sits in the gallery beside
+ * its original, where two identical cards can only be told apart by opening
+ * both. `copyTitle` also keeps the new name inside what `TitleSchema` accepts,
+ * which a title already at the limit would otherwise break.
+ */
+export async function duplicateDesign(designId: unknown): Promise<SaveDesignState> {
+  return copyOfDesign(designId, copyTitle, 'duplicateDesign')
+}
+
+/**
+ * Read one design and write a new one from it.
+ *
+ * Shared by both callers so a copy cannot drift into two behaviours. Pictures
+ * are REFERENCED rather than duplicated: copying the bytes would bill somebody
+ * twice for one file, and the new design points at the same rows in `assets`.
+ */
+async function copyOfDesign(
+  designId: unknown,
+  nameIt: (title: string) => string,
+  action: string,
+): Promise<SaveDesignState> {
   const id = z.uuid().safeParse(designId)
   if (!id.success) return { ok: false, message: TEMPLATE_REFUSALS.notFound }
 
@@ -726,13 +756,13 @@ export async function startFromTemplate(designId: unknown): Promise<SaveDesignSt
     // point saved before a layout was retired must not produce a design nobody
     // can open.
     return saveDesign({
-      title: source.data.title,
+      title: nameIt(source.data.title),
       presetId: source.data.preset_id,
       doc: source.data.doc,
       isTemplate: false,
     })
   } catch (error) {
-    reportServerError(error, { action: 'startFromTemplate' })
+    reportServerError(error, { action })
     return { ok: false, message: TEMPLATE_REFUSALS.copyFailed }
   }
 }
