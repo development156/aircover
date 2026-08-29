@@ -34,7 +34,9 @@ import {
 import { PhotoPicker } from '@/components/studio/photo-picker'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { type DesignDraft, describeSaveState } from '@/lib/studio/autosave'
 import { DELETE_AT_REST, DELETE_CANCEL, describeDesignDelete } from '@/lib/studio/delete-copy'
+import { useDesignAutosave } from '@/lib/studio/use-design-autosave'
 import type { PhotoListRead } from '@/lib/studio/read'
 
 /**
@@ -71,7 +73,6 @@ export function DesignEditor({
   const [title, setTitle] = useState(design.title)
   const [saving, startSave] = useTransition()
   const [note, setNote] = useState<string | null>(null)
-  const [dirty, setDirty] = useState(false)
   const [exporting, startExport] = useTransition()
   /**
    * What the last export did. Held apart from `note` because it carries a LINK:
@@ -108,6 +109,43 @@ export function DesignEditor({
    * toggle that lies the first time the write is refused.
    */
   const [isTemplate, setIsTemplate] = useState(design.is_template)
+
+  /**
+   * The design as it stands, and the autosave that keeps it.
+   *
+   * `isTemplate` is IN the draft, and that is a fix rather than tidiness:
+   * `saveDesign` writes `is_template: isTemplate ?? false`, so every save that
+   * omitted the field quietly took a starting point off the shelf. The Save
+   * button did that once per press; an autosave would have done it every time
+   * somebody paused typing.
+   */
+  const draft: DesignDraft = { title, doc, isTemplate }
+
+  const autosave = useDesignAutosave({
+    draft,
+    initial: { title: design.title, doc: design.doc, isTemplate: design.is_template },
+    save: async (attempt) => {
+      const result = await saveDesign({
+        id: design.id,
+        title: attempt.title,
+        presetId: design.preset_id,
+        doc: attempt.doc,
+        isTemplate: attempt.isTemplate,
+      })
+      if (!result.ok) return { ok: false, message: result.message }
+      // The snapshot is what came BACK, so a server that normalised anything
+      // does not leave this editor writing the same row forever.
+      return {
+        ok: true,
+        saved: {
+          title: result.design.title,
+          doc: result.design.doc,
+          isTemplate: result.design.is_template,
+        },
+      }
+    },
+  })
+  const dirty = autosave.dirty
   const [templateNote, setTemplateNote] = useState<string | null>(null)
   const [flagging, startFlag] = useTransition()
   /**
@@ -209,6 +247,9 @@ export function DesignEditor({
     )
   }
 
+  /** What the save status line says, or nothing when there is nothing to say. */
+  const saveSaid = describeSaveState(autosave.state, dirty)
+
   /** What the confirmation says, from facts this editor already holds. */
   const deletePrompt = describeDesignDelete({
     pageCount: doc.pages.length,
@@ -221,7 +262,6 @@ export function DesignEditor({
   )
 
   function setSlot(key: string, text: string) {
-    setDirty(true)
     setNote(null)
     setDoc((current) => {
       const pages = current.pages.map((p, index) =>
@@ -235,7 +275,6 @@ export function DesignEditor({
 
   /** Point a slot at a picture, and read its bytes so the preview is the export. */
   function chooseImage(key: string, assetId: string) {
-    setDirty(true)
     setNote(null)
     setDoc((current) => ({
       ...current,
@@ -262,7 +301,6 @@ export function DesignEditor({
    * refusing to draw.
    */
   function clearImage(key: string) {
-    setDirty(true)
     setNote(null)
     setDoc((current) => ({
       ...current,
@@ -291,7 +329,6 @@ export function DesignEditor({
       if (next !== current) setPageAt(next.pages.length - 1)
       return next
     })
-    setDirty(true)
   }
 
   /** Remove the slide being edited. The last one cannot go; the button is absent there. */
@@ -302,7 +339,6 @@ export function DesignEditor({
       if (next !== current) setPageAt(Math.max(0, activeIndex - 1))
       return next
     })
-    setDirty(true)
   }
 
   /** Keep this design as a starting point, or put it back among the designs. */
@@ -321,22 +357,18 @@ export function DesignEditor({
     })
   }
 
+  /**
+   * Write it down now, and tell the gallery.
+   *
+   * The same flush the autosave uses, so a press mid-pause cannot race the
+   * timer into two writes. What the button adds is the `router.refresh()` the
+   * autosave deliberately does not do: a new title has to reach the gallery,
+   * but not on every pause in a sentence.
+   */
   function save() {
     setNote(null)
     startSave(async () => {
-      const result = await saveDesign({
-        id: design.id,
-        title,
-        presetId: design.preset_id,
-        doc,
-      })
-      if (result.ok) {
-        setDirty(false)
-        setNote('Saved.')
-        router.refresh()
-        return
-      }
-      setNote(result.message)
+      if (await autosave.flush()) router.refresh()
     })
   }
 
@@ -353,14 +385,9 @@ export function DesignEditor({
     setNote(null)
     setExported(null)
     startExport(async () => {
-      if (dirty) {
-        const saved = await saveDesign({ id: design.id, title, presetId: design.preset_id, doc })
-        if (!saved.ok) {
-          setNote(saved.message)
-          return
-        }
-        setDirty(false)
-      }
+      // Through the same flush, so an export pressed while the autosave timer
+      // is running cannot become two writes of the same row.
+      if (!(await autosave.flush())) return
 
       // The page being LOOKED AT, not page one. Exporting a slide a person
       // cannot see would hand them a picture of something else.
@@ -457,7 +484,6 @@ export function DesignEditor({
             value={title}
             onChange={(event) => {
               setTitle(event.target.value.slice(0, 80))
-              setDirty(true)
             }}
             maxLength={80}
             className="surface-ring h-input rounded-sm bg-surface px-3 type-body focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
@@ -512,7 +538,11 @@ export function DesignEditor({
           })}
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={save} loading={saving} disabled={!dirty && note === null}>
+          {/* Still here, and still the way to make a failed save try again. What
+              it no longer is, is the only thing standing between a few minutes
+              of typing and losing it: the design is written down whenever
+              somebody stops typing and on every way out of this screen. */}
+          <Button onClick={save} loading={saving} disabled={!dirty}>
             Save design
           </Button>
           <Button
@@ -551,6 +581,17 @@ export function DesignEditor({
               {DELETE_CANCEL}
             </Button>
           ) : null}
+          {/* One line for both, and the save state first, because a save that
+              failed is the sentence somebody has to act on. `note` carries what
+              the pickers and the export said. */}
+          {saveSaid === null ? null : (
+            <span
+              role="status"
+              className={`type-sm ${autosave.state.kind === 'failed' ? 'text-ink' : 'text-muted'}`}
+            >
+              {saveSaid}
+            </span>
+          )}
           {note === null ? null : (
             <span role="status" className="type-sm text-muted">
               {note}
