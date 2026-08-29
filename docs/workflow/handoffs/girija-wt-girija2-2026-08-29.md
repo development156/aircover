@@ -572,3 +572,54 @@ the merge was clean and re-gated. All three branches are now `4f8cb9a1`.
 **The lesson is the ordering.** Promoting lane → core → web as three separate
 pushes means a rejection partway through can leave production ahead of the
 trunk. Fetch and reconcile BEFORE the first push, not after the third.
+
+---
+
+## The smoke leg cannot run in CI either, and nobody had tried (`run 981`)
+
+GitHub Actions came back, so the outstanding item of this whole session went to
+a runner. The result is not the one anyone expected.
+
+| leg | result |
+| --- | ------ |
+| typecheck · lint · test | **PASS**, 6m39s on `ubuntu-latest` |
+| root vitest | **PASS** |
+| prettier | **PASS** |
+| Playwright @smoke | **REFUSED at its own guard, in 17 seconds** |
+
+**MEASURED**, run 981 on `wt-girija2` at `eae5c5b8`, dispatched with
+`ack_target=rloztdhzfliyvpvxsgjl`: step 6, `Refuse without the keys the suite
+needs`, exits 1 naming **all three** as absent.
+
+```
+Repository secrets are not configured: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+                                       CLERK_SECRET_KEY
+                                       NEXT_PUBLIC_SUPABASE_URL
+```
+
+The runner's own env block prints all three empty, so this is not a masking
+artefact. **No repository secrets are configured at all.** The job has never
+once reached the step that installs Chromium.
+
+`CLAUDE.md` has told every session for days to "run the smoke leg in CI before
+merging this lane". That instruction has been **unexecutable since the workflow
+landed**, and it took someone dispatching it to find out. A plan written in the
+present tense reads exactly like a measurement, which is the same defect as a
+stale number on a screen. The sentence now carries what actually happens.
+
+**This is a settings problem and it stays reported rather than worked around.**
+A person with repository admin adds the three under Settings → Secrets and
+variables → Actions. Per the team rules: do not inline a key, do not relax the
+guard, do not un-skip a spec that skipped for want of one.
+
+**Until those three exist, this project has no automated way to run its own
+end-to-end suite** — not in the cloud sandbox, where Chromium has no outbound
+443, and not in CI. The last real smoke run remains 2026-08-24: 115 passed,
+15.6 minutes, on somebody's laptop.
+
+### Two earlier red runs were the outage, not the code
+
+Runs on `4f8cb9a1` and `eae5c5b8` at 20:08 and 20:09 both failed in **two
+seconds** with no downloadable log, which is a job that never ran a step.
+Re-running after the outage lifted turned the same commit green. Recorded so
+nobody bisects a phantom.
