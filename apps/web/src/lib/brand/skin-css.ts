@@ -54,21 +54,52 @@ import type { ThemeTokens } from '@sahoda/shared'
  *
  * `:root[data-brand-skin='on']` is 0,1,1 against `tokens.css`'s bare `:root` at
  * 0,0,1, so the brand wins while it is on with no `!important` and no dependence
- * on where a build puts a stylesheet. It says nothing about `data-theme`, which
- * is why light and dark stay entirely the theme toggle's business: the two
- * attributes are answers to two different questions and compose freely.
+ * on where a build puts a stylesheet.
+ *
+ * ── IT READS THE THEME, AND STILL DOES NOT OWN IT ───────────────────────────
+ * An earlier version of this paragraph said the rule "says nothing about
+ * `data-theme`", and treated that as the separation. It was wrong, and the
+ * founder's screenshot is what proved it: a brand derived only for a light
+ * surface, applied over the dark theme, produced a near-white card carrying
+ * near-white text.
+ *
+ * Reading the theme is not owning it. The moon and sun remain the only control
+ * that decides light against dark; this rule never sets `data-theme` and never
+ * defines a neutral. What it does now is answer the brand question SEPARATELY
+ * for each surface, which is what "separate them" actually requires.
  */
 export const SKIN_SCOPE = ":root[data-brand-skin='on']"
 
 export function skinCss(theme: ThemeTokens | null, scope: string = SKIN_SCOPE): string {
   if (!theme) return ''
 
-  const vars = brandSkinVars([theme.primary, theme.accent])
-  const body = Object.entries(vars)
-    .map(([name, value]) => `${name}:${value}`)
-    .join(';')
+  const colors = [theme.primary, theme.accent]
 
-  return `${scope}{${body}}`
+  /**
+   * ── TWO RULES, AND THE SECOND ONE IS THE BUG REPORT ─────────────────────────
+   * Founder's report with a screenshot: the selected plan card was a near-white
+   * fill carrying near-white text, and the day/night toggle looked like it was
+   * changing the BRAND rather than the theme.
+   *
+   * One rule was the whole cause, twice over. The derivation graded everything
+   * against white, so the tints came back near-white whatever the theme, and in
+   * dark `--ink` is `#ffffff`. And `:root[data-brand-skin='on']` is (0,1,1)
+   * while `tokens.css`'s `:root[data-theme='dark']` is ALSO (0,1,1) — a tie,
+   * broken by document order, and this style is inlined in the body AFTER the
+   * stylesheet. So the light-only brand values beat the dark block outright.
+   * That is exactly what "the day/night toggle is getting applied on the Brand
+   * Skin" describes, and it was right.
+   *
+   * The dark rule carries both attributes, so it is (0,2,1): it beats the dark
+   * block AND the light brand rule, by SPECIFICITY, with nothing resting on
+   * where a build happens to put a stylesheet.
+   */
+  const rule = (selector: string, s: Parameters<typeof brandSkinVars>[1]) =>
+    `${selector}{${Object.entries(brandSkinVars(colors, s))
+      .map(([name, value]) => `${name}:${value}`)
+      .join(';')}}`
+
+  return `${rule(scope, 'light')}${rule(`${scope}[data-theme='dark']`, 'dark')}`
 }
 
 /**
@@ -78,9 +109,12 @@ export function skinCss(theme: ThemeTokens | null, scope: string = SKIN_SCOPE): 
  * regular expression, and so the "seven and no more" rule is checkable rather
  * than merely stated.
  */
-export function skinVarNames(theme: ThemeTokens | null): string[] {
+export function skinVarNames(
+  theme: ThemeTokens | null,
+  surface: Parameters<typeof brandSkinVars>[1] = 'light',
+): string[] {
   if (!theme) return []
-  return Object.keys(brandSkinVars([theme.primary, theme.accent]))
+  return Object.keys(brandSkinVars([theme.primary, theme.accent], surface))
 }
 
 /**
