@@ -13,7 +13,10 @@ import { KillSwitch } from '@/components/loop/kill-switch'
 import { PendingLearnings } from '@/components/loop/learnings'
 import { LoopControls } from '@/components/loop/controls'
 import { PageTitle } from '@/components/page-title'
+import { explain, remedy } from '@/lib/loop/eligibility'
 import { readLoop, type LoopSnapshot } from '@/lib/loop/read'
+import { reflectSentence } from '@/lib/loop/reflect'
+import { loopVerdict } from '@/lib/loop/verdict'
 
 export const metadata = { title: 'The Loop' }
 
@@ -67,6 +70,13 @@ export default async function LoopPage() {
   const chosen: Record<string, AutonomyLevel> = {}
   for (const [channel, level] of snapshot.dial) chosen[channel] = level
 
+  // ── WHY THE LOOP WILL OR WILL NOT PLAN, IN A SENTENCE ─────────────────────
+  // The same `assess()` the Sunday cron uses, so the screen and the schedule
+  // cannot disagree. An eligible workspace gets no notice here — the button is
+  // enabled and its own line already says where the cycle stops.
+  const verdict = loopVerdict(snapshot, new Date())
+  const refusal = verdict.eligible ? null : { sentence: explain(verdict), remedy: remedy(verdict) }
+
   return (
     <div className="space-y-grid">
       <PageTitle sub="A weekly cycle that plans, writes, tests and reports, as far as you let it go on its own.">
@@ -81,6 +91,7 @@ export default async function LoopPage() {
         cycleCost={creditCost('loop_cycle')}
         hasChannels={snapshot.connected.length > 0}
         cycleRunning={Boolean(cycle) && !atHalt && !isOver(cycle?.status)}
+        refusal={refusal}
       />
 
       {/* The cost preview is the whole point of the halt, so it sits above
@@ -181,9 +192,17 @@ function CycleSummary({
 
       {!failed && !cancelled ? (
         <p className="type-sm mt-2 text-muted">
-          {cycle.reflectSkippedNoHistory
-            ? 'It had nothing to reflect on. No post of yours has been measured yet, so there was nothing to learn from.'
-            : 'It read last week’s numbers before planning.'}
+          {/*
+            The stored reason first, because it is the specific one. The
+            boolean is the fallback for cycles that ran before `reflect_reason`
+            existed, and the last sentence is for a cycle that DID produce a
+            learning — three different facts, and the screen used to have two
+            sentences for all three.
+          */}
+          {reflectSentence(cycle.reflectReason) ??
+            (cycle.reflectSkippedNoHistory
+              ? 'It had nothing to reflect on. No post of yours has been measured yet, so there was nothing to learn from.'
+              : 'It read last week’s numbers before planning.')}
         </p>
       ) : null}
 

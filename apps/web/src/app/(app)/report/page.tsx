@@ -4,6 +4,7 @@ import { ObservationNote } from '@/components/brain/observation-note'
 import { PageTitle } from '@/components/page-title'
 import { reflectionWindow } from '@/lib/loop/iso-week'
 import { readBrainObservations, type BrainRead } from '@/lib/brain/read'
+import { brainWaiting } from '@/lib/brain/waiting'
 import { readLoop } from '@/lib/loop/read'
 import { readCycleLearnings, readRanking } from '@/lib/loop/report'
 import { creditWord } from '@/lib/credit-words'
@@ -347,10 +348,7 @@ function BrainBlock({ brain }: { brain: BrainRead }) {
           Finish setting up your workspace and this fills in.
         </p>
       ) : brain.observations.length === 0 ? (
-        <p className="type-body max-w-[68ch] text-muted">
-          Nothing yet. Sahoda looks at your published posts once a week and only says something when
-          the numbers are strong enough to stand behind. That takes a run of posts, not a few.
-        </p>
+        <BrainWaitingNote brain={brain} />
       ) : (
         <ul className="grid gap-2">
           {brain.observations.map((observation) => (
@@ -361,6 +359,50 @@ function BrainBlock({ brain }: { brain: BrainRead }) {
         </ul>
       )}
     </Block>
+  )
+}
+
+/**
+ * WHY THE BLOCK IS EMPTY, WHICH IS A DIFFERENT SENTENCE EVERY WEEK.
+ *
+ * This used to be one static paragraph, and it read identically in week 1 and
+ * week 20 — so a customer whose report had been empty for two months could not
+ * tell a product that is working and waiting from a cron that stopped. The
+ * brain is most invisible exactly when it has run longest with nothing to say,
+ * and that is the moment this note exists for.
+ *
+ * Two claims, never merged: it has never looked here, or it looked on a named
+ * day and is short of something nameable. `lib/brain/waiting.ts` keeps them
+ * apart and its tests pin the separation.
+ */
+function BrainWaitingNote({ brain }: { brain: Extract<BrainRead, { status: 'ok' }> }) {
+  const waiting = brainWaiting(brain.lastPass)
+
+  if (waiting.state === 'never-examined') {
+    return (
+      <p className="type-body max-w-[68ch] text-muted">
+        Sahoda has not looked at this workspace yet. It reads your published posts once a week and
+        only speaks when the numbers are strong enough to stand behind.
+      </p>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="type-body max-w-[68ch] text-muted">
+        Sahoda last looked on <span className="num">{waiting.lastLookedOn}</span> and had nothing it
+        could stand behind.
+      </p>
+      {waiting.reasons.length > 0 && (
+        <ul className="grid gap-1 border-l-2 border-line pl-2.5">
+          {waiting.reasons.map((reason) => (
+            <li key={reason} className="type-sm max-w-[68ch] text-muted">
+              {reason}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 

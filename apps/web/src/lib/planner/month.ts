@@ -34,6 +34,13 @@ const DAY_KEY = new Intl.DateTimeFormat('en-CA', {
   day: '2-digit',
 })
 
+const FULL_DATE = new Intl.DateTimeFormat('en-GB', {
+  timeZone: IST,
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+})
+
 const MONDAY_FIRST = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 /** How many days back the Monday on-or-before `at` is, in IST. */
@@ -42,6 +49,19 @@ function istWeekdayOffset(at: Date): number {
   // An unrecognised weekday would silently shift the whole grid, so fail to 0
   // (start on the day itself) rather than to a wrong offset.
   return index < 0 ? 0 : index
+}
+
+/**
+ * "28 August 2026" — a cell's accessible name.
+ *
+ * A month grid runs from the Monday on or before the 1st, so it holds days from
+ * THREE months and the day-of-month number repeats: a 42-cell August grid has
+ * two cells reading "28". Visually the adjacent-month ones are dimmed, but a
+ * screen reader hears "28, link" twice with nothing to separate them. This is
+ * the name that separates them.
+ */
+export function istFullDate(at: Date): string {
+  return FULL_DATE.format(at)
 }
 
 /** The IST day-of-month number, as displayed in a cell. */
