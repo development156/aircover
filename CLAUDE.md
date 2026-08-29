@@ -128,8 +128,8 @@ integration branch move independently; a stale checkout writes against code that
 no longer exists. If `--ff-only` refuses, the lane has diverged — say so and
 stop, do not merge past it.
 
-**Lanes.** There are nine: `wt-girija`, `wt-girija2`, `wt-girija3` and the same
-for `wt-jiban` and `wt-divas`. A session is started with both facts given, never
+**Lanes.** There are twelve: `wt-girija`, `wt-girija2`, `wt-girija3` and the
+same three for `wt-jiban`, `wt-divas` and `wt-karunesh`. A session is started with both facts given, never
 inferred:
 
 ```
