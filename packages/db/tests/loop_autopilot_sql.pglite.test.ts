@@ -5,6 +5,7 @@ import { bootFullSchema } from './helpers/pglite-tenant'
 
 import {
   ACTIVE_BRAIN_SQL,
+  CANCEL_ANNOUNCEMENT_SQL,
   ARM_FOR_PUBLISH_SQL,
   AUTOPILOT_CANDIDATES_SQL,
   AUTOPILOT_SETTINGS_SQL,
@@ -631,6 +632,132 @@ describe('the autopilot dispatcher SQL against the real schema', () => {
       expect(r.rows).toHaveLength(1)
       // Version 2's payload, not version 1's.
       expect(r.rows[0]?.payload?.field_meta).not.toHaveProperty('taboo.red_lines')
+    })
+  })
+
+  describe('stopping an announced post', () => {
+    const post = 'ba000000-0000-4000-8000-0000000000ba'
+    const variant = 'bb000000-0000-4000-8000-0000000000bb'
+
+    beforeAll(async () => {
+      await db.query(WRITE_DECISION_SQL, [
+        WS,
+        post,
+        variant,
+        'x',
+        'acct-9',
+        null,
+        null,
+        'announced',
+        null,
+        new Date('2030-01-01T09:30:00.000Z').toISOString(),
+      ])
+    }, 120_000)
+
+    it('writes a cancellation and retires the announcement', async () => {
+      const r = await db.query<{ id: string }>(CANCEL_ANNOUNCEMENT_SQL, [WS, post, variant])
+      expect(r.rows).toHaveLength(1)
+
+      const pending = await db.query<{ post_id: string }>(PENDING_ANNOUNCEMENTS_SQL, [WS, 50])
+      expect(pending.rows.map((x) => x.post_id)).not.toContain(post)
+    })
+
+    it('the announcement row SURVIVES — the history is not rewritten', async () => {
+      // The append-only guarantee, asserted rather than assumed. The fact that
+      // this post was going out stays true after somebody stopped it.
+      const rows = await db.query<{ decision: string; actor: string }>(
+        `select decision, actor from loop_autopilot_log
+          where post_id = $1 and variant_id = $2 order by created_at asc`,
+        [post, variant],
+      )
+      expect(rows.rows.map((x) => x.decision)).toEqual(['announced', 'cancelled'])
+      // And the cancellation says a person did it, not the autopilot default.
+      expect(rows.rows[1]?.actor).toBe('person')
+    })
+
+    it("the cancellation copies the announcement's own identifiers", async () => {
+      const rows = await db.query<{ channel: string; account_id: string }>(
+        `select channel, account_id from loop_autopilot_log
+          where post_id = $1 and decision = 'cancelled'`,
+        [post],
+      )
+      expect(rows.rows[0]).toMatchObject({ channel: 'x', account_id: 'acct-9' })
+    })
+
+    it('cancelling twice writes nothing the second time', async () => {
+      const r = await db.query(CANCEL_ANNOUNCEMENT_SQL, [WS, post, variant])
+      expect(r.rows).toHaveLength(0)
+    })
+
+    it('REFUSES to cancel a post that already dispatched, and says so by writing nothing', async () => {
+      const gone = 'bc000000-0000-4000-8000-0000000000bc'
+      await db.query(WRITE_DECISION_SQL, [
+        WS,
+        gone,
+        variant,
+        'x',
+        'acct-9',
+        null,
+        null,
+        'announced',
+        null,
+        new Date('2030-01-01T09:30:00.000Z').toISOString(),
+      ])
+      await db.query(WRITE_DECISION_SQL, [
+        WS,
+        gone,
+        variant,
+        'x',
+        'acct-9',
+        null,
+        null,
+        'dispatched',
+        null,
+        null,
+      ])
+      const r = await db.query(CANCEL_ANNOUNCEMENT_SQL, [WS, gone, variant])
+      expect(r.rows).toHaveLength(0)
+    })
+
+    it('cancels a post whose window has CLOSED but which has not gone out', async () => {
+      // Refusing here would refuse a remedy that would have worked: the sweep
+      // has not reached it, so the post has not been sent. A dispatched row
+      // ends the ability to cancel, not a clock.
+      const late = 'bd000000-0000-4000-8000-0000000000bd'
+      await db.query(WRITE_DECISION_SQL, [
+        WS,
+        late,
+        variant,
+        'x',
+        'acct-9',
+        null,
+        null,
+        'announced',
+        null,
+        new Date('2020-01-01T00:00:00.000Z').toISOString(),
+      ])
+      const r = await db.query(CANCEL_ANNOUNCEMENT_SQL, [WS, late, variant])
+      expect(r.rows).toHaveLength(1)
+    })
+
+    it("never cancels another workspace's announcement", async () => {
+      const theirs = 'be000000-0000-4000-8000-0000000000be'
+      await db.query(WRITE_DECISION_SQL, [
+        WS,
+        theirs,
+        variant,
+        'x',
+        'acct-9',
+        null,
+        null,
+        'announced',
+        null,
+        new Date('2030-01-01T09:30:00.000Z').toISOString(),
+      ])
+      const r = await db.query(CANCEL_ANNOUNCEMENT_SQL, [OTHER, theirs, variant])
+      expect(r.rows).toHaveLength(0)
+      const still = await db.query<{ post_id: string }>(PENDING_ANNOUNCEMENTS_SQL, [WS, 50])
+      expect(still.rows.map((x) => x.post_id)).toContain(theirs)
     })
   })
 })

@@ -279,3 +279,58 @@ export const ACTIVE_BRAIN_SQL = `select payload
  where workspace_id = $1
    and status = 'active'
  limit 1`
+
+/**
+ * STOP ONE ANNOUNCED POST — the tap that makes autopilot humane.
+ *
+ * ── A CANCELLATION IS A NEW ROW, NEVER AN EDIT ───────────────────────────────
+ * `loop_autopilot_log` refuses UPDATE and DELETE even to service_role. That is
+ * not an obstacle to work around here, it is the design: the fact that a post
+ * WAS going out at 09:00 stays true after somebody stops it, and an audit trail
+ * that rewrites its own history is not one.
+ *
+ * ── WHY INSERT ... SELECT AND NOT A READ THEN A WRITE ────────────────────────
+ * Two statements race the dispatcher. Between "is it still pending?" and
+ * "write cancelled", the tick can dispatch it — and the cancellation would then
+ * be recorded against a post that has already gone out, which is a lie in the
+ * one table that exists not to tell them.
+ *
+ * One statement closes that. The SELECT re-derives the announcement and the
+ * NOT EXISTS re-checks for a terminal row, both inside the same statement as
+ * the INSERT, so a dispatch that lands first means zero rows written and the
+ * caller is told the cancel did not take.
+ *
+ * It also copies the identifiers FROM the announcement rather than taking them
+ * from the caller. A cancel row that named a different account or channel from
+ * the announcement it cancels would be unreadable as a pair, and this makes
+ * that impossible rather than merely unlikely.
+ *
+ * ── THE WINDOW IS NOT CHECKED, DELIBERATELY ──────────────────────────────────
+ * A post whose window closed but which the sweep has not reached yet has still
+ * not gone out, and refusing to stop it would be refusing a remedy that would
+ * have worked. What ends the ability to cancel is a `dispatched` row, not a
+ * clock.
+ *
+ * Parameters: $1 workspace_id, $2 post_id, $3 variant_id.
+ */
+export const CANCEL_ANNOUNCEMENT_SQL = `insert into loop_autopilot_log
+       (workspace_id, post_id, variant_id, channel, account_id,
+        brief_id, cycle_id, decision, actor)
+select a.workspace_id, a.post_id, a.variant_id, a.channel, a.account_id,
+       a.brief_id, a.cycle_id, 'cancelled', 'person'
+  from loop_autopilot_log a
+ where a.workspace_id = $1
+   and a.post_id = $2
+   and a.variant_id = $3
+   and a.decision = 'announced'
+   and not exists (
+     select 1 from loop_autopilot_log later
+      where later.workspace_id = a.workspace_id
+        and later.post_id = a.post_id
+        and later.variant_id = a.variant_id
+        and later.decision in ('dispatched', 'cancelled')
+        and later.created_at >= a.created_at
+   )
+ order by a.created_at desc
+ limit 1
+returning id`
