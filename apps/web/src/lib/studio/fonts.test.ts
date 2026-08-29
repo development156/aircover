@@ -33,6 +33,27 @@ import { BUNDLED_FAMILIES, registerStudioFonts, studioFontsDir } from './fonts'
  * equality assertion would then fail for a reason nobody can act on. A
  * substitution moves them by far more than this window: the control at the
  * bottom MEASURES that distance rather than asserting it from memory.
+ *
+ * ── WHAT IT CANNOT SEE ──────────────────────────────────────────────────────
+ * This file reads source (it scans `globals.css`), so it is a scanner and is
+ * subject to `scripts/lib/scanner-registry.test.mjs`'s rule. What it misses:
+ *
+ *  · a `@font-face` reached any way its regex does not name — an `@import`ed
+ *    stylesheet, a rule built by a Tailwind plugin, a `<style>` block in a
+ *    component, or a font loaded through `next/font` in TypeScript. It reads
+ *    ONE file and would certify a page whose real faces are declared elsewhere.
+ *  · a `src:` with several `url()` entries. It checks that every URL it finds
+ *    resolves to a file, so a rule listing a woff2 first and a ttf second would
+ *    be caught by the format assertion but a rule with two ttfs would not tell
+ *    you which one the browser picks.
+ *  · whether the browser actually USES these faces. Everything here about the
+ *    browser half is read off the CSS text; the ink measurements are the
+ *    server's, through sharp. Nothing in this repository renders the preview in
+ *    a real browser, so the two halves are proven to name the same files and
+ *    are not proven to paint the same pixels. That needs Playwright.
+ *  · a font file present, valid and WRONG — the right name over the wrong
+ *    typeface. The fingerprints would shift and this would report a
+ *    substitution, which is the correct alarm for the wrong reason.
  */
 
 /** Greyscale ink means, MEASURED 2026-08-29 with the bundled Noto through sharp 0.35.3. */
