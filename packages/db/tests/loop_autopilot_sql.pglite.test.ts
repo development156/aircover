@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 
 import { bootFullSchema } from './helpers/pglite-tenant'
 
+import { decisionParams } from '../../../apps/web/src/lib/loop/autopilot/decision-params'
 import {
   toAnnouncedForPerson,
   toAnnouncedPost,
@@ -1100,6 +1101,130 @@ describe('the autopilot dispatcher SQL against the real schema', () => {
       // could be satisfied by a row that had lost half its fields.
       expect(() => toAnnouncedPost({ post_id: 'p' })).toThrow(/variant_id/)
       expect(() => toHistoryRow({ decision: 'announced' })).toThrow(/actor|created_at/)
+    })
+  })
+
+  /**
+   * THE TEN ARGUMENTS OF THE WRITE, BOUND BY THE CODE THE DISPATCHER USES.
+   *
+   * Every test above hands `WRITE_DECISION_SQL` a hand-written array, and
+   * `store.ts` built a different array from an object. Both were correct and
+   * nothing compared them. FIVE of the ten are uuid strings — workspace, post,
+   * variant, brief, cycle — so TypeScript sees one type across all five and a
+   * swap of any two compiles and passes every unit test.
+   *
+   * `loop_autopilot_log` refuses UPDATE and DELETE. A row bound wrong is wrong
+   * for good, in the table whose whole purpose is to say what went out and who
+   * decided. So this block builds the array with `decisionParams`, the function
+   * the dispatcher calls, and reads every column back out of a real Postgres.
+   */
+  describe('the decision write, bound through the dispatcher’s own builder', () => {
+    const post = 'f0000000-0000-4000-8000-0000000000f0'
+    const variant = 'f1000000-0000-4000-8000-0000000000f1'
+    // Its own cycle and brief, so brief_id and cycle_id hold DIFFERENT values.
+    // Reusing one id for both would let a swap of the two pass unnoticed, which
+    // is the single most likely mistake in a ten-argument positional bind.
+    const BCYCLE = 'ee000000-0000-4000-8000-0000000000ee'
+    const BRIEF = 'ef000000-0000-4000-8000-0000000000ef'
+
+    beforeAll(async () => {
+      await db.exec(`
+        insert into loop_cycles (id, workspace_id, iso_year, iso_week, status)
+          values ('${BCYCLE}', '${WS}', 2026, 41, 'planning');
+        insert into posts (id, workspace_id, title, status, channels, created_by)
+          values ('${post}', '${WS}', 'A bound post', 'draft', '{x}', '${USER}');
+        insert into loop_briefs (id, workspace_id, cycle_id, title, body, channels, post_id, priority)
+          values ('${BRIEF}', '${WS}', '${BCYCLE}', 'b', 'bb', '{x}', '${post}', 1);
+      `)
+    }, 120_000)
+
+    it('puts each of the ten in the column it names', async () => {
+      const at = new Date('2030-03-03T03:03:03.000Z')
+      await db.query(
+        WRITE_DECISION_SQL,
+        decisionParams({
+          workspaceId: WS,
+          postId: post,
+          variantId: variant,
+          channel: 'x',
+          accountId: 'acct-bind',
+          briefId: BRIEF,
+          cycleId: BCYCLE,
+          decision: 'announced',
+          refusalReason: null,
+          dispatchAfter: at,
+        }),
+      )
+
+      const r = await db.query<{
+        workspace_id: string
+        post_id: string
+        variant_id: string
+        channel: string
+        account_id: string
+        brief_id: string | null
+        cycle_id: string | null
+        decision: string
+        refusal_reason: string | null
+        dispatch_after: string
+      }>(
+        `select workspace_id, post_id, variant_id, channel, account_id,
+                brief_id, cycle_id, decision, refusal_reason, dispatch_after
+           from loop_autopilot_log
+          where post_id = $1 and variant_id = $2`,
+        [post, variant],
+      )
+
+      expect(r.rows).toHaveLength(1)
+      const row = r.rows[0]!
+      // Named one by one on purpose. A single toEqual on the whole object would
+      // still pass if two same-typed columns were swapped in BOTH the builder and
+      // the expectation, which is exactly the mistake this guards.
+      expect(row.workspace_id).toBe(WS)
+      expect(row.post_id).toBe(post)
+      expect(row.variant_id).toBe(variant)
+      expect(row.channel).toBe('x')
+      expect(row.account_id).toBe('acct-bind')
+      expect(row.brief_id).toBe(BRIEF)
+      expect(row.cycle_id).toBe(BCYCLE)
+      expect(row.decision).toBe('announced')
+      expect(row.refusal_reason).toBeNull()
+      expect(new Date(row.dispatch_after).toISOString()).toBe(at.toISOString())
+    })
+
+    it('lets the database refuse an announcement with no window', async () => {
+      // The builder writes null rather than inventing a time, so the migration's
+      // CHECK is what says no. If this ever resolves, the guard moved out of the
+      // database and into a file the next caller does not inherit.
+      await expect(
+        db.query(
+          WRITE_DECISION_SQL,
+          decisionParams({
+            workspaceId: WS,
+            postId: 'ec000000-0000-4000-8000-0000000000ec',
+            variantId: variant,
+            channel: 'x',
+            accountId: 'acct-bind',
+            decision: 'announced',
+          }),
+        ),
+      ).rejects.toThrow()
+    })
+
+    it('lets the database refuse a refusal that names no guardrail', async () => {
+      await expect(
+        db.query(
+          WRITE_DECISION_SQL,
+          decisionParams({
+            workspaceId: WS,
+            postId: 'ed000000-0000-4000-8000-0000000000ed',
+            variantId: variant,
+            channel: 'x',
+            accountId: 'acct-bind',
+            decision: 'refused',
+          }),
+        ),
+      ).rejects.toThrow()
     })
   })
 })
