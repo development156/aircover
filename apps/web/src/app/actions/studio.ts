@@ -30,12 +30,17 @@ import {
   planExport,
   type ExistingCopy,
 } from '@/lib/studio/export-copy'
-import { resolvePageImages } from '@/lib/studio/images'
+import { imageDataUri, resolvePageImages } from '@/lib/studio/images'
 import { studioPalette } from '@/lib/studio/palette'
 import { rasterisePng } from '@/lib/studio/raster'
-import type { DeleteDesignState, ExportDesignState, SaveDesignState } from '@/lib/studio/state'
+import type {
+  DeleteDesignState,
+  DesignPhotoState,
+  ExportDesignState,
+  SaveDesignState,
+} from '@/lib/studio/state'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { workspaceForWrite } from '@/lib/workspaces'
+import { activeWorkspaceRead, workspaceForWrite } from '@/lib/workspaces'
 
 /**
  * THE STUDIO'S WRITES.
@@ -72,6 +77,16 @@ const REFUSALS = {
   notFound: 'That design is not in this workspace.',
   deleteFailed: 'This design could not be deleted. Nothing was changed.',
 } as const
+
+/**
+ * One sentence for every reason a picture cannot be shown, and that is
+ * deliberate rather than lazy: the reasons are "not in this workspace", "in the
+ * trash", "bytes unreadable" and "not an image type", and telling a person
+ * which would describe our storage to them. What they can act on is the same in
+ * all four, and it is what this says.
+ */
+const PHOTO_REFUSAL =
+  'That picture could not be opened, so it was not added to this design. It may have been deleted from your library.'
 
 /**
  * Create or update a design.
@@ -500,4 +515,28 @@ async function removeExportObject(
     // dangling in front of anybody. Reporting a cleanup failure over the
     // original one would bury the reason the export failed.
   }
+}
+
+/**
+ * The bytes of one picture, for the editor's preview.
+ *
+ * ── WHY THE EDITOR CANNOT JUST USE THE PICKER'S URL ─────────────────────────
+ * The preview is the SAME SVG string the export rasterises, and the renderer
+ * refuses any href that is not a data URI. A signed URL in the preview would
+ * make the picture appear on screen and vanish from the exported file, which is
+ * the exact class of failure the studio is built to make impossible.
+ *
+ * Fetched on demand rather than embedded in the page: a design with a 5 MB
+ * photo would otherwise put 7 MB of base64 into the HTML of every visit.
+ */
+export async function designPhoto(assetId: unknown): Promise<DesignPhotoState> {
+  const id = z.uuid().safeParse(assetId)
+  if (!id.success) return { ok: false, message: PHOTO_REFUSAL }
+
+  const workspace = await activeWorkspaceRead()
+  if (workspace.status !== 'ok') return { ok: false, message: PHOTO_REFUSAL }
+
+  const dataUri = await imageDataUri(id.data, workspace.workspace.id)
+  if (dataUri === null) return { ok: false, message: PHOTO_REFUSAL }
+  return { ok: true, dataUri }
 }

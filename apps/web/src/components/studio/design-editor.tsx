@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   charBudgetFor,
@@ -10,6 +10,7 @@ import {
   renderSvg,
   slotLabelOf,
   templateById,
+  imageIdOf,
   type DesignDocument,
   type Palette,
   type StudioDesign,
@@ -18,9 +19,11 @@ import {
 
 import Link from 'next/link'
 
-import { deleteDesign, exportDesign, saveDesign } from '@/app/actions/studio'
+import { deleteDesign, designPhoto, exportDesign, saveDesign } from '@/app/actions/studio'
+import { PhotoPicker } from '@/components/studio/photo-picker'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import type { PhotoListRead } from '@/lib/studio/read'
 
 /**
  * THE EDITOR. TYPE ON THE LEFT, SEE IT ON THE RIGHT, INSTANTLY.
@@ -42,7 +45,15 @@ import { Textarea } from '@/components/ui/textarea'
  * start: the browser and the server measure text differently, and the moment
  * one of them wraps, this preview stops being the export.
  */
-export function DesignEditor({ design, palette }: { design: StudioDesign; palette: Palette }) {
+export function DesignEditor({
+  design,
+  palette,
+  photos,
+}: {
+  design: StudioDesign
+  palette: Palette
+  photos: PhotoListRead
+}) {
   const router = useRouter()
   const [doc, setDoc] = useState<DesignDocument>(design.doc)
   const [title, setTitle] = useState(design.title)
@@ -56,11 +67,75 @@ export function DesignEditor({ design, palette }: { design: StudioDesign; palett
    * a sentence about a file the person then has to hunt for.
    */
   const [exported, setExported] = useState<{ message: string; href: string | null } | null>(null)
+  /**
+   * The BYTES of each chosen picture, keyed by slot, for the preview.
+   *
+   * Not held in the document and never sent back with it: the document stores
+   * an asset ID, and these are fetched from it. Keeping the two apart is what
+   * stops a stale base64 blob from being saved into a row and outliving the
+   * file it came from.
+   */
+  const [photoBytes, setPhotoBytes] = useState<Record<string, string>>({})
+  const [loadingPhoto, startPhoto] = useTransition()
 
   const template = templateById(doc.templateId)
   const preset = presetById(design.preset_id)
 
   const page = doc.pages[0]
+
+  /**
+   * Slot to bytes, built fresh from the document every render.
+   *
+   * Keyed by ASSET ID in state and mapped to slots here, rather than stored per
+   * slot: changing the picture in a slot then cannot leave the previous one's
+   * bytes behind it, which is a preview showing a photograph the design no
+   * longer references.
+   */
+  const slotImages = useMemo(() => {
+    if (page === undefined) return {}
+    const map: Record<string, string> = {}
+    for (const key of Object.keys(page.slots)) {
+      const assetId = imageIdOf(page, key)
+      if (assetId === null) continue
+      const bytes = photoBytes[assetId]
+      if (bytes !== undefined) map[key] = bytes
+    }
+    return map
+  }, [page, photoBytes])
+
+  /**
+   * Fetch the bytes of any picture the design references and this editor has
+   * not read yet.
+   *
+   * Bytes rather than the picker's signed URL, because the preview is the SAME
+   * string the export rasterises and the renderer refuses anything but a data
+   * URI. A picture that cannot be read leaves its slot EMPTY rather than
+   * half-drawn, and `composeScene` then refuses the whole design, which is
+   * exactly what the export would do.
+   */
+  useEffect(() => {
+    if (page === undefined) return
+    const wanted = Object.keys(page.slots)
+      .map((key) => imageIdOf(page, key))
+      .filter((id): id is string => id !== null && photoBytes[id] === undefined)
+    if (wanted.length === 0) return
+
+    let cancelled = false
+    void (async () => {
+      for (const assetId of wanted) {
+        const result = await designPhoto(assetId)
+        if (cancelled) return
+        if (result.ok) {
+          setPhotoBytes((current) => ({ ...current, [assetId]: result.dataUri }))
+        } else {
+          setNote(result.message)
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [page, photoBytes])
 
   const svg = useMemo(() => {
     if (template === null || preset === null || page === undefined) return null
@@ -68,6 +143,7 @@ export function DesignEditor({ design, palette }: { design: StudioDesign; palett
       width: preset.width,
       height: preset.height,
       palette,
+      images: slotImages,
     })
     if (!composed.ok) {
       return {
@@ -75,7 +151,7 @@ export function DesignEditor({ design, palette }: { design: StudioDesign; palett
       }
     }
     return { markup: renderSvg(composed.scene) }
-  }, [template, preset, page, palette])
+  }, [template, preset, page, palette, slotImages])
 
   if (template === null || preset === null || page === undefined) {
     return (
@@ -100,6 +176,45 @@ export function DesignEditor({ design, palette }: { design: StudioDesign; palett
       )
       return { ...current, pages }
     })
+  }
+
+  /** Point a slot at a picture, and read its bytes so the preview is the export. */
+  function chooseImage(key: string, assetId: string) {
+    setDirty(true)
+    setNote(null)
+    setDoc((current) => ({
+      ...current,
+      pages: current.pages.map((p, index) =>
+        index === 0
+          ? { ...p, slots: { ...p.slots, [key]: { kind: 'image' as const, assetId } } }
+          : p,
+      ),
+    }))
+    if (photoBytes[assetId] !== undefined) return
+    startPhoto(async () => {
+      const result = await designPhoto(assetId)
+      if (result.ok) setPhotoBytes((current) => ({ ...current, [assetId]: result.dataUri }))
+      else setNote(result.message)
+    })
+  }
+
+  /**
+   * Take the picture out of a slot.
+   *
+   * Back to `empty`, which is a slot nobody filled, and NOT to a text slot with
+   * an empty string. `document.ts` keeps those apart deliberately, and a
+   * template's image block reads the empty one as "no picture here" rather than
+   * refusing to draw.
+   */
+  function clearImage(key: string) {
+    setDirty(true)
+    setNote(null)
+    setDoc((current) => ({
+      ...current,
+      pages: current.pages.map((p, index) =>
+        index === 0 ? { ...p, slots: { ...p.slots, [key]: { kind: 'empty' as const } } } : p,
+      ),
+    }))
   }
 
   function save() {
@@ -183,6 +298,21 @@ export function DesignEditor({ design, palette }: { design: StudioDesign; palett
             className="surface-ring h-input rounded-sm bg-surface px-3 type-body focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           />
         </label>
+
+        {template.slots
+          .filter((slot) => slot.kind === 'image')
+          .map((slot) => (
+            <div key={slot.key} className="flex flex-col gap-1">
+              <span className="type-sm text-muted">{slot.label}</span>
+              <PhotoPicker
+                read={photos}
+                chosen={imageIdOf(page, slot.key)}
+                onChoose={(assetId) => chooseImage(slot.key, assetId)}
+                onClear={() => clearImage(slot.key)}
+                busy={loadingPhoto || saving || exporting}
+              />
+            </div>
+          ))}
 
         {template.slots
           .filter((slot) => slot.kind === 'text')

@@ -6,7 +6,7 @@ import { PageTitle } from '@/components/page-title'
 import { DesignEditor } from '@/components/studio/design-editor'
 import { activeThemeTokens } from '@/lib/brand/read-theme'
 import { describePaletteFallback, studioPalette } from '@/lib/studio/palette'
-import { readDesign } from '@/lib/studio/read'
+import { readDesign, readStudioPhotos } from '@/lib/studio/read'
 import { activeWorkspaceRead } from '@/lib/workspaces'
 
 export const metadata = { title: 'Design' }
@@ -25,9 +25,13 @@ export default async function DesignPage({ params }: { params: Promise<{ id: str
   const { id } = await params
   const workspace = await activeWorkspaceRead()
 
-  const [read, tokens] = await Promise.all([
+  // One batch, three independent reads. The pictures are read here rather than
+  // inside the editor because a client component cannot read the library, and
+  // sequentially would make opening a design wait for a list it may not use.
+  const [read, tokens, photos] = await Promise.all([
     readDesign(id),
     workspace.status === 'ok' ? activeThemeTokens(workspace.workspace.id) : Promise.resolve(null),
+    readStudioPhotos(),
   ])
 
   if (read.status === 'not-found') notFound()
@@ -55,7 +59,7 @@ export default async function DesignPage({ params }: { params: Promise<{ id: str
               {paletteNote}
             </p>
           )}
-          <DesignEditor design={read.design} palette={resolved.palette} />
+          <DesignEditor design={read.design} palette={resolved.palette} photos={photos} />
         </>
       ) : (
         <>

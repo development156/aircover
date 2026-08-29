@@ -39,3 +39,13 @@ export type DeleteDesignState = { ok: true } | { ok: false; message: string }
 export type ExportDesignState =
   | { ok: true; outcome: 'stored' | 'already' | 'in-trash'; assetId: string; message: string }
   | { ok: false; message: string }
+
+/**
+ * A picture handed to the editor's preview.
+ *
+ * The BYTES, not an address: the preview renders the same SVG the export will,
+ * and `svg.ts` refuses any href that is not a data URI. So the editor cannot be
+ * given a signed URL here even though the picker beside it uses one. The two
+ * are different jobs and this is the one that has to match the export.
+ */
+export type DesignPhotoState = { ok: true; dataUri: string } | { ok: false; message: string }

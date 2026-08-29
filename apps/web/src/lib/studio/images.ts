@@ -34,6 +34,44 @@ import { createServerSupabase } from '@/lib/supabase/server'
 /** The MIME types this product will put in front of the rasteriser, proven from bytes. */
 const RENDERABLE = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
 
+/**
+ * One picture, as a data URI, or null when this workspace cannot produce it.
+ *
+ * Null covers every reason on purpose: not in this workspace, in the trash,
+ * bytes unreadable, or not an image type the rasteriser takes. The caller says
+ * what that means for what it was doing, and no caller may render a slot it did
+ * not get bytes for.
+ */
+export async function imageDataUri(assetId: string, workspaceId: string): Promise<string | null> {
+  try {
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase
+      .from('assets')
+      .select('storage_path')
+      .eq('workspace_id', workspaceId)
+      .eq('id', assetId)
+      .is('deleted_at', null)
+      .maybeSingle()
+
+    if (error || !data) return null
+    const path = typeof data.storage_path === 'string' ? data.storage_path : null
+    if (path === null) return null
+
+    const download = await supabase.storage.from(MEDIA_BUCKET).download(path)
+    if (download.error || !download.data) return null
+
+    const bytes = new Uint8Array(await download.data.arrayBuffer())
+    // The type comes from the BYTES, never from the `mime` column. A row can
+    // say anything; this is what the rasteriser is actually about to read.
+    const sniffed = sniffImage(bytes)
+    if (!sniffed.ok || !RENDERABLE.has(sniffed.image.mime)) return null
+
+    return `data:${sniffed.image.mime};base64,${Buffer.from(bytes).toString('base64')}`
+  } catch {
+    return null
+  }
+}
+
 export type ResolvedImages = {
   /** Slot key to data URI, for every slot whose bytes were read. */
   images: Record<string, string>
@@ -69,51 +107,16 @@ export async function resolvePageImages(
   const images: Record<string, string> = {}
   const missing: string[] = []
 
-  try {
-    const supabase = createServerSupabase()
-    const { data, error } = await supabase
-      .from('assets')
-      .select('id, storage_path, deleted_at')
-      .eq('workspace_id', workspaceId)
-      .in('id', [...wanted.keys()])
-      .is('deleted_at', null)
-
-    if (error || !data) return { images: {}, missing: [...wanted.keys()] }
-
-    const paths = new Map<string, string>()
-    for (const row of data) {
-      const id = typeof row.id === 'string' ? row.id : null
-      const path = typeof row.storage_path === 'string' ? row.storage_path : null
-      if (id !== null && path !== null) paths.set(id, path)
+  // One read per DISTINCT asset, not per slot: two slots pointing at the same
+  // photo are one download. A template with more than a couple of pictures does
+  // not exist yet, so a batched read would be an optimisation of nothing.
+  for (const [assetId, slotKeys] of wanted) {
+    const href = await imageDataUri(assetId, workspaceId)
+    if (href === null) {
+      missing.push(assetId)
+      continue
     }
-
-    for (const [assetId, slotKeys] of wanted) {
-      const path = paths.get(assetId)
-      if (path === undefined) {
-        missing.push(assetId)
-        continue
-      }
-
-      const download = await supabase.storage.from(MEDIA_BUCKET).download(path)
-      if (download.error || !download.data) {
-        missing.push(assetId)
-        continue
-      }
-
-      const bytes = new Uint8Array(await download.data.arrayBuffer())
-      // The type comes from the BYTES, never from the `mime` column. A row can
-      // say anything; this is what the rasteriser is actually about to read.
-      const sniffed = sniffImage(bytes)
-      if (!sniffed.ok || !RENDERABLE.has(sniffed.image.mime)) {
-        missing.push(assetId)
-        continue
-      }
-
-      const href = `data:${sniffed.image.mime};base64,${Buffer.from(bytes).toString('base64')}`
-      for (const key of slotKeys) images[key] = href
-    }
-  } catch {
-    return { images: {}, missing: [...wanted.keys()] }
+    for (const key of slotKeys) images[key] = href
   }
 
   return { images, missing }
