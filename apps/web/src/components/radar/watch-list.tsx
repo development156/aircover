@@ -1,9 +1,15 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { AtSign, Building2, MapPin, Trash2 } from 'lucide-react'
-import { creditCost } from '@sahoda/shared'
-
+import {
+  AtSign,
+  Building2,
+  MapPin,
+  SendHorizontal,
+  ShieldCheck,
+  Target,
+  Trash2,
+} from 'lucide-react'
 import { addCompetitor, removeCompetitor } from '@/app/actions/radar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -45,14 +51,24 @@ const KIND_ICON: Record<CompetitorKind, typeof Building2> = {
   google_business: MapPin,
 }
 
-export function WatchList({ competitors }: { competitors: readonly Competitor[] }) {
+/**
+ * ── ONE COMPONENT BECAME TWO, AND THE SPLIT IS THE LAYOUT'S ────────────────
+ * `WatchList` was a heading, an explanatory paragraph, the list and the form in
+ * one column. The redesign puts the explanation and the counts beside the radar
+ * (`watch-summary.tsx`) and the form a row below it, so the two halves now sit
+ * in different grid cells and cannot be one component.
+ *
+ * They keep separate error state on purpose. A refused delete and a refused add
+ * are different sentences about different rows, and sharing one string meant
+ * removing a competitor could clear the message explaining why the last add
+ * failed — with the half-filled form still on screen.
+ */
+export function WatchForm() {
   const [name, setName] = useState('')
   const [url, setUrl] = useState('')
   const [kind, setKind] = useState<CompetitorKind>('website')
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
-
-  const perScan = creditCost('radar_scan')
 
   function submit(event: React.FormEvent) {
     event.preventDefault()
@@ -68,6 +84,85 @@ export function WatchList({ competitors }: { competitors: readonly Competitor[] 
     })
   }
 
+  return (
+    <section
+      aria-labelledby="radar-add"
+      className="surface-ring flex h-full flex-col gap-4 rounded-card bg-surface p-5"
+    >
+      <div>
+        <h2 id="radar-add" className="type-h3 flex items-center gap-2 text-ink">
+          <Target size={16} strokeWidth={1.8} aria-hidden className="text-accent" />
+          Add something to watch
+        </h2>
+        <p className="type-sm mt-1.5 max-w-[52ch] text-muted">
+          A competitor, a marketplace listing, a website or a public profile.
+        </p>
+      </div>
+
+      <form onSubmit={submit} className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="radar-name">What do you call them?</Label>
+          <Input
+            id="radar-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Sunrise Bakery"
+            autoComplete="off"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="radar-kind">What kind of page is it?</Label>
+          <Select
+            id="radar-kind"
+            value={kind}
+            wrapperClassName="max-w-none"
+            onChange={(e) => setKind(e.target.value as CompetitorKind)}
+          >
+            {(Object.keys(COMPETITOR_KIND_LABELS) as CompetitorKind[]).map((k) => (
+              <option key={k} value={k}>
+                {COMPETITOR_KIND_LABELS[k]}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="radar-url">Their public address</Label>
+          <Input
+            id="radar-url"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://example.com"
+            inputMode="url"
+            autoComplete="off"
+          />
+        </div>
+        {error ? <InlineError>{error}</InlineError> : null}
+        <Button type="submit" loading={pending} className="mt-1 w-full">
+          Add to the watch list
+          <SendHorizontal size={14} aria-hidden />
+        </Button>
+        {/* The reassurance says the CADENCE and the CHARGE, because those are
+            the two things a person hesitates over before naming somebody else's
+            business. "We'll alert you to meaningful changes" on its own is a
+            promise about judgement; this is a statement about a schedule. */}
+        <p className="type-meta flex items-start gap-1.5 text-muted">
+          <ShieldCheck size={13} strokeWidth={1.8} aria-hidden className="mt-icon-nudge shrink-0" />
+          Read once a week. You will see what moved, and a page that will not load is skipped and
+          not charged.
+        </p>
+      </form>
+    </section>
+  )
+}
+
+/**
+ * The businesses already on the list. Its own component and its own error, so a
+ * refused removal is reported next to the rows rather than under the add form.
+ */
+export function WatchRows({ competitors }: { competitors: readonly Competitor[] }) {
+  const [error, setError] = useState<string | null>(null)
+  const [pending, startTransition] = useTransition()
+
   function drop(id: string) {
     setError(null)
     startTransition(async () => {
@@ -79,120 +174,62 @@ export function WatchList({ competitors }: { competitors: readonly Competitor[] 
     })
   }
 
+  if (competitors.length === 0) return null
+
   return (
-    <section aria-labelledby="radar-watchlist" className="flex flex-col gap-3">
-      <div>
-        <h2 id="radar-watchlist" className="type-h2">
-          Who you are watching
-        </h2>
-        <p className="type-body mt-1 max-w-[68ch] text-muted">
-          A public website, Instagram page or Google listing. Each one is read once a week at{' '}
-          <span data-credit-price="radar_scan" className="num">
-            {perScan}
-          </span>{' '}
-          {perScan === 1 ? 'credit' : 'credits'} a scan. A page that will not load is skipped and
-          not charged.
-        </p>
-      </div>
-
-      {competitors.length > 0 ? (
-        <ul className="grid gap-2 wide:grid-cols-2">
-          {competitors.map((competitor) => {
-            const Icon = KIND_ICON[competitor.kind]
-            return (
-              <li
-                key={competitor.id}
-                // `min-w-0` IS LOAD-BEARING, not tidying. These are GRID items,
-                // and a grid item's default `min-width: auto` refuses to shrink
-                // below its content's min-content width — so the `truncate` on
-                // the name never got a chance to act and the row pushed the
-                // whole page to 464px at a 390 viewport. MEASURED, not guessed:
-                // the three offenders in the overflow probe were all this `li`.
-                className="surface-ring flex min-w-0 items-center gap-3 rounded-card bg-surface px-3 py-3"
-              >
-                <Icon size={15} strokeWidth={1.8} aria-hidden className="shrink-0 text-muted" />
-                <span className="min-w-0 flex-1">
-                  <span className="type-sm block truncate text-ink">{competitor.name}</span>
-                  <span className="type-eyebrow block truncate text-muted">
-                    {COMPETITOR_KIND_LABELS[competitor.kind]}
-                    {competitor.lastObservedAt ? (
-                      <>
-                        {' · read '}
-                        <span className="num">{competitor.lastObservedAt.slice(0, 10)}</span>
-                      </>
-                    ) : (
-                      // NOT a dash. "Never read" is a fact about our collector,
-                      // and a dash here would read as "nothing has happened at
-                      // that business" — the exact confusion this screen exists
-                      // to prevent, one component down.
-                      ' · not read yet'
-                    )}
-                  </span>
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => drop(competitor.id)}
-                  disabled={pending}
-                >
-                  <Trash2 size={14} aria-hidden />
-                  <span className="sr-only">Stop watching {competitor.name}</span>
-                  <span aria-hidden>Remove</span>
-                </Button>
-              </li>
-            )
-          })}
-        </ul>
-      ) : null}
-
-      <form
-        onSubmit={submit}
-        className="surface-ring flex flex-col gap-3 rounded-card bg-surface p-4"
-      >
-        <div className="grid gap-3 narrow:grid-cols-2">
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="radar-name">What do you call them?</Label>
-            <Input
-              id="radar-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Sunrise Bakery"
-              autoComplete="off"
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="radar-kind">What kind of page is it?</Label>
-            <Select
-              id="radar-kind"
-              value={kind}
-              onChange={(e) => setKind(e.target.value as CompetitorKind)}
+    <section
+      id="radar-watch-list"
+      aria-label="Businesses you are watching"
+      className="flex flex-col gap-2"
+    >
+      {error ? <InlineError>{error}</InlineError> : null}
+      <ul className="grid gap-2 wide:grid-cols-2">
+        {competitors.map((competitor) => {
+          const Icon = KIND_ICON[competitor.kind]
+          return (
+            <li
+              key={competitor.id}
+              // `min-w-0` IS LOAD-BEARING, not tidying. These are GRID items,
+              // and a grid item's default `min-width: auto` refuses to shrink
+              // below its content's min-content width — so the `truncate` on
+              // the name never got a chance to act and the row pushed the
+              // whole page to 464px at a 390 viewport. MEASURED, not guessed:
+              // the three offenders in the overflow probe were all this `li`.
+              className="surface-ring flex min-w-0 items-center gap-3 rounded-card bg-surface px-3 py-3"
             >
-              {(Object.keys(COMPETITOR_KIND_LABELS) as CompetitorKind[]).map((k) => (
-                <option key={k} value={k}>
-                  {COMPETITOR_KIND_LABELS[k]}
-                </option>
-              ))}
-            </Select>
-          </div>
-        </div>
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="radar-url">Their public address</Label>
-          <Input
-            id="radar-url"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://…"
-            inputMode="url"
-            autoComplete="off"
-          />
-        </div>
-        {error ? <InlineError>{error}</InlineError> : null}
-        <div>
-          <Button type="submit" loading={pending}>
-            Add to the watch list
-          </Button>
-        </div>
-      </form>
+              <Icon size={15} strokeWidth={1.8} aria-hidden className="shrink-0 text-muted" />
+              <span className="min-w-0 flex-1">
+                <span className="type-sm block truncate text-ink">{competitor.name}</span>
+                <span className="type-eyebrow block truncate text-muted">
+                  {COMPETITOR_KIND_LABELS[competitor.kind]}
+                  {competitor.lastObservedAt ? (
+                    <>
+                      {' · read '}
+                      <span className="num">{competitor.lastObservedAt.slice(0, 10)}</span>
+                    </>
+                  ) : (
+                    // NOT a dash. "Never read" is a fact about our collector,
+                    // and a dash here would read as "nothing has happened at
+                    // that business" — the exact confusion this screen exists
+                    // to prevent, one component down.
+                    ' · not read yet'
+                  )}
+                </span>
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => drop(competitor.id)}
+                disabled={pending}
+              >
+                <Trash2 size={14} aria-hidden />
+                <span className="sr-only">Stop watching {competitor.name}</span>
+                <span aria-hidden>Remove</span>
+              </Button>
+            </li>
+          )
+        })}
+      </ul>
     </section>
   )
 }

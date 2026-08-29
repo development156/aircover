@@ -762,3 +762,117 @@
   -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 20px), transparent 100%);
   mask-image: linear-gradient(to bottom, #000 calc(100% - 20px), transparent 100%);
 }
+
+/* ── THE RADAR SCOPE ─────────────────────────────────────────────────────────
+   The animation for `components/radar/radar-scope.tsx`. It lives here rather
+   than in `tokens.css` because it is one screen's decoration, not a token, and
+   `tokens.css` carries an inline-copy regeneration step that a decoration has
+   no business triggering.
+
+   THREE ANIMATIONS AND NOTHING ELSE MOVES. All three animate `transform` and
+   `opacity` only, which the compositor handles without a layout or a paint, so
+   a permanently running radar costs no main-thread work.
+
+   REDUCED MOTION IS ALREADY HANDLED, GLOBALLY, and deliberately not repeated
+   here: `tokens.css` ends with a `prefers-reduced-motion: reduce` block that
+   forces `animation-duration: 0.01ms` and `animation-iteration-count: 1` on
+   everything with `!important`. The sweep therefore lands on its final frame —
+   a full turn, which is where it started — and stops. The rings, the marks and
+   the centre are static geometry, so the face stays completely legible; only
+   the movement goes. A per-component rule here would be a second, weaker copy
+   of that guarantee and would rot the day someone edited one of them. */
+.radar-sweep,
+.radar-mark,
+.radar-mark-glow,
+.radar-core {
+  animation-play-state: paused;
+}
+
+/* The sweep turns ONLY while something is genuinely scanning. `is-scanning` is
+   set from `snapshot.collector !== 'absent'`, so a screen whose weekly
+   collector is not built shows a still radar rather than an animation claiming
+   work nobody is doing. */
+.radar-scope.is-scanning .radar-sweep,
+.radar-scope.is-scanning .radar-mark,
+.radar-scope.is-scanning .radar-mark-glow,
+.radar-scope.is-scanning .radar-core {
+  animation-play-state: running;
+}
+
+.radar-sweep {
+  animation: radar-turn 5s linear infinite;
+}
+
+/* A mark's delay is its own angle as a fraction of the turn, set inline, so its
+   brightest frame is exactly the frame the beam is over it. No timer. */
+.radar-mark,
+.radar-mark-glow {
+  /* WITHOUT THIS, `scale()` ON AN SVG SHAPE IS A TRANSLATION.
+     A transform on an SVG element resolves about the user-space ORIGIN — the
+     top-left of the viewBox — not the shape's own centre, so a mark at (300,
+     120) scaling to 1.35 would leap 105px down and to the right on every beam
+     pass. `fill-box` makes the shape its own reference and `center` puts the
+     origin where a reader expects it. */
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.radar-mark {
+  animation: radar-ping 5s ease-out infinite;
+}
+.radar-mark-glow {
+  animation: radar-ping-glow 5s ease-out infinite;
+  opacity: 0;
+}
+.radar-core {
+  animation: radar-breathe 4s ease-in-out infinite;
+}
+
+@keyframes radar-turn {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Bright for a moment as the beam arrives, then a long settle back. The mark is
+   never invisible: 0.45 at rest is a reading that exists whether or not the
+   beam is looking at it, which is what it is. */
+@keyframes radar-ping {
+  0% {
+    opacity: 1;
+    transform: scale(1.35);
+  }
+  12% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0.62;
+    transform: scale(1);
+  }
+}
+
+@keyframes radar-ping-glow {
+  0% {
+    opacity: 0.3;
+  }
+  25% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes radar-breathe {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
