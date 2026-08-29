@@ -325,6 +325,27 @@ any `<dialog>` assertion that means "the user can see and reach this" is not tes
 | `test:smoke` (Playwright) | **UNRUN** — and this is the one that matters. `playwright test --list --grep @smoke` is unchanged in count, but **17 spec files were rewritten** for the composer rebuild and not one has executed. |
 | CI `typecheck · lint · test · format` | **FAIL** — every attempt, 2-4s each, no log, no step run, no runner ever assigned (`runner_id: 0`, `runner_name: ""`). Four more on this lane's later commits, same shape. The count is deliberately not written as a figure: every push adds two, so a number here is stale before it is read. **The shape is the finding, not the tally.** It is also **not this lane's**: the advisor's own push to `wt-core` at 19:04 UTC (run 33202187815, head `f528a85b`) failed the same way, 3 seconds, and so did the same commit on `claude/advisor-qvz5wn` (run 33202255454). Different branch, different author, different diff, identical shape. |
 
+## Two things that happened AFTER this handoff was written
+
+**1. Another session pushed to this lane, and that is worth knowing about rather
+than worrying about.** At 07:21Z on 29 Aug a merge of `wt-core` into
+`wt-karunesh` appeared that this session did not make (`dd3b1a97`). It was a
+clean fast-forward, purely additive, and it touched **none** of this lane's app
+code — `git diff fa19aba4..dd3b1a97 -- apps/web/src apps/web/e2e` is empty. The
+gate was re-run on the merged head and is green: turbo 27/27, `@sahoda/web` 6126
+passed / 13 skipped, `js-budget` 82 routes. **One person, one lane, at a time** is
+still the rule, and this is the second time this week it has not held.
+
+**2. The trunk's new `ops/account-transfer/` kit turned the format leg RED
+everywhere it landed**, this lane included: 24 files, all the kit's own. Fixed
+here in `1f811f68` by EXCLUDING the directory rather than rewriting it. The
+reasoning matters more than the fix: `rules/ecc/` is a copied third-party rule
+set and `settings.sanitised.json` is an export, so prettier's markdown rewrites
+would make a verbatim copy no longer verbatim — which is precisely why
+`.prettierignore` already excludes `.agents/skills/humanizer/`, in a comment that
+calls the rewrite "a corruption, not a reformat". **The same fix is owed to
+`wt-core`, which is red on this right now.**
+
 ## One more thing the next session needs to know
 
 **`wt-core` is IN, as of `34993fd7`.** This paragraph previously said the merge had been left for
