@@ -7,6 +7,7 @@ import { saveBrandMemory, type BrandMemorySource } from '@/app/actions/brand-res
 import { resolveOnboarding } from '@/app/actions/onboarding-resolve'
 import { saveWorkspaceTheme } from '@/app/actions/theme'
 import { refineWithDoorText } from '@/lib/onboarding/classify'
+import { sendableSources } from '@/lib/onboarding/sources'
 import { storedIntakeFrom } from '@/lib/onboarding/to-stored-intake'
 
 import { doorColors, doorText, type DoorOutcome } from './door-outcome'
@@ -107,6 +108,17 @@ export function useBuild({
    * quietly would leave the person believing a page is being watched.
    */
   const [afterBuildNote, setWatchListNote] = useState<string | null>(null)
+  /**
+   * The logo's BYTES, deliberately outside `data`.
+   *
+   * `data` is serialised to localStorage on every change and a `File` becomes
+   * `{}` there — which is precisely how this screen once ended up persisting a
+   * logo as its filename and uploading nothing. A ref keeps the bytes for as
+   * long as the tab is open and loses them honestly when it is not: the palette
+   * survives the resume because it is strings, the file does not, and the screen
+   * says which it still has.
+   */
+  const logoRef = useRef<File | null>(null)
   const [wasFree, setWasFree] = useState(false)
   const [fallbackMessage, setFallbackMessage] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -135,9 +147,16 @@ export function useBuild({
    * ── AND THE HOLE IS BIGGER HERE THAN IT WAS THERE ───────────────────────────
    * The old flow dispatched through `useActionState`, so React's action queue
    * SERIALISED two presses into two charges. `start` is a bare async function:
-   * two presses run CONCURRENTLY, both reach `resolveOnboarding`, and
-   * `newResolveObjectRef` mints a fresh ledger key per call — so two dispatches
-   * are two charges of `brand_research`.
+   * two presses run CONCURRENTLY and both reach `resolveOnboarding`.
+   *
+   * The ledger key is now bound to the active brain version rather than minted
+   * fresh per call (`lib/brand/resolve-object-ref.ts`), so two concurrent
+   * dispatches would carry the SAME key and settle as one charge. **This guard
+   * is still the one that must hold.** Exactly-once there is a settlement
+   * property, not a scheduling one: two overlapping HOLDs on one key race, the
+   * loser surfaces as a failed build to somebody who pressed a button twice,
+   * and both run a real model call we pay for. The ledger stops the double
+   * charge; this stops the double request.
    *
    * There are FOUR ways in, not one:
    *   · `#next`  "Build my Brand Brain" on the last step
@@ -312,13 +331,14 @@ export function useBuild({
        * rather than sent — a session saved before this screen asked for one
        * comes back holding them, and `addCompetitor` would refuse them anyway.
        */
-      const [watchNote, sourcesNote] = [
+      const [watchNote, sourcesNote, logoNote] = [
         await sendWatchList(data.competitors),
         await sendSources(data.sources, data.sourceUrls),
+        await sendLogo(logoRef.current),
       ]
       // Joined rather than nested: two independent things went wrong or did
       // not, and the reader needs both sentences, not the first one only.
-      setWatchListNote([watchNote, sourcesNote].filter(Boolean).join(' ') || null)
+      setWatchListNote([watchNote, sourcesNote, logoNote].filter(Boolean).join(' ') || null)
       setWasFree(state.kind === 'free')
       setFallbackMessage(state.kind === 'fallback' ? state.message : null)
 
@@ -366,12 +386,14 @@ export function useBuild({
       setThemeError(null)
 
       try {
-        // Declared beats derived: swatches the user MOVED are their statement
-        // about the brand, and the door's extraction is a guess from a page.
-        const declared = data.colorsTouched.length > 0
-        const colors = declared
-          ? [data.colors.Primary, data.colors.Secondary]
-          : doorColors(doorRef.current)
+        /**
+         * The LOGO beats the website. Colours read out of a file somebody chose
+         * are their statement about the brand; the door's extraction is a guess
+         * from a page that may be mostly stock photography. An empty palette
+         * means no logo, or a logo nothing could be read from, and both fall
+         * through to the guess rather than to a theme of nothing.
+         */
+        const colors = data.palette.length > 0 ? data.palette : doorColors(doorRef.current)
         if (colors.length > 0) {
           const themeState = await saveWorkspaceTheme(colors)
           if (!themeState.ok) setThemeError(themeState.message)
@@ -433,6 +455,9 @@ export function useBuild({
     wasFree,
     fallbackMessage,
     afterBuildNote,
+    takeLogo: (file: File) => {
+      logoRef.current = file
+    },
     saving,
     saveError,
     themeError,
@@ -473,9 +498,11 @@ async function sendSources(
   urls: Readonly<Record<string, string>>,
 ): Promise<string | null> {
   const failed: string[] = []
-  for (const key of picked) {
+  // The SAME rule the summary card counts with. See `lib/onboarding/sources.ts`:
+  // when the rule lived only here, the card counted picks and told people about
+  // sources that were never sent.
+  for (const key of sendableSources(picked, urls)) {
     const url = (urls[key] ?? '').trim()
-    if (!url) continue
     try {
       const form = new FormData()
       form.set('url', url)
@@ -489,6 +516,35 @@ async function sendSources(
   }
   if (failed.length === 0) return null
   return `Sahoda could not read ${failed.join(', ')}. Your Brand Brain is saved. Try ${failed.length === 1 ? 'that source' : 'those sources'} again from Knowledge.`
+}
+
+/**
+ * Keep the logo, in the assets library, like any other file.
+ *
+ * The point of asking for a logo rather than three hex fields is that the file
+ * is worth having: it belongs in Assets, where a post or a site can use it. A
+ * version of this that read the colours and dropped the bytes would be the same
+ * defect the colour pickers replaced, wearing a friendlier question.
+ *
+ * AFTER the brain, and it cannot fail the build, for the reason the competitors
+ * and the sources are sent here too: by this line the expensive half is already
+ * paid for.
+ */
+async function sendLogo(file: File | null): Promise<string | null> {
+  if (!file) return null
+  try {
+    const form = new FormData()
+    form.set('file', file)
+    form.set('title', 'Logo')
+    const { uploadAsset } = await import('@/app/actions/assets')
+    const result = await uploadAsset(form)
+    if (result.ok) return null
+    // The COLOURS are already saved and the theme is right either way, so the
+    // sentence says what was lost and what was not.
+    return `Sahoda could not keep your logo file. Your colours are saved. Add it again from Assets.`
+  } catch {
+    return `Sahoda could not keep your logo file. Your colours are saved. Add it again from Assets.`
+  }
 }
 
 /**

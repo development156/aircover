@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 import { useBuild } from './use-build'
-import { DEFAULT_COLORS, DEFAULT_DATA, type OnboardingData } from './store'
+import { DEFAULT_DATA, type OnboardingData } from './store'
 import type { DoorOutcome } from './door-outcome'
 
 /**
@@ -43,7 +43,7 @@ vi.mock('@/app/actions/theme', () => ({ saveWorkspaceTheme }))
 const DOOR: DoorOutcome = { kind: 'none' }
 
 function data(): OnboardingData {
-  return { ...DEFAULT_DATA, colors: { ...DEFAULT_COLORS }, name: 'Chai & Chapters' }
+  return { ...DEFAULT_DATA, name: 'Chai & Chapters' }
 }
 
 function build() {
@@ -78,8 +78,10 @@ describe('one press, one charge', () => {
       void result.current.start()
     })
 
-    // THE MONEY. `newResolveObjectRef` mints a fresh ledger key per call, so a
-    // second call here is a second `brand_research` charge — 50 credits.
+    // THE MONEY. A second call here is a second `brand_research` request. The
+    // ledger key is bound to the brain version, so it would not be a second
+    // 50-credit DEBIT, but two overlapping holds on one key race and both run a
+    // real model call. The double REQUEST is what this stops.
     expect(resolveOnboarding).toHaveBeenCalledTimes(1)
   })
 
