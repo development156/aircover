@@ -137,15 +137,49 @@ export function MediaPeek({ items, postTitle }: MediaPeekProps) {
           title={postTitle}
           description={items.length === 1 ? '1 photo attached' : `${items.length} photos attached`}
         >
-          <div className="space-y-3">
-            {items.map((item) => (
-              <figure key={item.id}>
+          {/* ── ONE PHOTO FLOWS, TWO OR MORE SIT IN A GRID ────────────────────
+              Reported from the screen: two photos stacked one under the other,
+              each `max-h-[60dvh] w-full`, with 12px between them. Two similar
+              images that way read as ONE tall picture being scrolled — the
+              founder could not tell where the first ended and the second began,
+              and the pair in the report were near-identical logos, which is the
+              case this arrangement is worst at and the likeliest case on a
+              post.
+
+              A stack is not wrong because of the gap size. It is wrong because
+              nothing in it says "this is item one and that is item two", so the
+              boundary has to be inferred from the pictures themselves — exactly
+              what a person cannot do when the pictures are alike. The grid puts
+              them side by side, gives each its own edge and its own numbered
+              caption, and the count in the header ("2 photos attached") then has
+              two visibly separate things to refer to.
+
+              `object-contain` on a fixed-ratio cell rather than `object-cover`:
+              cropping would hide part of a picture the reader opened this dialog
+              to look at, and a logo cropped to a square is a different image.
+              The tallest a cell gets is bounded, so a portrait photo does not
+              push the second one off the screen — the defect in miniature. */}
+          <div
+            className={
+              items.length === 1 ? 'space-y-3' : 'grid grid-cols-1 gap-3 narrow:grid-cols-2'
+            }
+          >
+            {items.map((item, i) => (
+              <figure key={item.id} className={items.length === 1 ? undefined : 'min-w-0'}>
                 {item.url !== null ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={item.url}
                     alt={altFor(item.alt, postTitle)}
-                    className="max-h-[60dvh] w-full rounded-input object-contain"
+                    className={
+                      items.length === 1
+                        ? 'max-h-[60dvh] w-full rounded-input object-contain'
+                        : // The ring is what makes two similar photos read as two
+                          // objects rather than one long one. `bg-s2` fills the
+                          // letterboxing `object-contain` leaves, so the edge of
+                          // the cell is visible even where the picture is not.
+                          'surface-ring max-h-[38dvh] w-full rounded-input bg-s2 object-contain'
+                    }
                   />
                 ) : (
                   // Says which of the two nothings this is. "No photo" would be
@@ -159,8 +193,21 @@ export function MediaPeek({ items, postTitle }: MediaPeekProps) {
                     </span>
                   </div>
                 )}
-                {item.alt ? (
-                  <figcaption className="type-meta mt-1.5 text-muted">{item.alt}</figcaption>
+                {/* NUMBERED ONLY WHEN THERE IS SOMETHING TO NUMBER. On a single
+                    photo "Photo 1 of 1" is noise about a fact already on screen.
+                    On two it is the sentence that settles which one is which
+                    when the pictures themselves cannot. The description the
+                    person wrote, if any, follows it. */}
+                {items.length > 1 || item.alt ? (
+                  <figcaption className="type-meta mt-1.5 text-muted">
+                    {items.length > 1 ? (
+                      <span className="tabular-nums">
+                        Photo {i + 1} of {items.length}
+                      </span>
+                    ) : null}
+                    {items.length > 1 && item.alt ? ' · ' : null}
+                    {item.alt}
+                  </figcaption>
                 ) : null}
               </figure>
             ))}
