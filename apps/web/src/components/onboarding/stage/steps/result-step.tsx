@@ -4,6 +4,7 @@ import { ArrowRight, Brain, Check, Sparkles } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 
 import { websiteCell, type DoorOutcome } from '../door-outcome'
+import { sendableSources } from '@/lib/onboarding/sources'
 import { confidenceOf, type OnboardingData } from '../store'
 
 export interface ResultStepProps {
@@ -46,10 +47,20 @@ export function ResultStep({
   onReview,
 }: ResultStepProps) {
   const c = confidenceOf(data)
-  // Sources only. `docs` used to be added here, and an uploaded file was
-  // `{ name, size }` with no bytes — so a person who dropped in three PDFs was
-  // told Sahoda had three more sources to draw on than it had.
-  const knowledge = data.sources.length
+  /**
+   * Sources THAT WILL BE SENT, not sources picked.
+   *
+   * `docs` used to be added here, and an uploaded file was `{ name, size }` with
+   * no bytes, so a person who dropped in three PDFs was told Sahoda had three
+   * more sources to draw on than it had. Removing `docs` fixed that instance and
+   * not the class: this then counted `data.sources.length`, the ticked tiles,
+   * while `sendSources` skips any tile whose address was left blank. Three ticks
+   * and no addresses read as "3 sources" over a library that received nothing.
+   *
+   * `sendableSources` is the sender's own rule, imported rather than restated,
+   * because a copy of a rule is how this came back the first time.
+   */
+  const knowledge = sendableSources(data.sources, data.sourceUrls).length
 
   // Animated from 0 so the bar reads as a measurement being taken. The VALUE is
   // computed above and never moves; only its rendering is deferred a frame.
@@ -65,11 +76,19 @@ export function ResultStep({
     ['Audience', data.audience || '—'],
     ['Website', websiteCell(door, data.site)],
     [
-      'Primary',
-      <>
-        <span className="bb__sw" style={{ background: data.colors.Primary }} />
-        {data.colors.Primary}
-      </>,
+      /* The colour Brand Skin will actually use, which is the FIRST extracted
+         one — `brandSkinVars` reads `colors[0]` as the primary. An empty palette
+         means no logo, or one nothing could be read from, and the dash is this
+         product's absence mark rather than a guess at a colour. */
+      'Brand colour',
+      data.palette[0] ? (
+        <>
+          <span className="bb__sw" style={{ background: data.palette[0] }} />
+          {data.logoName || data.palette[0]}
+        </>
+      ) : (
+        '—'
+      ),
     ],
     ['Knowledge', knowledge ? `${knowledge} source${knowledge === 1 ? '' : 's'}` : 'None yet'],
     [
