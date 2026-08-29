@@ -1,9 +1,11 @@
-import { render, screen } from '@testing-library/react'
-import { describe, expect, test, vi } from 'vitest'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { PostSchema } from '@sahoda/shared'
 
 import { PostCard } from '@/components/posts/post-card'
 import type { ChannelMetrics } from '@/lib/analytics/post-metrics'
+import type { VariantStatusRow } from '@/lib/posts/variant-status'
 import { forDisplay } from '@/lib/posts/display-post'
 
 /**
@@ -33,6 +35,18 @@ import { forDisplay } from '@/lib/posts/display-post'
 vi.mock('@/app/actions/planner', () => ({ approvePost: vi.fn() }))
 vi.mock('@/app/actions/posts', () => ({ savePost: vi.fn(), deletePost: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
+vi.mock('sonner', () => ({ toast: vi.fn() }))
+
+// jsdom implements <dialog> but not `showModal`, which the delete dialog calls.
+beforeEach(() => {
+  HTMLDialogElement.prototype.showModal = function showModal() {
+    this.open = true
+  }
+  HTMLDialogElement.prototype.close = function close() {
+    this.open = false
+    this.dispatchEvent(new Event('close'))
+  }
+})
 
 const NOW = new Date('2026-08-11T12:00:00.000Z')
 
@@ -66,6 +80,25 @@ const metrics: ChannelMetrics[] = [
     },
   },
 ]
+
+/**
+ * A published variant row, as `listVariantStates` hands it over. Built through
+ * a helper rather than by hand at each call site so the ONE field these tests
+ * are about — the permalink — is the only thing that varies between them.
+ */
+function variantRow(channel: 'x' | 'linkedin', permalink: string | null): VariantStatusRow {
+  return {
+    channel,
+    status: 'published',
+    permalink,
+    platformPostId: permalink ? '123' : null,
+    simulated: false,
+    errorMessage: null,
+    errorCode: null,
+    gateRefusal: null,
+    retryable: false,
+  }
+}
 
 function renderBoth() {
   const post = forDisplay(PostSchema.parse(row))
@@ -166,5 +199,81 @@ describe('a compact tile against the full-width row it replaced', () => {
     expect(classes).toContain('h-full')
     expect(classes).toContain('wide:aspect-square')
     expect(classes).not.toContain('narrow:aspect-square')
+  })
+
+  /**
+   * ── THE SEAM BETWEEN THE CARD AND THE DELETE DIALOG ──────────────────────
+   * The dialog says "it has already gone out, and deleting it here does not
+   * take it down" only when the card tells it the post is really live, and the
+   * card decides that from a PERMALINK — the platform's own receipt — never
+   * from a status column. An audit swapped that for `variantStates.length > 0`
+   * (mere presence, the precise defect the card's comment argues against) and
+   * for a flat `false`, and all 265 tests in this folder stayed green.
+   *
+   * Both directions are asserted, because each is a different way to be wrong:
+   * a draft told it is live on a platform it never reached, and a live post let
+   * go believing this takes it off the internet.
+   */
+  test('a post with rows but NO receipt is never told it has gone out', async () => {
+    const user = userEvent.setup()
+    const post = forDisplay(PostSchema.parse(row))
+    render(
+      <PostCard
+        compact
+        post={post}
+        now={NOW}
+        // ── THIS IS THE CASE THAT SEPARATES EVIDENCE FROM PRESENCE ──────────
+        // A row exists and its status word says published, and STILL nothing
+        // came back from the platform. A card deciding on `variantStates.length`
+        // or on the status column says "it has already gone out" here, which is
+        // a claim about somebody else's server that nothing supports. An empty
+        // array cannot catch that mutation — both readings agree on empty — so
+        // the draft case alone left this seam open, MEASURED: swapping the
+        // permalink read for `length > 0` kept every test green until this one.
+        variantStates={[variantRow('x', null)]}
+        metrics={metrics}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: /^Delete .*Monsoon menu$/ }))
+    expect(
+      within(screen.getByRole('dialog')).queryByText(/already gone out/i),
+    ).not.toBeInTheDocument()
+  })
+
+  test('a draft is never told it has gone out', async () => {
+    const user = userEvent.setup()
+    const post = forDisplay(PostSchema.parse(row))
+    render(<PostCard compact post={post} now={NOW} variantStates={[]} metrics={metrics} />)
+
+    await user.click(screen.getByRole('button', { name: /^Delete .*Monsoon menu$/ }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).queryByText(/already gone out/i)).not.toBeInTheDocument()
+  })
+
+  test('a post with a real permalink IS told deleting here does not take it down', async () => {
+    const user = userEvent.setup()
+    const post = forDisplay(PostSchema.parse(row))
+    render(
+      <PostCard
+        compact
+        post={post}
+        now={NOW}
+        // A published row WITHOUT a permalink is deliberately included: it is
+        // the case that separates evidence from presence. If the card ever
+        // decides on `length > 0` or on the status word, this row alone makes
+        // the claim, and the assertion below still passes — so the LinkedIn row
+        // carries the receipt and the X row exists to keep that honest.
+        variantStates={[
+          variantRow('x', null),
+          variantRow('linkedin', 'https://www.linkedin.com/feed/update/123'),
+        ]}
+        metrics={metrics}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: /^Delete .*Monsoon menu$/ }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText(/already gone out/i)).toBeVisible()
   })
 })
