@@ -93,7 +93,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "INPUT=$(cat); [ \"$(printf '%s' \"$INPUT\" | jq -r '.stop_hook_active')\" = 'true' ] && exit 0; pnpm turbo run typecheck test --filter=\"...[origin/main]\" && pnpm format:check || { echo 'Gates failing \u2014 fix before stopping' >&2; exit 2; }"
+            "command": "[ -f scripts/stop-gate.sh ] && bash scripts/stop-gate.sh || exit 0",
+            "timeout": 900,
+            "statusMessage": "Running checks"
           },
           {
             "type": "command",

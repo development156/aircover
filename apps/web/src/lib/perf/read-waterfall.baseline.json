@@ -48,7 +48,6 @@
       "read",
       "soft",
       "read",
-      "readAssets",
       "signMediaPreviews"
     ]
   },
@@ -357,15 +356,7 @@
   },
   {
     "route": "/(app)/report",
-    "awaits": [
-      "decideLanding",
-      "activeWorkspaceRead",
-      "getOpsAdmin",
-      "read",
-      "soft",
-      "read",
-      "readLoop"
-    ]
+    "awaits": ["decideLanding", "activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
   },
   {
     "route": "/(app)/settings",
@@ -427,7 +418,27 @@
   },
   {
     "route": "/(app)/studio",
-    "awaits": ["decideLanding", "activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "activeWorkspaceRead"
+    ]
+  },
+  {
+    "route": "/(app)/studio/[id]",
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "activeWorkspaceRead"
+    ]
   },
   {
     "route": "/(app)/wallet",

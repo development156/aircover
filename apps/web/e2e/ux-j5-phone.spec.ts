@@ -140,9 +140,6 @@ test.describe('ux j5 phone', () => {
     await bootstrap(page)
 
     await timedGoto(page, '/posts/new')
-    const tile = page.locator('[data-channel-tile="instagram"]')
-    await tile.click().catch(() => {})
-    await page.waitForTimeout(2500)
     await shot(page, { journey: JOURNEY, stop: 'P3-composer-phone', width: 390, theme: 'light' })
 
     const body = page.getByLabel('Your post')
@@ -163,6 +160,29 @@ test.describe('ux j5 phone', () => {
       })
       await page.setViewportSize(PHONE)
       await page.waitForTimeout(600)
+
+      // ── AND THE RAIL, ON A PHONE ────────────────────────────────────────────
+      // The three parts of a post stack above the panel at this width rather
+      // than sitting in a column beside it, and picking a platform is a real
+      // journey a person takes on a phone. Photographed after the keyboard
+      // frames, because moving to another part would take the writing box —
+      // the subject of those frames — off the screen.
+      await page
+        .locator('[data-rail-step="2"] button')
+        .click()
+        .catch(() => {})
+      await page.waitForTimeout(1500)
+      await page
+        .locator('[data-channel-tile="instagram"]')
+        .click()
+        .catch(() => {})
+      await page.waitForTimeout(1500)
+      await shot(page, {
+        journey: JOURNEY,
+        stop: 'P5-platform-part-phone',
+        width: 390,
+        theme: 'light',
+      })
     }
   })
 
