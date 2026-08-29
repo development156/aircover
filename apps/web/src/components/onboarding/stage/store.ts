@@ -25,11 +25,34 @@
  */
 import { isCompetitorKind, type CompetitorKind } from '@/lib/radar/types'
 
-/** A colour the user actually moved off its default. See `signalIds`. */
-export type SwatchKey = 'Primary' | 'Secondary' | 'Background'
-
-export const SWATCH_KEYS: readonly SwatchKey[] = ['Primary', 'Secondary', 'Background']
-
+/**
+ * THE COLOURS, AND WHY THERE IS NO PICKER ANY MORE.
+ *
+ * Onboarding used to ask for three colours in `<input type="color">` fields.
+ * Two of them reached `saveWorkspaceTheme`; the third, `Background`, reached
+ * nothing at all — Brand Skin themes seven tokens and the surface is not one of
+ * them (Design System §2, "Neutrals and semantics are fixed"), so a
+ * customer-chosen page background could not be honoured and would be how a
+ * workspace ends up with text nobody can read on it. It still COUNTED as a
+ * signal, raising the confidence meter for an answer the product discarded.
+ *
+ * Rather than delete one field and leave two, the picker went entirely.
+ * Founder's ruling, 2026-08-29: a shop owner does not know their hex codes, and
+ * asking for them is asking somebody to do our work. They know their logo.
+ *
+ * `palette` is what `lib/brand/color-extract.ts#extractPalette` reads out of it,
+ * most frequent colour first, which is exactly the shape `brandSkinVars` wants:
+ * `[0]` becomes the primary and `[1]` the accent. Empty means no logo, or a logo
+ * nothing could be read from, and both fall back to the colours the door pulled
+ * off the website.
+ *
+ * The FILE is deliberately not in here. This object is serialised to
+ * localStorage on every keystroke and a `File` becomes `{}`, which is the exact
+ * shape of the defect this screen already carried once: a logo that persisted as
+ * its filename and was never uploaded. The bytes live in the stage's own state
+ * for as long as the tab is open, and `logoName` is only what the screen shows
+ * after a resume, when the bytes are gone.
+ */
 /**
  * A competitor, in the vocabulary Radar actually stores.
  *
@@ -59,13 +82,10 @@ export interface OnboardingData {
   loc: string
   role: string
   interests: string
-  colors: Record<SwatchKey, string>
-  /**
-   * Which swatches were MOVED. Without this the three defaults would each read
-   * as a signal on a workspace where nobody touched the colour picker — three
-   * invented signals on the one number the design promises is real.
-   */
-  colorsTouched: SwatchKey[]
+  /** Colours read out of the logo, most frequent first. Empty when there is none. */
+  palette: string[]
+  /** What the uploaded file was called, so a resumed tab can say what it had. */
+  logoName: string
   /**
    * What Sahoda must never say about them, in their words.
    *
@@ -93,18 +113,6 @@ export interface OnboardingData {
   competitors: Rival[]
 }
 
-/**
- * The package's own defaults. `#FF6600` is Sahoda orange, which is `--p`; the
- * other two are the ink and ground of the kit. They are DATA (a value in a
- * colour input), not styling, which is why they are spelled out rather than
- * read from a token — a `var(--p)` cannot go in `<input type="color">`.
- */
-export const DEFAULT_COLORS: Record<SwatchKey, string> = {
-  Primary: '#FF6600',
-  Secondary: '#111111',
-  Background: '#FAFAF8',
-}
-
 export const DEFAULT_DATA: OnboardingData = {
   name: '',
   site: '',
@@ -115,8 +123,8 @@ export const DEFAULT_DATA: OnboardingData = {
   loc: '',
   role: '',
   interests: '',
-  colors: { ...DEFAULT_COLORS },
-  colorsTouched: [],
+  palette: [],
+  logoName: '',
   sources: [],
   neverSay: '',
   sourceUrls: {},
@@ -182,7 +190,15 @@ export function signalIds(data: OnboardingData): string[] {
   // uploaded document as `{name, size}` with no bytes, and a reference as a URL
   // no request ever carried. The number on the result screen is a claim about
   // how much Sahoda was told, so counting them overstated it by up to four.
-  for (const key of SWATCH_KEYS) if (data.colorsTouched.includes(key)) ids.push(`color:${key}`)
+  /**
+   * ONE signal for a logo, and only when colours actually came out of it.
+   *
+   * Not "a logo was chosen": a file nothing could be read from reaches the theme
+   * with nothing, and counting the choosing would be the same overstatement this
+   * comment block was written about. `palette` is non-empty only when
+   * `extractPalette` returned colours, so it is the honest test.
+   */
+  if (data.palette.length > 0) ids.push('logo')
   if (data.neverSay.trim()) ids.push('neversay')
   for (const source of data.sources) ids.push(`src:${source}`)
   for (const rival of data.competitors) ids.push(`comp:${rival.name}`)
@@ -238,7 +254,7 @@ export const CAP_LABELS: Record<string, string> = {
   loc: 'Audience',
   role: 'Audience',
   int: 'Audience',
-  color: 'Brand colour',
+  logo: 'Brand colours',
   src: 'Knowledge',
   comp: 'Competitor',
 }
@@ -335,12 +351,6 @@ export function loadState(workspaceId: string): OnboardingState | null {
   const str = (v: unknown): string => (typeof v === 'string' ? v : '')
   const arr = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : [])
 
-  const colors = { ...DEFAULT_COLORS }
-  const savedColors = (saved.colors ?? {}) as Partial<Record<SwatchKey, unknown>>
-  for (const key of SWATCH_KEYS) {
-    if (typeof savedColors[key] === 'string') colors[key] = savedColors[key]
-  }
-
   return {
     step: resumeStep(parsed.step),
     data: {
@@ -353,8 +363,11 @@ export function loadState(workspaceId: string): OnboardingState | null {
       loc: str(saved.loc),
       role: str(saved.role),
       interests: str(saved.interests),
-      colors,
-      colorsTouched: arr<SwatchKey>(saved.colorsTouched).filter((k) => SWATCH_KEYS.includes(k)),
+      /* Strings, so they survive a resume. The logo's BYTES do not, which is
+         why `logoName` is carried beside them: the screen can then say what it
+         read the colours from without implying it still holds the file. */
+      palette: arr<string>(saved.palette).filter((c) => typeof c === 'string'),
+      logoName: str(saved.logoName),
       neverSay: str(saved.neverSay),
       sources: arr<string>(saved.sources).filter((s) => typeof s === 'string'),
       // Values only; the keys are whatever was picked and are checked against
