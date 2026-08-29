@@ -8,6 +8,7 @@ import type { AnnouncedPost } from './dispatch-due'
 import {
   ACTIVE_BRAIN_SQL,
   ARM_FOR_PUBLISH_SQL,
+  CANCEL_ANNOUNCEMENT_SQL,
   AUTOPILOT_CANDIDATES_SQL,
   AUTOPILOT_SETTINGS_SQL,
   DIAL_SQL,
@@ -243,4 +244,24 @@ export async function armForPublish(workspaceId: string, postId: string): Promis
 export async function readActiveBrain(workspaceId: string): Promise<unknown> {
   const r = await getPool().query(ACTIVE_BRAIN_SQL, [workspaceId])
   return (r.rows[0] as { payload: unknown } | undefined)?.payload ?? null
+}
+
+/**
+ * Stop one announced post, and report whether the stop actually took.
+ *
+ * ── FALSE IS AN ANSWER A PERSON NEEDS, NOT AN ERROR ──────────────────────────
+ * It means the post was already dispatched or already cancelled, and the
+ * caller must be able to say which of those happened rather than showing
+ * "stopped" over a post that has gone out. The statement re-derives the
+ * announcement and re-checks for a terminal row inside the same statement as
+ * the insert, so a dispatch that lands first wins the race and this returns
+ * false — the one outcome a read-then-write would have got wrong.
+ */
+export async function cancelAnnouncement(
+  workspaceId: string,
+  postId: string,
+  variantId: string,
+): Promise<boolean> {
+  const r = await getPool().query(CANCEL_ANNOUNCEMENT_SQL, [workspaceId, postId, variantId])
+  return r.rows.length > 0
 }
