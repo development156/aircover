@@ -4,6 +4,7 @@ import { ArrowRight, Brain, Check, Sparkles } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 
 import { websiteCell, type DoorOutcome } from '../door-outcome'
+import { sendableSources } from '@/lib/onboarding/sources'
 import { confidenceOf, type OnboardingData } from '../store'
 
 export interface ResultStepProps {
@@ -46,10 +47,20 @@ export function ResultStep({
   onReview,
 }: ResultStepProps) {
   const c = confidenceOf(data)
-  // Sources only. `docs` used to be added here, and an uploaded file was
-  // `{ name, size }` with no bytes — so a person who dropped in three PDFs was
-  // told Sahoda had three more sources to draw on than it had.
-  const knowledge = data.sources.length
+  /**
+   * Sources THAT WILL BE SENT, not sources picked.
+   *
+   * `docs` used to be added here, and an uploaded file was `{ name, size }` with
+   * no bytes, so a person who dropped in three PDFs was told Sahoda had three
+   * more sources to draw on than it had. Removing `docs` fixed that instance and
+   * not the class: this then counted `data.sources.length`, the ticked tiles,
+   * while `sendSources` skips any tile whose address was left blank. Three ticks
+   * and no addresses read as "3 sources" over a library that received nothing.
+   *
+   * `sendableSources` is the sender's own rule, imported rather than restated,
+   * because a copy of a rule is how this came back the first time.
+   */
+  const knowledge = sendableSources(data.sources, data.sourceUrls).length
 
   // Animated from 0 so the bar reads as a measurement being taken. The VALUE is
   // computed above and never moves; only its rendering is deferred a frame.
