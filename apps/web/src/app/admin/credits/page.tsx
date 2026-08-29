@@ -1,10 +1,16 @@
 import type { Metadata } from 'next'
 
+import { PageTitle } from '@/components/page-title'
 import { CreditsView } from '@/components/admin/credits-view'
 import { requireOpsAdmin } from '@/lib/ops/guard'
 import { readCreditRequests, readOpsAdmins } from '@/lib/ops/read'
 
 export const metadata: Metadata = { title: 'Credits' }
+
+/* One sentence, both branches. `sub` takes a string rather than a node, so the
+   apostrophe is the character and not the HTML entity the JSX text nodes used. */
+const CREDITS_SUB =
+  'Any admin can ask. A different admin\u2019s code confirms, so no single account can add credits on its own.'
 
 /**
  * A3 · `/admin/credits` (doc 13 §6).
@@ -26,7 +32,7 @@ export default async function CreditsPage() {
 
     return (
       <div className="space-y-grid">
-        <h1 className="text-[25px] leading-8 font-extrabold tracking-[-0.01em]">Credits</h1>
+        <PageTitle sub={CREDITS_SUB}>Credits</PageTitle>
         <div
           role="alert"
           className="rounded-input border border-danger-bg bg-danger-bg px-3 py-2.5 text-[13px] text-danger"
@@ -41,13 +47,7 @@ export default async function CreditsPage() {
 
   return (
     <div className="space-y-grid">
-      <div>
-        <h1 className="text-[25px] leading-8 font-extrabold tracking-[-0.01em]">Credits</h1>
-        <p className="mt-1 text-[14px] text-muted">
-          Any admin can ask. A different admin&apos;s code confirms, so no single account can add
-          credits on its own.
-        </p>
-      </div>
+      <PageTitle sub={CREDITS_SUB}>Credits</PageTitle>
 
       <CreditsView requests={requests.data} admins={admins.data} me={me.email} />
     </div>

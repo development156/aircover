@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 
+import { PageTitle } from '@/components/page-title'
 import { TeamView } from '@/components/admin/team-view'
 import { requireOpsAdmin } from '@/lib/ops/guard'
 import { readOpsAdmins } from '@/lib/ops/read'
@@ -14,7 +15,9 @@ export default async function TeamPage() {
   if (admins.status !== 'ok') {
     return (
       <div className="space-y-grid">
-        <h1 className="text-[25px] leading-8 font-extrabold tracking-[-0.01em]">Team</h1>
+        <PageTitle sub="Everyone who can open /admin. Revoking takes effect on their next request.">
+          Team
+        </PageTitle>
         <div
           role="alert"
           className="rounded-input border border-danger-bg bg-danger-bg px-3 py-2.5 text-[13px] text-danger"
@@ -31,12 +34,9 @@ export default async function TeamPage() {
 
   return (
     <div className="space-y-grid">
-      <div>
-        <h1 className="text-[25px] leading-8 font-extrabold tracking-[-0.01em]">Team</h1>
-        <p className="mt-1 text-[14px] text-muted">
-          Everyone who can open /admin. Revoking takes effect on their next request.
-        </p>
-      </div>
+      <PageTitle sub="Everyone who can open /admin. Revoking takes effect on their next request.">
+        Team
+      </PageTitle>
 
       <TeamView admins={admins.data} me={me.email} isOwner={me.role === 'owner'} />
     </div>
