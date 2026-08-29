@@ -3,6 +3,9 @@ import Link from 'next/link'
 import { ObservationNote } from '@/components/brain/observation-note'
 import { PageTitle } from '@/components/page-title'
 import { reflectionWindow } from '@/lib/loop/iso-week'
+import { bestSlotSentence } from '@/lib/analytics/timing'
+import { readWindow } from '@/lib/analytics/window-data'
+import { resolveView } from '@/lib/analytics/view-params'
 import { readBrainObservations, type BrainRead } from '@/lib/brain/read'
 import { brainWaiting } from '@/lib/brain/waiting'
 import { readLoop } from '@/lib/loop/read'
@@ -155,10 +158,27 @@ export default async function ReportPage() {
   }
 
   const window = reflectionWindow(new Date(cycle.startedAt))
-  const [ranking, learnings] = await Promise.all([
+  const [ranking, learnings, timingRead] = await Promise.all([
     readRanking(workspace.id, window.fromIso, window.toIso),
     readCycleLearnings(workspace.id, cycle.id),
+    /**
+     * THE SAME READ /analytics MAKES, calling the same function.
+     *
+     * Not a second query shaped like it: `readWindow` is one function and
+     * `bestSlotSentence` is one code path, so the sentence below and the grid on
+     * Analytics come from identical data through identical arithmetic. Two
+     * implementations of "the best time to post" disagree eventually, and the
+     * customer meets the two screens an hour apart.
+     *
+     * The default view is passed because the timing grid deliberately ignores
+     * the date window: it is a claim about the business rather than about
+     * thirty days, and a best slot that moved whenever somebody changed a date
+     * filter would not be a pattern.
+     */
+    readWindow(resolveView({})),
   ])
+
+  const slotSentence = timingRead.kind === 'ready' ? bestSlotSentence(timingRead.timing) : null
 
   const written = snapshot.briefs.filter((b) => b.postId !== null)
 
@@ -221,6 +241,32 @@ export default async function ReportPage() {
 
         {/* ── WHAT IT NOTICED, UNPROMPTED ───────────────────────────────── */}
         <BrainBlock brain={brain} />
+
+        {/* ── WHEN TO POST ──────────────────────────────────────────────────
+            THE SENTENCE COMES FROM THE SAME SELECTOR ANALYTICS DRAWS ITS GRID
+            FROM. `bestSlotSentence(timing)` is the only code path that produces
+            it, and Analytics renders the identical string beneath its heatmap.
+            That is not a convenience: two calculations of "the best time to
+            post" WILL disagree, not as a risk but as a certainty, and the
+            customer meets the two screens an hour apart.
+
+            It renders nothing at all when the selector has no defensible
+            winner. Nothing, rather than a hedge: "no best time found" invites
+            the reader to believe there is one and Sahoda is being coy, when the
+            true statement is that their posts have not yet said. */}
+        {slotSentence ? (
+          <Block eyebrow="What the numbers say about timing" title="When to post">
+            <p className="type-body max-w-[68ch] text-ink">{slotSentence}</p>
+            <p className="type-sm mt-1 text-muted">
+              Worked out from every post you have published, each read at the same age so an older
+              post does not win for being older.{' '}
+              <Link href="/analytics" className="underline-offset-2 hover:underline">
+                See the grid behind this
+              </Link>
+              .
+            </p>
+          </Block>
+        ) : null}
 
         {/* ── WHAT IT LEARNED ───────────────────────────────────────────── */}
         <Block eyebrow="The part that changes things" title="What Sahoda learned">
