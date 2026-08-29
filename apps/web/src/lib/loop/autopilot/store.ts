@@ -6,6 +6,7 @@ import type { Channel } from '@sahoda/shared'
 import type { AutopilotRefusal } from '@/lib/loop/autopilot-refusals'
 import type { AnnouncedPost } from './dispatch-due'
 import {
+  ACTIVE_BRAIN_SQL,
   ARM_FOR_PUBLISH_SQL,
   AUTOPILOT_CANDIDATES_SQL,
   AUTOPILOT_SETTINGS_SQL,
@@ -228,4 +229,18 @@ export async function readCandidateRows(workspaceId: string, limit = 100): Promi
 export async function armForPublish(workspaceId: string, postId: string): Promise<boolean> {
   const r = await getPool().query(ARM_FOR_PUBLISH_SQL, [workspaceId, postId])
   return r.rows.length > 0
+}
+
+/**
+ * The active Brand Brain payload, or null when there is none.
+ *
+ * ── NULL IS "NO BRAIN", AND IT REFUSES ───────────────────────────────────────
+ * `brainClearsAutopilotFloor(null)` is false, so an absent brain refuses with
+ * BRAIN_BELOW_FLOOR by name. That is the safe direction and it is deliberate:
+ * a read that came back empty and a business nobody has described are the same
+ * thing as far as publishing unattended is concerned.
+ */
+export async function readActiveBrain(workspaceId: string): Promise<unknown> {
+  const r = await getPool().query(ACTIVE_BRAIN_SQL, [workspaceId])
+  return (r.rows[0] as { payload: unknown } | undefined)?.payload ?? null
 }
