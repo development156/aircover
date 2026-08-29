@@ -84,7 +84,9 @@
     }
   },
   "modelSettings": {
-    "claude-opus-5": {}
+    "claude-opus-5": {
+      "effortLevel": "low"
+    }
   },
   "advisorModel": "opus",
   "askUserQuestionTimeout": "5m",
