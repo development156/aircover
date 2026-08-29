@@ -163,6 +163,12 @@ export interface CandidateRow {
   body: string
   /** `post_variants.last_error`, untyped jsonb. Read defensively by the caller. */
   lastError: unknown
+  /**
+   * The account this would publish to, already verified against the same four
+   * terms `assert_account_for_scheduled_post` uses. Never empty: the scan joins
+   * the connection, so a variant with no publishable account is not a row.
+   */
+  accountId: string
   briefId: string | null
   cycleId: string | null
 }
@@ -171,13 +177,15 @@ export interface CandidateRow {
  * The posts autopilot may consider, this workspace only.
  *
  * ── WHY THIS RETURNS ROWS AND NOT AutopilotCandidate ─────────────────────────
- * An `AutopilotCandidate` carries `gateFlagged`, `fitsChannel`, `accountId` and
- * a price. None of those is a column: the first two are verdicts computed from
- * the body, the third comes from the connection the post would publish through,
- * and the fourth is a lookup in pricing.config.json. Returning a half-filled
- * `AutopilotCandidate` with those defaulted would be the same defect as a
- * default of `''` on an account id — a value nobody decided, travelling as
+ * An `AutopilotCandidate` also carries `gateFlagged`, `fitsChannel` and a price.
+ * None of those three is a column: the first two are verdicts computed from the
+ * body, and the third is a lookup in pricing.config.json. Returning a
+ * half-filled `AutopilotCandidate` with them defaulted would be the same defect
+ * as a default of `''` on an account id — a value nobody decided, travelling as
  * though somebody had.
+ *
+ * `accountId` IS on the row, because the scan joins the connection rather than
+ * leaving the account to a later lookup that could come back empty.
  */
 export async function readCandidateRows(workspaceId: string, limit = 100): Promise<CandidateRow[]> {
   const r = await getPool().query(AUTOPILOT_CANDIDATES_SQL, [workspaceId, limit])
@@ -190,6 +198,7 @@ export async function readCandidateRows(workspaceId: string, limit = 100): Promi
       last_error: unknown
       brief_id: string | null
       cycle_id: string | null
+      account_id: string
     }[]
   ).map((row) => ({
     postId: row.post_id,
@@ -197,6 +206,7 @@ export async function readCandidateRows(workspaceId: string, limit = 100): Promi
     channel: row.channel,
     body: row.body,
     lastError: row.last_error,
+    accountId: row.account_id,
     briefId: row.brief_id,
     cycleId: row.cycle_id,
   }))

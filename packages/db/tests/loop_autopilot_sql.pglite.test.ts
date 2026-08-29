@@ -312,6 +312,8 @@ describe('the autopilot dispatcher SQL against the real schema', () => {
     const CPOST = 'aa000000-0000-4000-8000-000000000001'
     const CVAR = 'bb000000-0000-4000-8000-000000000002'
     const CYCLE = 'cc000000-0000-4000-8000-000000000003'
+    const PROFILE = 'a1b2c3d4e5f6a7b8c9d0e1f2'
+    const ACCOUNT = '0f1e2d3c4b5a69788796a5b4'
 
     beforeAll(async () => {
       await db.exec(`
@@ -343,6 +345,17 @@ describe('the autopilot dispatcher SQL against the real schema', () => {
         insert into loop_briefs (id, workspace_id, cycle_id, title, body, channels, post_id, priority)
           values ('dd000000-0000-4000-8000-000000000004', '${WS}', '${CYCLE}',
                   'brief', 'brief body', '{x}', '${CPOST}', 1);
+        -- The account side, on the same four terms assert_account_for_scheduled_post
+        -- uses: an ACTIVE connection, on the SAME channel, whose external_account
+        -- id is the account and whose profileId matches this workspace's Zernio
+        -- profile. Both ids are 24-char lowercase hex because the column's own
+        -- CHECK says so: a uuid here is accepted by a plain text column and matches
+        -- nothing Zernio ever returns.
+        insert into zernio_profiles (workspace_id, profile_id)
+          values ('${WS}', '${PROFILE}');
+        insert into connections (workspace_id, platform, status, external_account, created_by)
+          values ('${WS}', 'x', 'active',
+                  '{"id":"${ACCOUNT}","profileId":"${PROFILE}"}'::jsonb, '${USER}');
       `)
     }, 120_000)
 
@@ -368,6 +381,7 @@ describe('the autopilot dispatcher SQL against the real schema', () => {
         body: string
         brief_id: string
         cycle_id: string
+        account_id: string
       }>(AUTOPILOT_CANDIDATES_SQL, [WS, 50])
       expect(r.rows).toHaveLength(1)
       expect(r.rows[0]).toMatchObject({
@@ -376,6 +390,7 @@ describe('the autopilot dispatcher SQL against the real schema', () => {
         channel: 'x',
         body: 'the body',
         cycle_id: CYCLE,
+        account_id: ACCOUNT,
       })
     })
 
@@ -421,6 +436,77 @@ describe('the autopilot dispatcher SQL against the real schema', () => {
       ])
       const r = await db.query(AUTOPILOT_CANDIDATES_SQL, [WS, 50])
       expect(r.rows).toHaveLength(0)
+    })
+
+    describe('the account, on the same four terms the publish assertion uses', () => {
+      // Each of these is a way autopilot could otherwise pick up work it can
+      // never complete: the row would reach a decision, get announced, and then
+      // fail at assert_account_for_scheduled_post with nobody watching.
+      const other = 'aa000000-0000-4000-8000-00000000000a'
+
+      beforeAll(async () => {
+        await db.exec(`
+          insert into posts (id, workspace_id, title, status, channels, created_by)
+            values ('${other}', '${WS}', 'Needs an account', 'draft', '{gbp}', '${USER}');
+          insert into post_variants (workspace_id, post_id, channel, body, publish_status)
+            values ('${WS}', '${other}', 'gbp', 'for a channel with no connection', 'pending');
+          insert into loop_briefs (workspace_id, cycle_id, title, body, channels, post_id, priority)
+            values ('${WS}', '${CYCLE}', 'b3', 'body', '{gbp}', '${other}', 3);
+          insert into loop_channel_autonomy (workspace_id, channel, level, created_by)
+            values ('${WS}', 'gbp', 3, '${USER}');
+        `)
+      }, 120_000)
+
+      it('a channel armed at L3 with NO connection yields no candidate at all', async () => {
+        const r = await db.query<{ post_id: string }>(AUTOPILOT_CANDIDATES_SQL, [WS, 50])
+        expect(r.rows.map((x) => x.post_id)).not.toContain(other)
+      })
+
+      it('a connection on a DIFFERENT channel does not qualify it', async () => {
+        await db.exec(`
+          insert into connections (workspace_id, platform, status, external_account, created_by)
+            values ('${WS}', 'linkedin', 'active',
+                    '{"id":"111122223333444455556666","profileId":"${PROFILE}"}'::jsonb, '${USER}');
+        `)
+        const r = await db.query<{ post_id: string }>(AUTOPILOT_CANDIDATES_SQL, [WS, 50])
+        expect(r.rows.map((x) => x.post_id)).not.toContain(other)
+      })
+
+      it('an INACTIVE connection on the right channel does not qualify it either', async () => {
+        await db.exec(`
+          insert into connections (workspace_id, platform, status, external_account, created_by)
+            values ('${WS}', 'gbp', 'revoked',
+                    '{"id":"777788889999aaaabbbbcccc","profileId":"${PROFILE}"}'::jsonb, '${USER}');
+        `)
+        const r = await db.query<{ post_id: string }>(AUTOPILOT_CANDIDATES_SQL, [WS, 50])
+        expect(r.rows.map((x) => x.post_id)).not.toContain(other)
+      })
+
+      it("a connection whose profileId is not this workspace's Zernio profile does not qualify it", async () => {
+        await db.exec(`
+          insert into connections (workspace_id, platform, status, external_account, created_by)
+            values ('${WS}', 'gbp', 'active',
+                    '{"id":"dddd1111eeee2222ffff3333","profileId":"999888777666555444333222"}'::jsonb,
+                    '${USER}');
+        `)
+        const r = await db.query<{ post_id: string }>(AUTOPILOT_CANDIDATES_SQL, [WS, 50])
+        expect(r.rows.map((x) => x.post_id)).not.toContain(other)
+      })
+
+      it('and it becomes a candidate the moment all four hold, naming that account', async () => {
+        await db.exec(`
+          insert into connections (workspace_id, platform, status, external_account, created_by)
+            values ('${WS}', 'gbp', 'active',
+                    '{"id":"44445555666677778888aaaa","profileId":"${PROFILE}"}'::jsonb, '${USER}');
+        `)
+        const r = await db.query<{ post_id: string; account_id: string }>(
+          AUTOPILOT_CANDIDATES_SQL,
+          [WS, 50],
+        )
+        const row = r.rows.find((x) => x.post_id === other)
+        expect(row).toBeDefined()
+        expect(row?.account_id).toBe('44445555666677778888aaaa')
+      })
     })
 
     it('never crosses a workspace boundary', async () => {

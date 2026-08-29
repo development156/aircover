@@ -142,6 +142,26 @@ returning id`
  * refuses `undefined` by name as well; this is the half that makes that refusal
  * hard to reach rather than the half that reports it.
  *
+ * ── THE ACCOUNT IS JOINED ON THE SAME TERMS THE ASSERTION USES ───────────────
+ * `assert_account_for_scheduled_post` accepts an account only when there is an
+ * ACTIVE connection on the SAME channel as the variant whose
+ * `external_account ->> 'id'` matches and whose `profileId` matches the
+ * workspace's `zernio_profiles.profile_id`. This join mirrors all four, so the
+ * `account_id` this scan returns is one that function would accept.
+ *
+ * Two reasons it is a join and not a later lookup. A channel armed at L3 with
+ * no active connection then produces NO ROW, which is the same treatment an
+ * unarmed channel gets and for the same reason — it never reaches a decision to
+ * be mis-defaulted. And `loop_autopilot_log.account_id` is NOT NULL with a
+ * non-empty CHECK, so a row that could not name its account could not be
+ * written anyway; failing to produce the candidate is better than producing one
+ * that the log will refuse.
+ *
+ * MIRRORING IS NOT ENFORCING. The publish path still calls the assertion, which
+ * is the guard that actually holds and is verified against production with five
+ * hostile calls. This join only stops autopilot considering work it could never
+ * complete.
+ *
  * ── AND WHY publish_status IS CHECKED HERE ───────────────────────────────────
  * `pending` and `scheduled` are the two states a variant can be in before it
  * goes out. `published`, `publishing`, `failed` and `skipped` are each a reason
@@ -156,7 +176,8 @@ export const AUTOPILOT_CANDIDATES_SQL = `select p.id            as post_id,
        v.body          as body,
        v.last_error    as last_error,
        b.id            as brief_id,
-       b.cycle_id      as cycle_id
+       b.cycle_id      as cycle_id,
+       c.external_account ->> 'id' as account_id
   from loop_briefs b
   join posts p
     on p.id = b.post_id
@@ -168,6 +189,13 @@ export const AUTOPILOT_CANDIDATES_SQL = `select p.id            as post_id,
     on d.workspace_id = b.workspace_id
    and d.channel = v.channel
    and d.level = 3
+  join zernio_profiles z
+    on z.workspace_id = b.workspace_id
+  join connections c
+    on c.workspace_id = b.workspace_id
+   and c.platform = v.channel
+   and c.status = 'active'
+   and c.external_account ->> 'profileId' = z.profile_id
  where b.workspace_id = $1
    and b.post_id is not null
    and b.included
