@@ -38,7 +38,16 @@ export function BrandMark({
   const [open, setOpen] = useState(false)
 
   return (
-    <div className="relative shrink-0">
+    /**
+     * `data-brand-skin` IS THE BOUNDARY. `(app)/layout.tsx` emits the workspace's
+     * seven themeable tokens scoped to this attribute, so the brand colour lives
+     * here and stops here. Founder's ruling, 2026-08-29: the day/night toggle
+     * gives Sahoda's designed theme, and only the brand mark carries the
+     * customer's. Removing this attribute does not break the page — it makes the
+     * emitted rule match nothing, which is why `skin-css.test.ts` guards the
+     * selector rather than trusting this line.
+     */
+    <div data-brand-skin="" className="relative shrink-0">
       <button
         type="button"
         aria-haspopup="dialog"
