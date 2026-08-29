@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { CalendarRange, Share2, Target } from 'lucide-react'
+import { CalendarRange, Share2, Sparkles, Target } from 'lucide-react'
 import { creditCost, toChannelSet, type ChannelSet } from '@sahoda/shared'
 
 import { planMyWeek } from '@/app/actions/plan-week'
@@ -81,7 +81,21 @@ export function PlanWeekPanel() {
   return (
     <section
       data-guide="planner.plan_week"
-      className="rounded-card border border-line bg-bg p-5 shadow-card narrow:p-6"
+      /* ── WHY THIS CARD LOOKS DIFFERENT FROM EVERY OTHER CARD ──────────────
+         The founder asked for the one AI feature on the page to read as the
+         main event. The available currency for that is NOT more orange:
+         `accent-budget.spec.ts` enforces docs/37 §16's "exactly one solid-brand
+         fill per view", /planner already spends it on this card's own button,
+         and §2.3 records this route at 2.883% saturated pixels — the worst of
+         ten. So the weight comes from GROUND and EDGE instead: a `--brand-wash`
+         tint (orange at 6%, a ground rather than a fill, explicitly excluded
+         from the accent count) under a firmer inset ring.
+
+         A ring, not a border. docs/37 §6: "Never use a border and a ring
+         together. Pick one." The previous `border border-line` plus
+         `shadow-card` also broke §6's other rule — "a resting card gets no
+         shadow" — so both are gone. */
+      className="surface-ring-firm rounded-card bg-brand-wash p-5 narrow:p-6"
     >
       {/* ── THE ANCHOR ────────────────────────────────────────────────────────
           The mark and the title are one object: a 40px tinted square, then the
@@ -111,6 +125,7 @@ export function PlanWeekPanel() {
           goal, then channels, then the action. The card was one undifferentiated
           `space-y-3` stack before, which is why it read as a settings form. */}
       <div className="mt-5 border-t border-line pt-5">
+        <p className="type-eyebrow text-ink-mute">Step 1</p>
         {/* A plain <label>, not the `Label` primitive. `Label` hard-codes a 12px
             form-label step, and layering `type-h3` over it would leave two font
             declarations racing on CSS order rather than on intent.
@@ -120,7 +135,7 @@ export function PlanWeekPanel() {
             reader would hear a required-sounding field. */}
         <label
           htmlFor="plan-week-goals"
-          className="flex flex-wrap items-center gap-x-2 type-h3 text-ink"
+          className="mt-1 flex flex-wrap items-center gap-x-2 type-h3 text-ink"
         >
           <Target size={15} strokeWidth={2} className="text-accent" aria-hidden />
           Goals for the week <span className="type-sm text-muted">(optional)</span>
@@ -133,7 +148,7 @@ export function PlanWeekPanel() {
           disabled={pending}
           rows={5}
           maxLength={GOALS_MAX}
-          placeholder="More weekend footfall, launch the monsoon menu…"
+          placeholder="e.g. promote the monsoon menu, bring more people in at the weekend"
           // Padding and height only, plus a focus ring one tint step firmer than
           // the primitive's. The RESTING ring, the radius and the placeholder
           // colour are deliberately NOT overridden: every other field in the
@@ -154,7 +169,8 @@ export function PlanWeekPanel() {
 
       {/* ── 2 · THE CHANNELS ──────────────────────────────────────────────── */}
       <div className="mt-5 border-t border-line pt-5">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <p className="type-eyebrow text-ink-mute">Step 2</p>
+        <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <h3 className="flex items-center gap-2 type-h3 text-ink">
             <Share2 size={15} strokeWidth={2} className="text-accent" aria-hidden />
             Channels
@@ -200,7 +216,12 @@ export function PlanWeekPanel() {
               disabled={channels.length === 0}
               className="w-full px-5 shadow-[0_2px_10px_-4px_var(--t300)] transition-micro hover:shadow-none narrow:w-auto"
             >
-              <CalendarRange size={15} aria-hidden />
+              {/* `Sparkles`, not the ✨ the brief asked for. docs/37 §18 bans
+                  emoji in Sahoda's own interface — the carve-out is for generated
+                  social captions, which this is not. The lucide glyph carries the
+                  same "this is the AI action" reading and inherits the button's
+                  own colour in both themes, which an emoji cannot. */}
+              <Sparkles size={15} aria-hidden />
               <CostLabel action="Plan my week" cost={cost} />
             </Button>
             {/* Says where the output LANDS, which nothing else on this card

@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+import type { Route } from 'next'
 import { useState, useTransition } from 'react'
 import { Play, Pause } from 'lucide-react'
 import { MAX_WEEKLY_BUDGET_CREDITS } from '@sahoda/shared'
@@ -28,12 +30,36 @@ import { CostLabel } from '@/components/ui/cost-label'
  * the dragging affordance for anyone who wants it and lets the rest type.
  */
 
+/**
+ * WHY THE LOOP WILL NOT PLAN THIS WEEK, AND WHERE TO GO ABOUT IT.
+ *
+ * One sentence and one link, both from `lib/loop/eligibility` — the same
+ * function the Sunday cron reaches its verdict with. `null` when the workspace
+ * is eligible.
+ *
+ * This replaced a ladder written here by hand. That ladder knew two causes of
+ * the six — no channels, and paused — and phrased both differently from the
+ * cron's words for the same state. A workspace short of credits, or one whose
+ * connection had lapsed, got the same disabled button with a sentence that did
+ * not describe it: MEASURED against production 2026-08-28, three workspaces
+ * would have been told to connect a channel and two that the Loop was paused,
+ * and none of those five sentences was on a screen anywhere.
+ */
+export interface LoopRefusalNotice {
+  /** The sentence, from `explain(verdict)`. Never a code, never a boolean. */
+  sentence: string
+  /** Somewhere that can actually fix it, from `remedy(verdict)`. */
+  remedy: { href: string; label: string } | null
+}
+
 export interface LoopControlsProps {
   paused: boolean
   weeklyBudgetCredits: number
   cycleCost: number
   hasChannels: boolean
   cycleRunning: boolean
+  /** Absent when the Loop will plan this week. */
+  refusal?: LoopRefusalNotice | null
 }
 
 export function LoopControls({
@@ -42,6 +68,7 @@ export function LoopControls({
   cycleCost,
   hasChannels,
   cycleRunning,
+  refusal = null,
 }: LoopControlsProps) {
   const [paused, setPaused] = useState(initialPaused)
   const [budget, setBudget] = useState(weeklyBudgetCredits)
@@ -103,13 +130,24 @@ export function LoopControls({
             <CostLabel action="Plan my week" cost={cycleCost} />
           </Button>
           <span className="type-sm max-w-[42ch] text-muted">
-            {!hasChannels
-              ? 'Connect a channel first. Sahoda has nowhere to plan for.'
-              : paused
-                ? 'The Loop is paused. Turn it back on to plan a week.'
-                : cycleRunning
-                  ? 'A cycle is already running for this week.'
-                  : 'Stops at a cost preview. Nothing is written until you approve it.'}
+            {refusal ? (
+              <>
+                {refusal.sentence}
+                {refusal.remedy ? (
+                  <>
+                    {' '}
+                    <Link
+                      href={refusal.remedy.href as Route}
+                      className="font-[550] text-accent underline underline-offset-2"
+                    >
+                      {refusal.remedy.label}
+                    </Link>
+                  </>
+                ) : null}
+              </>
+            ) : (
+              'Stops at a cost preview. Nothing is written until you approve it.'
+            )}
           </span>
         </div>
 
