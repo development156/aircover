@@ -42,8 +42,17 @@ export const REPORT = {
   principle: 'Sahoda only speaks when the numbers are strong enough to stand behind.',
 
   verdict: {
-    tooFewPosts:
-      'One post measured so far. I will have a read on your week once a few more have gone out.',
+    /**
+     * THE COUNT IS PASSED IN, AND IT USED NOT TO BE.
+     * This read "One post measured so far" at every count below the floor,
+     * including a workspace with none measured and one with four posts out and
+     * nothing reported back yet. A hardcoded figure about somebody's week is a
+     * fabricated measurement whatever else is true of the sentence.
+     */
+    tooFewPosts: (measured: number) =>
+      measured === 0
+        ? 'Nothing of yours has come back with numbers yet. I will have a read on your week once it does.'
+        : 'One post measured so far. I will have a read on your week once a few more have gone out.',
     noBaseline: 'First weeks. I am still learning what a normal week looks like for you.',
     unreadable: 'I could not read last week just now, so I am not going to call it either way.',
   },
@@ -135,6 +144,17 @@ export const REPORT = {
         : `${spent} of your ${credits(budget)} used this week.`,
     link: 'See every charge',
     href: '/wallet',
+  },
+
+  /**
+   * A CONNECTED WORKSPACE THAT HAS NOT RUN A WEEK YET IS A DIFFERENT SENTENCE.
+   * It is not "connect a channel" — they did that. It is "the week has not been
+   * run", and the remedy is the one thing that would produce a report.
+   */
+  noCycle: {
+    heading: 'No week has been reported yet',
+    body: 'I write this at the end of each week I run. Run one and this page fills in with what your posts did, what I learned, and what I changed because of it.',
+    action: { label: 'Run a week', href: '/loop' },
   },
 
   empty: {

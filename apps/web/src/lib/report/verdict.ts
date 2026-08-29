@@ -21,6 +21,7 @@
 export const MIN_POSTS_FOR_VERDICT = 2
 
 export interface VerdictInput {
+  /** Carried into the suppressed sentence, so it can state the real count. */
   postsMeasured: number
   /** People reached last week, and the workspace's own normal. Null when unknown. */
   reach: { value: number; baseline: number | null }
@@ -29,14 +30,24 @@ export interface VerdictInput {
 }
 
 export type Verdict =
-  | { kind: 'none'; reason: 'too-few-posts' | 'no-baseline' }
+  | {
+      kind: 'none'
+      reason: 'too-few-posts' | 'no-baseline' | 'unreadable'
+      /** Posts measured, so the sentence can say the real number. */
+      measured?: number
+    }
   | { kind: 'good' | 'mixed' | 'poor'; headline: string; support: string }
 
 /** A change big enough to be worth a sentence. Below this a week is flat. */
 const MOVED = 0.1
 
+/**
+ * `before` is guaranteed positive by the caller. It used to answer `'up'` for a
+ * zero baseline, which is not a measured rise: three weeks that each reached
+ * nobody is not a normal, and "a good week" drawn from it would be the product
+ * congratulating somebody on arithmetic rather than on their business.
+ */
 function move(now: number, before: number): 'up' | 'down' | 'flat' {
-  if (before <= 0) return now > 0 ? 'up' : 'flat'
   const delta = (now - before) / before
   if (delta >= MOVED) return 'up'
   if (delta <= -MOVED) return 'down'
@@ -50,10 +61,16 @@ export function percentMove(now: number, before: number): number | null {
 }
 
 export function verdictOf(input: VerdictInput): Verdict {
-  if (input.postsMeasured < MIN_POSTS_FOR_VERDICT) return { kind: 'none', reason: 'too-few-posts' }
+  if (input.postsMeasured < MIN_POSTS_FOR_VERDICT) {
+    return { kind: 'none', reason: 'too-few-posts', measured: input.postsMeasured }
+  }
   const { baseline } = input.reach
   const { previous } = input.replies
-  if (baseline === null || previous === null) return { kind: 'none', reason: 'no-baseline' }
+  // A zero normal is not a normal. Nothing can be a percentage above nothing,
+  // and every sentence below this line is a percentage.
+  if (baseline === null || previous === null || baseline <= 0 || previous <= 0) {
+    return { kind: 'none', reason: 'no-baseline' }
+  }
 
   const reachMove = move(input.reach.value, baseline)
   const replyMove = move(input.replies.value, previous)

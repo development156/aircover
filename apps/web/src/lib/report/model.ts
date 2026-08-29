@@ -21,6 +21,8 @@ export interface WorkedPost {
   postId: string
   title: string
   channel: Channel
+  /** The channel as a person writes it. `gbp` reached the page as `gbp`. */
+  channelName: string
   value: number
   /** What was counted. Never a jargon word: this reaches the reader. */
   measure: string
@@ -42,7 +44,7 @@ export interface OneThing {
 }
 
 export interface ReportView {
-  week: { label: string; postsRan: number; channels: readonly string[] }
+  week: { label: string; postsRan: number | null; channels: readonly string[] }
   verdict: Verdict
   numbers: { reach: Compared; replies: Compared; enquiries: Compared }
   worked: { best: WorkedPost; weakest: WorkedPost } | null

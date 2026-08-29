@@ -6,10 +6,11 @@ import { ReportBody } from '@/components/report/report-body'
 import { SamplePreview } from '@/components/report/sample'
 import { WhatsappButton } from '@/components/report/whatsapp-button'
 import { PageTitle } from '@/components/page-title'
+import type { Channel } from '@sahoda/shared'
 import { reflectionWindow } from '@/lib/loop/iso-week'
 import { readBrainObservations } from '@/lib/brain/read'
 import { readLoop } from '@/lib/loop/read'
-import { readCycleLearnings, readRanking } from '@/lib/loop/report'
+import { readCycleLearnings } from '@/lib/loop/report'
 import { comparedEnquiries, comparedReach, comparedReplies } from '@/lib/report/compose'
 import type { PlanRow, ReportView } from '@/lib/report/model'
 import { toPlainText } from '@/lib/report/plain-text'
@@ -61,7 +62,16 @@ export default async function ReportPage() {
   const cycle = snapshot.cycle
   const nothingConnected = snapshot.connected.length === 0 && snapshot.lapsed.length === 0
 
-  if (nothingConnected || !cycle) {
+  /**
+   * ── THE EMPTY STATE IS FOR A WORKSPACE WITH NOTHING, NOT ONE WITHOUT A CYCLE ─
+   * This branch used to fire on `!cycle` as well, so a workspace with live
+   * accounts and published posts that simply had not run the Loop yet was told
+   * "Your first report lands next Monday" under a button reading "Connect a
+   * channel" — a remedy they had already carried out, which is the impossible
+   * remedy this codebase forbids by name. A connected workspace with no cycle
+   * gets the real report shape instead, saying what it is waiting for.
+   */
+  if (nothingConnected) {
     return (
       <div className="space-y-grid">
         <Header text={null} />
@@ -91,6 +101,27 @@ export default async function ReportPage() {
     )
   }
 
+  if (!cycle) {
+    return (
+      <div className="space-y-grid">
+        <Header text={null} />
+        <div className="flex w-full max-w-[760px] flex-col gap-6">
+          <section className="surface-ring rounded-card bg-surface p-4">
+            <h2 className="type-h2 text-ink">{REPORT.noCycle.heading}</h2>
+            <p className="type-body mt-1 max-w-[62ch] text-muted">{REPORT.noCycle.body}</p>
+            <Link
+              href={REPORT.noCycle.action.href as Route}
+              className="mt-3 inline-flex h-control items-center rounded-sm bg-primary type-sm px-3 font-[550] text-primary-foreground transition-micro hover:bg-ink hover:text-white dark:hover:bg-white dark:hover:text-[var(--canvas)]"
+            >
+              {REPORT.noCycle.action.label}
+            </Link>
+          </section>
+          <NoticedBlock brain={brain} />
+        </div>
+      </div>
+    )
+  }
+
   const window = reflectionWindow(new Date(cycle.startedAt))
   const written = snapshot.briefs.filter((b) => b.postId !== null)
 
@@ -101,25 +132,41 @@ export default async function ReportPage() {
    * moment the Loop snapshot arrives. Awaiting them one after another would add
    * their latencies together on a page a person opens on a phone.
    */
-  const [reach, replies, enquiries, ranking, learnings, times] = await Promise.all([
-    readReach(read.workspaceId, window.fromIso, window.toIso),
-    readReplies(read.workspaceId, window.fromIso, window.toIso),
-    readEnquiries(read.workspaceId, window.fromIso, window.toIso),
-    readRanking(read.workspaceId, window.fromIso, window.toIso, 'reach'),
-    readCycleLearnings(read.workspaceId, cycle.id),
-    readPlanTimes(
-      read.workspaceId,
-      written.map((b) => b.postId as string),
+  const [reach, replies, enquiries, learnings, times] = await Promise.all([
+    settled(readReach(read.workspaceId, window.fromIso, window.toIso), {
+      status: 'unreadable' as const,
+    }),
+    settled(readReplies(read.workspaceId, window.fromIso, window.toIso), {
+      status: 'unreadable' as const,
+    }),
+    settled(readEnquiries(read.workspaceId, window.fromIso, window.toIso), {
+      status: 'unreadable' as const,
+    }),
+    settled(readCycleLearnings(read.workspaceId, cycle.id), []),
+    settled(
+      readPlanTimes(
+        read.workspaceId,
+        written.map((b) => b.postId as string),
+      ),
+      new Map<string, string | null>(),
     ),
   ])
 
-  const plan: PlanRow[] = written.map((brief) => ({
-    id: brief.id,
-    title: brief.title,
-    channels: brief.channels,
-    when: formatScheduledAt(times.get(brief.postId as string) ?? null),
-    status: brief.stageOutcome === 'awaiting_approval' ? 'awaiting_approval' : 'drafted',
-  }))
+  const plan: PlanRow[] = written.map((brief) => {
+    const when = times.get(brief.postId as string) ?? null
+    return {
+      id: brief.id,
+      title: brief.title,
+      channels: brief.channels,
+      when: formatScheduledAt(when),
+      status:
+        brief.stageOutcome === 'awaiting_approval'
+          ? 'awaiting_approval'
+          : when
+            ? 'scheduled'
+            : 'drafted',
+    }
+  })
 
   /**
    * WHAT I CHANGED, AND WHY ONLY THE ACCEPTED ONES COUNT.
@@ -138,7 +185,7 @@ export default async function ReportPage() {
   const report: ReportView = {
     week: {
       label: `Week of ${day(window.fromIso)} to ${day(window.toIso)}`,
-      postsRan: reach.status === 'ok' ? reach.postsRan : 0,
+      postsRan: reach.status === 'ok' ? reach.postsRan : null,
       channels: snapshot.connected.map(channelName),
     },
     verdict:
@@ -148,18 +195,16 @@ export default async function ReportPage() {
             reach: { value: reach.value, baseline: reach.baseline },
             replies: { value: replies.value, previous: replies.previous },
           })
-        : { kind: 'none', reason: 'no-baseline' },
+        : // A failed read is not a young workspace, and telling a two-year-old
+          // one that Sahoda is "still learning your normal" would be a claim
+          // about their history made out of a broken request.
+          { kind: 'none', reason: 'unreadable' },
     numbers: {
       reach: comparedReach(reach),
       replies: comparedReplies(replies),
       enquiries: comparedEnquiries(enquiries),
     },
-    worked: ranking
-      ? {
-          best: { ...ranking.top, measure: 'people reached' },
-          weakest: { ...ranking.bottom, measure: 'people reached' },
-        }
-      : null,
+    worked: workedFrom(reach),
     changed,
     plan,
     oneThing: oneThingFor({
@@ -177,6 +222,49 @@ export default async function ReportPage() {
       <ReportBody report={report} noticed={<NoticedBlock brain={brain} />} />
     </div>
   )
+}
+
+/**
+ * A READ THAT THROWS IS A READ THAT FAILED, NOT A PAGE THAT DIES.
+ *
+ * Each read below already turns a query error into an honest "I could not read
+ * this". None of them survived an EXCEPTION — a socket dropped mid-flight, a
+ * malformed row, a date the formatter refuses — and one rejection inside
+ * `Promise.all` takes the whole page with it, including the five sections that
+ * had their answers. This is the seam between "one number is missing" and
+ * "the report is gone", and it belongs here rather than in a boundary, because
+ * a server component that throws never reaches one.
+ */
+function settled<T>(work: Promise<T>, fallback: T): Promise<T> {
+  // `.catch` rather than try/await, so this adds no await of its own — an
+  // awaited wrapper reads as a second sequential round trip to the waterfall
+  // guard, and would be one if it were written the obvious way.
+  return work.catch(() => fallback)
+}
+
+/**
+ * BEST AND WEAKEST, FROM THE SAME ARITHMETIC AS THE NUMBER ABOVE THEM.
+ *
+ * The ranking used to come from a query that buckets readings by the day they
+ * were TAKEN, with no join to the publish log — so on a page headed by last
+ * week's dates it could name a post from three months ago and print its
+ * lifetime total. These two come from the same per-post figures the reach card
+ * is built from: published in the reported week, highest reading each.
+ */
+function workedFrom(reach: Awaited<ReturnType<typeof readReach>>): ReportView['worked'] {
+  if (reach.status !== 'ok' || reach.posts.length < 2) return null
+  const top = reach.posts[0]
+  const bottom = reach.posts[reach.posts.length - 1]
+  if (!top || !bottom) return null
+  const shape = (post: { postId: string; title: string; channel: string; value: number }) => ({
+    postId: post.postId,
+    title: post.title,
+    channel: post.channel as Channel,
+    channelName: channelName(post.channel),
+    value: post.value,
+    measure: 'people reached',
+  })
+  return { best: shape(top), weakest: shape(bottom) }
 }
 
 function Header({ text }: { text: string | null }) {
