@@ -1,7 +1,7 @@
 import { expect } from '@playwright/test'
 
 import { test } from './fixtures/seeded-user'
-import { leaveOnboarding } from './fixtures/compose'
+import { leaveOnboarding, dismissPlanOffer } from './fixtures/compose'
 
 /**
  * The entrance system, proved on a real page (docs/26 §8.1).
@@ -52,6 +52,7 @@ test.describe('@smoke entrance', () => {
     void signedIn
     await bootstrapWorkspace(page)
     await page.goto('/home')
+    await dismissPlanOffer(page)
 
     const step = page.locator('.enter-step').first()
     await expect(step).toBeVisible()
@@ -80,6 +81,7 @@ test.describe('@smoke entrance', () => {
     await bootstrapWorkspace(page)
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await page.goto('/home')
+    await dismissPlanOffer(page)
 
     /**
      * READ THE RENDERED TEXT, not a box — that is the claim, and it is why this

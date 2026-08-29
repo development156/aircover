@@ -53,8 +53,15 @@ const DEFAULT_PLAN: PlanId = 'starter'
  * advisor lane is editing pricing in that exact file right now and this branch
  * already carries one unresolved conflict with them. Which plan a screen points
  * at is a presentation choice; the catalog stays the contract.
+ *
+ * ── EXPORTED, SO THERE IS ONE OF IT ──────────────────────────────────────────
+ * `components/billing/plan-offer-cards.tsx` points at the same plan and had its
+ * own copy of this line, with a comment claiming a test kept the two in step.
+ * There was no such test. Two screens disagreeing about which plan Sahoda
+ * recommends is a small thing that would be very hard to notice, so the second
+ * copy is gone and this is the one.
  */
-const RECOMMENDED_PLAN: PlanId = 'growth'
+export const RECOMMENDED_PLAN: PlanId = 'growth'
 
 const inr = (value: number): string => value.toLocaleString('en-IN')
 
@@ -529,7 +536,26 @@ export function TopUpPanel({ currency = null, fx = null }: TopUpPanelProps) {
   )
 }
 
-function CheckoutResult({ result, onRetry }: { result: CheckoutState; onRetry: () => void }) {
+/**
+ * EXPORTED, because a second caller now renders the same three outcomes.
+ *
+ * `components/billing/plan-offer-modal.tsx` starts checkouts through the same
+ * `startCheckout` action and has to tell a live session from a sandbox order
+ * from a failure. That distinction is the whole point of the `simulated`
+ * discriminant — `checkout-state.ts` says it is explicit "so a caller must not
+ * be able to render a fixture or sandbox session as a completed purchase by
+ * forgetting a check" — and two components each holding their own opinion about
+ * it is exactly how one of them eventually forgets. Export, do not copy.
+ *
+ * Nothing else changed: the markup, the copy and the props are as they were.
+ */
+export function CheckoutResult({
+  result,
+  onRetry,
+}: {
+  result: CheckoutState
+  onRetry: () => void
+}) {
   if (!result.ok) {
     return (
       <div
