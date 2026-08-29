@@ -15,6 +15,8 @@ import {
   slotKeysOf,
   slotLabelOf,
   templateById,
+  type Palette,
+  type StudioDesign,
 } from '@sahoda/shared'
 import { z } from 'zod'
 
@@ -27,8 +29,11 @@ import { sniffImage } from '@/lib/posts/sniff-image'
 import {
   EXPORT_REFUSALS,
   EXPORT_STORED,
+  describeBatchExport,
   planExport,
+  titleForPage,
   type ExistingCopy,
+  type PageExport,
 } from '@/lib/studio/export-copy'
 import { imageDataUri, resolvePageImages } from '@/lib/studio/images'
 import { studioPalette } from '@/lib/studio/palette'
@@ -37,6 +42,7 @@ import type {
   DeleteDesignState,
   DesignPhotoState,
   ExportDesignState,
+  ExportPagesState,
   SaveDesignState,
 } from '@/lib/studio/state'
 import { createServerSupabase } from '@/lib/supabase/server'
@@ -323,60 +329,41 @@ const ExportInputSchema = z.object({
   pageIndex: z.number().int().min(0).optional(),
 })
 
-export async function exportDesign(input: unknown): Promise<ExportDesignState> {
-  let workspaceId: string | undefined
+/**
+ * One page of one design, drawn and stored.
+ *
+ * Split out of the action because a carousel exports every slide through this
+ * same body. Two copies of it would drift on the day one of them learned
+ * something about duplicates, and the duplicate rule is the whole reason this
+ * path is more than an upload.
+ */
+async function exportOnePage(
+  supabase: ReturnType<typeof createServerSupabase>,
+  input: {
+    workspaceId: string
+    userId: string
+    design: StudioDesign
+    pageIndex: number
+    palette: Palette
+  },
+): Promise<ExportDesignState> {
+  const { workspaceId, userId, design, pageIndex, palette } = input
   let uploadedPath: string | null = null
-  const supabase = createServerSupabase()
+
+  const template = templateById(design.doc.templateId)
+  const preset = presetById(design.preset_id)
+  const page = design.doc.pages[pageIndex]
+  if (template === null || preset === null || page === undefined) {
+    return { ok: false, message: EXPORT_REFUSALS.unreadable }
+  }
 
   try {
-    const { userId } = await auth()
-    if (!userId) return { ok: false, message: 'Sign in to export a design.' }
-
-    const ws = await workspaceForWrite()
-    if (!ws.ok) return { ok: false, message: ws.message }
-    const workspace = ws.workspace
-    workspaceId = workspace.id
-
-    const parsed = ExportInputSchema.safeParse(input)
-    if (!parsed.success) return { ok: false, message: EXPORT_REFUSALS.notFound }
-    const { designId } = parsed.data
-    const pageIndex = parsed.data.pageIndex ?? 0
-
-    const read = await supabase
-      .from('studio_designs')
-      .select('*')
-      .eq('workspace_id', workspace.id)
-      .eq('id', designId)
-      .maybeSingle()
-
-    if (read.error) return { ok: false, message: EXPORT_REFUSALS.unreadable }
-    if (!read.data) return { ok: false, message: EXPORT_REFUSALS.notFound }
-
-    const design = StudioDesignSchema.safeParse(read.data)
-    if (!design.success) return { ok: false, message: EXPORT_REFUSALS.unreadable }
-
-    const template = templateById(design.data.doc.templateId)
-    const preset = presetById(design.data.preset_id)
-    const page = design.data.doc.pages[pageIndex]
-    if (template === null || preset === null || page === undefined) {
-      return { ok: false, message: EXPORT_REFUSALS.unreadable }
-    }
-
-    const tokens = await activeThemeTokens(workspace.id)
-    const palette = studioPalette(tokens).palette
-
     // A picture the design points at and we cannot read is a REFUSAL, never a
     // gap. `composeScene` would refuse anyway once the slot is absent; naming
     // the file here is the difference between "one of your pictures could not
     // be read" and a compose failure a person cannot act on.
-    const resolved = await resolvePageImages(page, workspace.id)
-    if (resolved.missing.length > 0) {
-      return {
-        ok: false,
-        message:
-          'One of the pictures in this design could not be read, so nothing was exported. It may have been deleted from your library.',
-      }
-    }
+    const resolved = await resolvePageImages(page, workspaceId)
+    if (resolved.missing.length > 0) return { ok: false, message: EXPORT_REFUSALS.missingPhoto }
 
     const composed = composeScene(template, page, {
       width: preset.width,
@@ -397,19 +384,19 @@ export async function exportDesign(input: unknown): Promise<ExportDesignState> {
     const raster = await rasterisePng(markup, { width: preset.width, height: preset.height })
     if (!raster.ok) return { ok: false, message: EXPORT_REFUSALS.unrenderable }
 
-    const existing = await existingCopyOf(supabase, workspace.id, designId, raster.sha256)
+    const existing = await existingCopyOf(supabase, workspaceId, design.id, raster.sha256)
     const plan = planExport(existing)
 
     if (plan.kind !== 'store') {
       // Nothing is uploaded and nothing is written. A design already in the
       // library costs no storage to press again, which is half the reason the
       // check happens before the upload rather than after it.
-      if (plan.kind === 'linked' && existing !== null) {
+      if (plan.kind === 'linked') {
         // The bytes are live but this design may never have been recorded
         // against them, which is how an interrupted export heals.
         await recordExport(supabase, {
-          workspace_id: workspace.id,
-          design_id: designId,
+          workspace_id: workspaceId,
+          design_id: design.id,
           asset_id: plan.assetId,
           content_sha256: raster.sha256,
         })
@@ -432,11 +419,7 @@ export async function exportDesign(input: unknown): Promise<ExportDesignState> {
     if (kind === null) return { ok: false, message: EXPORT_REFUSALS.unrenderable }
 
     const assetId = randomUUID()
-    const objectPath = assetObjectPath({
-      workspaceId: workspace.id,
-      assetId,
-      mime: sniffed.image.mime,
-    })
+    const objectPath = assetObjectPath({ workspaceId, assetId, mime: sniffed.image.mime })
 
     const upload = await supabase.storage.from(MEDIA_BUCKET).upload(objectPath, raster.bytes, {
       contentType: sniffed.image.mime,
@@ -447,14 +430,16 @@ export async function exportDesign(input: unknown): Promise<ExportDesignState> {
 
     const row = {
       id: assetId,
-      workspace_id: workspace.id,
+      workspace_id: workspaceId,
       storage_path: objectPath,
       kind,
       mime: sniffed.image.mime,
       bytes: raster.bytes.byteLength,
       width: sniffed.image.width,
       height: sniffed.image.height,
-      title: design.data.title,
+      // A slide is named for the design and its position, because a library of
+      // ten files all called "Diwali offer" is a library nobody can use.
+      title: titleForPage(design.title, pageIndex, design.doc.pages.length),
       created_by: userId,
     }
 
@@ -476,20 +461,17 @@ export async function exportDesign(input: unknown): Promise<ExportDesignState> {
 
     if (error || !data) {
       await removeExportObject(supabase, uploadedPath)
-      uploadedPath = null
       return { ok: false, message: EXPORT_REFUSALS.failed }
     }
 
     const asset = AssetSchema.safeParse(data)
     await recordExport(supabase, {
-      workspace_id: workspace.id,
-      design_id: designId,
+      workspace_id: workspaceId,
+      design_id: design.id,
       asset_id: assetId,
       content_sha256: raster.sha256,
     })
 
-    revalidatePath('/assets')
-    revalidatePath('/studio')
     return {
       ok: true,
       outcome: 'stored',
@@ -501,6 +483,111 @@ export async function exportDesign(input: unknown): Promise<ExportDesignState> {
     if (uploadedPath !== null) await removeExportObject(supabase, uploadedPath)
     return { ok: false, message: EXPORT_REFUSALS.failed }
   }
+}
+
+/** Load a design and everything drawing it needs, scoped to the workspace writing. */
+async function designForExport(
+  supabase: ReturnType<typeof createServerSupabase>,
+  workspaceId: string,
+  designId: string,
+): Promise<{ ok: true; design: StudioDesign; palette: Palette } | { ok: false; message: string }> {
+  const read = await supabase
+    .from('studio_designs')
+    .select('*')
+    .eq('workspace_id', workspaceId)
+    .eq('id', designId)
+    .maybeSingle()
+
+  if (read.error) return { ok: false, message: EXPORT_REFUSALS.unreadable }
+  if (!read.data) return { ok: false, message: EXPORT_REFUSALS.notFound }
+
+  const design = StudioDesignSchema.safeParse(read.data)
+  if (!design.success) return { ok: false, message: EXPORT_REFUSALS.unreadable }
+
+  const tokens = await activeThemeTokens(workspaceId)
+  return { ok: true, design: design.data, palette: studioPalette(tokens).palette }
+}
+
+export async function exportDesign(input: unknown): Promise<ExportDesignState> {
+  const { userId } = await auth()
+  if (!userId) return { ok: false, message: 'Sign in to export a design.' }
+
+  const ws = await workspaceForWrite()
+  if (!ws.ok) return { ok: false, message: ws.message }
+
+  const parsed = ExportInputSchema.safeParse(input)
+  if (!parsed.success) return { ok: false, message: EXPORT_REFUSALS.notFound }
+
+  const supabase = createServerSupabase()
+  const loaded = await designForExport(supabase, ws.workspace.id, parsed.data.designId)
+  if (!loaded.ok) return loaded
+
+  const result = await exportOnePage(supabase, {
+    workspaceId: ws.workspace.id,
+    userId,
+    design: loaded.design,
+    pageIndex: parsed.data.pageIndex ?? 0,
+    palette: loaded.palette,
+  })
+
+  if (result.ok && result.outcome === 'stored') {
+    revalidatePath('/assets')
+    revalidatePath('/studio')
+  }
+  return result
+}
+
+/**
+ * Every slide of a carousel, in one press.
+ *
+ * ── A SLIDE THAT FAILS DOES NOT UNDO THE ONES THAT WORKED ───────────────────
+ * Each page is its own file and its own row, so there is nothing to roll back
+ * and rolling back would be the wrong act anyway: deleting four good pictures
+ * because the fifth would not draw destroys work over a problem the person can
+ * fix. What matters is that the sentence afterwards is exact about which
+ * slides are in the library and which are not, and `describeBatchExport` is
+ * where that is argued and tested.
+ *
+ * Sequential rather than parallel, deliberately. Each page rasterises a full
+ * canvas through sharp and uploads it; ten at once on a small server instance
+ * is a memory spike for a person who would not notice the difference in speed.
+ */
+export async function exportDesignPages(designId: unknown): Promise<ExportPagesState> {
+  const { userId } = await auth()
+  if (!userId) return { ok: false, message: 'Sign in to export a design.' }
+
+  const ws = await workspaceForWrite()
+  if (!ws.ok) return { ok: false, message: ws.message }
+
+  const id = z.uuid().safeParse(designId)
+  if (!id.success) return { ok: false, message: EXPORT_REFUSALS.notFound }
+
+  const supabase = createServerSupabase()
+  const loaded = await designForExport(supabase, ws.workspace.id, id.data)
+  if (!loaded.ok) return loaded
+
+  const pages: PageExport[] = []
+  for (let pageIndex = 0; pageIndex < loaded.design.doc.pages.length; pageIndex += 1) {
+    const result = await exportOnePage(supabase, {
+      workspaceId: ws.workspace.id,
+      userId,
+      design: loaded.design,
+      pageIndex,
+      palette: loaded.palette,
+    })
+    pages.push(
+      result.ok
+        ? { pageIndex, ok: true, outcome: result.outcome, assetId: result.assetId }
+        : { pageIndex, ok: false, message: result.message },
+    )
+  }
+
+  if (pages.some((page) => page.ok && page.outcome === 'stored')) {
+    revalidatePath('/assets')
+    revalidatePath('/studio')
+  }
+
+  return { ok: true, pages, message: describeBatchExport(pages) }
 }
 
 /** Undo a partial export. A stored object with no row is a file nobody can reach or delete. */

@@ -49,3 +49,15 @@ export type ExportDesignState =
  * are different jobs and this is the one that has to match the export.
  */
 export type DesignPhotoState = { ok: true; dataUri: string } | { ok: false; message: string }
+
+/**
+ * Exporting every slide of a carousel.
+ *
+ * `ok: true` with failures inside it, and that is the honest shape rather than a
+ * looser one: four slides in the library and one that would not draw is a
+ * SUCCESS for four files and a failure for one, and a single boolean cannot say
+ * that. The per-slide list is what lets the screen name which is which.
+ */
+export type ExportPagesState =
+  | { ok: true; pages: import('./export-copy').PageExport[]; message: string }
+  | { ok: false; message: string }
