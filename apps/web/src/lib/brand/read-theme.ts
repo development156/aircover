@@ -1,5 +1,7 @@
 import 'server-only'
 
+import { cache } from 'react'
+
 import { ThemeTokensSchema, type ThemeTokens } from '@sahoda/shared'
 
 import { createServerSupabase } from '@/lib/supabase/server'
@@ -32,7 +34,17 @@ import { createServerSupabase } from '@/lib/supabase/server'
  * nobody notices. (RLS still confines this to the caller's own memberships — it
  * was never another CUSTOMER's brand, which is why nothing looked wrong.)
  */
-export async function activeThemeTokens(workspaceId: string): Promise<ThemeTokens | null> {
+/**
+ * CACHED PER RENDER, since the app shell began reading this on every route.
+ *
+ * `/sites` and `/studio` also call it, so a page in either group would otherwise
+ * make the same query twice in one render: once for the shell's Brand Skin and
+ * once for its own preview. React's `cache` keys on the argument, so two
+ * workspaces in one render stay two reads and the tenant scoping is untouched.
+ */
+export const activeThemeTokens = cache(async function activeThemeTokens(
+  workspaceId: string,
+): Promise<ThemeTokens | null> {
   try {
     const supabase = createServerSupabase()
     const { data, error } = await supabase
@@ -51,4 +63,4 @@ export async function activeThemeTokens(workspaceId: string): Promise<ThemeToken
   } catch {
     return null
   }
-}
+})
