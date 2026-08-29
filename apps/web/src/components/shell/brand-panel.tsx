@@ -21,7 +21,24 @@ import { Button } from '@/components/ui/button'
  * no content until a person asks for it, and a spinner in its place would be a
  * claim that something is loading before anybody wanted it.
  */
-export function BrandPanel({ logoUrl, onClose }: { logoUrl: string | null; onClose: () => void }) {
+export function BrandPanel({
+  logoUrl,
+  skinOn,
+  hasTheme,
+  onToggleSkin,
+  onUseBrand,
+  onClose,
+}: {
+  logoUrl: string | null
+  /** Whether the customer's colours are painting the product right now. */
+  skinOn: boolean
+  /** Whether a brand has been stored at all. With none, there is nothing to switch to. */
+  hasTheme: boolean
+  onToggleSkin: () => void
+  /** Turn the brand colours ON, for the acts that mean exactly that. */
+  onUseBrand: () => void
+  onClose: () => void
+}) {
   const router = useRouter()
   const input = useRef<HTMLInputElement>(null)
   const [palette, setPalette] = useState<string[] | null>(null)
@@ -52,6 +69,9 @@ export function BrandPanel({ logoUrl, onClose }: { logoUrl: string | null; onClo
       const rest = (palette ?? []).filter((c) => c !== color)
       const { saveWorkspaceTheme } = await import('@/app/actions/theme')
       await saveWorkspaceTheme([color, ...rest])
+      // Choosing a colour IS asking for it, so it takes effect rather than being
+      // stored against a switch the person has not met.
+      onUseBrand()
       onClose()
       router.refresh()
     })
@@ -100,16 +120,32 @@ export function BrandPanel({ logoUrl, onClose }: { logoUrl: string | null; onClo
       className="surface-ring-firm absolute top-[calc(100%+8px)] left-0 z-15 w-[280px] rounded-card bg-surface p-3 shadow-pop"
     >
       <p className="type-sm text-ink">Your brand colour</p>
-      {/* THE CLAIM IS NARROWED TO WHAT SHIPS. This read "every button and link
-          follows it", which was true for the few hours Brand Skin painted the
-          whole document and became a lie the moment the founder scoped it back to
-          this mark. A sentence that is true in fewer cases than it says is a
-          defect, so it names the two places the colour actually reaches. */}
+      {/* THE CLAIM TRACKS THE MECHANISM, WHICH HAS MOVED TWICE IN A DAY. It once
+          read "every button and link follows it" while the paint was
+          unconditional, then named two places while it was confined to the mark.
+          Both were true when written and false a few hours later. What is true
+          now: the colour paints the product WHILE the switch is on, and the
+          light and dark themes are a different switch. */}
       <p className="type-xs mt-1 text-muted">
-        Sahoda picks the colour it saw most of. Choose a different one and it becomes your brand
-        colour here and on the website Sahoda builds for you. Your light and dark theme stay as they
-        are.
+        Sahoda picks the colour it saw most of. Choose a different one and your buttons and links
+        follow it while your brand colours are switched on. Light and dark stay on the moon.
       </p>
+
+      {/* ── THE SWITCH, STATED AS WHAT IT IS ────────────────────────────────────
+          Pressing the logo does this too. It is repeated here because a person
+          who opened the menu to fix an unreadable screen should not have to
+          guess that the way out is the button they just walked past, and because
+          this is the only place that can say which state they are in. */}
+      {hasTheme ? (
+        <div className="surface-ring mt-3 flex items-center justify-between gap-2 rounded-control p-2">
+          <span className="type-xs text-ink">
+            {skinOn ? 'Your brand colours are on' : 'Sahoda colours are on'}
+          </span>
+          <Button variant="secondary" disabled={busy} onClick={onToggleSkin}>
+            {skinOn ? 'Use Sahoda colours' : 'Use my colours'}
+          </Button>
+        </div>
+      ) : null}
 
       {palette && palette.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-2">
