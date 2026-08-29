@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 
-import { skinCss, skinIsGlobal, skinVarNames, SKIN_SCOPE } from './skin-css'
+import { skinCss, skinIsUnconditional, skinVarNames, SKIN_SCOPE } from './skin-css'
+import { SKIN_ATTR } from './skin-preference'
 import type { ThemeTokens } from '@sahoda/shared'
 
 /**
@@ -100,36 +101,41 @@ describe('skinCss', () => {
   })
 
   /**
-   * ── THE RULING THIS FILE NOW EXISTS TO HOLD ───────────────────────────────
-   * Founder's ruling, 2026-08-29: "Day/Night Theme Toggle should apply Sahoda
-   * Brand Theme. Only the Left Brand Logo should apply Brand Skin."
+   * ── THE RULING THIS FILE EXISTS TO HOLD ───────────────────────────────────
+   * Founder's ruling, 2026-08-29: Brand Skin is separate from the platform theme
+   * and switches back and forth, "because it will give the user more options if
+   * Brand Skin breaks the readability."
    *
-   * Brand Skin shipped as `:root:root` for a few hours and repainted every
-   * button, link and tint in the product from an automatic read of one PNG. A
-   * grey-and-white logo made the whole interface washed out. The regression is
-   * ONE CHARACTER away at all times — `:root` compiles, renders, and silently
-   * puts it back — so the guard names the failure rather than the rule text.
+   * Two shipped attempts got it wrong in opposite directions on the same day.
+   * `:root:root` repainted everything from an automatic read of one PNG with no
+   * way out. Scoping to the logo mark painted nothing, so there was nothing to
+   * switch. The rule must paint the DOCUMENT and be GATED on the attribute, and
+   * dropping the attribute leaves `:root`, which compiles and renders and
+   * silently restores attempt one.
    */
-  it('paints only what carries the scope, never the whole document', () => {
+  it('paints the document, and only while the switch is on', () => {
     const css = skinCss(TEAL)
 
     expect(css.startsWith(`${SKIN_SCOPE}{`)).toBe(true)
-    expect(skinIsGlobal(css)).toBe(false)
+    expect(SKIN_SCOPE).toContain(SKIN_ATTR)
+    expect(skinIsUnconditional(css)).toBe(false)
   })
 
   /** And the guard itself is worth nothing if it cannot see the defect. */
-  it('recognises the global rule it exists to forbid', () => {
-    expect(skinIsGlobal(skinCss(TEAL, ':root:root'))).toBe(true)
-    expect(skinIsGlobal(skinCss(TEAL, 'html'))).toBe(true)
+  it('recognises the ungated rule it exists to forbid', () => {
+    expect(skinIsUnconditional(skinCss(TEAL, ':root:root'))).toBe(true)
+    expect(skinIsUnconditional(skinCss(TEAL, 'html'))).toBe(true)
   })
 
   /**
-   * The attribute selector is 0,1,0 and `tokens.css`'s bare `:root` is 0,0,1, so
-   * the brand wins inside the mark without an `!important` and without depending
-   * on where a build puts a stylesheet.
+   * IT SAYS NOTHING ABOUT `data-theme`, and that is the separation. Light and
+   * dark belong to the moon and sun; the brand belongs to the logo. A scope that
+   * named both attributes would make one switch unable to work without the
+   * other, which is exactly the tangle the ruling ends.
    */
-  it('names an attribute, which is what outranks the default palette', () => {
-    expect(SKIN_SCOPE).toBe('[data-brand-skin]')
+  it('leaves light and dark entirely to the theme switch', () => {
+    expect(skinCss(TEAL)).not.toContain('data-theme')
+    expect(SKIN_SCOPE).not.toContain('data-theme')
   })
 
   /**
