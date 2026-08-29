@@ -18,7 +18,31 @@ describe('verdictOf', () => {
         reach: { value: 900, baseline: 100 },
         replies: { value: 40, previous: 1 },
       }),
-    ).toEqual({ kind: 'none', reason: 'too-few-posts' })
+    ).toEqual({ kind: 'none', reason: 'too-few-posts', measured: 1 })
+  })
+
+  it('carries the real measured count, so the sentence never invents one', () => {
+    // "One post measured so far" used to be printed at every count below the
+    // floor, including zero.
+    expect(
+      verdictOf({
+        postsMeasured: 0,
+        reach: { value: 0, baseline: 800 },
+        replies: { value: 0, previous: 4 },
+      }),
+    ).toEqual({ kind: 'none', reason: 'too-few-posts', measured: 0 })
+  })
+
+  it('refuses a verdict against a normal of nothing', () => {
+    // Three weeks that reached nobody is not a normal, and every sentence a
+    // verdict can produce is a percentage of one.
+    expect(
+      verdictOf({
+        postsMeasured: 4,
+        reach: { value: 500, baseline: 0 },
+        replies: { value: 5, previous: 2 },
+      }).kind,
+    ).toBe('none')
   })
 
   it('issues no verdict without a baseline, and never calls it a flat week', () => {

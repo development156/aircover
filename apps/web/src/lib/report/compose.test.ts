@@ -15,6 +15,7 @@ describe('the three numbers', () => {
       baseline: null,
       postsRan: 2,
       postsMeasured: 2,
+      posts: [],
     })
     expect(compared).toEqual({ status: 'learning', value: 400 })
     expect(comparisonLine(compared)).toContain('still learning your normal')
@@ -34,6 +35,7 @@ describe('the three numbers', () => {
       baseline: 1000,
       postsRan: 4,
       postsMeasured: 4,
+      posts: [],
     })
     expect(comparisonLine(compared)).toBe('up 34% on your normal')
   })
@@ -41,6 +43,28 @@ describe('the three numbers', () => {
   it('calls a small move no move', () => {
     const compared = comparedReplies({ status: 'ok', value: 13, previous: 12 })
     expect(comparisonLine(compared)).toBe('the same as last week')
+  })
+
+  it('draws no comparison on a week whose posts have not been counted yet', () => {
+    // Posts went out and the platforms have not reported. A baseline exists, so
+    // the naive arithmetic said "down 100% on your normal" about a week nobody
+    // had measured.
+    const compared = comparedReach({
+      status: 'ok',
+      value: 0,
+      baseline: 800,
+      postsRan: 3,
+      postsMeasured: 0,
+      posts: [],
+    })
+    expect(compared.status).toBe('learning')
+    expect(comparisonLine(compared)).not.toContain('100%')
+  })
+
+  it('never calls a rise from nothing "the same as last week"', () => {
+    const compared = comparedReplies({ status: 'ok', value: 12, previous: 0 })
+    expect(compared.status).toBe('learning')
+    expect(comparisonLine(compared)).not.toContain('same')
   })
 
   it('tells the reader how many enquiries are still on them', () => {

@@ -40,6 +40,8 @@ export type WeeklyRead =
       postsRan: number
       /** Posts that went out AND came back with a reading. */
       postsMeasured: number
+      /** Each post of the reported week with its highest reading. */
+      posts: ReadonlyArray<{ postId: string; title: string; channel: string; value: number }>
     }
   | { status: 'unreadable' }
 
@@ -51,13 +53,22 @@ function weeksBefore(fromIso: string, weeks: number): string {
   return new Date(from.getTime() - weeks * 7 * DAY_MS).toISOString().slice(0, 10)
 }
 
-/** Which of the four buckets a day falls in. 0 is the reported week, 1..3 older. */
+/**
+ * Which of the four buckets a day falls in. 0 is the reported week, 1..3 older.
+ *
+ * ── THE BOUNDARY BELONGS TO THE REPORTED WEEK, NOT THE ONE BEFORE IT ─────────
+ * The first version made the window half-open on the wrong side, so a post sent
+ * at exactly `from` midnight landed in a BASELINE week. That is a post moved out
+ * of the week it is being reported on and into the average it is compared
+ * against, which moves both halves of the comparison in opposite directions —
+ * the one arithmetic error that cannot be spotted from the page.
+ */
 function bucketOf(dayIso: string, fromIso: string): number {
   const days = Math.floor(
     (new Date(`${fromIso}T00:00:00Z`).getTime() - new Date(dayIso).getTime()) / DAY_MS,
   )
-  if (days < 0) return 0
-  return Math.floor(days / 7) + 1
+  if (days <= 0) return 0
+  return Math.floor((days - 1) / 7) + 1
 }
 
 /**
@@ -75,21 +86,14 @@ export async function readReach(
   const supabase = createServerSupabase()
   const since = weeksBefore(fromIso, BASELINE_WEEKS)
 
-  const [logs, snapshots] = await Promise.all([
-    supabase
-      .from('post_publish_logs')
-      .select('post_id, published_at')
-      .eq('workspace_id', workspaceId)
-      .eq('status', 'succeeded')
-      .gte('published_at', `${since}T00:00:00Z`)
-      .lte('published_at', `${toIso}T23:59:59Z`),
-    supabase
-      .from('post_metric_snapshots')
-      .select('post_id, value')
-      .eq('workspace_id', workspaceId)
-      .eq('metric', 'reach'),
-  ])
-  if (logs.error || snapshots.error) return { status: 'unreadable' }
+  const logs = await supabase
+    .from('post_publish_logs')
+    .select('post_id, published_at')
+    .eq('workspace_id', workspaceId)
+    .eq('status', 'succeeded')
+    .gte('published_at', `${since}T00:00:00Z`)
+    .lte('published_at', `${toIso}T23:59:59Z`)
+  if (logs.error) return { status: 'unreadable' }
 
   // One publish week per post: the earliest successful send. A retry on Friday
   // does not move a Tuesday post into a different week.
@@ -103,15 +107,32 @@ export async function readReach(
     if (found === undefined || bucket > found) publishedIn.set(row.post_id as string, bucket)
   }
 
-  // One value per post: the highest reading it ever reached.
+  /**
+   * ── THE READING IS ASKED FOR BY POST, NOT SWEPT AND FILTERED ───────────────
+   * This used to select every reach row the workspace had ever recorded and
+   * throw away the ones it did not want. PostgREST caps a response at a
+   * thousand rows, so a workspace with a year of history would silently lose
+   * posts off the end — understating this week AND the normal it is compared
+   * against, with nothing on the page to show it had happened. Four weeks of
+   * posts is a list short enough to name.
+   */
   const highest = new Map<string, number>()
-  for (const row of snapshots.data ?? []) {
-    const id = row.post_id as string
-    if (!publishedIn.has(id)) continue
-    const value = Number(row.value)
-    if (!Number.isFinite(value)) continue
-    const found = highest.get(id)
-    if (found === undefined || value > found) highest.set(id, value)
+  const ids = [...publishedIn.keys()]
+  if (ids.length > 0) {
+    const snapshots = await supabase
+      .from('post_metric_snapshots')
+      .select('post_id, value')
+      .eq('workspace_id', workspaceId)
+      .eq('metric', 'reach')
+      .in('post_id', ids)
+    if (snapshots.error) return { status: 'unreadable' }
+    for (const row of snapshots.data ?? []) {
+      const id = row.post_id as string
+      const value = Number(row.value)
+      if (!Number.isFinite(value)) continue
+      const found = highest.get(id)
+      if (found === undefined || value > found) highest.set(id, value)
+    }
   }
 
   const totals = new Array<number>(BASELINE_WEEKS + 1).fill(0)
@@ -132,12 +153,33 @@ export async function readReach(
   let postsRan = 0
   for (const bucket of publishedIn.values()) if (bucket === 0) postsRan += 1
 
+  /**
+   * The titles are fetched HERE rather than by the page, because the page would
+   * have to await this list first and then await the titles — a second round
+   * trip in series on a screen somebody opens on a phone. Inside this function
+   * it is one read's worth of work either way.
+   */
+  const measuredIds = [...publishedIn.entries()]
+    .filter(([postId, bucket]) => bucket === 0 && highest.has(postId))
+    .map(([postId]) => postId)
+  const named = await readPostTitles(workspaceId, measuredIds)
+
+  const posts = measuredIds
+    .map((postId) => ({
+      postId,
+      title: named.get(postId)?.title ?? 'Untitled',
+      channel: named.get(postId)?.channel ?? '',
+      value: highest.get(postId) as number,
+    }))
+    .sort((a, b) => b.value - a.value)
+
   return {
     status: 'ok',
     value: totals[0] ?? 0,
     baseline,
     postsRan,
     postsMeasured: measured[0] ?? 0,
+    posts,
   }
 }
 
@@ -215,5 +257,42 @@ export async function readPlanTimes(
   if (error) return new Map()
   return new Map(
     (data ?? []).map((row) => [row.id as string, (row.scheduled_at as string) ?? null]),
+  )
+}
+
+/**
+ * The title and channel of each post named in the report.
+ *
+ * The channel comes from the publish log rather than `posts.channels`, because a
+ * post sent to two places has two rows there and only one of them carries the
+ * reading this page ranked.
+ */
+export async function readPostTitles(
+  workspaceId: string,
+  postIds: readonly string[],
+): Promise<Map<string, { title: string; channel: string }>> {
+  if (postIds.length === 0) return new Map()
+  const supabase = createServerSupabase()
+  const [posts, logs] = await Promise.all([
+    supabase
+      .from('posts')
+      .select('id, title')
+      .eq('workspace_id', workspaceId)
+      .in('id', [...postIds]),
+    supabase
+      .from('post_publish_logs')
+      .select('post_id, channel')
+      .eq('workspace_id', workspaceId)
+      .eq('status', 'succeeded')
+      .in('post_id', [...postIds]),
+  ])
+  if (posts.error) return new Map()
+  const channels = new Map<string, string>()
+  for (const row of logs.data ?? []) channels.set(row.post_id as string, row.channel as string)
+  return new Map(
+    (posts.data ?? []).map((row) => [
+      row.id as string,
+      { title: (row.title as string) ?? 'Untitled', channel: channels.get(row.id as string) ?? '' },
+    ]),
   )
 }

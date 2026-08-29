@@ -18,9 +18,21 @@ export function readable(value: number): string {
 
 export function comparedReach(read: WeeklyRead): Compared {
   if (read.status === 'unreadable') return { status: 'unreadable' }
+  /**
+   * ── A WEEK WITH NO READINGS YET IS NOT A WEEK THAT REACHED NOBODY ──────────
+   * Posts go out on Tuesday and the platforms report days later, so between
+   * those two moments the total is 0 with a real baseline sitting beside it —
+   * and the card said "down 100% on your normal" about a week that had simply
+   * not been counted yet. That is the worst sentence on the page: alarming,
+   * specific, and false.
+   */
+  if (read.postsMeasured === 0) return { status: 'learning', value: read.value }
   if (read.baseline === null) return { status: 'learning', value: read.value }
   const pct = percentMove(read.value, read.baseline)
-  if (pct === null || pct < 10) {
+  // No percentage exists against a zero normal, and "about your normal" would
+  // be a comparison drawn from one.
+  if (pct === null) return { status: 'learning', value: read.value }
+  if (pct < 10) {
     return { status: 'ok', value: read.value, comparison: REPORT.numbers.sameAsNormal }
   }
   return {
@@ -37,7 +49,10 @@ export function comparedReplies(read: CountRead): Compared {
   if (read.status === 'unreadable') return { status: 'unreadable' }
   if (read.previous === null) return { status: 'learning', value: read.value }
   const pct = percentMove(read.value, read.previous)
-  if (pct === null || pct < 10) {
+  // Nobody wrote back last week and twelve people did this week is not "the
+  // same as last week", which is what a null percentage used to render.
+  if (pct === null) return { status: 'learning', value: read.value }
+  if (pct < 10) {
     return { status: 'ok', value: read.value, comparison: REPORT.numbers.sameAsLastWeek }
   }
   return {

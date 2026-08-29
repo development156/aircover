@@ -14,8 +14,16 @@ describe('toPlainText', () => {
     expect(text).toContain('One enquiry is waiting')
   })
 
-  it('carries no markdown, because WhatsApp renders none', () => {
-    expect(toPlainText(SAMPLE_REPORT)).not.toMatch(/[*_#`|]/)
+  /**
+   * THE CLAIM IS ABOUT THE TEMPLATE, AND IT IS WORTH STATING NARROWLY.
+   * `changed[]` and the action line carry text a model wrote and a database
+   * stored, so an asterisk CAN reach the message through them — this assertion
+   * would be a false guarantee if it were read as "the output never contains
+   * one". What it pins is that nothing this file adds is markup.
+   */
+  it('adds no markup of its own, because WhatsApp renders none', () => {
+    const bare = toPlainText({ ...SAMPLE_REPORT, changed: ['Moved the posts'] })
+    expect(bare).not.toMatch(/[*_#`|]/)
   })
 
   it('drops from the bottom rather than overflowing', () => {

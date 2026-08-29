@@ -81,7 +81,11 @@ test.describe('@smoke the Marketing Brain', () => {
     const block = page.getByRole('heading', { name: 'What I noticed on my own' })
     await expect(block).toBeVisible()
     // It names the FLOOR, so the reader knows what would change it.
-    await expect(page.getByText(/takes a run of posts, not a few/i)).toBeVisible()
+    // The floor sentence, so the reader knows what would change it. The string
+    // this line used to look for existed nowhere in `src` and had not for as
+    // long as git remembers, so the assertion could only ever fail. This is the
+    // sentence the never-examined branch actually renders.
+    await expect(page.getByText(/reads your published posts once a week/i)).toBeVisible()
     // And it never claims a failure. This is the assertion that would catch a
     // read error being rendered as an absence.
     await expect(page.getByText(/couldn.t read what it has noticed/i)).toHaveCount(0)
@@ -107,6 +111,6 @@ test.describe('@smoke the Marketing Brain', () => {
     await expect(page.getByText('Exclamation marks per post, earlier')).toBeVisible()
     await expect(page.getByText(/Sahoda did not ask a model for this/i)).toBeVisible()
     // The floor sentence is gone now that there is something to say.
-    await expect(page.getByText(/takes a run of posts, not a few/i)).toHaveCount(0)
+    await expect(page.getByText(/reads your published posts once a week/i)).toHaveCount(0)
   })
 })

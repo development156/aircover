@@ -1,6 +1,7 @@
 import type { ReportView } from './model'
 import { comparisonLine, readable } from './compose'
 import { REPORT } from './strings'
+import { withheldSentence } from './withheld'
 
 /**
  * THE REPORT AS ONE MESSAGE, FOR WHATSAPP.
@@ -25,10 +26,8 @@ export function toPlainText(report: ReportView): string {
 
   if (report.verdict.kind !== 'none') {
     parts.push(`${report.verdict.headline} ${report.verdict.support}`)
-  } else if (report.verdict.reason === 'too-few-posts') {
-    parts.push(REPORT.verdict.tooFewPosts)
   } else {
-    parts.push(REPORT.verdict.noBaseline)
+    parts.push(withheldSentence(report.verdict))
   }
 
   const numbers = [

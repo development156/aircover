@@ -5,6 +5,7 @@ import { comparisonLine, readable } from '@/lib/report/compose'
 import type { Compared, OneThing, PlanRow, WorkedPost } from '@/lib/report/model'
 import { REPORT } from '@/lib/report/strings'
 import type { Verdict } from '@/lib/report/verdict'
+import { withheldSentence } from '@/lib/report/withheld'
 
 /**
  * THE REPORT'S SECTIONS, AND NOT ONE OF THEM READS A DATABASE.
@@ -26,20 +27,24 @@ export function VerdictBlock({
   week,
 }: {
   verdict: Verdict
-  week: { label: string; postsRan: number; channels: readonly string[] }
+  week: { label: string; postsRan: number | null; channels: readonly string[] }
 }) {
-  const ran = week.postsRan === 1 ? '1 post' : `${week.postsRan} posts`
+  // A null count is a count nobody read. It used to render as "0 posts", which
+  // is a statement about the reader's week made out of a failed request.
+  const ran =
+    week.postsRan === null ? null : week.postsRan === 1 ? '1 post' : `${week.postsRan} posts`
   return (
     <section>
       <p className="type-meta text-muted">
         {[week.label, ran, week.channels.join(', ')].filter(Boolean).join(' · ')}
       </p>
+      {/* ── THE VERDICT IS ALWAYS AN h2, INCLUDING WHEN IT IS WITHHELD ──────
+          It used to be a paragraph in heading clothes on the suppressed branch,
+          which is the COMMON state for a new workspace — so the document went
+          h1 straight to h3 and somebody moving by headings skipped the answer
+          the page exists to give. */}
       {verdict.kind === 'none' ? (
-        <p className="type-h2 mt-2 max-w-[46ch] text-ink">
-          {verdict.reason === 'too-few-posts'
-            ? REPORT.verdict.tooFewPosts
-            : REPORT.verdict.noBaseline}
-        </p>
+        <h2 className="type-h2 mt-2 max-w-[46ch] text-ink">{withheldSentence(verdict)}</h2>
       ) : (
         <>
           <h2 className="type-h1 mt-2 text-ink">{verdict.headline}</h2>
@@ -115,7 +120,7 @@ export function WorkedBlock({
             {post.title}
           </Link>
           <p className="type-sm num mt-1 text-muted">
-            {readable(post.value)} {post.measure} on {post.channel}
+            {readable(post.value)} {post.measure} on {post.channelName}
           </p>
           {reason ? <p className="type-sm mt-2 text-muted">{reason}</p> : null}
         </section>
