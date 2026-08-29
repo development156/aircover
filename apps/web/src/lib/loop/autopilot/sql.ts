@@ -118,3 +118,65 @@ export const WRITE_DECISION_SQL = `insert into loop_autopilot_log
         brief_id, cycle_id, decision, refusal_reason, dispatch_after)
 values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 returning id`
+
+/**
+ * The posts autopilot may CONSIDER: one row per variant the Loop planned, on a
+ * channel the customer armed to level 3, that has not gone out.
+ *
+ * ── SCOPED THROUGH loop_briefs, NEVER THROUGH posts.origin ───────────────────
+ * The rule this schema already follows in two places, both of which say why:
+ * `20260820000400_loop_rpcs.sql` and the kill switch in
+ * `20260820000600_loop_kill_switch_reported.sql`. `origin` is one text column
+ * that can only record where a post came from LAST, so it cannot tell a Loop
+ * post from a hand-written one once anything else has touched it. `loop_briefs`
+ * carries a real link, guarded by a tenancy trigger, and there is a partial
+ * index for exactly this read (`loop_briefs_linked_posts`).
+ *
+ * Reading `origin` instead would be worse than untidy here: it would let
+ * autopilot publish a post the Loop never planned, in a customer's voice, with
+ * nobody watching.
+ *
+ * ── WHY THE DIAL IS JOINED RATHER THAN FILTERED IN CODE ──────────────────────
+ * An INNER join on `level = 3` means a channel nobody armed produces NO ROW at
+ * all, so it cannot reach `decideOne` and be mis-defaulted on the way. The code
+ * refuses `undefined` by name as well; this is the half that makes that refusal
+ * hard to reach rather than the half that reports it.
+ *
+ * ── AND WHY publish_status IS CHECKED HERE ───────────────────────────────────
+ * `pending` and `scheduled` are the two states a variant can be in before it
+ * goes out. `published`, `publishing`, `failed` and `skipped` are each a reason
+ * not to consider it, and the most important is `publishing`: that variant is
+ * in flight right now, and picking it up would publish it twice.
+ *
+ * Parameters: $1 workspace_id, $2 row limit.
+ */
+export const AUTOPILOT_CANDIDATES_SQL = `select p.id            as post_id,
+       v.id            as variant_id,
+       v.channel       as channel,
+       v.body          as body,
+       v.last_error    as last_error,
+       b.id            as brief_id,
+       b.cycle_id      as cycle_id
+  from loop_briefs b
+  join posts p
+    on p.id = b.post_id
+   and p.workspace_id = b.workspace_id
+  join post_variants v
+    on v.post_id = p.id
+   and v.workspace_id = p.workspace_id
+  join loop_channel_autonomy d
+    on d.workspace_id = b.workspace_id
+   and d.channel = v.channel
+   and d.level = 3
+ where b.workspace_id = $1
+   and b.post_id is not null
+   and b.included
+   and v.publish_status in ('pending', 'scheduled')
+   and not exists (
+     select 1 from loop_autopilot_log a
+      where a.workspace_id = b.workspace_id
+        and a.post_id = p.id
+        and a.variant_id = v.id
+   )
+ order by b.priority asc, v.created_at asc
+ limit $2`

@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { bootFullSchema } from './helpers/pglite-tenant'
 
 import {
+  AUTOPILOT_CANDIDATES_SQL,
   AUTOPILOT_SETTINGS_SQL,
   DIAL_SQL,
   PENDING_ANNOUNCEMENTS_SQL,
@@ -305,5 +306,143 @@ describe('the autopilot dispatcher SQL against the real schema', () => {
         null,
       ]),
     ).rejects.toThrow()
+  })
+
+  describe('the candidate scan', () => {
+    const CPOST = 'aa000000-0000-4000-8000-000000000001'
+    const CVAR = 'bb000000-0000-4000-8000-000000000002'
+    const CYCLE = 'cc000000-0000-4000-8000-000000000003'
+
+    beforeAll(async () => {
+      await db.exec(`
+        -- The dial cannot reach level 3 without BOTH preconditions the trigger
+        -- in 20260828120000_loop_autopilot_l3.sql enforces. This fixture
+        -- satisfies them for real rather than working around them: a cycle a
+        -- person approved the cost of and which reached the end, and a brain
+        -- with the four named fields confirmed. Writing them here is what
+        -- makes the later update to level 3 legal, and the first
+        -- draft of this file left them out and was correctly refused with
+        -- AUTOPILOT_NEEDS_SUPERVISED_CYCLE.
+        -- Approval is ONE FACT IN THREE COLUMNS and loop_cycles checks them
+        -- together: who, when, and how much was approved. Setting only
+        -- cost_approved_by is a row nobody writes on purpose, and the table
+        -- refuses it -- which this fixture found the hard way.
+        insert into loop_cycles (id, workspace_id, iso_year, iso_week, status,
+                                 cost_approved_by, cost_approved_at, approved_credits)
+          values ('${CYCLE}', '${WS}', 2026, 35, 'reported', '${USER}', now(), 29);
+        insert into brand_memory (workspace_id, version, status, payload, source)
+          values ('${WS}', 1, 'active', '{"field_meta":{
+                    "hook.core_promise":{"confirmed":true},
+                    "customer_persona.primary_pain_point":{"confirmed":true},
+                    "voice.descriptor":{"confirmed":true},
+                    "taboo.red_lines":{"confirmed":true}}}'::jsonb, 'resolved');
+        insert into posts (id, workspace_id, title, status, channels, created_by)
+          values ('${CPOST}', '${WS}', 'A planned post', 'draft', '{x}', '${USER}');
+        insert into post_variants (id, workspace_id, post_id, channel, body, publish_status)
+          values ('${CVAR}', '${WS}', '${CPOST}', 'x', 'the body', 'pending');
+        insert into loop_briefs (id, workspace_id, cycle_id, title, body, channels, post_id, priority)
+          values ('dd000000-0000-4000-8000-000000000004', '${WS}', '${CYCLE}',
+                  'brief', 'brief body', '{x}', '${CPOST}', 1);
+      `)
+    }, 120_000)
+
+    it('parses and executes against the real schema', async () => {
+      await db.query(AUTOPILOT_CANDIDATES_SQL, [WS, 50])
+    })
+
+    it('finds NOTHING while the channel sits at level 2', async () => {
+      // The dial is inserted at level 2 in the outer beforeAll. A channel
+      // nobody armed must produce no row at all, so it cannot be defaulted
+      // to something on the way to the decision.
+      const r = await db.query(AUTOPILOT_CANDIDATES_SQL, [WS, 50])
+      expect(r.rows).toHaveLength(0)
+    })
+
+    it('finds the post once the dial reaches level 3, and names its brief and cycle', async () => {
+      await db.exec(`update loop_channel_autonomy set level = 3
+                      where workspace_id = '${WS}' and channel = 'x'`)
+      const r = await db.query<{
+        post_id: string
+        variant_id: string
+        channel: string
+        body: string
+        brief_id: string
+        cycle_id: string
+      }>(AUTOPILOT_CANDIDATES_SQL, [WS, 50])
+      expect(r.rows).toHaveLength(1)
+      expect(r.rows[0]).toMatchObject({
+        post_id: CPOST,
+        variant_id: CVAR,
+        channel: 'x',
+        body: 'the body',
+        cycle_id: CYCLE,
+      })
+    })
+
+    it('a post the Loop never planned is invisible to it, however armed the channel', async () => {
+      // Scoped through loop_briefs, never posts.origin. This post has no brief.
+      const stray = 'ee000000-0000-4000-8000-000000000005'
+      await db.exec(`
+        insert into posts (id, workspace_id, title, status, channels, created_by)
+          values ('${stray}', '${WS}', 'Hand written', 'draft', '{x}', '${USER}');
+        insert into post_variants (workspace_id, post_id, channel, body, publish_status)
+          values ('${WS}', '${stray}', 'x', 'typed by a person', 'pending');
+      `)
+      const r = await db.query<{ post_id: string }>(AUTOPILOT_CANDIDATES_SQL, [WS, 50])
+      expect(r.rows.map((x) => x.post_id)).not.toContain(stray)
+    })
+
+    it('a variant already in flight is never picked up, which would publish it twice', async () => {
+      await db.exec(`update post_variants set publish_status = 'publishing' where id = '${CVAR}'`)
+      const r = await db.query(AUTOPILOT_CANDIDATES_SQL, [WS, 50])
+      expect(r.rows).toHaveLength(0)
+      await db.exec(`update post_variants set publish_status = 'pending' where id = '${CVAR}'`)
+    })
+
+    it('a brief the person trimmed out of the plan is not a candidate', async () => {
+      await db.exec(`update loop_briefs set included = false where post_id = '${CPOST}'`)
+      const r = await db.query(AUTOPILOT_CANDIDATES_SQL, [WS, 50])
+      expect(r.rows).toHaveLength(0)
+      await db.exec(`update loop_briefs set included = true where post_id = '${CPOST}'`)
+    })
+
+    it('stops being a candidate once autopilot has already decided on it', async () => {
+      await db.query(WRITE_DECISION_SQL, [
+        WS,
+        CPOST,
+        CVAR,
+        'x',
+        'acct-1',
+        null,
+        null,
+        'refused',
+        'DAILY_CAP',
+        null,
+      ])
+      const r = await db.query(AUTOPILOT_CANDIDATES_SQL, [WS, 50])
+      expect(r.rows).toHaveLength(0)
+    })
+
+    it('never crosses a workspace boundary', async () => {
+      // A LIVE candidate has to exist in WS for this to mean anything. The
+      // first draft asserted only that OTHER saw nothing, and by the time it
+      // ran the preceding test had already retired the one candidate — so
+      // dropping the workspace filter entirely left this test GREEN. It was
+      // measuring an empty world, not a boundary.
+      const fresh = 'ff000000-0000-4000-8000-000000000006'
+      await db.exec(`
+        insert into posts (id, workspace_id, title, status, channels, created_by)
+          values ('${fresh}', '${WS}', 'Still to go out', 'draft', '{x}', '${USER}');
+        insert into post_variants (workspace_id, post_id, channel, body, publish_status)
+          values ('${WS}', '${fresh}', 'x', 'unspoken for', 'pending');
+        insert into loop_briefs (workspace_id, cycle_id, title, body, channels, post_id, priority)
+          values ('${WS}', '${CYCLE}', 'b2', 'body', '{x}', '${fresh}', 2);
+      `)
+      const mine = await db.query<{ post_id: string }>(AUTOPILOT_CANDIDATES_SQL, [WS, 50])
+      expect(mine.rows.map((x) => x.post_id)).toContain(fresh)
+
+      const theirs = await db.query(AUTOPILOT_CANDIDATES_SQL, [OTHER, 50])
+      expect(theirs.rows).toHaveLength(0)
+    })
   })
 })
