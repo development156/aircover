@@ -100,9 +100,15 @@ export function BrandPanel({ logoUrl, onClose }: { logoUrl: string | null; onClo
       className="surface-ring-firm absolute top-[calc(100%+8px)] left-0 z-15 w-[280px] rounded-card bg-surface p-3 shadow-pop"
     >
       <p className="type-sm text-ink">Your brand colour</p>
+      {/* THE CLAIM IS NARROWED TO WHAT SHIPS. This read "every button and link
+          follows it", which was true for the few hours Brand Skin painted the
+          whole document and became a lie the moment the founder scoped it back to
+          this mark. A sentence that is true in fewer cases than it says is a
+          defect, so it names the two places the colour actually reaches. */}
       <p className="type-xs mt-1 text-muted">
-        Sahoda picks the colour it saw most of. Choose a different one and every button and link
-        follows it. Your light and dark theme do not change.
+        Sahoda picks the colour it saw most of. Choose a different one and it becomes your brand
+        colour here and on the website Sahoda builds for you. Your light and dark theme stay as they
+        are.
       </p>
 
       {palette && palette.length > 0 ? (
