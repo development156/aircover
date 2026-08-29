@@ -135,9 +135,16 @@ export function useBuild({
    * ── AND THE HOLE IS BIGGER HERE THAN IT WAS THERE ───────────────────────────
    * The old flow dispatched through `useActionState`, so React's action queue
    * SERIALISED two presses into two charges. `start` is a bare async function:
-   * two presses run CONCURRENTLY, both reach `resolveOnboarding`, and
-   * `newResolveObjectRef` mints a fresh ledger key per call — so two dispatches
-   * are two charges of `brand_research`.
+   * two presses run CONCURRENTLY and both reach `resolveOnboarding`.
+   *
+   * The ledger key is now bound to the active brain version rather than minted
+   * fresh per call (`lib/brand/resolve-object-ref.ts`), so two concurrent
+   * dispatches would carry the SAME key and settle as one charge. **This guard
+   * is still the one that must hold.** Exactly-once there is a settlement
+   * property, not a scheduling one: two overlapping HOLDs on one key race, the
+   * loser surfaces as a failed build to somebody who pressed a button twice,
+   * and both run a real model call we pay for. The ledger stops the double
+   * charge; this stops the double request.
    *
    * There are FOUR ways in, not one:
    *   · `#next`  "Build my Brand Brain" on the last step
