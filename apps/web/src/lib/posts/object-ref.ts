@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 
 /**
  * Ledger idempotency namespaces for the two paid post actions. **Server-derived
- * only** — mirrors `newResolveObjectRef`, and for the same reason.
+ * only** — mirrors `resolveObjectRef`, and for the same reason.
  *
  * `withCredits` keys exactly-once on `(action, objectRef)`, and billing's
  * `nextAttempt()` deliberately REUSES the attempt when the previous one settled
