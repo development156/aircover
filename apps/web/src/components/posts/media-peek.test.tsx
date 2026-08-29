@@ -219,6 +219,81 @@ describe('the photo preview on a post tile', () => {
     expect(classes).toContain('dark:text-[var(--canvas)]')
   })
 
+  test('lays two photos out side by side, never stacked one under the other', async () => {
+    const user = userEvent.setup()
+    render(
+      <MediaPeek
+        items={[
+          { id: 'm1', url: 'https://signed.example/a.jpg', alt: null },
+          { id: 'm2', url: 'https://signed.example/b.jpg', alt: null },
+        ]}
+        postTitle="Grand Visitor Day"
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: /Preview 2 photos/ }))
+
+    // ── THE DEFECT, REPORTED FROM THE SCREEN ─────────────────────────────────
+    // Two photos were laid out `space-y-3`, each `max-h-[60dvh] w-full`. Two
+    // similar pictures that way read as ONE tall picture being scrolled: the
+    // pair in the report were near-identical logos and the boundary between
+    // them was invisible. A stack is not wrong because the gap is small — it is
+    // wrong because nothing in it says which photo is which.
+    //
+    // A class assertion, and here is the honest limit: jsdom has no layout
+    // engine, so nothing here can prove two cells sit on one row. What it CAN
+    // prove is the thing that regressed — the container going back to a stack.
+    // Read as whole tokens, because `space-y-3` contains no substring that
+    // `grid` does not also survive.
+    const figure = screen.getAllByRole('figure')[0]
+    const container = figure?.parentElement
+    const classes = (container?.className ?? '').split(/\s+/)
+    expect(classes).toContain('grid')
+    expect(classes).toContain('narrow:grid-cols-2')
+    expect(classes).not.toContain('space-y-3')
+  })
+
+  test('numbers each photo, so two alike are still two', async () => {
+    const user = userEvent.setup()
+    render(
+      <MediaPeek
+        items={[
+          { id: 'm1', url: 'https://signed.example/a.jpg', alt: null },
+          { id: 'm2', url: 'https://signed.example/b.jpg', alt: null },
+        ]}
+        postTitle="Grand Visitor Day"
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: /Preview 2 photos/ }))
+
+    // The caption is the half of the fix that survives without layout: even
+    // stacked on a phone, "Photo 1 of 2" and "Photo 2 of 2" tell a reader where
+    // one ends and the next begins. Two identical logos cannot do that alone.
+    expect(screen.getByText(/Photo 1 of 2/)).toBeVisible()
+    expect(screen.getByText(/Photo 2 of 2/)).toBeVisible()
+  })
+
+  test('a single photo is NOT gridded, and is not told it is one of one', async () => {
+    const user = userEvent.setup()
+    render(
+      <MediaPeek
+        items={[{ id: 'm1', url: 'https://signed.example/a.jpg', alt: null }]}
+        postTitle="Cardamom Chai"
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: /Preview the photo/ }))
+
+    // One photo gets the whole width, because there is nothing to compare it
+    // against and halving it would be a worse look for no reason. And "Photo 1
+    // of 1" is noise about a fact already on the screen.
+    const figure = screen.getAllByRole('figure')[0]
+    const classes = (figure?.parentElement?.className ?? '').split(/\s+/)
+    expect(classes).not.toContain('grid')
+    expect(screen.queryByText(/Photo 1 of 1/)).not.toBeInTheDocument()
+  })
+
   test('sits above the card’s stretched link so the thumbnail is clickable at all', () => {
     render(
       <MediaPeek
