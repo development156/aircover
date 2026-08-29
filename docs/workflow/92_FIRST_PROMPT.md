@@ -145,9 +145,12 @@ Nothing works without the first two.
    Sentry and Resend are sign-in pop-ups.
 3. **Re-install the plugins**, including the private `divas-personal`
    marketplace. `scripts/account-import.sh` prints the list.
-4. **Cloud only:** paste the same secret values into the cloud session's
-   environment settings once. `scripts/cloud-setup.sh` then runs on its own and
-   handles the browser and the guards.
+4. **Cloud only:** set the environment's **Setup script** field to
+   `bash setup.sh` (never `scripts/cloud-setup.sh` directly — a branch without
+   that file exits 127 and the harness then refuses to start the session), set
+   `SAHODA_LANE_OWNER`, and paste the same secret values into the environment
+   settings once. It then runs on its own and handles the browser and the
+   guards.
 
 ## Local vs cloud, in one line each
 
