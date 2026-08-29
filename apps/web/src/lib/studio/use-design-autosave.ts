@@ -101,6 +101,40 @@ export function useDesignAutosave({
   // why the first of those needs `popstate` rather than a teardown.
   useFlushOnLeave(() => void flush())
 
+  /**
+   * The way out that the three events above DO NOT cover: a forward link.
+   *
+   * `popstate` fires on Back and Forward. It does not fire on a `pushState`
+   * navigation, which is what a Next `<Link>` does, so clicking "All designs"
+   * at the top of the editor, or "Open your library" under the export, fired
+   * none of the three and lost whatever had been typed since the last save.
+   * That is the commonest deliberate way off this screen, so covering only the
+   * others would have made the claim in `autosave.ts` true in fewer cases than
+   * it states.
+   *
+   * Capture phase, so this runs before the router's own handler. It does not
+   * block the navigation and does not need to: no document unload happens on a
+   * client-side route change, so the request stays in flight and completes.
+   *
+   * Modified clicks and non-primary buttons are ignored because they open a new
+   * tab or a menu and leave this page exactly where it is.
+   */
+  useEffect(() => {
+    if (!dirty) return
+    const onClick = (event: MouseEvent) => {
+      if (event.defaultPrevented) return
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return
+      }
+      const target = event.target
+      if (!(target instanceof Element)) return
+      if (target.closest('a[href]') === null) return
+      void flush()
+    }
+    document.addEventListener('click', onClick, true)
+    return () => document.removeEventListener('click', onClick, true)
+  }, [dirty, flush])
+
   // The second belt, for the one case the flush above may not finish: a closed
   // tab or a hard reload. The browser decides whether to show anything, but not
   // asking at all would be our failure rather than theirs.

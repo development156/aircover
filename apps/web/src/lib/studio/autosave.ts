@@ -23,6 +23,14 @@ import type { DesignDocument } from '@sahoda/shared'
  * tab or a hard reload, where the flush may not finish. It is the second belt,
  * not the strategy.
  *
+ * ── "EVERY ROUTE OUT" HAS FOUR MEMBERS, NOT THREE ───────────────────────────
+ * `useFlushOnLeave` covers Back, a backgrounded tab and a real unload. It does
+ * NOT cover a forward link: `popstate` fires on Back and Forward, not on the
+ * `pushState` a Next `<Link>` performs. "All designs" at the top of the editor
+ * is a forward link and is the commonest deliberate way off the screen, so the
+ * hook adds a fourth listener for it. Three out of four would have been a claim
+ * true in fewer cases than this header states.
+ *
  * Pure: no I/O, no clock, no React.
  */
 
@@ -104,7 +112,14 @@ export function draftIsDirty(draft: DesignDraft, saved: DesignDraft): boolean {
  * change no test in either direction.
  */
 export function canonicalKey(draft: DesignDraft): string {
-  return JSON.stringify(canonical(draft))
+  // The title is TRIMMED, matching `TitleSchema` in `app/actions/studio.ts`
+  // (`z.string().trim()`). This is not cosmetic and it is not optional: the
+  // server stores the trimmed title, so a draft ending in a space can never
+  // equal the row that comes back, and without this the editor would write the
+  // same row every 1.2 seconds for as long as that space is there. Trimming
+  // here rather than in the editor's state means nothing is yanked out from
+  // under somebody who is mid-word.
+  return JSON.stringify(canonical({ ...draft, title: draft.title.trim() }))
 }
 
 /** Where a save has got to. `at` is the moment the row came back, not the moment it was sent. */
