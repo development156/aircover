@@ -77,6 +77,26 @@ describe('draftIsDirty', () => {
     expect(draftIsDirty(typed, fromDatabase)).toBe(false)
   })
 
+  /**
+   * The title is trimmed because `TitleSchema` trims it server-side, so a draft
+   * ending in a space could never equal the row that comes back and the editor
+   * would write it forever.
+   */
+  test('a title the server will trim is not dirty', () => {
+    const saved = draft('Open Sunday')
+    expect(draftIsDirty({ ...saved, title: `${saved.title} ` }, saved)).toBe(false)
+  })
+
+  /**
+   * AND THE TRIM STOPS AT THE TITLE. Slot text is stored exactly as typed, so a
+   * trailing space inside a headline is a real change somebody made and a save
+   * they are owed. Trimming every string in the document would silently drop
+   * it, and the loop guard above would still pass.
+   */
+  test('a trailing space inside a slot is dirty, because the server keeps it', () => {
+    expect(draftIsDirty(draft('Open Sunday '), draft('Open Sunday'))).toBe(true)
+  })
+
   /** Slide ORDER is meaning, so arrays are compared in order and not sorted. */
   test('reordering slides is dirty', () => {
     const a: DesignDraft = {
