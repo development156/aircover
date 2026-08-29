@@ -22,7 +22,6 @@ import {
   canAdvance,
   clearState,
   isStepId,
-  DEFAULT_COLORS,
   DEFAULT_DATA,
   energyOf,
   loadState,
@@ -89,7 +88,8 @@ export function OnboardingStage({
   const [dir, setDir] = useState(1)
   const [data, setData] = useState<OnboardingData>(() => ({
     ...DEFAULT_DATA,
-    colors: { ...DEFAULT_COLORS },
+    palette: [],
+    logoName: '',
   }))
   const [hydrated, setHydrated] = useState(false)
   const [door, setDoor] = useState<DoorOutcome>({ kind: 'none' })
@@ -457,7 +457,7 @@ export function OnboardingStage({
     ) : step === '3' ? (
       <AudienceStep data={data} patch={patch} />
     ) : step === '4' ? (
-      <VisualStep data={data} patch={patch} />
+      <VisualStep data={data} patch={patch} onLogo={build.takeLogo} />
     ) : step === '5' ? (
       <KnowledgeStep data={data} patch={patch} />
     ) : step === 'comp' ? (

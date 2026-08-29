@@ -13,6 +13,7 @@ import {
 
 import { duplicateMessage } from '@/lib/assets/duplicate-copy'
 import { kindForProvenMime } from '@/lib/assets/kind'
+import { assetTitle, MAX_ASSET_TITLE } from '@/lib/assets/title'
 import { readAsset, readTrashedAssets } from '@/lib/assets/read'
 import { offerForAsset } from '@/lib/media/offer-asset'
 import type {
@@ -48,7 +49,7 @@ import { workspaceForWrite } from '@/lib/workspaces'
  */
 
 /** Free text a person types about a file. Long enough for a real sentence, bounded. */
-const MAX_TITLE = 120
+const MAX_TITLE = MAX_ASSET_TITLE
 const MAX_ALT = 300
 
 /** Which channels cannot use this file, given what its bytes proved. */
@@ -209,11 +210,17 @@ export async function uploadAsset(formData: FormData): Promise<UploadAssetState>
     }
     uploadedPath = objectPath
 
-    // A file name is the one thing the browser sends that is worth keeping: it
-    // is what the person calls the photo. It is stored as a TITLE and never as a
-    // path — nothing downstream builds a key from it.
-    const rawName = typeof file.name === 'string' ? file.name.trim() : ''
-    const title = rawName === '' ? null : rawName.slice(0, MAX_TITLE)
+    // ── THE CALLER'S TITLE OUTRANKS THE FILE NAME ────────────────────────────
+    // This used to read `file.name` and nothing else, while three callers set a
+    // `title` field on the form — onboarding's logo step, the topbar's "Replace
+    // logo" and the URL-source loop. Every one was dropped here, silently. The
+    // sharp consequence: `readBrandLogo` finds the logo by the title `Logo`, so
+    // no logo was ever findable and the topbar showed its colour chip for ever
+    // while the file sat in the library under its own name.
+    //
+    // Stored as a TITLE and never as a path — nothing downstream builds a key
+    // from it. `lib/assets/title.ts` carries the rule and its guards.
+    const title = assetTitle(formData.get('title'), file.name)
 
     const row = {
       id: assetId,
