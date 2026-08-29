@@ -59,6 +59,16 @@ export const BUNDLED_FAMILIES = ['Noto Sans', 'Noto Sans Devanagari'] as const
 /**
  * Where the `.ttf` files live at runtime.
  *
+ * ── UNDER `public/`, AND THAT IS THE WHOLE TRICK ────────────────────────────
+ * One copy of each file, doing two jobs. The server reads them from disk here,
+ * and the BROWSER downloads the same bytes from `/fonts/...` through the
+ * `@font-face` rules in `globals.css`. Both sides therefore answer to the same
+ * family names, which is what lets the preview and the export be the SAME SVG
+ * string rather than two strings that merely look alike.
+ *
+ * A second copy under a private folder would work for the server and would
+ * drift from the served one the first time somebody updated a file.
+ *
  * `process.cwd()` is the app root under `next start` and inside a serverless
  * function alike. The files reach the function because `next.config.ts` names
  * them in `outputFileTracingIncludes`: nothing imports them, so tracing cannot
@@ -66,7 +76,7 @@ export const BUNDLED_FAMILIES = ['Noto Sans', 'Noto Sans Devanagari'] as const
  * production while every check here still passes locally.
  */
 export function studioFontsDir(): string {
-  return path.join(process.cwd(), 'fonts')
+  return path.join(process.cwd(), 'public', 'fonts')
 }
 
 let applied: string | null = null

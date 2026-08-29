@@ -164,3 +164,49 @@ describe('the bundled typefaces', () => {
     expect(hindi).toBeLessThan(blank - 5)
   })
 })
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * THE BROWSER HALF, AND THE DRIFT BETWEEN THE TWO.
+ *
+ * The server reads these files from disk and the browser downloads the same
+ * ones over `/fonts/...`. Nothing links those two facts together at runtime, so
+ * renaming a file fixes one side and silently breaks the other: the server
+ * keeps rendering while the preview quietly falls back to whatever the reader's
+ * machine has, and the person sees one typeface and exports another. That
+ * failure is invisible by construction, which is why it gets a guard.
+ */
+describe('the CSS and the disk agree about the fonts', () => {
+  const cssPath = path.join(studioFontsDir(), '..', '..', 'src/app/globals.css')
+  const css = fs.readFileSync(cssPath, 'utf8')
+
+  test('every file the CSS serves is really in the folder the server reads', () => {
+    const urls = [...css.matchAll(/url\(['"]\/fonts\/([^'")]+)['"]\)/g)].map((m) => m[1] as string)
+    // The rules exist at all. A zero-length list would make every assertion
+    // below vacuously true, which is how this guard would rot into nothing.
+    expect(urls.length).toBeGreaterThanOrEqual(4)
+    for (const file of urls) {
+      expect(fs.existsSync(path.join(studioFontsDir(), file)), `/fonts/${file}`).toBe(true)
+    }
+  })
+
+  test('every family the templates ask for is declared to the browser', () => {
+    for (const family of BUNDLED_FAMILIES) {
+      expect(css, family).toContain(`font-family: '${family}'`)
+    }
+  })
+
+  test('both weights are served, because the templates use 400 and 700', () => {
+    const declared = [...css.matchAll(/@font-face\s*\{[^}]*\}/g)]
+      .filter((match) => match[0].includes('/fonts/'))
+      .map((match) => /font-weight:\s*(\d+)/.exec(match[0])?.[1])
+    expect(new Set(declared)).toEqual(new Set(['400', '700']))
+  })
+
+  test('the browser is served the same FORMAT the server can read', () => {
+    // woff2 would be lighter over the wire and unreadable by fontconfig, so the
+    // two halves would stop being the same files. `fonts.ts` argues the trade.
+    expect(css).not.toMatch(/url\(['"]\/fonts\/[^'")]+\.woff2?['"]\)/)
+    expect(css).toMatch(/url\(['"]\/fonts\/[^'")]+\.ttf['"]\)/)
+  })
+})
