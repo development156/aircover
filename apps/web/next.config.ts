@@ -17,7 +17,7 @@ const nextConfig: NextConfig = {
   // production while every check passes locally. `lib/studio/fonts.ts` carries
   // the measurements behind the whole arrangement.
   outputFileTracingIncludes: {
-    '**': ['./fonts/**'],
+    '**': ['./public/fonts/**'],
   },
   // @sahoda/shared ships raw TS via package exports — webpack `next build`
   // needs it transpiled (Turbopack dev handles workspace packages natively).
