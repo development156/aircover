@@ -7,6 +7,7 @@ import { saveBrandMemory, type BrandMemorySource } from '@/app/actions/brand-res
 import { resolveOnboarding } from '@/app/actions/onboarding-resolve'
 import { saveWorkspaceTheme } from '@/app/actions/theme'
 import { refineWithDoorText } from '@/lib/onboarding/classify'
+import { sendableSources } from '@/lib/onboarding/sources'
 import { storedIntakeFrom } from '@/lib/onboarding/to-stored-intake'
 
 import { doorColors, doorText, type DoorOutcome } from './door-outcome'
@@ -480,9 +481,11 @@ async function sendSources(
   urls: Readonly<Record<string, string>>,
 ): Promise<string | null> {
   const failed: string[] = []
-  for (const key of picked) {
+  // The SAME rule the summary card counts with. See `lib/onboarding/sources.ts`:
+  // when the rule lived only here, the card counted picks and told people about
+  // sources that were never sent.
+  for (const key of sendableSources(picked, urls)) {
     const url = (urls[key] ?? '').trim()
-    if (!url) continue
     try {
       const form = new FormData()
       form.set('url', url)
