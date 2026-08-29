@@ -11,6 +11,9 @@ import { coverageFor } from '@/lib/analytics/compare'
 import { ANALYTICS_METRIC_CALLS, readAnalyticsPage } from '@/lib/analytics/page-data'
 import { analyticsReadiness } from '@/lib/analytics/readiness'
 import { readMetricSeries } from '@/lib/analytics/series'
+import { readWeeklyReport, type WeeklyRead } from '@/lib/analytics/week-data'
+import { WeekCard } from '@/components/analytics/week-card'
+import { ReportExample } from '@/components/analytics/report-example'
 
 export const metadata = { title: 'Analytics' }
 
@@ -48,9 +51,19 @@ export default async function AnalyticsPage() {
    * one. MEASURED 2026-08-23: a PostgREST call from this server has a p50 of
    * 105ms, so that is roughly a tenth of a second on every visit to /analytics.
    */
-  const [{ rows, posts, account, hasPublished }, series] = await Promise.all([
+  const [{ rows, posts, account, hasPublished }, series, weekly] = await Promise.all([
     readAnalyticsPage(),
     readMetricSeries('reach'),
+    /**
+     * ── THE FIFTH INDEPENDENT READ, AND NOW THE PRIMARY ONE ──────────────────
+     * The weekly report is what this page leads with, and it is read alongside
+     * the other four for the same reason they are read alongside each other: it
+     * depends on none of them, and awaiting it second would cost another round
+     * trip to ap-south-1 on every visit.
+     *
+     * It never rejects. A failure costs the stack and nothing else.
+     */
+    readWeeklyReport(),
   ])
 
   /**
@@ -132,8 +145,29 @@ export default async function AnalyticsPage() {
           and there is nothing to tabulate until a post goes out. */}
       <ReadinessLine readiness={readiness} />
 
+      {/* ── THE REPORT, WHICH IS NOW THE PAGE ─────────────────────────────
+          Everything below this block is the detail behind it. That order is the
+          product's whole argument: a shop owner should never have to read a
+          dashboard and work out what it means, so the verdict comes first and
+          the tables become the evidence rather than the answer.
+
+          The stack is newest week first and scrolls back through every week that
+          published something. Over months that is a record of the business
+          getting better, which is the one thing on this screen worth returning
+          to when nothing is wrong. */}
+      <WeeklyReport weekly={weekly} />
+
       {nothingToStructure ? null : (
         <>
+          {/* ── THE DETAIL, DEMOTED ON PURPOSE ───────────────────────────
+              These containers used to BE the page, and each one diagnosed the
+              page's single shared cause in its own words. `ReadinessLine` fixed
+              the diagnosis; this heading fixes what is left, which is that a
+              reader arriving at a screen of tables has to work out what they
+              mean. They are the evidence for the report above, and a heading
+              that says so is the difference between a reference section and a
+              second, quieter dashboard. */}
+          <h2 className="type-eyebrow pt-4 text-muted">The numbers behind this</h2>
           {/* ── THREE NUMBERS THIS PAGE CAN ALWAYS PROVE ─────────────────
               MEASURED before this landed: a workspace with two posts on two
               channels saw six containers and NOT ONE NUMBER, while the two real
@@ -193,6 +227,73 @@ export default async function AnalyticsPage() {
               about. The claim did not move. The second rendering of it did. */}
         </>
       )}
+    </div>
+  )
+}
+
+/**
+ * THE WEEK STACK, OR THE ONE THING THAT IS TRUE INSTEAD.
+ *
+ * ── FIVE STATES, FIVE DIFFERENT CLAIMS ───────────────────────────────────────
+ * `no-workspace` is an account that has not made one yet and nothing failed.
+ * `unreadable` is a read that DID fail, and it is the only one a reload can fix.
+ * `nothing-published` is a working account with nothing to report on. Collapsing
+ * any of them into the others tells somebody something false about their own
+ * account, which is the failure `lib/inbox/emptiness.ts` exists to prevent and
+ * the one this screen kept making six times over.
+ *
+ * The empty case SHOWS the report rather than describing it — see
+ * `ReportExample` for the four things that keep a made-up figure from reading as
+ * a real one.
+ */
+function WeeklyReport({ weekly }: { weekly: WeeklyRead }) {
+  if (weekly.kind === 'no-workspace') {
+    // No remedy: a reload cannot create a workspace, and offering one would be
+    // the impossible remedy `e2e/no-impossible-remedy.spec.ts` guards against.
+    return (
+      <ReportExample
+        headline="There is no workspace here yet to report on"
+        detail="Sahoda writes a report for a workspace. This account does not have one yet, so there is nothing for it to measure."
+        action={null}
+      />
+    )
+  }
+
+  if (weekly.kind === 'unreadable') {
+    return (
+      <ReportExample
+        headline="Sahoda could not read your weeks just now"
+        detail="The request went out and came back without an answer, so this is not a reading of your posts. Nothing is wrong with them. Refresh to try again."
+        action={null}
+      />
+    )
+  }
+
+  if (weekly.kind === 'nothing-published') {
+    return (
+      <ReportExample
+        headline="Your first report arrives the week after your first post goes out"
+        detail="Sahoda writes one of these every week: what worked, how it compares with your usual, and what it changed because of it. It needs a post of yours out in the world before it can start."
+        action={{ label: 'Write a post', href: '/posts/new' }}
+      />
+    )
+  }
+
+  if (weekly.weeks.length === 0) {
+    return (
+      <ReportExample
+        headline="Nothing has gone out in the last two years"
+        detail="Sahoda reports on the weeks you published in. There are none in the window it looks at."
+        action={{ label: 'Write a post', href: '/posts/new' }}
+      />
+    )
+  }
+
+  return (
+    <div className="space-y-8" data-testid="weekly-report">
+      {weekly.weeks.map((week) => (
+        <WeekCard key={week.key} week={week} />
+      ))}
     </div>
   )
 }
