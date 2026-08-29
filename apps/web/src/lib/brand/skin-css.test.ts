@@ -128,14 +128,58 @@ describe('skinCss', () => {
   })
 
   /**
-   * IT SAYS NOTHING ABOUT `data-theme`, and that is the separation. Light and
-   * dark belong to the moon and sun; the brand belongs to the logo. A scope that
-   * named both attributes would make one switch unable to work without the
-   * other, which is exactly the tangle the ruling ends.
+   * ── THE INVISIBLE CARD, WHICH IS WHY THIS FILE GAINED A DARK HALF ─────────
+   * Founder's report, 2026-08-29, with a screenshot of the wallet: the selected
+   * plan card was a near-white fill carrying near-white text.
+   *
+   * `brand-theme.ts` graded everything against white, so `--t50` came back at
+   * lightness 0.97 whatever the theme — and in dark, `--ink` is `#ffffff`. A
+   * near-white fill under white text is an invisible card, and no component was
+   * at fault: the derivation answered a question about a light surface and its
+   * answer was applied to a dark one.
+   *
+   * So the tints in the dark rule must actually be DARK. Asserting the lightness
+   * is asserting the defect, which a "the two strings differ" check would not.
    */
-  it('leaves light and dark entirely to the theme switch', () => {
-    expect(skinCss(TEAL)).not.toContain('data-theme')
-    expect(SKIN_SCOPE).not.toContain('data-theme')
+  it('paints dark tints on the dark theme, not near-white ones', () => {
+    const dark = skinCss(TEAL).split(`${SKIN_SCOPE}[data-theme='dark']`)[1] ?? ''
+
+    for (const token of ['--t50', '--t100'] as const) {
+      const lightness = Number(new RegExp(`${token}:oklch\\(([0-9.]+)`).exec(dark)?.[1])
+      expect(lightness, `${token} must not be a near-white fill in dark`).toBeLessThan(0.5)
+    }
+  })
+
+  /**
+   * AND IT WINS BY SPECIFICITY, NOT BY LUCK. `:root[data-brand-skin='on']` is
+   * (0,1,1) and so is `tokens.css`'s `:root[data-theme='dark']` — a tie, broken
+   * by document order, and this style is inlined AFTER the stylesheet. That is
+   * how light-only brand values came to beat the dark block, which is what "the
+   * day/night toggle is getting applied on the Brand Skin" described. Carrying
+   * both attributes makes the dark rule (0,2,1) and settles it outright.
+   */
+  it('gives the dark rule both attributes, so it outranks the dark block', () => {
+    const css = skinCss(TEAL)
+    const darkSelector = `${SKIN_SCOPE}[data-theme='dark']`
+
+    expect(css).toContain(darkSelector)
+    // And AFTER the light rule, so the two are never the same rule by accident.
+    expect(css.indexOf(darkSelector)).toBeGreaterThan(css.indexOf(`${SKIN_SCOPE}{`))
+  })
+
+  /**
+   * THE SEPARATION SURVIVES. Reading `data-theme` is not owning it: the skin
+   * still never SETS the theme and still never touches a neutral, so the moon
+   * and sun remain the only thing that decides light against dark. What changed
+   * is that the brand now answers the question per surface instead of assuming
+   * one.
+   */
+  it('reads the theme without defining anything the theme owns', () => {
+    for (const surface of ['light', 'dark'] as const) {
+      expect(skinVarNames(TEAL, surface).sort()).toEqual(
+        ['--acc', '--p', '--pfg', '--pstrong', '--t100', '--t300', '--t50'].sort(),
+      )
+    }
   })
 
   /**
