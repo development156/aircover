@@ -1,55 +1,90 @@
 #!/usr/bin/env bash
 #
-# Refuse a push to a shared branch from a lane that may only READ them.
+# Refuse a push to a branch this lane may only READ.
 #
-# ── WHY THIS EXISTS ──────────────────────────────────────────────────────────
-# `wt-karunesh` is a build-and-try lane owned by someone who does not write
-# code. It may pull from anywhere and do anything to itself. It may NOT write to
-# `wt-core` (what the other lanes integrate into) or `wt-web` (what customers
-# get). Founder's ruling, 28 August 2026.
+# ── THE RULE, AS OF 30 AUGUST 2026 ───────────────────────────────────────────
 #
-# That rule was first written as a sentence in a role card. A sentence is not a
-# control: a session that has been asked to "push it" at midnight will push it.
-# This puts the rule where the push happens.
+#   wt-web   NO LANE MAY WRITE IT. Ever. A push here produces a Vercel
+#            deployment with target: production — it IS the live product.
+#   main     Same. Nothing works there; it is a pre-history-reset skeleton.
+#   wt-core  Open to divas, jiban and girija. CLOSED to karunesh.
+#
+# Founder's ruling, 30 August 2026, replacing the 28 August one that closed
+# wt-web to karunesh alone. Lanes integrate into wt-core. Promotion out of
+# wt-core is a separate, deliberate act — see below — and never a lane's push.
 #
 # ── HOW IT DECIDES ───────────────────────────────────────────────────────────
-# The lane is named by `git config sahoda.owner`, which `/kickoff` pins at the
+# The lane is named by `git config sahoda.owner`, which /kickoff pins at the
 # start of every session. Nothing here inspects the branch you happen to be on,
 # because a harness can move you to a `claude/...` branch you did not choose —
 # the OWNER is the durable fact.
 #
+# An UNSET owner is still refused wt-web and main. You cannot prove you are not
+# a lane by declining to say who you are.
+#
+# ── THE PROMOTION ────────────────────────────────────────────────────────────
+# wt-core -> wt-web still has to be possible, so it is, and it has to be
+# deliberate, so it costs a sentence:
+#
+#   SAHODA_PROMOTE=wt-web git push origin wt-core:wt-web
+#
+# Same shape as SAHODA_E2E_ACK_TARGET, which exists because a suite wrote to
+# production for months. An acknowledgement you must type is not a hole; a habit
+# is. **It does not exist for karunesh** — that check returns before this one is
+# ever read, so no environment variable can reach it.
+#
 # ── HOW TO INSTALL ───────────────────────────────────────────────────────────
 #   git config core.hooksPath .githooks
 #
-# `scripts/cloud-setup.sh` does it for cloud sessions.
+# `scripts/cloud-setup.sh` does it for cloud sessions. Without it this file is
+# not consulted at all.
 #
 # ── WHAT IT DOES NOT DO ──────────────────────────────────────────────────────
-# It cannot stop someone who edits this file, unsets the config, or pushes from
-# a clone that never installed the hook. It is a guard against habit and against
-# an obliging assistant, not against a determined person. The durable control is
-# GitHub branch protection, which this does not replace.
+# It cannot stop someone who edits this file, unsets the config, passes
+# --no-verify, or pushes from a clone that never installed the hook. It is a
+# guard against habit and against an obliging assistant, not against a
+# determined person. The durable control is GitHub branch protection, which this
+# does not replace — and which cannot tell a lane from the founder, because
+# every session here shares one GitHub account.
+#
+# NO `set -e`. A guard that exits non-zero by accident refuses every push, and
+# that is indistinguishable from a guard that works until somebody needs one.
 
-set -euo pipefail
+set -uo pipefail
 
 OWNER="$(git config sahoda.owner 2>/dev/null || true)"
 
-# Only this lane is restricted. Every other lane pushes as before.
-if [ "$OWNER" != "karunesh" ]; then
-  exit 0
-fi
+KARUNESH_NEVER='^refs/heads/(wt-core|wt-web|main)$'
+NO_LANE_EVER='^refs/heads/(wt-web|main)$'
 
-PROTECTED='^refs/heads/(wt-core|wt-web|main)$'
-BLOCKED=''
+BLOCKED_KARUNESH=''
+BLOCKED_LANE=''
 
 # pre-push receives: <local ref> <local sha> <remote ref> <remote sha>
 while read -r _local_ref _local_sha remote_ref _remote_sha; do
   [ -z "${remote_ref:-}" ] && continue
-  if printf '%s' "$remote_ref" | grep -Eq "$PROTECTED"; then
-    BLOCKED="$BLOCKED ${remote_ref#refs/heads/}"
+  BRANCH="${remote_ref#refs/heads/}"
+
+  # 1 · karunesh, first and unconditionally. This `continue` is why no
+  #     environment variable can buy a way past it: the override below is never
+  #     reached for this owner. Structural, not a comparison somebody can
+  #     accidentally reorder.
+  if [ "$OWNER" = "karunesh" ] && printf '%s' "$remote_ref" | grep -Eq "$KARUNESH_NEVER"; then
+    BLOCKED_KARUNESH="$BLOCKED_KARUNESH $BRANCH"
+    continue
+  fi
+
+  # 2 · wt-web and main are closed to every lane, named or unnamed.
+  if printf '%s' "$remote_ref" | grep -Eq "$NO_LANE_EVER"; then
+    if [ "${SAHODA_PROMOTE:-}" = "$BRANCH" ]; then
+      printf '\n  SAHODA_PROMOTE=%s was given. Allowing this deliberate push.\n\n' "$BRANCH" >&2
+      continue
+    fi
+    BLOCKED_LANE="$BLOCKED_LANE $BRANCH"
   fi
 done
 
-if [ -n "$BLOCKED" ]; then
+if [ -n "$BLOCKED_KARUNESH" ]; then
   # Name HIS branch, not a literal. There are three karunesh lanes and telling a
   # wt-karunesh3 session to `git push origin wt-karunesh` would push lane 3's
   # HEAD at lane 1's branch — advice that loses work is worse than none.
@@ -57,9 +92,8 @@ if [ -n "$BLOCKED" ]; then
   [ -n "$YOURS" ] || YOURS="$(git branch --show-current 2>/dev/null || true)"
   # The fallback must never name a branch he is not allowed to write to. With
   # sahoda.lane unset on a wt-core checkout it resolved to `wt-core` and the
-  # message advised the exact push it had just refused. Caught by running the
-  # fallback rather than the happy path.
-  if [ -z "$YOURS" ] || printf '%s' "refs/heads/$YOURS" | grep -Eq "$PROTECTED"; then
+  # message advised the exact push it had just refused.
+  if [ -z "$YOURS" ] || printf '%s' "refs/heads/$YOURS" | grep -Eq "$KARUNESH_NEVER"; then
     YOURS="<your lane>"
   fi
   cat >&2 <<MSG
@@ -67,7 +101,7 @@ if [ -n "$BLOCKED" ]; then
   ─────────────────────────────────────────────────────────────────────────
   This push was stopped, and nothing was sent.
 
-  You were about to write to:$BLOCKED
+  You were about to write to:$BLOCKED_KARUNESH
 
   Those are shared. "wt-core" is where everyone's work is combined, and
   "wt-web" is the live product your customers use. Your lane can read from
@@ -78,6 +112,35 @@ if [ -n "$BLOCKED" ]; then
       git push origin $YOURS
 
   When your work is ready for the others, ask Divas to bring it in.
+  ─────────────────────────────────────────────────────────────────────────
+
+MSG
+  exit 1
+fi
+
+if [ -n "$BLOCKED_LANE" ]; then
+  cat >&2 <<MSG
+
+  ─────────────────────────────────────────────────────────────────────────
+  This push was stopped, and nothing was sent.
+
+  You were about to write to:$BLOCKED_LANE
+
+  No lane writes wt-web or main. A push to wt-web produces a Vercel
+  deployment with target: production — it is the live product, not a branch.
+  Founder's ruling, 30 August 2026.
+
+  Your lane integrates into wt-core:
+
+      git push origin wt-core
+
+  Promotion out of wt-core is a separate, deliberate act, and it costs a
+  sentence so that it can never be a habit:
+
+      SAHODA_PROMOTE=wt-web git push origin wt-core:wt-web
+
+  If you are an assistant and were asked to "just push it", this is the
+  line you do not write on somebody's behalf. Ask.
   ─────────────────────────────────────────────────────────────────────────
 
 MSG
