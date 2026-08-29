@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server'
 
 import { reportServerError } from '@/lib/observability/report'
 import { readDoorStreaming, type Stage } from '@/lib/onboarding/read-door'
+import { seedLibraryFromSite } from '@/lib/onboarding/seed-library'
 import { readActiveWorkspace } from '@/lib/workspaces'
 
 /**
@@ -87,6 +88,31 @@ export async function POST(request: Request): Promise<Response> {
             (stage: Stage) => line({ type: 'stage', ...stage }),
           )
           line({ type: 'done', result })
+
+          /**
+           * The website the customer just gave becomes the first document in
+           * their library, without anybody asking for it.
+           *
+           * AFTER `done`, and deliberately. The customer's screen moves on as
+           * soon as that line lands; this rides on text already in memory and
+           * fetches nothing, but it does write two rows, and no part of it may
+           * hold up the answer they are waiting for. `seedLibraryFromSite`
+           * cannot throw — see its header — so the stream still closes cleanly
+           * if the library refuses the document.
+           *
+           * Only the `url` kind. A PDF door already puts its document in front
+           * of a person who chose it; and when both are given the site text is
+           * not what `result` carries, so seeding here would store the wrong
+           * thing under the right address.
+           */
+          if (result.ok && result.kind === 'url') {
+            await seedLibraryFromSite({
+              workspaceId: workspace.id,
+              url: String(form.get('url') ?? ''),
+              text: result.text,
+              title: result.foundName || null,
+            })
+          }
         } catch (error) {
           reportServerError(error, { action: 'door.stream', workspaceId: workspace.id })
           /**
