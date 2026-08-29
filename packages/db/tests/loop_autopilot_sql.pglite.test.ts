@@ -912,6 +912,60 @@ describe('the autopilot dispatcher SQL against the real schema', () => {
       expect(r.rows[1]?.dispatch_after).toBeNull()
     })
 
+    /**
+     * THE TIE, MADE DETERMINISTIC.
+     *
+     * `created_at` defaults to `now()`, the TRANSACTION timestamp, so an
+     * announcement and the cancellation that stops it can share one. When they
+     * do, `order by created_at` alone leaves the pair in scan order. MEASURED
+     * 2026-08-29 in CI: the two tests above went red with
+     * `['cancelled', 'announced']` after passing locally minutes before, which
+     * is what a timing-dependent guard looks like from the outside.
+     *
+     * The rows below are inserted with ONE explicit timestamp and the
+     * cancellation written FIRST, so the pair really is tied and the answer
+     * cannot come from the clock.
+     *
+     * WHAT THIS TEST DOES AND DOES NOT PROVE, measured rather than assumed.
+     * Inverting the tiebreaker turns it red, so the clause is genuinely
+     * consulted. REMOVING the tiebreaker leaves it GREEN here: PGlite on this
+     * machine hands back `announced, cancelled` regardless, which is the right
+     * order by luck and not by rule. The CI runner returned the opposite for
+     * the very same rows. So no local run can turn the missing tiebreaker red,
+     * and this test is not claimed to. It pins the ORDER the reader gets;
+     * the header on `POST_AUTOPILOT_HISTORY_SQL` carries the reason the rule
+     * has to be written down rather than observed.
+     */
+    it('puts the announcement first even when both rows share a timestamp', async () => {
+      const tied = 'de000000-0000-4000-8000-0000000000de'
+      const at = new Date('2030-02-02T02:02:02.000Z').toISOString()
+
+      // Written in the WRONG order on purpose, and with no gap to sort on.
+      await db.query(
+        `insert into loop_autopilot_log
+           (workspace_id, post_id, variant_id, channel, account_id,
+            decision, actor, created_at)
+         values ($1, $2, $3, 'x', 'acct-tie', 'cancelled', 'person', $4)`,
+        [WS, tied, variant, at],
+      )
+      await db.query(
+        `insert into loop_autopilot_log
+           (workspace_id, post_id, variant_id, channel, account_id,
+            decision, actor, dispatch_after, created_at)
+         values ($1, $2, $3, 'x', 'acct-tie', 'announced', 'autopilot', $4, $5)`,
+        [WS, tied, variant, at, at],
+      )
+
+      const r = await db.query<{ decision: string; created_at: string }>(
+        POST_AUTOPILOT_HISTORY_SQL,
+        [WS, tied, variant],
+      )
+      // The timestamps really are equal, so the order below is the tiebreaker's
+      // work and not the clock's.
+      expect(r.rows[0]?.created_at).toEqual(r.rows[1]?.created_at)
+      expect(r.rows.map((x) => x.decision)).toEqual(['announced', 'cancelled'])
+    })
+
     it('a post autopilot never touched returns NO ROWS, which is not a refusal', async () => {
       const untouched = 'dc000000-0000-4000-8000-0000000000dc'
       const r = await db.query(POST_AUTOPILOT_HISTORY_SQL, [WS, untouched, variant])
