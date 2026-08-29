@@ -19,6 +19,33 @@ export interface LedgerTableProps {
    * activity" and "this is the newest slice of it".
    */
   limit: number
+  /**
+   * Which holds are closed, computed over EVERY entry that was read.
+   *
+   * ── THE DEFECT THIS PROP EXISTS FOR ─────────────────────────────────────────
+   * `settledHoldIds(entries)` used to be derived inside this component, and its
+   * comment justified that: "a settling entry always has a higher `seq` than its
+   * hold, and the page is the top N by `seq DESC`, so any visible hold has its
+   * settlement visible too." That argument is exactly true of ONE page of fifty
+   * and exactly false of a paginated list. A hold on page two whose DEBIT sits
+   * on page one would be handed a set derived from page two alone, find no
+   * settlement, and render the word "Reserved" — telling somebody credits are
+   * frozen that were spent days ago.
+   *
+   * So the caller that paginates computes this once over the whole window and
+   * passes it down. Omitted, the old derivation still applies, which is correct
+   * for any caller rendering every entry it holds.
+   */
+  settled?: ReadonlySet<string>
+  /** Adds the running balance column. Every row records `balance_after`. */
+  showBalance?: boolean
+  /**
+   * The trailing notes — the window notice, the provider-cost total and the
+   * skipped-row warning. A paginated caller owns those sentences, because each
+   * is about the WHOLE history rather than the rows on screen, and printing
+   * them under one page of ten would scope them to the wrong set.
+   */
+  notes?: boolean
 }
 
 /**
@@ -34,9 +61,30 @@ const WHEN = new Intl.DateTimeFormat('en-IN', {
   timeZone: 'Asia/Kolkata',
 })
 
+/**
+ * The phone's date. Same instant, same pinned zone, fewer parts.
+ *
+ * MEASURED at 390px: the full stamp wraps to FOUR lines in the column it is
+ * given ("30 Aug / 2026, / 02:30 / pm"), which makes every row twice as tall as
+ * its content and turns a ten-row page into a scroll. Both spellings are
+ * rendered and CSS picks one, so the `<time datetime>` — the machine-readable
+ * value, and the one a screen reader can be given in full — is identical either
+ * way. Nothing is hidden from anybody: the full stamp is a rotation away.
+ */
+const WHEN_SHORT = new Intl.DateTimeFormat('en-IN', {
+  day: '2-digit',
+  month: 'short',
+  timeZone: 'Asia/Kolkata',
+})
+
 function formatWhen(iso: string): string | null {
   const ms = Date.parse(iso)
   return Number.isFinite(ms) ? WHEN.format(ms) : null
+}
+
+function formatWhenShort(iso: string): string | null {
+  const ms = Date.parse(iso)
+  return Number.isFinite(ms) ? WHEN_SHORT.format(ms) : null
 }
 
 /**
@@ -95,11 +143,13 @@ function EntryRow({
   entry,
   corrected,
   open,
+  showBalance,
 }: {
   entry: LedgerEntry
   corrected: boolean
-  /** Credits frozen RIGHT NOW — a HOLD with no settling entry on the page. */
+  /** Credits frozen RIGHT NOW — a HOLD with no settling entry in the window. */
   open: boolean
+  showBalance: boolean
 }) {
   const display = describeEntry(entry)
   const when = formatWhen(entry.created_at)
@@ -115,12 +165,16 @@ function EntryRow({
       data-certainty={open ? 'committed' : 'real'}
       className="border-b border-line last:border-b-0"
     >
-      <td className={cn(CELL, 'text-[13px] whitespace-nowrap text-muted')}>
+      {/* `whitespace-normal` below `narrow`: "30 Aug 2026, 02:30 pm" on one
+          line is ~150px of a 390px screen, and wrapping it to two costs a row
+          of height and buys back the width the amount column needs. */}
+      <td className={cn(CELL, 'text-[13px] text-muted narrow:whitespace-nowrap')}>
         {when === null ? (
           <span className="text-muted">Date not recorded</span>
         ) : (
           <time dateTime={entry.created_at} className="tabular-nums">
-            {when}
+            <span className="narrow:hidden">{formatWhenShort(entry.created_at)}</span>
+            <span className="hidden narrow:inline">{when}</span>
           </time>
         )}
       </td>
@@ -169,6 +223,38 @@ function EntryRow({
       >
         {display.signedAmount}
       </td>
+
+      {/* ── THE BALANCE AFTER THIS ENTRY, AS THE LEDGER RECORDED IT ──────────
+          `credit_ledger.balance_after` is written by `apply_ledger_entry` in the
+          same transaction as the entry, so this is the stored figure and not a
+          running total this component added up. That distinction is the whole
+          reason the column can exist at all: a balance recomputed in the browser
+          over a WINDOW of the history would be wrong for everyone whose ledger
+          is longer than the window, and wrong about their money.
+
+          A HOLD's `balance_after` is the spendable total, which a hold does not
+          move — so the column repeats the row above it on a reservation, which
+          is correct and is what the ledger says. */}
+      {showBalance ? (
+        /* ── HIDDEN ON A PHONE, AND THE CHOICE OF WHICH COLUMN GOES MATTERS ──
+           MEASURED at 400px: with five columns the table needed 560px inside a
+           390px screen, so `overflow-x-auto` pushed CREDITS and BALANCE off the
+           right edge — the two figures the whole screen is for, reachable only
+           by a sideways drag most people never try.
+
+           The running balance is the one that goes, because it is derivable:
+           the balance after any row is the balance shown on the row above it,
+           less that row's own amount. The amount is not derivable from
+           anything. So the phone keeps what it cannot reconstruct. */
+        <td
+          className={cn(
+            CELL,
+            'num hidden text-right type-body whitespace-nowrap text-muted narrow:table-cell',
+          )}
+        >
+          {entry.balance_after.toLocaleString('en-IN')}
+        </td>
+      ) : null}
     </tr>
   )
 }
@@ -186,11 +272,13 @@ function CorrectionGroup({
   row,
   correctedSeqs,
   settled,
+  showBalance,
 }: {
   row: Extract<LedgerRow, { kind: 'correction' }>
   correctedSeqs: ReadonlySet<number>
-  /** Ids of holds closed by an entry on this page — see hold-settlement.ts. */
+  /** Ids of holds closed by an entry in the window — see hold-settlement.ts. */
   settled: ReadonlySet<string>
+  showBalance: boolean
 }) {
   // Derived, not `useId`: this is a Server Component and hooks are unavailable
   // here — `useId` only appeared to work because the tests render it on the
@@ -204,7 +292,7 @@ function CorrectionGroup({
   return (
     <tbody aria-labelledby={headingId} className="border-b border-line last:border-b-0">
       <tr className="bg-s1">
-        <td colSpan={3} className="px-3 py-2.5">
+        <td colSpan={showBalance ? 4 : 3} className="px-3 py-2.5">
           <span id={headingId} className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="flex items-center gap-1.5 text-[13px] font-semibold">
               <Undo2 size={13} strokeWidth={2} aria-hidden />
@@ -247,13 +335,21 @@ function CorrectionGroup({
           entry={entry}
           corrected={correctedSeqs.has(entry.seq)}
           open={isOpenHold(entry, settled)}
+          showBalance={showBalance}
         />
       ))}
     </tbody>
   )
 }
 
-export function LedgerTable({ entries, skipped, limit }: LedgerTableProps) {
+export function LedgerTable({
+  entries,
+  skipped,
+  limit,
+  settled: settledProp,
+  showBalance = false,
+  notes = true,
+}: LedgerTableProps) {
   // A full page means the window cut the history off. There is no pagination to
   // offer yet, so this states the limit rather than implying a "load more".
   //
@@ -281,13 +377,13 @@ export function LedgerTable({ entries, skipped, limit }: LedgerTableProps) {
   // Derived once for the page, not per row. Safe to read from this page alone:
   // a settling entry always has a higher `seq` than its hold, and the page is
   // the top N by `seq DESC`, so any visible hold has its settlement visible too.
-  const settled = settledHoldIds(entries)
+  const settled = settledProp ?? settledHoldIds(entries)
 
   return (
     <div className="space-y-3">
       {/* The page body must never scroll horizontally — the table does instead. */}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[560px] border-collapse text-left">
+        <table className="w-full min-w-[340px] border-collapse text-left narrow:min-w-[560px]">
           <caption className="sr-only">
             {isWindowed
               ? `Credit activity, newest first: the ${limit} most recent entries`
@@ -304,6 +400,14 @@ export function LedgerTable({ entries, skipped, limit }: LedgerTableProps) {
               <th scope="col" className={cn(CELL, 'text-right font-semibold')}>
                 Credits
               </th>
+              {showBalance ? (
+                <th
+                  scope="col"
+                  className={cn(CELL, 'hidden text-right font-semibold narrow:table-cell')}
+                >
+                  Balance
+                </th>
+              ) : null}
             </tr>
           </thead>
           {rows.map((row) =>
@@ -313,6 +417,7 @@ export function LedgerTable({ entries, skipped, limit }: LedgerTableProps) {
                 row={row}
                 correctedSeqs={correctedSeqs}
                 settled={settled}
+                showBalance={showBalance}
               />
             ) : (
               <tbody key={row.entry.id}>
@@ -320,6 +425,7 @@ export function LedgerTable({ entries, skipped, limit }: LedgerTableProps) {
                   entry={row.entry}
                   corrected={correctedSeqs.has(row.entry.seq)}
                   open={isOpenHold(row.entry, settled)}
+                  showBalance={showBalance}
                 />
               </tbody>
             ),
@@ -327,14 +433,14 @@ export function LedgerTable({ entries, skipped, limit }: LedgerTableProps) {
         </table>
       </div>
 
-      {isWindowed ? (
+      {notes && isWindowed ? (
         <p className="text-[13px] text-muted">
           Showing the <span className="tabular-nums">{limit}</span> most recent entries. Older
           activity is not listed here.
         </p>
       ) : null}
 
-      {recorded.length > 0 ? (
+      {notes && recorded.length > 0 ? (
         <p className="text-[13px] text-muted">
           Provider cost recorded on <span className="tabular-nums">{recorded.length}</span> of these{' '}
           <span className="tabular-nums">{entries.length}</span> entries:{' '}
@@ -344,7 +450,7 @@ export function LedgerTable({ entries, skipped, limit }: LedgerTableProps) {
         </p>
       ) : null}
 
-      <SkippedNote skipped={skipped} />
+      {notes ? <SkippedNote skipped={skipped} /> : null}
     </div>
   )
 }
