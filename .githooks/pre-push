@@ -50,6 +50,18 @@ while read -r _local_ref _local_sha remote_ref _remote_sha; do
 done
 
 if [ -n "$BLOCKED" ]; then
+  # Name HIS branch, not a literal. There are three karunesh lanes and telling a
+  # wt-karunesh3 session to `git push origin wt-karunesh` would push lane 3's
+  # HEAD at lane 1's branch — advice that loses work is worse than none.
+  YOURS="$(git config sahoda.lane 2>/dev/null || true)"
+  [ -n "$YOURS" ] || YOURS="$(git branch --show-current 2>/dev/null || true)"
+  # The fallback must never name a branch he is not allowed to write to. With
+  # sahoda.lane unset on a wt-core checkout it resolved to `wt-core` and the
+  # message advised the exact push it had just refused. Caught by running the
+  # fallback rather than the happy path.
+  if [ -z "$YOURS" ] || printf '%s' "refs/heads/$YOURS" | grep -Eq "$PROTECTED"; then
+    YOURS="<your lane>"
+  fi
   cat >&2 <<MSG
 
   ─────────────────────────────────────────────────────────────────────────
@@ -63,7 +75,7 @@ if [ -n "$BLOCKED" ]; then
 
   Your own branch is yours completely — push to it as often as you like:
 
-      git push origin wt-karunesh
+      git push origin $YOURS
 
   When your work is ready for the others, ask Divas to bring it in.
   ─────────────────────────────────────────────────────────────────────────
