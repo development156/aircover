@@ -6,9 +6,7 @@ import { ChevronRight, Lock } from 'lucide-react'
 import { AUTONOMY_LEVELS, type AutonomyLevel, type Channel } from '@sahoda/shared'
 
 import { setChannelAutonomy } from '@/app/actions/loop-dial'
-import { ChannelLogo } from '@/components/connections/channel-logo'
 import { CHANNEL_LABELS } from '@/components/posts/channel-label'
-import type { CatalogueChannel } from '@/lib/connections/catalogue'
 
 /**
  * THE AUTONOMY DIAL — four levels of how much Sahoda may do without asking, and
@@ -32,6 +30,26 @@ import type { CatalogueChannel } from '@/lib/connections/catalogue'
  * The stages beyond the chosen one are not disabled — they are perfectly
  * choosable, and dimming them would say they were unavailable. They are simply
  * unmarked: everything up to the mark is Sahoda's, everything past it is yours.
+ *
+ * ── THE ROWS CARRY NO CHANNEL LOGO, AND THE REASON IS MEASURED ───────────────
+ * The redraw put a `ChannelLogo` on each row. It looked right and it cost 19.5
+ * kB of client JavaScript, which took this route past its budget and FAILED THE
+ * BUILD — twice, because the obvious fix was wrong.
+ *
+ * | attempt | route size | over the 728 kB budget |
+ * | --- | --- | --- |
+ * | logo imported into this client component | 755.9 kB | +28.0 |
+ * | logo rendered on the SERVER and passed down | 747.5 kB | +19.5 |
+ * | no logo | within budget | — |
+ *
+ * The second attempt failed because the cost is not this component's import: it
+ * is `next/image`, which four of the plannable channels' marks are PNGs behind.
+ * `next/image` ships its client runtime to any page that renders one, server
+ * component or not — MEASURED, a 13.1 kB chunk carrying the Image component and
+ * the head manager, for a decorative mark on at most four rows.
+ *
+ * The channel's NAME identifies the row and always did. A logo is recognition,
+ * not information, and this one was not worth 13 kB of image machinery.
  *
  * ── L3 IS A `div`. IT IS NOT A DISABLED BUTTON. ──────────────────────────────
  * A `<button disabled>` is still announced as a button: a screen reader offers
@@ -200,7 +218,6 @@ function ChannelDial({
   return (
     <li className="grid items-start gap-x-6 gap-y-3 p-5 max-narrow:p-4 wide:grid-cols-[200px_1fr]">
       <div className="flex items-center gap-2.5">
-        <ChannelLogo channel={channel as CatalogueChannel} size={20} />
         <div className="min-w-0">
           <h3 className="type-h3 text-ink">{CHANNEL_LABELS[channel]}</h3>
           {level === undefined ? (
