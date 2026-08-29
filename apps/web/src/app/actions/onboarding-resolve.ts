@@ -17,7 +17,7 @@ import {
   reportPaidActionFailure,
 } from '@/lib/actions/paid-failure'
 import { revalidateBalance } from '@/lib/actions/revalidate-balance'
-import { newResolveObjectRef } from '@/lib/brand/resolve-object-ref'
+import { resolveObjectRef } from '@/lib/brand/resolve-object-ref'
 import {
   mapResolveOutcome,
   type CreditsOutcome,
@@ -25,7 +25,7 @@ import {
   type ResolveActionState,
 } from '@/lib/brand/resolve-result'
 import { IntakeSchema } from '@/lib/onboarding/intake'
-import { isFirstResolve } from '@/lib/onboarding/read-brain'
+import { activeBrandMemory } from '@/lib/onboarding/read-brain'
 import { toResolveInput } from '@/lib/onboarding/to-resolve-input'
 import { reportServerError } from '@/lib/observability/report'
 import { getActiveWorkspace } from '@/lib/workspaces'
@@ -69,6 +69,16 @@ interface ResolveArgs {
   input: ReturnType<typeof toResolveInput>
 }
 
+interface ChargedArgs extends ResolveArgs {
+  /**
+   * The version of the brain this purchase REPLACES, which is what the ledger
+   * key is bound to. See `resolve-object-ref.ts`: a retry after an abandoned
+   * paid build carries the same version, so the ledger replays the charge it
+   * already took instead of taking a second one.
+   */
+  activeVersion: number
+}
+
 /** The free path: the model call, with no ledger involvement whatsoever. */
 async function resolveFree({
   workspaceId,
@@ -100,11 +110,16 @@ async function resolveCharged({
   workspaceId,
   userId,
   input,
-}: ResolveArgs): Promise<OnboardingResolveState> {
+  activeVersion,
+}: ChargedArgs): Promise<OnboardingResolveState> {
   let meshOutcome: MeshResolveOutcome | null = null
 
   const credits = await getWithCredits()(
-    { workspaceId, action: 'brand_research', objectRef: newResolveObjectRef(workspaceId) },
+    {
+      workspaceId,
+      action: 'brand_research',
+      objectRef: resolveObjectRef(workspaceId, activeVersion),
+    },
     async (ctx) => {
       const result = await getMesh().runTask(brandGuidelinesTask.def, input, {
         workspaceId,
@@ -201,10 +216,17 @@ export async function resolveOnboarding(
       audienceInterests: field('audienceInterests'),
     })
 
+    /**
+     * ONE read, two decisions. It used to call `isFirstResolve`, which is this
+     * same query with the row thrown away. The charged path needs the version
+     * as well as the existence, and reading it twice would let the two answers
+     * disagree under a concurrent save.
+     */
+    const active = await activeBrandMemory(workspace.id)
     const args: ResolveArgs = { workspaceId: workspace.id, userId, input }
-    return (await isFirstResolve(workspace.id))
+    return active === null
       ? await resolveFree(args)
-      : await resolveCharged(args)
+      : await resolveCharged({ ...args, activeVersion: active.version })
   } catch (error) {
     reportServerError(error, { action: 'resolveOnboarding', workspaceId })
     reportPaidActionFailure('onboarding-resolve', error)
