@@ -35,7 +35,7 @@ const MAX_CHARS = 8_000
 
 const PENDING_LINES = [
   'Sending your copy to the model…',
-  'Waiting on the rewrite…',
+  'Waiting on the improved version…',
   'Still waiting. You are not charged if this fails.',
 ] as const
 
@@ -117,7 +117,7 @@ export function ImproveCopy({ target, body, onAccept }: ImproveCopyProps) {
               call. A pencil is what manual editing looks like everywhere else in
               the app, and using it here would say the opposite of what happens. */}
           <Sparkles size={14} className="text-accent" aria-hidden />
-          Rewrite this
+          Improve this copy
         </span>
         <span className="type-meta text-muted">
           <span className="tabular-nums">{cost}</span> {creditWord(cost)} each
@@ -133,7 +133,7 @@ export function ImproveCopy({ target, body, onAccept }: ImproveCopyProps) {
           This copy is <span className="tabular-nums">{length.toLocaleString('en-IN')}</span>{' '}
           characters, past the{' '}
           <span className="tabular-nums">{MAX_CHARS.toLocaleString('en-IN')}</span> Sahoda can
-          rewrite in one go. Every channel&rsquo;s own limit is well below that.
+          improve in one go. Every channel&rsquo;s own limit is well below that.
         </p>
       ) : pending && suggestion === null ? (
         /* ── AND ONLY WHILE THERE IS NOTHING TO READ, WHICH CARRIES NO TEST ──
@@ -159,14 +159,7 @@ export function ImproveCopy({ target, body, onAccept }: ImproveCopyProps) {
                 key={mode.value}
                 variant="secondary"
                 size="sm"
-                // ── THE NAME FOLLOWS THE HEADING, AND HAS TO ────────────────
-                // The heading is "Rewrite this". Leaving these as "Improve X
-                // copy, polish" would give a screen-reader user a verb that
-                // appears nowhere on the screen, so the spoken interface and
-                // the seen one would be describing the same control with
-                // different words. Renaming the heading without these is half
-                // a rename.
-                aria-label={`Rewrite ${target}, ${mode.label.toLowerCase()}`}
+                aria-label={`Improve ${target}, ${mode.label.toLowerCase()}`}
                 title={mode.detail}
                 disabled={length === 0}
                 onClick={() => run(mode.value)}

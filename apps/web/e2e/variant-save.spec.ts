@@ -1,4 +1,4 @@
-import { bootstrapWorkspace, openPart, startPost } from './fixtures/compose'
+import { bootstrapWorkspace, startPost } from './fixtures/compose'
 import { expect, test } from './fixtures/seeded-user'
 
 /**
@@ -36,9 +36,8 @@ test.describe('saving a channel variant @smoke', () => {
     // ── 1. A workspace, from a standing start.
     await bootstrapWorkspace(page)
 
-    // ── 2. A post with Instagram picked. `startPost` writes the words and then
-    //      picks the platform, which leaves the page on the part holding that
-    //      channel's version card.
+    // ── 2. A post with Instagram picked, so the composer opens that channel's
+    //      version card. No navigation follows: the card is already on screen.
     await startPost(page, 'instagram')
 
     // ── 3. The per-channel box — not the post's own body beside it.
@@ -83,9 +82,6 @@ test.describe('saving a channel variant @smoke', () => {
 
     // ── 5. The honest check: the row, re-read, not the state we just typed into.
     await page.reload()
-    // The composer opens on the words after a reload; Instagram's own box is in
-    // the platform part, one press down the rail.
-    await openPart(page, 2)
     await expect(page.getByRole('textbox', { name: 'Instagram copy', exact: true })).toHaveValue(
       written,
     )

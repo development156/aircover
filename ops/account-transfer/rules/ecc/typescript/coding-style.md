@@ -1,10 +1,11 @@
 ---
 paths:
-  - "**/*.ts"
-  - "**/*.tsx"
-  - "**/*.js"
-  - "**/*.jsx"
+  - '**/*.ts'
+  - '**/*.tsx'
+  - '**/*.js'
+  - '**/*.jsx'
 ---
+
 # TypeScript/JavaScript Coding Style
 
 > This file extends [common/coding-style.md](../common/coding-style.md) with TypeScript/JavaScript specific content.
@@ -133,7 +134,7 @@ function updateUser(user: User, name: string): User {
 function updateUser(user: Readonly<User>, name: string): User {
   return {
     ...user,
-    name
+    name,
   }
 }
 ```
@@ -161,7 +162,7 @@ function getErrorMessage(error: unknown): string {
 const logger = {
   error: (message: string, error: unknown) => {
     // Replace with your production logger (for example, pino or winston).
-  }
+  },
 }
 
 async function loadUser(userId: string): Promise<User> {
@@ -184,7 +185,7 @@ import { z } from 'zod'
 
 const userSchema = z.object({
   email: z.string().email(),
-  age: z.number().int().min(0).max(150)
+  age: z.number().int().min(0).max(150),
 })
 
 type UserInput = z.infer<typeof userSchema>

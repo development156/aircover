@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs'
 import type { Page } from '@playwright/test'
 
-import { bootstrapWorkspace, expectPostSaved, openPart, startPost } from './fixtures/compose'
+import { bootstrapWorkspace, expectPostSaved, startPost } from './fixtures/compose'
 import { expect, test } from './fixtures/seeded-user'
 
 /**
@@ -68,8 +68,6 @@ test.describe('the composer across widths @smoke', () => {
     await bootstrapWorkspace(page)
     const postId = await startPost(page, 'x')
     await page.locator('[data-channel-tile="linkedin"]').click()
-    // The words are part one; `startPost` left the page on part two.
-    await openPart(page, 1)
     await page.getByLabel('Your post').fill(BODY)
     // Waited for, not assumed. The body is written on a debounce, and the loop
     // below opens a SEPARATE browser context — so a capture taken before the
@@ -109,9 +107,6 @@ test.describe('the composer across widths @smoke', () => {
         await p.setViewportSize({ width, height: 900 })
         await p.goto(`/posts/${postId}`, { waitUntil: 'domcontentloaded' })
         await expect(p.locator('[data-composer]')).toBeVisible({ timeout: 60_000 })
-        // The composer opens on the WORDS every time, so the per-platform cards
-        // this spec measures are one press away rather than already on screen.
-        await openPart(p, 2)
         await p.waitForTimeout(800)
 
         const dir = `composer-proof/${theme}`

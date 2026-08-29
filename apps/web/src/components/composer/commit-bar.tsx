@@ -34,18 +34,6 @@ export interface CommitBarProps {
    * about what "saved" means.
    */
   onSaveDraft: () => Promise<boolean>
-  /**
-   * Take the reader to the send panel, once the save has landed.
-   *
-   * ── WHY THIS IS A CALL AND NOT JUST THE ADDRESS ─────────────────────────────
-   * The address is still set, because it is a real address and Back should
-   * return. But an address ALONE cannot carry this: assigning a hash that the
-   * bar already assigned fires no `hashchange`, so the second press of Save
-   * saved the post and moved nothing, silently, for as long as the reader
-   * stayed on `#finish`. MEASURED. The call happens every time; the address is
-   * for the browser.
-   */
-  onFinish?: () => void
 }
 
 /**
@@ -81,13 +69,7 @@ export interface CommitBarProps {
  * important word on the screen. So it now SAVES and then goes to the end of the
  * page — the label is true, and the journey it was there for is unchanged.
  */
-export function CommitBar({
-  status,
-  unsavedVersions,
-  canFinish,
-  onSaveDraft,
-  onFinish,
-}: CommitBarProps) {
+export function CommitBar({ status, unsavedVersions, canFinish, onSaveDraft }: CommitBarProps) {
   const versionWord = unsavedVersions === 1 ? 'version' : 'versions'
   const [saving, setSaving] = useState(false)
 
@@ -98,17 +80,13 @@ export function CommitBar({
    *
    * The jump is a plain hash assignment rather than `router.push` so it behaves
    * like the anchor it replaces — it lands on `#finish`, `scroll-mt-6` on that
-   * section keeps the heading clear of the topbar, and Back returns. It is no
-   * longer the whole mechanism, though: see `onFinish`.
+   * section keeps the heading clear of the topbar, and Back returns.
    */
   async function saveThenFinish() {
     setSaving(true)
     await onSaveDraft()
     setSaving(false)
     window.location.hash = 'finish'
-    // And ASK, rather than leaving it to the event the line above may not
-    // fire. See `onFinish` for what that cost the second press.
-    onFinish?.()
   }
 
   /**
