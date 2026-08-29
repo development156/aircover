@@ -105,6 +105,58 @@ describe('where the rail says the cycle is', () => {
     expect(screen.getByText('Not running yet')).toBeTruthy()
   })
 
+  /**
+   * THE RAIL IS TWO HALVES PER STEP, AND THEY DO NOT MEAN THE SAME THING.
+   *
+   * The half ENTERING a step is travelled once that step is reached; the half
+   * LEAVING it only once the step is finished. Collapse the two and the line
+   * runs out of the step that is still working, which draws the cycle a stage
+   * further along than it is — the same lie the tick-instead-of-a-number
+   * mutation tells, in the other direction.
+   *
+   * Counted rather than located: at step 4 of 7 the travelled halves are the
+   * three entering steps 2, 3 and 4, plus the three leaving steps 1, 2 and 3.
+   * Six. Seven means the line left the running step.
+   */
+  it('does not run the line out of the step that is still working', () => {
+    const { container } = render(<CycleStrip status="creating" />)
+    const rails = [...container.querySelectorAll('span.h-px')]
+    // Fourteen halves: two per step, the outer two drawn transparent so every
+    // column measures the same.
+    expect(rails).toHaveLength(14)
+    const travelled = rails.filter((r) => r.className.includes('bg-accent'))
+    expect(travelled).toHaveLength(6)
+  })
+
+  /**
+   * THE TWO OUTER HALVES STAY IN FLOW.
+   *
+   * The rail either side of a step is what makes all seven columns one width.
+   * Drop the first step's left half and the last step's right half — the
+   * obvious tidy-up, since neither is ever visible — and those two columns
+   * become narrower than the other five, which is the one thing the reference
+   * layout is entirely about.
+   *
+   * WHAT THIS CANNOT SEE: whether they actually occupy space. jsdom computes no
+   * layout, so a width regression from any other cause is invisible here; this
+   * pins the mechanism (drawn, not removed) rather than the pixels. The pixels
+   * were checked by rendering at 1440, 1000 and 420 in Chromium.
+   */
+  it('draws the two outer halves rather than removing them', () => {
+    const { container } = render(<CycleStrip status="creating" />)
+    const rails = [...container.querySelectorAll('span.h-px')]
+    expect(rails).toHaveLength(14)
+    // Transparent, never `hidden`: a removed box is a narrower column.
+    expect(rails.filter((r) => r.className.split(/\s+/).includes('hidden'))).toHaveLength(0)
+    expect(rails.filter((r) => r.className.includes('bg-transparent'))).toHaveLength(2)
+  })
+
+  it('leaves the whole rail untravelled when no cycle has run', () => {
+    const { container } = render(<CycleStrip />)
+    const rails = [...container.querySelectorAll('span.h-px')]
+    expect(rails.filter((r) => r.className.includes('bg-accent'))).toHaveLength(0)
+  })
+
   it('still names all seven steps in order, whatever the status', () => {
     render(<CycleStrip status="reported" />)
     const names = ['Collect', 'Reflect', 'Plan', 'Create', 'Test', 'Stage', 'Report']

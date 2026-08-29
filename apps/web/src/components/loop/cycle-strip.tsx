@@ -119,7 +119,7 @@ export function CycleStrip({ status }: CycleStripProps = {}) {
   return (
     <section
       aria-labelledby="loop-cycle"
-      className="surface-ring rounded-card bg-surface p-5 shadow-card max-narrow:p-4"
+      className="surface-ring rounded-card bg-surface p-6 shadow-card max-narrow:p-4"
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
         <h2 id="loop-cycle" className="type-h2">
@@ -142,21 +142,33 @@ export function CycleStrip({ status }: CycleStripProps = {}) {
         </p>
       </div>
 
-      <ol className="mt-5 grid gap-y-5 wide:grid-cols-7 wide:gap-x-0 max-wide:grid-cols-2 max-narrow:grid-cols-1">
+      {/*
+        SEVEN EQUAL COLUMNS, and the rail is drawn BETWEEN them rather than
+        inside them. Each cell carries half a connector on its left and half on
+        its right; adjacent halves meet exactly on the column boundary, so the
+        line is continuous at any width without a single absolute position.
+
+        The first cell's left half and the last cell's right half render
+        transparent rather than being omitted — a missing element would make
+        those two columns a different width from the other five, and the
+        reference's whole character is seven columns of one size.
+
+        WIDTH BEHAVIOUR. Seven columns hold to 1180px. Below that they become
+        four, then two — never seven squeezed, because a 90px column
+        cannot hold "Approve to publish" and the description under it. The
+        horizontal rail is hidden the moment the row wraps: a connector that
+        runs off the end of a row and reappears on the next one draws an order
+        that is not the order.
+      */}
+      <ol className="mt-6 grid gap-y-7 wide:grid-cols-7 max-wide:grid-cols-4 max-narrow:grid-cols-2">
         {STAGES.map((stage, index) => (
-          <Stage
-            key={stage.name}
-            stage={stage}
-            index={index}
-            current={current}
-            last={index === STAGES.length - 1}
-          />
+          <Stage key={stage.name} stage={stage} index={index} current={current} />
         ))}
       </ol>
 
       {/* The return edge, stated rather than drawn. This is the sentence a
           circular diagram would be trying to convey, and it says more. */}
-      <p className="type-sm mt-5 max-w-[68ch] border-t border-line-soft pt-4 text-muted">
+      <p className="type-sm mt-6 max-w-[68ch] border-t border-line-soft pt-4 text-muted">
         The Loop runs the same seven steps every week. Then it starts again, from a Brand Brain that
         now knows what happened last week. That is the part that makes it a loop rather than a
         schedule. You decide how far it gets on its own before it needs you, and the dial below is
@@ -170,15 +182,21 @@ function Stage({
   stage,
   index,
   current,
-  last,
 }: {
   stage: (typeof STAGES)[number]
   index: number
   current: number
-  last: boolean
 }) {
   const isCurrent = index === current
   const isDone = current >= 0 && index < current
+  const first = index === 0
+  const last = index === STAGES.length - 1
+
+  // A segment is travelled once the step on its RIGHT has been reached. So the
+  // half-line entering step 4 is filled while the half leaving it is not — a
+  // filled connector means "this step finished", never "the next one started".
+  const enteringFilled = current >= 0 && index <= current
+  const leavingFilled = current >= 0 && index < current
 
   return (
     <li
@@ -186,57 +204,81 @@ function Stage({
       // about the reader's week and has to reach someone who cannot see the
       // accent.
       aria-current={isCurrent ? 'step' : undefined}
-      className="flex flex-col gap-2 wide:px-1.5"
+      // `h-full` with the bar on `mt-auto`: descriptions are two to four lines
+      // and a bar placed after the text would sit at a different height in every
+      // column. One baseline across all seven is the whole point of a rail.
+      className="flex h-full min-w-0 flex-col items-center text-center"
     >
-      {/* The node and the rail it sits on. The connector belongs to the node on
-          its left, so a filled connector means "this step finished", never
-          "the next one started". */}
-      <div className="flex items-center gap-2">
+      {/* The rail. Full-bleed to the cell edges so the halves meet. */}
+      {/* Below 1180px the rail halves are hidden, which leaves the circle as the
+          only child and floats it to the start of the row. Centred once the rail
+          is gone, so a wrapped grid reads as a grid of steps rather than as a
+          ragged left edge. */}
+      <div className="flex w-full items-center max-wide:justify-center" aria-hidden>
+        <Rail filled={enteringFilled} hidden={first} />
         <span
-          aria-hidden
           className={[
-            'flex size-8 shrink-0 items-center justify-center rounded-full transition-micro',
+            'flex size-9 shrink-0 items-center justify-center rounded-full transition-micro',
             isCurrent
               ? 'bg-primary text-primary-foreground shadow-brand'
               : isDone
-                ? 'surface-ring bg-tint-100 text-accent dark:bg-s2'
-                : 'surface-ring bg-s2 text-muted',
+                ? 'bg-tint-100 text-accent shadow-[inset_0_0_0_1.5px_var(--acc)] dark:bg-s2'
+                : 'surface-ring-firm bg-surface text-muted',
           ].join(' ')}
         >
           {isDone ? (
-            <Check size={15} strokeWidth={2.5} />
+            <Check size={16} strokeWidth={2.6} />
           ) : (
             <span className="type-sm num font-[650]">{index + 1}</span>
           )}
         </span>
-        <span className="sr-only">
-          Step {index + 1} of {STAGES.length}
-          {isCurrent ? ', running now' : isDone ? ', done' : ''}
-        </span>
-        {!last ? (
-          <span
-            aria-hidden
-            className={[
-              'h-px min-w-4 flex-1 transition-micro max-wide:hidden',
-              isDone ? 'bg-accent' : 'bg-line-soft',
-            ].join(' ')}
-          />
-        ) : null}
+        <Rail filled={leavingFilled} hidden={last} />
       </div>
 
-      <div className="flex flex-col gap-1">
-        <span className="flex items-center gap-1.5">
-          <stage.icon
-            size={14}
-            strokeWidth={1.9}
-            aria-hidden
-            className={['shrink-0', isCurrent ? 'text-accent' : 'text-muted'].join(' ')}
-          />
-          <span className="type-h3 text-ink">{stage.name}</span>
-          {isCurrent ? <span className="type-eyebrow text-accent">Now</span> : null}
-        </span>
-        <span className="type-sm text-muted">{stage.what}</span>
-      </div>
+      <span className="sr-only">
+        Step {index + 1} of {STAGES.length}
+        {isCurrent ? ', running now' : isDone ? ', done' : ''}
+      </span>
+
+      <stage.icon
+        size={20}
+        strokeWidth={1.7}
+        aria-hidden
+        className={['mt-4 shrink-0', isCurrent ? 'text-accent' : 'text-ink'].join(' ')}
+      />
+
+      <span className="type-h3 mt-2 text-ink">{stage.name}</span>
+
+      <span className="type-sm mt-1 mb-4 max-w-[24ch] text-balance text-muted">{stage.what}</span>
+
+      {/*
+        The progress bar under the running step. It is the reference's one piece
+        of pure decoration, and it earns its place by being the only mark that
+        survives at a glance from across a desk — but it is decoration, so the
+        state it shows is also spelled out in the sr-only line above and in the
+        "Step 4 of 7" beside the heading. Nothing here is the only carrier of a
+        fact.
+      */}
+      <span
+        aria-hidden
+        className={[
+          'mt-auto h-[3px] w-14 shrink-0 rounded-full transition-micro',
+          isCurrent ? 'bg-accent' : 'bg-transparent',
+        ].join(' ')}
+      />
     </li>
+  )
+}
+
+/** Half a connector. Transparent rather than absent at the two ends, so every
+ *  column measures the same. */
+function Rail({ filled, hidden }: { filled: boolean; hidden: boolean }) {
+  return (
+    <span
+      className={[
+        'h-px min-w-0 flex-1 transition-micro max-wide:hidden',
+        hidden ? 'bg-transparent' : filled ? 'bg-accent' : 'bg-line-soft',
+      ].join(' ')}
+    />
   )
 }
