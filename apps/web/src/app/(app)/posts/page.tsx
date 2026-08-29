@@ -82,12 +82,7 @@ export default async function PostsPage({
     <div className="space-y-grid">
       {/* The empty state owns the only create affordance when there is
           nothing to list — two "Create post" buttons on one screen is noise. */}
-      <PageTitle
-        sub="Everything you have written, drafted or scheduled, newest first."
-        actions={posts.length > 0 ? <CreatePostButton /> : null}
-      >
-        Posts
-      </PageTitle>
+      <PageTitle actions={posts.length > 0 ? <CreatePostButton /> : null}>Posts</PageTitle>
 
       <ConnectFirstNote connections={connected} />
 

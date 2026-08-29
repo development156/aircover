@@ -36,7 +36,12 @@ export default async function MarketingBrainPage() {
   if (read.status !== 'ok') {
     return (
       <div className="space-y-grid">
-        <PageTitle sub={BRAIN_SUB}>Marketing Brain</PageTitle>
+        {/* NO `sub` HERE. The description names what the list holds, and on
+            this branch there is no list — the read failed. Saying "every
+            observation the weekly pass has written, newest first" above an
+            alert that says we could not read them describes something that is
+            not on the screen. */}
+        <PageTitle>Marketing Brain</PageTitle>
         <div
           role="alert"
           className="rounded-input border border-danger-bg bg-danger-bg px-3 py-2.5 type-sm text-danger"

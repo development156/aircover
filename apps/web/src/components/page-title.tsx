@@ -29,12 +29,18 @@ import { cn } from '@/lib/utils'
  * added in the same commit as the anchor rather than ahead of it.
  *
  * ── `min-w-0` IS SCOPED TO THE TRAIL, AND THAT IS NOT FUSSINESS ──────────────
- * MEASURED 2026-08-29: thirty-five call sites render this component, covering
- * forty-two of the sixty routes (twenty-one pages call it directly and four
- * section layouts carry it for the rest), and exactly one passes a `crumb`.
+ * MEASURED 2026-08-29, ON THE TREE THAT SHIPS THIS: forty-five call sites
+ * across thirty-one files — twenty-seven `page.tsx` and four section
+ * `layout.tsx` — and exactly one passes a `crumb`.
+ *
+ * The first draft of this comment said thirty-five, which was the count BEFORE
+ * the same commit converted five admin screens and added ten call sites. A
+ * number moved in the commit that invalidated it is the defect this repository
+ * names first, and it was caught here by an adversarial pass rather than by me.
+ *
  * `min-w-0` lets a flex child shrink below its content width, so putting it on
  * the wrapper unconditionally would change how the title block competes with its
- * siblings on all thirty-four of the others — a layout change nothing on those
+ * siblings on all forty-four of the others — a layout change nothing on those
  * screens asked for and no test here would see. The trail needs it, because it
  * adds a second and third item to a row that already sits in a `flex-wrap`
  * header; the bare title never did.
@@ -103,9 +109,9 @@ export function PageTitle({
   )
 
   /* NO ACTIONS MEANS NO WRAPPER, AND THAT IS THE WHOLE CARE HERE.
-     Thirty-five call sites render this component and three pass an action.
+     Forty-five call sites render this component and three pass an action.
      Wrapping every one of them in a flex row would change how the title block
-     competes with its siblings on the other thirty-two, which is a layout change none
+     competes with its siblings on the other forty-two, which is a layout change none
      of them asked for and no test on them would see. Same reasoning, and the
      same guard, as `min-w-0` above. */
   if (!actions) return block
@@ -113,7 +119,22 @@ export function PageTitle({
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
       {block}
-      <div className="flex flex-none flex-wrap items-center gap-2">{actions}</div>
+      {/* ── `max-narrow:w-full`, AND WHY THIS BOX MUST NOT BE `flex-none` ────
+          /assets passes `<div className="max-narrow:w-full"><AssetUpload /></div>`,
+          which was a DIRECT child of the row before this slot existed — so on a
+          phone it filled the row. Nesting it inside a `flex-none` box silently
+          neutralised that: `flex: 0 0 auto` sizes to content, so the child's
+          `w-full` resolved to 100% of a content-width box and could no longer
+          shrink. MEASURED on a 390px fixture: the row went from 390px to 461px
+          of scroll width, an overflow of 71px, and the real component is wider
+          than the fixture because it also prints filenames on error.
+
+          So the box carries the narrow-width rule itself and stays shrinkable.
+          `justify-end` keeps a wrapped action against the trailing edge rather
+          than letting it drift left of where it sat. */}
+      <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 max-narrow:w-full">
+        {actions}
+      </div>
     </div>
   )
 }
