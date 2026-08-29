@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { bootFullSchema } from './helpers/pglite-tenant'
 
 import {
+  ACTIVE_BRAIN_SQL,
   ARM_FOR_PUBLISH_SQL,
   AUTOPILOT_CANDIDATES_SQL,
   AUTOPILOT_SETTINGS_SQL,
@@ -595,6 +596,41 @@ describe('the autopilot dispatcher SQL against the real schema', () => {
         theirs,
       ])
       expect(after.rows[0]?.status).toBe('draft')
+    })
+  })
+
+  describe('the brain read, which decides whether autopilot may write at all', () => {
+    it('returns the ACTIVE payload', async () => {
+      const r = await db.query<{ payload: { field_meta?: Record<string, unknown> } }>(
+        ACTIVE_BRAIN_SQL,
+        [WS],
+      )
+      expect(r.rows).toHaveLength(1)
+      expect(r.rows[0]?.payload?.field_meta).toHaveProperty('taboo.red_lines')
+    })
+
+    it('a workspace with no brain returns NO ROW, which the caller reads as null', async () => {
+      const r = await db.query(ACTIVE_BRAIN_SQL, [OTHER])
+      expect(r.rows).toHaveLength(0)
+    })
+
+    it('NEVER returns a superseded version, however recent', async () => {
+      // A superseded payload describes the business the way it was described
+      // before somebody corrected it. Publishing unattended from one is
+      // publishing a correction the customer already made.
+      await db.exec(`
+        update brand_memory set status = 'superseded' where workspace_id = '${WS}';
+        insert into brand_memory (workspace_id, version, status, payload, source)
+          values ('${WS}', 2, 'active',
+                  '{"field_meta":{"hook.core_promise":{"confirmed":true}}}'::jsonb, 'resolved');
+      `)
+      const r = await db.query<{ payload: { field_meta?: Record<string, unknown> } }>(
+        ACTIVE_BRAIN_SQL,
+        [WS],
+      )
+      expect(r.rows).toHaveLength(1)
+      // Version 2's payload, not version 1's.
+      expect(r.rows[0]?.payload?.field_meta).not.toHaveProperty('taboo.red_lines')
     })
   })
 })

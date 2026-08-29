@@ -255,3 +255,27 @@ export const ARM_FOR_PUBLISH_SQL = `update posts
    and workspace_id = $1
    and status in ('idea', 'draft', 'review', 'approved')
 returning id`
+
+/**
+ * The ACTIVE Brand Brain payload, or no row.
+ *
+ * ── WHY THE DIAL BEING AT 3 IS NOT ENOUGH ────────────────────────────────────
+ * The trigger in `20260828120000_loop_autopilot_l3.sql` refuses an L3 write
+ * unless the four named fields are confirmed, so a channel can only have
+ * REACHED 3 with a brain that cleared the floor. That is a fact about the past.
+ *
+ * A person can unconfirm a field afterwards and the dial does not move. The
+ * floor has to be re-read at decision time or autopilot keeps publishing on an
+ * agreement somebody has since withdrawn — and withdrawing it is exactly how a
+ * customer says "stop writing that about us".
+ *
+ * `status = 'active'` and nothing else: a superseded version describes the
+ * business the way it was described before somebody corrected it.
+ *
+ * Parameters: $1 workspace_id.
+ */
+export const ACTIVE_BRAIN_SQL = `select payload
+  from brand_memory
+ where workspace_id = $1
+   and status = 'active'
+ limit 1`
