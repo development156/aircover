@@ -28,8 +28,24 @@ nobody had asked for.
 
 ## 0 · If the cloud Setup script never ran, run it here
 
-**`bash setup.sh`** is what belongs in the cloud environment's **Setup script**
-field — the repo-root wrapper, not `scripts/cloud-setup.sh` directly. Pointing
+**The Setup script field does NOT run in the repository root.** MEASURED
+2026-08-30 on wt-karunesh2: with `setup.sh` present on every branch in this repo,
+the field `bash setup.sh` still died with `bash: setup.sh: No such file or
+directory`, exit 127 — the same failure the earlier `bash scripts/cloud-setup.sh`
+gave. One cause explains both, and it is not the branch. Paste this instead:
+
+```
+bash -c 'set +e; R="$(git rev-parse --show-toplevel 2>/dev/null)"; for d in "$PWD" "$R"; do [ -n "$d" ] && [ -f "$d/setup.sh" ] && { bash "$d/setup.sh"; exit 0; }; done; F="$(find "$HOME" /workspace /repo /app /src -maxdepth 4 -name setup.sh -type f 2>/dev/null | head -1)"; [ -n "$F" ] && { echo "SAHODA: found $F"; bash "$F"; exit 0; }; echo "SAHODA: no setup.sh found. pwd=$PWD"; ls -la; exit 0'
+```
+
+It looks for the repo where it stands, then where git says the root is, then
+under `$HOME` and the usual container roots, and **exits 0 whatever it finds** —
+including when it finds nothing, where it prints `pwd` and a listing so the next
+attempt is informed rather than another guess. Proven at exit 0 from the repo
+root, from `$HOME`, from `/tmp`, from `/`, and with no `setup.sh` anywhere.
+
+`setup.sh` is the repo-root wrapper it ends up running — never
+`scripts/cloud-setup.sh` directly. Pointing
 the field at the script itself kills any session whose branch does not carry it:
 bash exits 127, the harness calls that "Setup script failed" and refuses to start
 Claude Code at all. That happened on the wt-karunesh2 and wt-karunesh3
