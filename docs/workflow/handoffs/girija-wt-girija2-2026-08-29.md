@@ -469,3 +469,106 @@ at the same time. Read the error block, not only the count.
   the fix.
 - **A logo uploaded before `ba47a1a3` is still not findable** — the row carries
   the file name. Re-upload through the chevron menu.
+
+---
+
+## The invisible card: the brand was derived for one surface only (`1d5cf404`)
+
+The founder sent a screenshot of /wallet in dark mode. The selected plan card
+was a **near-white fill carrying near-white text**, and he said the day/night
+toggle looked like it was changing the brand rather than the theme. Both
+readings were correct and both were one cause.
+
+### Two defects, one root
+
+**1 · The derivation graded everything against white.** `--acc` was darkened
+until it read on `#ffffff`, which is exactly the accent that cannot be read on
+`#171717`. The three tints were pinned at lightness **0.97 / 0.93 / 0.78** —
+near-white fills whatever the theme. In dark, `--ink` is `#ffffff`. A near-white
+fill under white ink is a blank card.
+
+**No component was at fault.** `brandSkinVars` answered a question about a light
+surface and its answer was applied to a dark one. A single-surface test suite
+cannot see that class of defect by construction, which is why the new tests run
+every claim across both surfaces and six brand hues.
+
+**2 · The selectors tied.**
+
+| selector | specificity |
+| -------- | ----------- |
+| `:root[data-brand-skin='on']` (mine) | **0,1,1** |
+| `:root[data-theme='dark']` (tokens.css) | **0,1,1** |
+
+A tie is broken by document order, and the skin is inlined in the body *after*
+the stylesheet. So the light-only brand values beat the dark block outright.
+That is precisely "the day/night toggle is getting applied on the Brand Skin".
+
+### The fix
+
+`brandSkinVars(colors, surface)`. The dark spec grades against `#171717`, walks
+lightness **up** rather than down, points `--pfg` at `var(--canvas)` rather than
+`var(--ink)` (which is `#ffffff` in dark), and derives tints at 0.28 / 0.34 /
+0.52.
+
+Walking up is not symmetry for its own sake: a fill darkened until it clears
+4.5:1 against white text has disappeared into a `#171717` page. Every dark
+interface puts a bright primary button with dark text on a dark ground, for
+this reason.
+
+`skinCss` emits **two rules**. The dark one carries both attributes at
+**(0,2,1)**, so it beats the dark block and the light brand rule by
+specificity, with nothing resting on document order.
+
+### The founder's research, adopted where it improves on ours
+
+| his rule | adopted | why |
+| -------- | ------- | --- |
+| chroma floor → fallback | **yes** | his own logo is mostly grey and white; the extractor was right and the product went washed out. Near-zero chroma is the absence of a brand colour, so Sahoda's orange is kept |
+| chroma ceiling | **yes** | a neon logo no longer glows |
+| split-complementary at +150 | **yes** | the old answer was worse than either option: with one colour the accent reused the primary's hue, so the accent WAS the primary and nothing popped |
+| luminance-threshold text pick | **no, ours is stronger** | his snippet omits the sRGB gamma linearisation, so it misjudges mid-tones. `contrastRatio` already implements the full WCAG formula and the guard iterates rather than thresholding |
+
+### Two of my own bugs, found by the new tests rather than by reading
+
+- **The hover step had an inverted sign** and lightened on the light theme.
+- **The grey fallback clamped Sahoda's own orange**, which is a designed colour
+  rather than an extraction, so the two routes to the fallback disagreed.
+
+Both were caught by assertions written before the code was run. Neither was
+visible on a careful re-read of the diff.
+
+### Mutation
+
+| mutation | result |
+| -------- | ------ |
+| dark tints back to near-white (**the screenshot**) | **RED** |
+| the dark surface graded as white | **RED** |
+| `--pfg` at `var(--ink)` | **RED** |
+| no grey fallback | **RED** |
+| the accent reusing the primary hue | **RED** |
+| one rule instead of two | **RED** |
+| all six at once | **RED**, 25 tests |
+| all six reverted | **PASS**, 345 in 29 files |
+
+### Gate
+
+| leg | result |
+| --- | ------ |
+| `turbo typecheck lint test` | **PASS**, 27 of 27, **5m38.4s**, 3 cache misses. `@sahoda/web:test`: **490 files, 6,196 passed** |
+| root vitest | **PASS**, 223 |
+| `test:smoke` | **UNRUN**, Clerk's API unreachable from this sandbox |
+| `prettier --check .` | **PASS** |
+| build | **PASS**, `js-budget ok: 82 routes within budget` |
+
+### A push race, recorded because it reached production
+
+Another session pushed three commits to `wt-core` (cloud-setup and lane config)
+while this was building. My `wt-girija2` and `wt-core` pushes were **rejected**;
+`wt-web` fast-forwarded and **succeeded**. So for roughly ten minutes production
+carried this fix WITHOUT those three commits. Nothing overlapped — they touch
+`setup.sh`, `scripts/cloud-setup.sh` and docs, none of them web-app inputs — and
+the merge was clean and re-gated. All three branches are now `4f8cb9a1`.
+
+**The lesson is the ordering.** Promoting lane → core → web as three separate
+pushes means a rejection partway through can leave production ahead of the
+trunk. Fetch and reconcile BEFORE the first push, not after the third.
