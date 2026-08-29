@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test'
+import { dismissPlanOffer } from './fixtures/compose'
 
 import { expect, test } from './fixtures/seeded-user'
 import { leaveOnboarding } from './fixtures/compose'
@@ -266,6 +267,11 @@ test.describe('ux j5 phone', () => {
       })
       await page.waitForLoadState('load').catch(() => {})
       await page.waitForTimeout(600)
+      // The SETTLED frame only. The 700ms frame above is deliberately taken
+      // mid-load and whatever is on screen then is the finding, dialog included.
+      // This one is meant to be the arrived screen, and on /home that is the
+      // dashboard rather than the plan offer over it.
+      await dismissPlanOffer(page)
       await shot(page, {
         journey: JOURNEY,
         stop: `P7-slow-settled-${route.slice(1).replace(/\//g, '-')}`,
