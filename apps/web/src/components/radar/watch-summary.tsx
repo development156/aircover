@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowRight, Eye, Timer, Users } from 'lucide-react'
+import { ArrowRight, CheckCheck, Timer, Users } from 'lucide-react'
 import { creditCost } from '@sahoda/shared'
 
 import { creditWord } from '@/lib/credit-words'
@@ -28,6 +28,18 @@ import type { Competitor } from '@/lib/radar/types'
  * `creditCost('radar_scan')`, and printing a price a customer is not charged is
  * the one thing a screen about money may never do. `data-credit-price` is the
  * attribute `no-hardcoded-price` looks for.
+ */
+/*
+ * ── EVERY ICON HERE ALREADY SHIPS, AND THAT IS A BUDGET DECISION ────────────
+ * The first draft reached for `Eye` and `SendHorizontal`, which no other screen
+ * used. MEASURED on Vercel: two lucide glyphs nobody else imports grew the
+ * SHARED chunk, and the shared chunk lands on every route — `/layout` went
+ * 833.8 kB against 833.6 allowed and `/global-error` 710.0 against 709.9. Two
+ * decorative icons, 0.1 and 0.2 kB over, and a red build for the whole app.
+ *
+ * `CheckCheck` and `ArrowRight` say the same things and are already in the
+ * bundle, so they cost nothing. Prefer an icon this app already imports over
+ * the perfect one, unless the perfect one is carrying meaning the other cannot.
  */
 export function WatchSummary({ competitors }: { competitors: readonly Competitor[] }) {
   const perScan = creditCost('radar_scan')
@@ -59,7 +71,7 @@ export function WatchSummary({ competitors }: { competitors: readonly Competitor
             <Figure icon={Users} label="Watching" value={competitors.length} />
             {/* NOT "Paused". See the header — the flag does not exist, and this
                 division is the one the list can actually make. */}
-            <Figure icon={Eye} label={read === 1 ? 'Read once' : 'Read'} value={read} />
+            <Figure icon={CheckCheck} label={read === 1 ? 'Read once' : 'Read'} value={read} />
             <Figure icon={Timer} label="Waiting" value={waiting} />
           </dl>
 

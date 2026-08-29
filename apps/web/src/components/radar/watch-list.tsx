@@ -1,15 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import {
-  AtSign,
-  Building2,
-  MapPin,
-  SendHorizontal,
-  ShieldCheck,
-  Target,
-  Trash2,
-} from 'lucide-react'
+import { ArrowRight, AtSign, Building2, MapPin, ShieldCheck, Target, Trash2 } from 'lucide-react'
 import { addCompetitor, removeCompetitor } from '@/app/actions/radar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -139,7 +131,7 @@ export function WatchForm() {
         {error ? <InlineError>{error}</InlineError> : null}
         <Button type="submit" loading={pending} className="mt-1 w-full">
           Add to the watch list
-          <SendHorizontal size={14} aria-hidden />
+          <ArrowRight size={14} aria-hidden />
         </Button>
         {/* The reassurance says the CADENCE and the CHARGE, because those are
             the two things a person hesitates over before naming somebody else's
