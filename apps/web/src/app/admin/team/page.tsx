@@ -15,9 +15,10 @@ export default async function TeamPage() {
   if (admins.status !== 'ok') {
     return (
       <div className="space-y-grid">
-        <PageTitle sub="Everyone who can open /admin. Revoking takes effect on their next request.">
-          Team
-        </PageTitle>
+        {/* NO `sub` — the read failed, so there is no list of admins to
+            describe, and "revoking takes effect on their next request" would
+            offer a control this branch does not render. */}
+        <PageTitle>Team</PageTitle>
         <div
           role="alert"
           className="rounded-input border border-danger-bg bg-danger-bg px-3 py-2.5 text-[13px] text-danger"

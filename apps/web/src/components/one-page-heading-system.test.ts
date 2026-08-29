@@ -31,6 +31,28 @@ import { join, resolve } from 'node:path'
  * treatment exist in the source at all. It runs in milliseconds, on every gate,
  * with no browser.
  *
+ * ── WHAT IT READS, AND WHAT IT PROVABLY MISSES ──────────────────────────────
+ * It walks every `.tsx` under `app/`, not only `page.tsx`. The first draft read
+ * `page.tsx` alone, which left the four section `layout.tsx` files — the ones
+ * carrying the heading for fifteen routes — outside a guard whose name claims
+ * to cover the routing tree. Nothing superseded was hiding there; the guard was
+ * certifying a surface it never opened, which is the same defect as passing by
+ * looking at nothing, one level up.
+ *
+ * It matches CLASS STRINGS in the source. An adversarial pass enumerated what
+ * that cannot see, and the list belongs here rather than in a review comment:
+ *
+ *   · classes split across a `cn(...)` argument boundary, because a quote ends
+ *     the match
+ *   · a heading class hoisted into a `const` and referenced by name
+ *   · a different shout — `font-bold`, `font-[800]`, `text-2xl`, `text-[26px]`
+ *
+ * The first two are reachable by a real parse and are not worth one here. The
+ * third is the honest limit of a ban-list: it forbids the treatments that
+ * actually shipped, and a NEW way of shouting is a new entry. What makes that
+ * acceptable is that the treatments below were not hypothetical — every one was
+ * live in the console on 2026-08-29.
+ *
  * ── WHAT IT DELIBERATELY DOES NOT ASSERT ────────────────────────────────────
  * Not "every page.tsx imports PageTitle". Eight routes legitimately do not have
  * one — the two Clerk auth screens, the two embed frames rendered inside someone
@@ -44,31 +66,54 @@ import { join, resolve } from 'node:path'
 
 const APP = resolve(import.meta.dirname, '..', 'app')
 
-/** Every treatment `PageTitle` replaced. Each was live in the console. */
+/**
+ * Every treatment `PageTitle` replaced. Each was live in the console.
+ *
+ * `text-[25px]` is banned OUTRIGHT rather than only beside `font-extrabold`:
+ * it is off the type scale entirely, so there is no combination in which it is
+ * correct, and pairing the two in one pattern made the check order-dependent
+ * and quote-fragile for no gain.
+ *
+ * The `type-h2` rules run over the whole file rather than a single line, so a
+ * heading the formatter has wrapped across three lines is still caught. `[\s\S]`
+ * is bounded to 200 characters so the two halves have to be part of one element
+ * rather than merely present in the same file.
+ */
 const SUPERSEDED: { pattern: RegExp; what: string }[] = [
-  { pattern: /text-\[25px\][^"'`]*font-extrabold/, what: '25px/800 page heading' },
-  { pattern: /font-extrabold[^"'`]*text-\[25px\]/, what: '25px/800 page heading' },
-  { pattern: /<h1[^>]*type-h2[^>]*font-extrabold/, what: 'type-h2/800 page heading' },
-  { pattern: /<h1[^>]*font-extrabold[^>]*type-h2/, what: 'type-h2/800 page heading' },
+  { pattern: /text-\[25px\]/, what: '25px page heading — off the type scale' },
+  {
+    pattern: /<h1[\s\S]{0,200}?type-h2[\s\S]{0,200}?font-extrabold/,
+    what: 'type-h2/800 page heading',
+  },
+  {
+    pattern: /<h1[\s\S]{0,200}?font-extrabold[\s\S]{0,200}?type-h2/,
+    what: 'type-h2/800 page heading',
+  },
 ]
 
-function pageFiles(dir: string): string[] {
+function routeFiles(dir: string): string[] {
   const out: string[] = []
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name)
-    if (entry.isDirectory()) out.push(...pageFiles(path))
-    else if (entry.name === 'page.tsx') out.push(path)
+    if (entry.isDirectory()) out.push(...routeFiles(path))
+    else if (entry.name.endsWith('.tsx')) out.push(path)
   }
   return out
 }
 
 describe('one page-heading system', () => {
-  const files = pageFiles(APP)
+  const files = routeFiles(APP)
 
   it('finds the routes to check', () => {
     // If this ever reads 0 the scan below passes by looking at nothing, which is
-    // the failure mode every source scan has and most do not guard.
-    expect(files.length).toBeGreaterThan(50)
+    // the failure mode every source scan has and most do not guard. Sixty
+    // `page.tsx` plus layouts, error and loading files, so the floor is well
+    // above the route count and still far below the real total.
+    expect(files.length).toBeGreaterThan(60)
+
+    // And the layouts specifically, because leaving them out was the first
+    // draft's blind spot and a floor on the total would not have caught it.
+    expect(files.filter((f) => f.endsWith('layout.tsx')).length).toBeGreaterThan(3)
   })
 
   it('renders no superseded page-heading treatment on any route', () => {
@@ -102,7 +147,14 @@ describe('one page-heading system', () => {
 
     for (const route of converted) {
       const source = readFileSync(join(APP, route), 'utf8')
-      expect(source, route).toContain('PageTitle')
+
+      // NOT `toContain('PageTitle')` — that is satisfied by the word appearing
+      // in a comment, which is exactly what the comments this commit added
+      // would have done. The claim is that these screens no longer hand-roll a
+      // heading, so what is asserted is the ABSENCE of an `<h1>`: each of these
+      // files had two, one per branch, and both had to go.
+      expect(source, route).not.toMatch(/<h1[\s>]/)
+      expect(source, route).toMatch(/<PageTitle[\s>]/)
     }
   })
 })

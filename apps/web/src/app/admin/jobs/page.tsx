@@ -32,7 +32,9 @@ export default async function DeadLettersPage() {
   if (letters.status !== 'ok') {
     return (
       <div className="space-y-grid">
-        <PageTitle sub={JOBS_SUB}>Dead letters</PageTitle>
+        {/* NO `sub` — see /admin/brain. The read failed, so there is no list
+            for the description to describe. */}
+        <PageTitle>Dead letters</PageTitle>
         <div
           role="alert"
           className="rounded-input border border-danger-bg bg-danger-bg px-3 py-2.5 type-sm text-danger"
