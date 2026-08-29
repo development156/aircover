@@ -65,15 +65,7 @@ export function VersionsPane({
 
       {channels.length === 0 ? (
         <p className="surface-ring rounded-card bg-surface p-4 text-[13px] text-muted">
-          {/* ── THE REMEDY POINTS AT SOMETHING ON THIS SCREEN ─────────────────
-              This sentence has been wrong twice, in opposite directions, and
-              both times because it named a PLACE. It said "above" while the
-              picker was below; it then said "in step 2" while the reader was
-              standing in step 2 with the picker directly overhead. This pane
-              only ever renders inside the platform part, and the picker is the
-              element immediately before it there, so "above" is true by
-              construction now rather than by luck. */}
-          Pick a platform above and its version opens here.
+          Pick a channel above and its version opens here.
         </p>
       ) : (
         <>

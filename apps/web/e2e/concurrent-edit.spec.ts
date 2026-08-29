@@ -1,4 +1,4 @@
-import { bootstrapWorkspace, openPart, startPost } from './fixtures/compose'
+import { bootstrapWorkspace, startPost } from './fixtures/compose'
 import { adminClient, expect, signInSecondContext, test } from './fixtures/seeded-user'
 
 /**
@@ -31,19 +31,6 @@ const CHANNEL = 'instagram'
 async function newPost(page: import('@playwright/test').Page): Promise<string> {
   await bootstrapWorkspace(page)
   return startPost(page, CHANNEL)
-}
-
-/**
- * Open a post and go to the part holding each platform's own copy.
- *
- * The composer lists the three parts of a post down the side and opens on the
- * WORDS every time — a writer coming back to a draft is here to read it. Every
- * box in this file is a channel's own copy, which lives one press away, so the
- * two steps are one helper rather than a line every spec forgets.
- */
-async function openPost(page: import('@playwright/test').Page, postId: string): Promise<void> {
-  await page.goto(`/posts/${postId}`)
-  await openPart(page, 2)
 }
 
 const copyBox = (page: import('@playwright/test').Page) =>
@@ -93,7 +80,7 @@ test.describe('concurrent edit, against the real database @smoke', () => {
   }) => {
     void signedIn
     const postId = await newPost(page)
-    await openPost(page, postId)
+    await page.goto(`/posts/${postId}`)
 
     // ── (d) THE CREATE ARM ────────────────────────────────────────────────────
     // docs/23's SQL as printed only UPDATEs, and the app's write is an upsert — so
@@ -128,13 +115,13 @@ test.describe('concurrent edit, against the real database @smoke', () => {
     signedIn,
   }) => {
     const postId = await newPost(page)
-    await openPost(page, postId)
+    await page.goto(`/posts/${postId}`)
     await saveCopy(page, 'A wrote this first.')
     await expect(savedChip(page)).toBeVisible({ timeout: 60_000 })
 
     // B opens the same post in its OWN session, and reads the row as it is now.
     const other = await signInSecondContext(browser, signedIn)
-    await openPost(other, postId)
+    await other.goto(`/posts/${postId}`)
     await expect(copyBox(other)).toHaveValue('A wrote this first.')
 
     // A saves again. B is now holding a version that no longer exists.
@@ -196,7 +183,7 @@ test.describe('concurrent edit, against the real database @smoke', () => {
     test.skip(admin === null, 'no service key in this environment')
 
     const postId = await newPost(page)
-    await openPost(page, postId)
+    await page.goto(`/posts/${postId}`)
     await saveCopy(page, 'Belongs to the first workspace.')
     await expect(savedChip(page)).toBeVisible({ timeout: 60_000 })
 
@@ -246,12 +233,12 @@ test.describe('concurrent edit, against the real database @smoke', () => {
     signedIn,
   }) => {
     const postId = await newPost(page)
-    await openPost(page, postId)
+    await page.goto(`/posts/${postId}`)
     await saveCopy(page, 'A first.')
     await expect(savedChip(page)).toBeVisible({ timeout: 60_000 })
 
     const other = await signInSecondContext(browser, signedIn)
-    await openPost(other, postId)
+    await other.goto(`/posts/${postId}`)
     await expect(copyBox(other)).toHaveValue('A first.')
 
     await saveCopy(page, 'A second.')

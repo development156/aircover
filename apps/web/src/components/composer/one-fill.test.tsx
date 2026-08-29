@@ -106,20 +106,6 @@ function solidFills(root: HTMLElement): string[] {
 }
 
 /**
- * Go to one of the three parts, the way a writer does: by pressing its row in
- * the rail down the side.
- *
- * ── AND THIS IS WHY THE RULE GOT STRONGER, NOT WEAKER ───────────────────────
- * docs/37 §2.3 rations the solid brand fill to one element PER VIEW. When all
- * three parts were stacked on one page, "the view" was the whole composer and
- * the honest count was five. The rail made each part its own view, so the rule
- * now has three counts to satisfy rather than one, and this file checks each.
- */
-function openPart(root: HTMLElement, index: 1 | 2 | 3): void {
-  fireEvent.click(root.querySelector(`[data-rail-step="${index}"] button`) as HTMLElement)
-}
-
-/**
  * A SECOND, OPENED COMPOSER USED PURELY AS A CLOCK.
  *
  * `FinishPanel` loads both of its halves with `next/dynamic`, so a synchronous
@@ -133,7 +119,6 @@ function openPart(root: HTMLElement, index: 1 | 2 | 3): void {
  */
 async function afterChunksArrive(): Promise<void> {
   const probe = composer()
-  openPart(probe, 3)
   fireEvent.click(within(probe).getByRole('button', { name: /^Post now/ }))
   await waitFor(() => expect(probe.querySelector('[data-guide="post-publish-now"]')).toBeTruthy())
 }
@@ -156,21 +141,9 @@ describe('the brand fill marks what commits, and only that', () => {
    * that a new fill has to be argued for, and `toHaveLength(5)` would let any
    * fifth one through as long as one left.
    */
-  test('the words are a view with ONE fill on it, and it is the bar’s Save', async () => {
+  test('at rest it is Adapt, one Save per channel, and the bar’s Save', async () => {
     const root = composer()
     await afterChunksArrive()
-    const found = solidFills(root)
-
-    // Part one is the writing box, the pictures and the saved starting points.
-    // Nothing there commits anything, so the only fill on the screen belongs to
-    // the bar that follows the reader down every part.
-    expect(found, `Found ${found.length} brand fills:\n${found.join('\n')}`).toEqual(['Save'])
-  })
-
-  test('each platform’s view is Adapt, one Save per card, and the bar’s Save', async () => {
-    const root = composer()
-    await afterChunksArrive()
-    openPart(root, 2)
     const found = solidFills(root)
 
     expect(found, `Found ${found.length} brand fills:\n${found.join('\n')}`).toEqual([
@@ -199,7 +172,6 @@ describe('the brand fill marks what commits, and only that', () => {
     // cards the moment the bar grew one.
     const one = composer(['x'])
     await afterChunksArrive()
-    openPart(one, 2)
 
     const cardSaves = [...one.querySelectorAll<HTMLElement>('[data-version-card] button')].filter(
       (el) => el.className.split(/\s+/).includes('bg-primary') && el.textContent?.trim() === 'Save',
@@ -218,15 +190,7 @@ describe('the brand fill marks what commits, and only that', () => {
   test('nothing that merely opens, chooses or cancels carries it', async () => {
     const root = composer()
     await afterChunksArrive()
-
-    // ── ACROSS ALL THREE VIEWS, NOT JUST THE ONE THAT OPENS FIRST ────────────
-    // Two of these four live on the send panel and two on a version card. With
-    // the parts on separate views, a check that looked at only one of them
-    // would silently stop watching the other two.
-    openPart(root, 2)
-    const found = [...solidFills(root)]
-    openPart(root, 3)
-    found.push(...solidFills(root))
+    const found = solidFills(root)
 
     for (const label of ['Schedule it', 'Post now', 'Emoji', 'Polish']) {
       expect(
@@ -239,7 +203,6 @@ describe('the brand fill marks what commits, and only that', () => {
   test('and Undo, Redo and Clear never do, on any channel', async () => {
     const root = composer()
     await afterChunksArrive()
-    openPart(root, 2)
     const found = solidFills(root)
 
     for (const label of ['Undo', 'Redo', 'Clear']) {
@@ -254,7 +217,6 @@ describe('the brand fill marks what commits, and only that', () => {
 describe('the committing buttons inside the Send it panel', () => {
   test('Confirm schedule is the schedule side one fill', async () => {
     const root = composer()
-    openPart(root, 3)
     fireEvent.click(screen.getByRole('button', { name: /^Schedule it/ }))
     const confirm = await screen.findByRole('button', { name: /Confirm schedule/ })
 
