@@ -137,7 +137,7 @@ describe('the brand mark', () => {
   it('says which colours are on and offers the other', async () => {
     render(panel({ skinOn: true }))
 
-    expect(screen.getByText(/your brand colours are on/i)).toBeInTheDocument()
+    expect(screen.getByText(/brand colours are on/i)).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /use sahoda colours/i }))
     expect(onToggleSkin).toHaveBeenCalledTimes(1)
   })
