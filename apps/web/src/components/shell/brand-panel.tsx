@@ -4,6 +4,8 @@ import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { Button } from '@/components/ui/button'
+import { isUsableBrandColor } from '@/lib/brand/brand-theme'
+import { rgbToOklch } from '@/lib/brand/oklch'
 
 /**
  * The brand panel: the colours found in the logo, and the way to replace it.
@@ -43,6 +45,24 @@ export function BrandPanel({
   const input = useRef<HTMLInputElement>(null)
   const [palette, setPalette] = useState<string[] | null>(null)
   const [unreadable, setUnreadable] = useState(false)
+  /**
+   * ── WHAT WENT WRONG, SHOWN ────────────────────────────────────────────────
+   * `replace()` used to be `await uploadAsset(form)` with the result thrown
+   * away. `uploadAsset` refuses a duplicate file, an oversized one, unreadable
+   * bytes, a storage failure and a missing workspace, and every one of those
+   * closed this panel and refreshed the page as though it had worked.
+   *
+   * MEASURED on the founder's own workspace: "Replace logo" appeared to do
+   * nothing, over and over. The file was being refused as a DUPLICATE — it
+   * matches by content hash against the copy already in the library — and the
+   * refusal, which names the file and points at the trash, was discarded here.
+   *
+   * A silent failure is worse than a loud one on a control whose entire job is
+   * to change something visible.
+   */
+  const [failed, setFailed] = useState<string | null>(null)
+  /** An SVG was turned into a PNG. Said out loud rather than done quietly. */
+  const [converted, setConverted] = useState(false)
   const [busy, startTransition] = useTransition()
   const [read, setRead] = useState(false)
 
@@ -64,11 +84,38 @@ export function BrandPanel({
     })()
   }
 
+  /**
+   * ── ONLY THE COLOURS THAT CAN ACTUALLY BECOME A BRAND ────────────────────
+   * MEASURED on the founder's logo, which is grey, white and black: all five
+   * extracted swatches had chroma 0.0000, every one fell back to Sahoda orange,
+   * and the panel offered five choices that could not do anything. Filtering by
+   * the derivation's own predicate is the difference between a palette and a
+   * row of decoys.
+   */
+  const usable = (palette ?? []).filter(isUsableBrandColor)
+  /** The logo was read successfully and simply has no colour in it. */
+  const monochrome = palette !== null && palette.length > 0 && usable.length === 0
+
+  function pick(hex: string): void {
+    const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex)
+    if (!m) return
+    choose(rgbToOklch(parseInt(m[1]!, 16), parseInt(m[2]!, 16), parseInt(m[3]!, 16)))
+  }
+
   function choose(color: string): void {
     startTransition(async () => {
-      const rest = (palette ?? []).filter((c) => c !== color)
+      // FROM THE USABLE LIST, and the test that found this is worth keeping in
+      // mind: `colors[1]` becomes the ACCENT, and an unusable colour there falls
+      // back to Sahoda orange. Carrying the greys along would have handed a
+      // customer who picked teal an orange accent.
+      const rest = usable.filter((c) => c !== color)
+      setFailed(null)
       const { saveWorkspaceTheme } = await import('@/app/actions/theme')
-      await saveWorkspaceTheme([color, ...rest])
+      const saved = await saveWorkspaceTheme([color, ...rest])
+      if (!saved.ok) {
+        setFailed(saved.message)
+        return
+      }
       // Choosing a colour IS asking for it, so it takes effect rather than being
       // stored against a switch the person has not met.
       onUseBrand()
@@ -77,33 +124,76 @@ export function BrandPanel({
     })
   }
 
+  /**
+   * ── THE UPLOAD GOES FIRST, AND THAT ORDER IS THE FIX ────────────────────────
+   * This used to read the palette from a canvas BEFORE calling the server, with
+   * both inside one try. An adversarial review measured the consequence: a
+   * browser that will not decode the file — an SVG with no `xmlns`, which is
+   * common in hand-edited markup — rejects in `load()`, the catch fires, and
+   * `setBrandLogo` is NEVER CALLED. No request, no rasterisation, no row, and a
+   * message telling the person to try a PNG for a file the SERVER would have
+   * accepted, since sharp rasterises it fine.
+   *
+   * That is the same "Replace logo does nothing" this commit set out to end,
+   * rebuilt one layer up. So the file is STORED first, and reading colours out
+   * of it is a separate, failable step afterwards: the logo is the point, the
+   * palette is a bonus, and a bonus must never gate the point.
+   */
   function replace(file: File): void {
     startTransition(async () => {
+      setFailed(null)
+      setConverted(false)
+
+      const form = new FormData()
+      form.set('file', file)
+      form.set('title', 'Logo')
+
+      let stored
+      try {
+        const { setBrandLogo } = await import('@/app/actions/brand-logo')
+        stored = await setBrandLogo(form)
+      } catch {
+        setFailed('Sahoda could not save that file. Try again.')
+        return
+      }
+      if (!stored.ok) {
+        setFailed(stored.message)
+        return
+      }
+      setConverted(stored.converted)
+
+      /**
+       * Colours, second and optional. A canvas read can fail for reasons that
+       * have nothing to do with whether the file is a good logo — a namespace
+       * the browser dislikes, a tainted canvas — and none of them is a reason to
+       * discard a file that is already stored.
+       */
       try {
         const { extractPalette } = await import('@/lib/brand/color-extract')
         const found = extractPalette(await load(URL.createObjectURL(file), false))
-        const form = new FormData()
-        form.set('file', file)
-        form.set('title', 'Logo')
-        const { uploadAsset } = await import('@/app/actions/assets')
-        await uploadAsset(form)
-
         if (found.length > 0) {
           const { saveWorkspaceTheme } = await import('@/app/actions/theme')
-          await saveWorkspaceTheme(found)
-          setPalette(found)
-          setUnreadable(false)
+          const saved = await saveWorkspaceTheme(found)
+          if (saved.ok) {
+            setPalette(found)
+            setUnreadable(false)
+          }
         } else {
-          // The file is KEPT either way. A logo Sahoda cannot read colours from
-          // is still their logo, and saying nothing about the colours is more
-          // honest than painting the workspace in whatever a failed read left.
           setUnreadable(true)
         }
-        onClose()
-        router.refresh()
       } catch {
+        // The file is KEPT. Saying nothing about the colours is more honest than
+        // painting the workspace in whatever a failed read left behind.
         setUnreadable(true)
       }
+
+      /**
+       * The panel STAYS OPEN. Closing here made the "saved as an image" notice
+       * unreachable — the flag was set in the same transition that unmounted the
+       * component, so nobody ever saw it. Staying open is also better: the
+       * swatches have just changed and choosing one is the likely next act.
+       */
+      router.refresh()
     })
   }
 
@@ -147,9 +237,9 @@ export function BrandPanel({
         </div>
       ) : null}
 
-      {palette && palette.length > 0 ? (
+      {usable.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-2">
-          {palette.map((color) => (
+          {usable.map((color) => (
             <button
               key={color}
               type="button"
@@ -163,6 +253,51 @@ export function BrandPanel({
         </div>
       ) : null}
 
+      {/* ── A LOGO WITH NO COLOUR IN IT ───────────────────────────────────────
+          Founder's ruling, 2026-08-30: pick-a-colour. His own logo is grey,
+          white and black, so the extractor was right and there was simply
+          nothing to offer. Saying that plainly and handing over a picker is the
+          honest answer; five grey decoys was not. */}
+      {monochrome ? (
+        <div className="mt-3">
+          <p className="type-xs text-muted">
+            Your logo is greys and blacks, so Sahoda found no brand colour in it. Pick one and
+            everything follows it.
+          </p>
+          <label className="surface-ring mt-2 flex items-center justify-between gap-2 rounded-control p-2">
+            <span className="type-xs text-ink">Pick your brand colour</span>
+            <input
+              type="color"
+              disabled={busy}
+              /* No seed value. `<input type="color">` speaks hex and the design
+                 lint forbids a hex literal here, correctly — a token would be
+                 the right answer and this element cannot take one. Left
+                 unseeded, the browser shows its own default and `onChange`
+                 fires only on a real choice, so nothing is saved until the
+                 person picks. */
+              onChange={(e) => pick(e.target.value)}
+              className="size-8 cursor-pointer rounded-control border-0 bg-transparent p-0"
+            />
+          </label>
+        </div>
+      ) : null}
+
+      {failed ? (
+        <p className="type-xs mt-3 text-danger" role="alert">
+          {failed}
+        </p>
+      ) : null}
+
+      {/* A silent conversion is a surprise waiting to happen: somebody who
+          uploaded a vector should not have to discover from the media library
+          that Sahoda holds a picture of it. */}
+      {converted ? (
+        <p className="type-xs mt-3 text-muted">
+          Sahoda saved your SVG as a high-resolution image, which is what social channels and image
+          generation can use.
+        </p>
+      ) : null}
+
       {unreadable ? (
         <p className="type-xs mt-3 text-muted">
           Sahoda could not read the colours out of your logo from here. Add it again below and it
@@ -173,10 +308,28 @@ export function BrandPanel({
       <input
         ref={input}
         type="file"
-        accept="image/png,image/jpeg,image/webp"
+        /* SVG included, and it does not reach storage as one: `setBrandLogo`
+           rasterises it and discards the vector. Without this line the dialog
+           greys out the founder's own logo, which presents as the button doing
+           nothing at all. */
+        accept="image/png,image/jpeg,image/webp,image/svg+xml"
         className="sr-only"
         onChange={(e) => {
           const file = e.target.files?.[0]
+          /**
+           * ── THE VALUE IS CLEARED, AND THAT IS THE WHOLE SECOND BUG ────────
+           * A file input fires `change` only when its VALUE changes. Choosing
+           * the same file twice does not change it, so the second press and
+           * every press after it fired NOTHING: no handler, no request, no
+           * error, not a single line in the network tab.
+           *
+           * That is what "still not working" was. The founder was re-choosing
+           * the same logo to test, so after the first attempt he was clicking a
+           * control that had been inert since the moment he picked that file.
+           * The previous commit made the first attempt report its refusal and
+           * could not have helped with any attempt after it.
+           */
+          e.target.value = ''
           if (file) replace(file)
         }}
       />
