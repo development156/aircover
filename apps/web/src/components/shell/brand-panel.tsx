@@ -124,51 +124,76 @@ export function BrandPanel({
     })
   }
 
+  /**
+   * ── THE UPLOAD GOES FIRST, AND THAT ORDER IS THE FIX ────────────────────────
+   * This used to read the palette from a canvas BEFORE calling the server, with
+   * both inside one try. An adversarial review measured the consequence: a
+   * browser that will not decode the file — an SVG with no `xmlns`, which is
+   * common in hand-edited markup — rejects in `load()`, the catch fires, and
+   * `setBrandLogo` is NEVER CALLED. No request, no rasterisation, no row, and a
+   * message telling the person to try a PNG for a file the SERVER would have
+   * accepted, since sharp rasterises it fine.
+   *
+   * That is the same "Replace logo does nothing" this commit set out to end,
+   * rebuilt one layer up. So the file is STORED first, and reading colours out
+   * of it is a separate, failable step afterwards: the logo is the point, the
+   * palette is a bonus, and a bonus must never gate the point.
+   */
   function replace(file: File): void {
     startTransition(async () => {
       setFailed(null)
       setConverted(false)
+
+      const form = new FormData()
+      form.set('file', file)
+      form.set('title', 'Logo')
+
+      let stored
+      try {
+        const { setBrandLogo } = await import('@/app/actions/brand-logo')
+        stored = await setBrandLogo(form)
+      } catch {
+        setFailed('Sahoda could not save that file. Try again.')
+        return
+      }
+      if (!stored.ok) {
+        setFailed(stored.message)
+        return
+      }
+      setConverted(stored.converted)
+
+      /**
+       * Colours, second and optional. A canvas read can fail for reasons that
+       * have nothing to do with whether the file is a good logo — a namespace
+       * the browser dislikes, a tainted canvas — and none of them is a reason to
+       * discard a file that is already stored.
+       */
       try {
         const { extractPalette } = await import('@/lib/brand/color-extract')
         const found = extractPalette(await load(URL.createObjectURL(file), false))
-        const form = new FormData()
-        form.set('file', file)
-        form.set('title', 'Logo')
-        /**
-         * `setBrandLogo`, not `uploadAsset`. The library refuses a duplicate by
-         * content hash, which is right for a library and fatal here: the
-         * founder's logo was ALREADY in his library under its file name, so the
-         * one action that could make it findable was the one guaranteed to
-         * fail. `setBrandLogo` adopts those bytes instead of refusing them.
-         */
-        const { setBrandLogo } = await import('@/app/actions/brand-logo')
-        const stored = await setBrandLogo(form)
-        if (!stored.ok) {
-          setFailed(stored.message)
-          return
-        }
-        setConverted(stored.converted)
-
         if (found.length > 0) {
           const { saveWorkspaceTheme } = await import('@/app/actions/theme')
           const saved = await saveWorkspaceTheme(found)
-          if (!saved.ok) {
-            setFailed(saved.message)
-            return
+          if (saved.ok) {
+            setPalette(found)
+            setUnreadable(false)
           }
-          setPalette(found)
-          setUnreadable(false)
         } else {
-          // The file is KEPT either way. A logo Sahoda cannot read colours from
-          // is still their logo, and saying nothing about the colours is more
-          // honest than painting the workspace in whatever a failed read left.
           setUnreadable(true)
         }
-        onClose()
-        router.refresh()
       } catch {
-        setFailed('Sahoda could not read that file. Try a PNG or a JPEG.')
+        // The file is KEPT. Saying nothing about the colours is more honest than
+        // painting the workspace in whatever a failed read left behind.
+        setUnreadable(true)
       }
+
+      /**
+       * The panel STAYS OPEN. Closing here made the "saved as an image" notice
+       * unreachable — the flag was set in the same transition that unmounted the
+       * component, so nobody ever saw it. Staying open is also better: the
+       * swatches have just changed and choosing one is the likely next act.
+       */
+      router.refresh()
     })
   }
 

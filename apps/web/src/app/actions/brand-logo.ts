@@ -49,6 +49,34 @@ export type SetBrandLogoState =
 
 const LOGO_TITLE = 'Logo'
 
+/** The label a superseded logo keeps. It is still their file. */
+const PREVIOUS_LOGO_TITLE = 'Logo (previous)'
+
+/**
+ * Leave exactly one asset titled `Logo`.
+ *
+ * A failure here is NOT fatal to setting the logo: the worst case is two rows
+ * carrying the title and `readBrandLogo` picking the newer, which is the
+ * behaviour we want anyway. Refusing the whole act over it would be worse.
+ */
+async function demoteOtherLogos(
+  supabase: ReturnType<typeof createServerSupabase>,
+  workspaceId: string,
+  keepId: string | null,
+): Promise<void> {
+  try {
+    const query = supabase
+      .from('assets')
+      .update({ title: PREVIOUS_LOGO_TITLE })
+      .eq('workspace_id', workspaceId)
+      .eq('title', LOGO_TITLE)
+
+    await (keepId ? query.neq('id', keepId) : query)
+  } catch {
+    // Best effort, deliberately. See above.
+  }
+}
+
 /** `brand.svg` -> `brand`. The stored file is a PNG and its name should say so. */
 function baseName(name: string): string {
   const trimmed = typeof name === 'string' ? name.trim() : ''
@@ -139,6 +167,20 @@ export async function setBrandLogo(formData: FormData): Promise<SetBrandLogoStat
 
     const existing = data as { id: string; deleted_at: string | null } | null
     if (existing) {
+      /**
+       * ── DEMOTE FIRST, OR ADOPTION IS A LIE ────────────────────────────────
+       * Found by two independent review lenses. `readBrandLogo` takes the
+       * NEWEST row titled `Logo`, so retitling an OLDER row reported success
+       * while the topbar went on showing the previous logo — exactly the "it
+       * says it worked and nothing changed" shape this whole sequence has been
+       * chasing.
+       *
+       * So exactly one row carries the title. The others are not deleted, they
+       * are demoted: a previous logo is still the customer's file and still
+       * theirs to find in the library, and the label says what it is.
+       */
+      await demoteOtherLogos(supabase, workspaceId, existing.id)
+
       const { error: claimed } = await supabase
         .from('assets')
         .update({ title: LOGO_TITLE, deleted_at: null })
@@ -150,6 +192,11 @@ export async function setBrandLogo(formData: FormData): Promise<SetBrandLogoStat
       revalidatePath('/assets')
       return { ok: true, adopted: true, converted }
     }
+
+    // A NEW upload becomes the newest row by construction, so demoting the
+    // others is belt and braces there — but it keeps the invariant "exactly one
+    // asset is titled Logo" true, which is what makes the read unambiguous.
+    await demoteOtherLogos(supabase, workspaceId, null)
 
     // Not here yet, so it is an ordinary upload — with every check that carries,
     // including the sniffing that proves the bytes are an image at all.

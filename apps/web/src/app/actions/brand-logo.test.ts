@@ -29,6 +29,9 @@ const state = vi.hoisted(() => ({
   updates: [] as Record<string, unknown>[],
   uploadCalled: 0,
   uploaded: null as FormData | null,
+  /** What the adoption lookup actually filtered on. The old mock threw this away. */
+  filters: [] as [string, unknown][],
+  demoted: [] as Record<string, unknown>[],
   uploadResult: { ok: true } as { ok: boolean; message?: string },
 }))
 
@@ -45,27 +48,48 @@ vi.mock('./assets', () => ({
     return Promise.resolve(state.uploadResult)
   },
 }))
-vi.mock('@/lib/supabase/server', () => ({
-  createServerSupabase: () => ({
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          eq: () => ({
-            order: () => ({
-              limit: () => ({
-                maybeSingle: () => Promise.resolve({ data: state.match, error: state.lookupError }),
-              }),
-            }),
-          }),
-        }),
-      }),
-      update: (patch: Record<string, unknown>) => {
-        state.updates.push(patch)
-        return { eq: () => ({ eq: () => Promise.resolve({ error: null }) }) }
+/**
+ * ── THE MOCK RECORDS THE QUERY, WHICH IT USED TO DISCARD ────────────────────
+ * Found by review: every `eq()` was `() => ...`, taking no arguments and
+ * asserting nothing, so NO test pinned that the lookup is scoped to the
+ * workspace or that it matches on the content hash. Removing `.eq('workspace_id',
+ * …)` from the action — a cross-tenant read — would have left the suite green.
+ */
+vi.mock('@/lib/supabase/server', () => {
+  const record = (bucket: [string, unknown][]) => {
+    const chain: Record<string, unknown> = {
+      eq: (column: string, value: unknown) => {
+        bucket.push([column, value])
+        return chain
       },
+      neq: (column: string, value: unknown) => {
+        bucket.push([`neq:${column}`, value])
+        return chain
+      },
+      order: () => chain,
+      limit: () => chain,
+      maybeSingle: () => Promise.resolve({ data: state.match, error: state.lookupError }),
+      then: (resolve: (v: unknown) => unknown) => resolve({ error: null }),
+    }
+    return chain
+  }
+
+  return {
+    createServerSupabase: () => ({
+      from: (table: string) => ({
+        select: () => {
+          expect(table).toBe('assets')
+          return record(state.filters)
+        },
+        update: (patch: Record<string, unknown>) => {
+          if (patch.title === 'Logo (previous)') state.demoted.push(patch)
+          else state.updates.push(patch)
+          return record(state.filters)
+        },
+      }),
     }),
-  }),
-}))
+  }
+})
 
 const { setBrandLogo } = await import('./brand-logo')
 
@@ -91,6 +115,8 @@ beforeEach(() => {
   state.updates = []
   state.uploadCalled = 0
   state.uploaded = null
+  state.filters = []
+  state.demoted = []
   state.uploadResult = { ok: true }
 })
 
@@ -104,6 +130,44 @@ describe('setBrandLogo', () => {
     expect(result).toEqual({ ok: true, adopted: true, converted: false })
     expect(state.updates[0]).toMatchObject({ title: 'Logo' })
     expect(state.uploadCalled, 'the library action would have refused this').toBe(0)
+  })
+
+  /**
+   * ── THE LOOKUP MUST BE SCOPED, AND NOTHING SAID SO ────────────────────────
+   * The old mock ignored every argument, so removing the workspace filter — a
+   * read across tenants — would not have failed a single test.
+   */
+  it('looks only inside this workspace, and only for these bytes', async () => {
+    await setBrandLogo(form())
+
+    const columns = state.filters.map(([c]) => c)
+    expect(columns, 'the lookup must be scoped to the workspace').toContain('workspace_id')
+    expect(columns, 'and must match on the content hash').toContain('content_sha256')
+
+    const scoped = state.filters.find(([c]) => c === 'workspace_id')
+    expect(scoped?.[1]).toBe(WORKSPACE)
+  })
+
+  /**
+   * ── ADOPTION HAS TO WIN THE READ ──────────────────────────────────────────
+   * Found by TWO independent review lenses. `readBrandLogo` takes the NEWEST row
+   * titled `Logo`, so retitling an OLDER row reported success while the topbar
+   * went on showing the previous logo — the exact "it says it worked and nothing
+   * changed" shape this whole sequence has been chasing.
+   */
+  it('demotes any other logo so exactly one row carries the title', async () => {
+    state.match = { id: 'asset-1', deleted_at: null }
+
+    await setBrandLogo(form())
+
+    expect(state.demoted, 'an older logo must lose the title').toHaveLength(1)
+    const columns = state.filters.map(([c]) => c)
+    expect(columns, 'and the one being adopted must be spared').toContain('neq:id')
+  })
+
+  it('demotes the previous logo on a fresh upload too', async () => {
+    await setBrandLogo(form())
+    expect(state.demoted).toHaveLength(1)
   })
 
   /** A logo in the trash is still their logo. Claiming it brings it back. */

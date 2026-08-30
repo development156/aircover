@@ -63,7 +63,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   saveWorkspaceTheme.mockResolvedValue({ ok: true })
   uploadAsset.mockResolvedValue({ ok: true })
-  setBrandLogo.mockResolvedValue({ ok: true, adopted: false })
+  setBrandLogo.mockResolvedValue({ ok: true, adopted: false, converted: false })
   // A real extraction: one colour the brand cannot use, two it can.
   extractPalette.mockReturnValue([GREY, BLUE, TEAL])
   // jsdom never fires load on an <img>, so the decode is resolved here.
@@ -332,6 +332,66 @@ describe('the brand mark', () => {
     const input = document.querySelector<HTMLInputElement>('input[type="file"]')!
 
     expect(input.accept, 'a greyed-out file reads as a broken button').toContain('image/svg+xml')
+  })
+
+  /**
+   * ── A NOTICE NO TEST COULD SEE ────────────────────────────────────────────
+   * Found by review: every `setBrandLogo` mock omitted `converted`, so
+   * `stored.converted` was undefined in all 19 panel tests and the SVG notice
+   * could be deleted silently. It was doubly unreachable — the panel also used
+   * to close in the same transition that set the flag.
+   */
+  it('says so when an SVG was saved as an image', async () => {
+    setBrandLogo.mockResolvedValue({ ok: true, adopted: false, converted: true })
+    render(panel())
+
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!
+    await userEvent.upload(
+      input,
+      new File([new Uint8Array([1])], 'brand.svg', { type: 'image/svg+xml' }),
+    )
+
+    expect(
+      await screen.findByText(/saved your svg as a high-resolution image/i),
+    ).toBeInTheDocument()
+  })
+
+  it('says nothing about conversion when a raster was uploaded', async () => {
+    setBrandLogo.mockResolvedValue({ ok: true, adopted: false, converted: false })
+    render(panel())
+
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!
+    await userEvent.upload(
+      input,
+      new File([new Uint8Array([1])], 'logo.png', { type: 'image/png' }),
+    )
+
+    await vi.waitFor(() => expect(setBrandLogo).toHaveBeenCalled())
+    expect(screen.queryByText(/saved your svg/i)).toBeNull()
+  })
+
+  /**
+   * ── THE UPLOAD MUST NOT BE GATED ON A CANVAS READ ─────────────────────────
+   * MEASURED by review: the palette was read BEFORE the server call, inside the
+   * same try. A browser that will not decode the file — an SVG with no `xmlns`,
+   * common in hand-edited markup — rejected in `load()`, the catch fired, and
+   * `setBrandLogo` was never called. No request, no row, and a message telling
+   * the person to try a PNG for a file the server would have accepted.
+   */
+  it('stores the file even when its colours cannot be read', async () => {
+    extractPalette.mockImplementation(() => {
+      throw new Error('the browser refused to decode this')
+    })
+    render(panel())
+
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!
+    await userEvent.upload(
+      input,
+      new File([new Uint8Array([1])], 'logo.svg', { type: 'image/svg+xml' }),
+    )
+
+    await vi.waitFor(() => expect(setBrandLogo).toHaveBeenCalledTimes(1))
+    expect(screen.queryByRole('alert'), 'a stored file is not a failure').toBeNull()
   })
 
   it('spends nothing and writes nothing just by being opened', async () => {

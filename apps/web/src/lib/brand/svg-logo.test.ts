@@ -39,9 +39,32 @@ describe('looksLikeSvg', () => {
     ['a bare root', svg('')],
     ['an xml declaration first', `<?xml version="1.0"?>${svg('')}`],
     ['a doctype first', `<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN">${svg('')}`],
-    ['a byte-order mark and whitespace first', `﻿\n  ${svg('')}`],
+    ['a byte-order mark and whitespace first', `\ufeff\n  ${svg('')}`],
+    // MEASURED BY REVIEW: every one of these returned false, and the first is
+    // what Illustrator and Sketch put at the top of every export.
+    ['a generator comment first', `<!-- Generator: Adobe Illustrator 27.0 -->${svg('')}`],
+    ['several comments and a declaration', `<?xml version="1.0"?>\n<!--a--><!--b-->${svg('')}`],
+    ['a lowercase doctype', `<!doctype svg PUBLIC "x">${svg('')}`],
+    ['a doctype with an internal subset', `<!DOCTYPE svg [ <!ELEMENT x ANY> ]>${svg('')}`],
+    ['long leading whitespace', `${' '.repeat(2000)}${svg('')}`],
+    ['an uppercase root', '<SVG xmlns="http://www.w3.org/2000/svg"/>'],
   ])('recognises %s', (_name, text) => {
     expect(looksLikeSvg(bytesOf(text))).toBe(true)
+  })
+
+  /** UTF-16 is rare and legal; a UTF-8 decode of it matches nothing. */
+  it('recognises a UTF-16 encoded vector', () => {
+    const text = svg('')
+    const buf = new Uint8Array(2 + text.length * 2)
+    buf[0] = 0xff
+    buf[1] = 0xfe
+    for (let i = 0; i < text.length; i += 1) buf[2 + i * 2] = text.charCodeAt(i)
+    expect(looksLikeSvg(buf)).toBe(true)
+  })
+
+  /** `<svg` inside a COMMENT is not a root element. */
+  it('is not fooled by the string appearing in a comment', () => {
+    expect(looksLikeSvg(bytesOf('<!-- <svg/> --><html></html>'))).toBe(false)
   })
 
   it('does not mistake a raster for a vector', () => {
@@ -130,11 +153,50 @@ describe('rasteriseSvgLogo', () => {
     expect(result.message).toMatch(/script/i)
   })
 
+  /**
+   * ── THIS TEST USED TO PASS FOR THE WRONG REASON ───────────────────────────
+   * It padded with NUL bytes, which make libxml throw, so it went green whether
+   * or not the size cap ran — the review deleted `SVG_MAX_BYTES` entirely and
+   * it stayed green. The padding is now VALID markup, so only the cap can
+   * refuse it, and the message is asserted so a different refusal cannot pass.
+   */
   it('refuses a file larger than a logo needs', async () => {
-    const huge = new Uint8Array(SVG_MAX_BYTES + 1)
-    huge.set(bytesOf(svg('')))
+    const filler = `<rect width="1" height="1" fill="red"/>`
+    const huge = bytesOf(svg(filler.repeat(Math.ceil(SVG_MAX_BYTES / filler.length) + 1)))
+    expect(huge.byteLength).toBeGreaterThan(SVG_MAX_BYTES)
 
-    expect((await rasteriseSvgLogo(huge)).ok).toBe(false)
+    const result = await rasteriseSvgLogo(huge)
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.message, 'it must be the SIZE cap that refused').toMatch(/larger than/i)
+  })
+
+  /**
+   * ── RENDER TIME, WHICH NOTHING BOUNDED ────────────────────────────────────
+   * MEASURED by an adversarial review against this repo's own sharp: filter
+   * cost is roughly 7ms of CPU per byte of markup. Twenty stacked
+   * `feTurbulence`/`feGaussianBlur` filters over a 3000x3000 canvas is 23
+   * seconds in 3.4 KB — inside the old 2 MB cap, inside the 40M pixel cap, past
+   * `refuseUnsafeSvg`, and inside a server action with no concurrency limit.
+   * At the old cap that extrapolated to about four hours of CPU per upload.
+   */
+  it('refuses a filter bomb before the renderer sees it', async () => {
+    const bomb = Array.from(
+      { length: 20 },
+      (_, i) =>
+        `<filter id="f${i}"><feTurbulence baseFrequency="0.9" numOctaves="10"/><feGaussianBlur stdDeviation="100"/></filter><rect width="3000" height="3000" filter="url(#f${i})"/>`,
+    ).join('')
+
+    const result = await rasteriseSvgLogo(bytesOf(svg(bomb, 'width="3000" height="3000"')))
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.message).toMatch(/filter/i)
+  })
+
+  /** And a real logo's handful of filters is still fine. */
+  it('allows the few filters a real logo uses', () => {
+    const modest = Array.from({ length: 3 }, (_, i) => `<filter id="f${i}"/>`).join('')
+    expect(refuseUnsafeSvg(svg(modest))).toBeNull()
   })
 
   /** Malformed input is a fact to report, never an exception to leak. */
