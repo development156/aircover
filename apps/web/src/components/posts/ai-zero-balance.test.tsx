@@ -5,7 +5,8 @@ import { creditCost, toChannelSet } from '@sahoda/shared'
 
 import { GeneratePanel } from './generate-panel'
 import { InlineRewrite } from './inline-rewrite'
-import { GenerateImage } from './generate-image'
+import { GenerateForm } from '@/components/studio/generate-form'
+import { generatableFormats } from '@/lib/studio/formats'
 
 /**
  * WHAT EVERY PAID CONTROL SAYS WHEN THE WALLET IS EMPTY.
@@ -35,6 +36,10 @@ const insufficient = (required: number) => ({
   required,
   available: 0,
 })
+
+vi.mock('@/app/actions/studio', () => ({
+  queueGeneration: vi.fn(async () => insufficient(6)),
+}))
 
 vi.mock('@/app/actions/posts-ai', () => ({
   generateVariants: vi.fn(async () => insufficient(3)),
@@ -104,22 +109,29 @@ describe('rewriting a selection — 1 credit', () => {
   })
 })
 
-describe('making an image — 6 credits', () => {
-  test('names the price before the click, and picks the CHEAPER tier', () => {
-    render(<GenerateImage postId="p1" />)
+describe('making a picture, which now lives in the Studio', () => {
+  /**
+   * RETARGETED, NOT DELETED. This block used to drive the composer's own
+   * `GenerateImage`, which was the only paid image control in the product. The
+   * Studio replaced it, and the guard follows the control rather than dying with
+   * it: what is being protected is the REFUSAL, and the refusal moved.
+   */
+  test('names the price before the press, and picks the CHEAPER tier', () => {
+    render(<GenerateForm formats={generatableFormats()} cost={creditCost('image_standard')} />)
     // `MESH_TASK_ACTION.image_generate` maps to `image_standard` (6), not
-    // `image_premium` (12): a customer who asked for "an image" and was charged
+    // `image_premium` (12): a customer who asked for "a picture" and was charged
     // for a tier they never chose has been overcharged, and the reverse never
     // happens.
     expect(creditCost('image_standard')).toBe(6)
     expect(document.body.textContent).toMatch(/6\s*credits/)
   })
 
-  test('refuses with both numbers', async () => {
-    render(<GenerateImage postId="p1" />)
-    await userEvent.type(screen.getByPlaceholderText(/describe the picture/i), 'a cup of chai')
-    await userEvent.click(screen.getByRole('button', { name: /make an image/i }))
+  test('refuses with both numbers, and says nothing was charged', async () => {
+    render(<GenerateForm formats={generatableFormats()} cost={creditCost('image_standard')} />)
+    await userEvent.type(screen.getByPlaceholderText(/plate of fresh samosas/i), 'a cup of chai')
+    await userEvent.click(screen.getByRole('button', { name: /make this picture/i }))
     await screen.findByText(/needs/i)
-    expectsShortfall(6)
+    expect(document.body.textContent).toMatch(/needs\s*6\s*credits and you have\s*0\s*credits/)
+    expect(document.body.textContent).toMatch(/nothing was charged/i)
   })
 })

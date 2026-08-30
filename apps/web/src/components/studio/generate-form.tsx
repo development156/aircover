@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { GenerationMode } from '@sahoda/shared'
 
@@ -45,6 +46,13 @@ export function GenerateForm({ formats, cost }: { formats: StudioFormat[]; cost:
   const [mode, setMode] = useState<GenerationMode>('on_brand')
   const [formatId, setFormatId] = useState(formats[0]?.id ?? '')
   const [note, setNote] = useState<string | null>(null)
+  /**
+   * True when the refusal was a shortfall rather than a fault. It decides
+   * whether a way OUT is offered: "not enough credits" with nowhere to go is a
+   * dead end, and this product forbids those. Held apart from the sentence
+   * because only this arm has a remedy.
+   */
+  const [short, setShort] = useState(false)
   const [busy, start] = useTransition()
 
   const chosen = formats.find((f) => f.id === formatId) ?? null
@@ -52,6 +60,7 @@ export function GenerateForm({ formats, cost }: { formats: StudioFormat[]; cost:
 
   function generate() {
     setNote(null)
+    setShort(false)
     start(async () => {
       const result = await queueGeneration({ mode, wanted, formatId })
       if (result.ok) {
@@ -61,6 +70,7 @@ export function GenerateForm({ formats, cost }: { formats: StudioFormat[]; cost:
       }
       // The insufficient arm carries NUMBERS, not a sentence, precisely so the
       // sentence is written once and tested. See `refusal-copy.ts`.
+      setShort(result.insufficient)
       setNote(
         result.insufficient
           ? describeInsufficient({ required: result.required, available: result.available })
@@ -150,7 +160,19 @@ export function GenerateForm({ formats, cost }: { formats: StudioFormat[]; cost:
         <CostLabel action="Make a picture" cost={cost} />
         {note === null ? null : (
           <span role="alert" className="type-sm text-ink">
-            {note}
+            {note}{' '}
+            {/* A shortfall is the one refusal with a remedy, so it is the one
+                that gets a way out. Every other failure here is ours to fix and
+                a link would send somebody to spend money on a problem that is
+                not theirs. */}
+            {short ? (
+              <Link
+                href="/wallet"
+                className="font-[600] underline underline-offset-2 transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
+                Top up your wallet
+              </Link>
+            ) : null}
           </span>
         )}
       </div>
