@@ -89,8 +89,9 @@ export const metadata: Metadata = {
    *     home-screen tile all draw into a SQUARE, so all four were squashing the
    *     mark by 15%, and each was a browser's own downscale of a 594px image at
    *     the 16px it is actually read at.
-   *   - Neither file is the brand mark. They are black-and-white silhouettes;
-   *     `public/LOGOS/element.png` is the Sahoda element in the brand orange.
+   *   - Neither file is the brand mark. They are black-and-white silhouettes.
+   *     `public/brand/icon-source.png` is the Sahoda element in the brand
+   *     orange, on a transparent ground, and it is what every size is cut from.
    *   - There was no Apple touch icon at all, so an iPhone home screen fell back
    *     to a snapshot of the page.
    *
