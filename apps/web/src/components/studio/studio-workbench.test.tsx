@@ -4,7 +4,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 
 import { StudioWorkbench } from '@/components/studio/studio-workbench'
 import { generatableFormats } from '@/lib/studio/formats'
-import { MAX_REFERENCES } from '@/lib/studio/modes'
+import { MAX_REFERENCES, MAX_TRIES_PER_PRESS } from '@/lib/studio/modes'
 
 /**
  * THE WORKBENCH, AND THE RULES IT MUST NOT RE-IMPLEMENT.
@@ -249,6 +249,50 @@ describe('matching a picture', () => {
     open([])
     await user.click(screen.getByRole('button', { name: /match a picture/i }))
     expect(screen.getByText(/you have no pictures yet/i)).toBeTruthy()
+  })
+})
+
+describe('asking for more than one', () => {
+  /**
+   * THE MONEY SENTENCE. Somebody who chose four options and was shown the price
+   * of one has not been told what this press costs. The total is what leaves
+   * their wallet, so the total is what the screen names.
+   */
+  test('the price shown is the TOTAL for the press, not the unit price', async () => {
+    const user = userEvent.setup()
+    const { container } = open()
+    const counts = container.querySelector('[data-guide="studio-count"]') as HTMLElement
+    await user.click(within(counts).getByRole('button', { name: '4' }))
+    expect(document.body.textContent).toMatch(/24\s*credits/)
+  })
+
+  /**
+   * The routed model draws one picture per call, so four are four calls and
+   * will NOT match. Saying otherwise would promise a carousel, which is the
+   * thing `MODE_RULES` refuses to fake.
+   */
+  test('says plainly that the options will not match each other', async () => {
+    const user = userEvent.setup()
+    const { container } = open()
+    const counts = container.querySelector('[data-guide="studio-count"]') as HTMLElement
+    await user.click(within(counts).getByRole('button', { name: '3' }))
+    expect(screen.getByText(/will not match each other/i)).toBeTruthy()
+  })
+
+  test('one is chosen to begin with, and says nothing extra about matching', () => {
+    const { container } = open()
+    const counts = container.querySelector('[data-guide="studio-count"]') as HTMLElement
+    expect(within(counts).getByRole('button', { name: '1' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(screen.queryByText(/will not match each other/i)).toBeNull()
+  })
+
+  test('the choice stops at the bound the action enforces', () => {
+    const { container } = open()
+    const counts = container.querySelector('[data-guide="studio-count"]') as HTMLElement
+    expect(within(counts).getAllByRole('button')).toHaveLength(MAX_TRIES_PER_PRESS)
   })
 })
 

@@ -13,9 +13,15 @@ import { CostLabel } from '@/components/ui/cost-label'
 import { Textarea } from '@/components/ui/textarea'
 import type { CanvasPicture } from '@/lib/studio/canvas'
 import type { StudioFormat } from '@/lib/studio/formats'
-import { MAX_REFERENCES, describeModeBlock, readyModes, ruleFor } from '@/lib/studio/modes'
+import {
+  MAX_REFERENCES,
+  MAX_TRIES_PER_PRESS,
+  describeModeBlock,
+  readyModes,
+  ruleFor,
+} from '@/lib/studio/modes'
 import type { LibraryPicture } from '@/lib/studio/read'
-import { describeInsufficient } from '@/lib/studio/refusal-copy'
+import { describeInsufficient, describePartial } from '@/lib/studio/refusal-copy'
 
 /**
  * THE WORKBENCH: CONTROLS ON THE LEFT, THE PICTURE ON THE RIGHT.
@@ -54,6 +60,7 @@ export function StudioWorkbench({
   const [mode, setMode] = useState<GenerationMode>('on_brand')
   const [formatId, setFormatId] = useState(formats[0]?.id ?? '')
   const [picked, setPicked] = useState<string[]>([])
+  const [count, setCount] = useState(1)
   const [note, setNote] = useState<string | null>(null)
   const [short, setShort] = useState(false)
   const [made, setMade] = useState(false)
@@ -105,9 +112,14 @@ export function StudioWorkbench({
         wanted,
         formatId,
         referenceAssetIds: picked,
+        count,
       })
       if (result.ok) {
         setMade(true)
+        // Silent when everything asked for arrived. A partial result is neither
+        // a success nor a failure and gets its own sentence, which names both
+        // numbers and says what happened to the money.
+        setNote(describePartial({ made: result.made, asked: result.asked }))
         // Back to position zero, so the refreshed data shows the NEW picture
         // rather than whichever older one was being looked at when it started.
         setActiveId(null)
@@ -232,6 +244,35 @@ export function StudioWorkbench({
           </fieldset>
         )}
 
+        {/* ── HOW MANY TRIES ──────────────────────────────────────────────────
+            Four separate calls, not a matching set: the routed model draws one
+            picture per call, so these will differ from each other. That is what
+            "show me some options" means and is why the label says options. */}
+        <fieldset className="flex flex-col gap-2">
+          <legend className="type-sm text-muted">How many options?</legend>
+          <div className="flex flex-wrap gap-2" data-guide="studio-count">
+            {Array.from({ length: MAX_TRIES_PER_PRESS }, (unused, i) => i + 1).map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setCount(n)}
+                aria-pressed={count === n}
+                className={`surface-ring rounded-card px-3 py-1 type-sm transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                  count === n ? 'bg-primary text-primary-foreground' : 'bg-s2 text-muted'
+                }`}
+              >
+                <span className="num">{n}</span>
+              </button>
+            ))}
+          </div>
+          {count === 1 ? null : (
+            <span className="type-sm text-muted">
+              <span className="num">{count}</span> different pictures from the same description, so
+              you can pick. They will not match each other.
+            </span>
+          )}
+        </fieldset>
+
         <label className="flex flex-col gap-1">
           <span className="type-sm text-muted">What size?</span>
           <select
@@ -265,7 +306,12 @@ export function StudioWorkbench({
           <Button onClick={generate} loading={busy} disabled={!ready} data-guide="studio-generate">
             Make this picture
           </Button>
-          <CostLabel action="Make a picture" cost={cost} />
+          {/* The TOTAL, not the unit price. Somebody who chose four and was
+              shown the price of one has not been told what this press costs. */}
+          <CostLabel
+            action={count === 1 ? 'Make a picture' : `Make ${count} pictures`}
+            cost={cost * count}
+          />
         </div>
 
         {note === null ? null : (
