@@ -5,7 +5,8 @@ import { Download } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
-import { downloadName, type CanvasPicture } from '@/lib/studio/canvas'
+import type { CanvasPicture } from '@/lib/studio/canvas'
+import { savePicture } from '@/lib/studio/save-picture'
 
 /**
  * ONE PICTURE, AS LARGE AS THE SCREEN ALLOWS, WITH A WAY TO KEEP IT.
@@ -18,17 +19,10 @@ import { downloadName, type CanvasPicture } from '@/lib/studio/canvas'
  * strip instead of the viewport (apps/web/CLAUDE.md). The top layer has no
  * containing block to be captured by, so this cannot happen to it.
  *
- * ── WHY THE DOWNLOAD FETCHES BYTES INSTEAD OF LINKING ───────────────────────
- * The href is a short-lived signed URL on the storage host, and `<a download>`
- * is IGNORED cross-origin: the browser navigates to the picture instead of
- * saving it, which loses the person their screen and gives them no file. So the
- * bytes are fetched, wrapped in an object URL on this origin, and saved under a
- * name they will recognise later.
- *
- * A fetch that fails says so and offers the one remedy that works. It does NOT
- * silently fall back to opening the picture in a tab, because somebody who
- * pressed Save and got a new tab has to work out for themselves that nothing
- * was saved.
+ * ── SAVING LIVES IN `lib/studio/save-picture.ts` ────────────────────────────
+ * Two places offer Save now, this and the canvas, and a second copy of the
+ * cross-origin reasoning is a second place for it to drift. A fetch that fails
+ * says so here and offers the one remedy that works.
  */
 export function PictureViewer({
   picture,
@@ -44,27 +38,9 @@ export function PictureViewer({
     if (picture === null) return
     setFailed(false)
     setSaving(true)
-    let objectUrl: string | null = null
-    try {
-      const response = await fetch(picture.url)
-      if (!response.ok) throw new Error('FETCH_FAILED')
-      const blob = await response.blob()
-      objectUrl = URL.createObjectURL(blob)
-
-      const link = document.createElement('a')
-      link.href = objectUrl
-      link.download = downloadName(picture)
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-    } catch {
-      setFailed(true)
-    } finally {
-      // Revoked either way. An object URL that is never revoked holds the whole
-      // picture in memory for as long as the tab lives.
-      if (objectUrl !== null) URL.revokeObjectURL(objectUrl)
-      setSaving(false)
-    }
+    const ok = await savePicture(picture)
+    setFailed(!ok)
+    setSaving(false)
   }
 
   return (

@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Maximize2, Sparkles } from 'lucide-react'
+import { Download, Maximize2, Sparkles } from 'lucide-react'
 import type { GenerationMode } from '@sahoda/shared'
 
 import { queueGeneration } from '@/app/actions/studio'
@@ -23,6 +23,7 @@ import {
 } from '@/lib/studio/modes'
 import type { LibraryPicture } from '@/lib/studio/read'
 import { describeInsufficient, describePartial } from '@/lib/studio/refusal-copy'
+import { savePicture } from '@/lib/studio/save-picture'
 
 /**
  * THE WORKBENCH: CONTROLS ON THE LEFT, THE PICTURE ON THE RIGHT.
@@ -67,6 +68,8 @@ export function StudioWorkbench({
   const [made, setMade] = useState(false)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [viewing, setViewing] = useState<CanvasPicture | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [saveFailed, setSaveFailed] = useState(false)
   const [busy, start] = useTransition()
 
   /**
@@ -375,15 +378,36 @@ export function StudioWorkbench({
           <h2 id="studio-canvas" className="type-h2">
             The canvas
           </h2>
+          {/* ── ALWAYS VISIBLE, NEVER HOVER-ONLY ────────────────────────────
+              A toolbar that appears on hover does not exist for a phone, for a
+              keyboard, or for anybody using a screen reader. These are the two
+              things a person does with a finished picture, so they are on the
+              screen. */}
           {active === null ? null : (
-            <button
-              type="button"
-              onClick={() => setViewing(active)}
-              className="flex items-center gap-1 type-sm text-muted underline underline-offset-2 transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            >
-              <Maximize2 className="size-[14px]" aria-hidden />
-              Open it large
-            </button>
+            <div className="flex flex-wrap items-center gap-3" data-guide="studio-canvas-actions">
+              <button
+                type="button"
+                onClick={() => setViewing(active)}
+                className="flex items-center gap-1 type-sm text-muted underline underline-offset-2 transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
+                <Maximize2 className="size-[14px]" aria-hidden />
+                Open it large
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setSaveFailed(false)
+                  setSaving(true)
+                  const ok = await savePicture(active)
+                  setSaveFailed(!ok)
+                  setSaving(false)
+                }}
+                className="flex items-center gap-1 type-sm text-muted underline underline-offset-2 transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
+                <Download className="size-[14px]" aria-hidden />
+                {saving ? 'Saving' : 'Save it'}
+              </button>
+            </div>
           )}
         </div>
 
@@ -469,6 +493,13 @@ export function StudioWorkbench({
             })}
           </ul>
         )}
+
+        {saveFailed ? (
+          <p role="alert" className="type-sm text-ink">
+            Sahoda could not save that picture to your computer just now. It is safe in your
+            library, and reloading this screen gives the link another try.
+          </p>
+        ) : null}
 
         <p className="type-sm text-muted">
           Every picture is saved to your library the moment it is made, so nothing is lost if you

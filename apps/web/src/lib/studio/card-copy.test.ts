@@ -8,6 +8,8 @@ import {
   describeFormat,
   describePicture,
   describeStatus,
+  describeStranded,
+  STRANDED_AFTER_MS,
 } from './card-copy'
 import { generatableFormats } from './formats'
 
@@ -171,5 +173,105 @@ describe('the size a picture was made at', () => {
       expect(said, format.id).not.toBeNull()
       expect(said, format.id).not.toContain(format.id)
     }
+  })
+})
+
+describe('a picture that never finished', () => {
+  const CREATED = '2026-08-30T10:00:00.000Z'
+  const began = Date.parse(CREATED)
+
+  /**
+   * THE ROW THAT SAYS "BEING DRAWN NOW" FOREVER. The row is written before the
+   * model is called so a Back press does not lose the request; the cost is a row
+   * left running when the process serving it died, and nothing settles it.
+   */
+  test('an old running row stops claiming it is being drawn', () => {
+    const said = describeStranded({
+      status: 'running',
+      startedAt: CREATED,
+      createdAt: CREATED,
+      now: began + STRANDED_AFTER_MS + 1,
+    })
+    expect(said).toMatch(/stopped before it finished/i)
+    expect(said).not.toMatch(/being drawn/i)
+  })
+
+  test('a young running row says nothing, because it is simply running', () => {
+    expect(
+      describeStranded({
+        status: 'running',
+        startedAt: CREATED,
+        createdAt: CREATED,
+        now: began + STRANDED_AFTER_MS - 1,
+      }),
+    ).toBeNull()
+  })
+
+  /**
+   * We cannot tell from the row whether the hold was released. Promising
+   * "nothing was charged" would be a claim this data cannot support; staying
+   * silent would leave somebody watching a spinner that will never stop. So it
+   * says what IS known and names where the answer is.
+   */
+  test('it does not claim to know what happened to the money', () => {
+    const said = describeStranded({
+      status: 'running',
+      startedAt: CREATED,
+      createdAt: CREATED,
+      now: began + STRANDED_AFTER_MS + 1,
+    })
+    expect(said).not.toMatch(/nothing was charged/i)
+    expect(said).toMatch(/wallet/i)
+  })
+
+  test('a row that never started is aged from when it was created', () => {
+    expect(
+      describeStranded({
+        status: 'queued',
+        startedAt: null,
+        createdAt: CREATED,
+        now: began + STRANDED_AFTER_MS + 1,
+      }),
+    ).not.toBeNull()
+  })
+
+  test('a settled row is never called stranded, however old', () => {
+    for (const status of ['ready', 'failed', 'cancelled'] as const) {
+      expect(
+        describeStranded({
+          status,
+          startedAt: CREATED,
+          createdAt: CREATED,
+          now: began + STRANDED_AFTER_MS * 100,
+        }),
+        status,
+      ).toBeNull()
+    }
+  })
+
+  /**
+   * An unparseable timestamp is not evidence of anything. Calling a row
+   * stranded on a date we could not read would age out live generations at
+   * random, which is worse than saying nothing.
+   */
+  test('an unreadable timestamp says nothing rather than guessing', () => {
+    expect(
+      describeStranded({
+        status: 'running',
+        startedAt: 'not a date',
+        createdAt: 'also not a date',
+        now: began,
+      }),
+    ).toBeNull()
+  })
+
+  test('carries no em dash, which is the standing ruling for prose', () => {
+    const said = describeStranded({
+      status: 'running',
+      startedAt: CREATED,
+      createdAt: CREATED,
+      now: began + STRANDED_AFTER_MS + 1,
+    })
+    expect(said ?? '').not.toMatch(/[—–]/)
   })
 })

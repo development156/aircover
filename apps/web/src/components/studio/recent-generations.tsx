@@ -8,6 +8,7 @@ import {
   describeFormat,
   describePicture,
   describeStatus,
+  describeStranded,
 } from '@/lib/studio/card-copy'
 import type { GenerationsRead } from '@/lib/studio/read'
 
@@ -31,6 +32,10 @@ import type { GenerationsRead } from '@/lib/studio/read'
  * just failed would be an instruction that cannot work.
  */
 export function RecentGenerations({ read }: { read: GenerationsRead }) {
+  // Read ONCE for the whole list, so two cards a millisecond apart cannot
+  // disagree about whether the same age has passed.
+  const now = Date.now()
+
   if (read.status === 'no-workspace') return null
 
   if (read.status === 'unreadable') {
@@ -66,6 +71,15 @@ export function RecentGenerations({ read }: { read: GenerationsRead }) {
             // no query produced, which is the defect this product names by name.
             const arrived = pictures.filter((one) => one.assetId !== null).length
             const howMany = describeCount({ made: arrived, asked: generation.requested_count })
+            // The row is written BEFORE the model is called so a Back press does
+            // not lose the request. The cost is a row left running when the
+            // process died, and nothing else settles it.
+            const stranded = describeStranded({
+              status: generation.status,
+              startedAt: generation.started_at,
+              createdAt: generation.created_at,
+              now,
+            })
             return (
               <li
                 key={generation.id}
