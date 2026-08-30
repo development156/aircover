@@ -3,11 +3,12 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Check, Maximize2, Sparkles } from 'lucide-react'
+import { Maximize2, Sparkles } from 'lucide-react'
 import type { GenerationMode } from '@sahoda/shared'
 
 import { queueGeneration } from '@/app/actions/studio'
 import { PictureViewer } from '@/components/studio/picture-viewer'
+import { ReferenceUpload } from '@/components/studio/reference-upload'
 import { Button } from '@/components/ui/button'
 import { CostLabel } from '@/components/ui/cost-label'
 import { Textarea } from '@/components/ui/textarea'
@@ -209,21 +210,46 @@ export function StudioWorkbench({
                 : 'Anything Sahoda should match? (optional)'}
             </legend>
 
+            <ReferenceUpload
+              disabled={picked.length >= rule.maxReferences}
+              onAdded={(assetId) => {
+                setNote(null)
+                // Selected at once. Somebody who adds a picture to match wants
+                // to match it, and it appears in the grid below on the refresh
+                // already chosen.
+                setPicked((current) =>
+                  current.includes(assetId) || current.length >= rule.maxReferences
+                    ? current
+                    : [...current, assetId],
+                )
+                router.refresh()
+              }}
+            />
+
             {library.length === 0 ? (
               <p className="surface-ring rounded-card bg-s2 px-3 py-2 type-sm text-muted">
-                You have no pictures yet. Make one below, or add photos to your library, and they
-                appear here to match.
+                You have no pictures yet. Add one from this device, or make one below, and it
+                appears here to match.
               </p>
             ) : (
               <ul className="grid grid-cols-4 gap-2">
                 {library.map((picture) => {
-                  const on = picked.includes(picture.assetId)
+                  // The POSITION, not a yes. `signReferences` sends them in pick
+                  // order and the first weighs most, so an order-free tick hides
+                  // something the model acts on.
+                  const at = picked.indexOf(picture.assetId)
+                  const on = at !== -1
                   return (
                     <li key={picture.assetId}>
                       <button
                         type="button"
                         onClick={() => toggleReference(picture.assetId)}
                         aria-pressed={on}
+                        aria-label={
+                          on
+                            ? `${picture.title ?? 'A picture in your library'}, picked ${at + 1} of ${picked.length}`
+                            : (picture.title ?? 'A picture in your library')
+                        }
                         className={`surface-ring relative block w-full overflow-hidden rounded-card transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
                           on ? 'ring-2 ring-accent' : ''
                         }`}
@@ -243,8 +269,8 @@ export function StudioWorkbench({
                           />
                         )}
                         {on ? (
-                          <span className="absolute right-1 top-1 rounded-full bg-primary p-0.5 text-primary-foreground">
-                            <Check className="size-[13px]" aria-hidden />
+                          <span className="absolute right-1 top-1 flex size-[18px] items-center justify-center rounded-full bg-primary type-sm text-primary-foreground">
+                            <span className="num">{at + 1}</span>
                           </span>
                         ) : null}
                       </button>

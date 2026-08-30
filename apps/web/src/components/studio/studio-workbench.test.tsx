@@ -4,6 +4,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 
 import { StudioWorkbench } from '@/components/studio/studio-workbench'
 import { generatableFormats } from '@/lib/studio/formats'
+import { uploadAccept } from '@/lib/studio/upload'
 import {
   MAX_REFERENCES,
   MAX_TRIES_PER_PRESS,
@@ -23,6 +24,7 @@ import {
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }))
 vi.mock('@/app/actions/studio', () => ({ queueGeneration: vi.fn() }))
+vi.mock('@/app/actions/assets', () => ({ uploadAsset: vi.fn() }))
 
 afterEach(cleanup)
 
@@ -294,6 +296,81 @@ describe('a press that changes nothing must say why', () => {
     expect(screen.getByRole('alert').textContent?.trim()).toBe(
       describeModeBlock({ mode: 'edit', references: 2 }),
     )
+  })
+})
+
+describe('adding a picture from this device', () => {
+  /**
+   * THE HOLE THIS FILLS. Matching only worked on pictures already in the
+   * library, so the photograph on the phone in somebody's hand could not start
+   * a generation without a trip through the library and back. Most people do
+   * not come back.
+   */
+  test('the way in is a real file control, reachable by name', async () => {
+    const user = userEvent.setup()
+    open()
+    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    expect(screen.getByLabelText(/add a picture from this device/i)).toBeTruthy()
+  })
+
+  /**
+   * A real `<input type="file">` is what makes this work with a keyboard, with
+   * a screen reader, and on a phone where there is nothing to drag FROM. A drop
+   * target alone would be a feature only a mouse can reach.
+   */
+  test('it is an input, not a drop target pretending to be one', async () => {
+    const user = userEvent.setup()
+    open()
+    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    const control = screen.getByLabelText(/add a picture from this device/i)
+    expect(control.tagName).toBe('INPUT')
+    expect(control.getAttribute('type')).toBe('file')
+  })
+
+  test('what it offers is the proven list, so it cannot drift from the server', async () => {
+    const user = userEvent.setup()
+    open()
+    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    const control = screen.getByLabelText(/add a picture from this device/i)
+    expect(control.getAttribute('accept')).toBe(uploadAccept())
+  })
+
+  test('the empty library points at this device rather than at a library trip', async () => {
+    const user = userEvent.setup()
+    open([])
+    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    expect(screen.getByText(/add one from this device/i)).toBeTruthy()
+  })
+})
+
+describe('which picture is which', () => {
+  /**
+   * `signReferences` sends the pictures in PICK ORDER and the first weighs most.
+   * An order-free tick hides something the model acts on, so a person cannot see
+   * or control it.
+   */
+  test('a picked reference shows its position, not just that it is picked', async () => {
+    const user = userEvent.setup()
+    const { container } = open()
+    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
+    const thumbs = within(picker).getAllByRole('button')
+
+    await user.click(thumbs[1]!)
+    await user.click(thumbs[0]!)
+
+    expect(within(picker).getByText('1')).toBeTruthy()
+    expect(within(picker).getByText('2')).toBeTruthy()
+  })
+
+  test('the position is announced, not only drawn', async () => {
+    const user = userEvent.setup()
+    const { container } = open()
+    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
+    await user.click(within(picker).getAllByRole('button')[0]!)
+
+    expect(within(picker).getByRole('button', { name: /picked 1 of 1/i })).toBeTruthy()
   })
 })
 
