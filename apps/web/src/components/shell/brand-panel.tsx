@@ -235,7 +235,12 @@ export function BrandPanel({
             <input
               type="color"
               disabled={busy}
-              defaultValue="#ff6600"
+              /* No seed value. `<input type="color">` speaks hex and the design
+                 lint forbids a hex literal here, correctly — a token would be
+                 the right answer and this element cannot take one. Left
+                 unseeded, the browser shows its own default and `onChange`
+                 fires only on a real choice, so nothing is saved until the
+                 person picks. */
               onChange={(e) => pick(e.target.value)}
               className="size-8 cursor-pointer rounded-control border-0 bg-transparent p-0"
             />

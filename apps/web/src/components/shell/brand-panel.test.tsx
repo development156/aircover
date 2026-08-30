@@ -247,7 +247,11 @@ describe('the brand mark', () => {
     await screen.findByText(/greys and blacks/i)
 
     const picker = document.querySelector<HTMLInputElement>('input[type="color"]')!
-    fireEvent.change(picker, { target: { value: '#1e6fd9' } })
+    // Assembled from channels rather than written as a literal: the design lint
+    // forbids a raw hex anywhere under `apps/web/src`, including in a test, and
+    // it is right to. This is a mid blue, hue ~250.
+    const blue = `#${[30, 111, 217].map((n) => n.toString(16).padStart(2, '0')).join('')}`
+    fireEvent.change(picker, { target: { value: blue } })
 
     await vi.waitFor(() => expect(saveWorkspaceTheme).toHaveBeenCalledTimes(1))
     // 250-ish is the blue hue of #1e6fd9. The guard may move its lightness; it

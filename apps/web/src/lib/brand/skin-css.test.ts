@@ -50,32 +50,52 @@ describe('skinCss', () => {
   })
 
   /**
-   * THE RULE THAT KEEPS IT SAFE. Design System §2: seven tokens are themeable
-   * and nothing else. A workspace whose brand is red must not have its delete
-   * confirmation blend into its buttons, so danger stays crimson and every
-   * neutral stays fixed.
+   * ── SEVEN BECAME TWELVE, AND THE FIVE ARE NAMED ───────────────────────────
+   * Founder's ruling, 2026-08-30, unfreezing the NEUTRALS in Design System §2
+   * and nothing else. The seven brand tokens reach under 0.5% of the pixels on
+   * any screen — two guards hold them there deliberately — so Brand Skin
+   * recoloured one button and his verdict was "a pathetic failed attempt".
+   *
+   * The list is exhaustive on purpose. A token added here without a ruling is
+   * the drift this assertion exists to catch, and the count in `skin-css.ts`'s
+   * header moves in the same commit as this line.
    */
-  it('emits the seven themeable tokens and no others', () => {
+  it('emits exactly the twelve tokens the rulings allow', () => {
     expect(skinVarNames(TEAL).sort()).toEqual(
-      ['--acc', '--p', '--pfg', '--pstrong', '--t100', '--t300', '--t50'].sort(),
+      [
+        '--acc',
+        '--p',
+        '--pfg',
+        '--pstrong',
+        '--t100',
+        '--t300',
+        '--t50',
+        '--canvas',
+        '--surface',
+        '--surface-2',
+        '--surface-3',
+        '--line',
+      ].sort(),
     )
   })
 
-  it('never DEFINES a neutral or a semantic token', () => {
-    const defined = skinVarNames(TEAL)
+  /**
+   * ── THE HALF OF §2 THAT WAS ALWAYS LOAD BEARING ───────────────────────────
+   * The neutrals were unfrozen. The SEMANTICS were not, and never will be by
+   * this route: a workspace whose brand is red must not have its delete
+   * confirmation blend into its buttons. `--ink` stays fixed for the same
+   * reason — it is what every tinted surface is read against, so theming it
+   * would move both sides of every pair at once.
+   */
+  it('never DEFINES a semantic token, whatever the brand', () => {
+    for (const surface of ['light', 'dark'] as const) {
+      const defined = skinVarNames(TEAL, surface)
 
-    for (const forbidden of [
-      '--danger',
-      '--ok',
-      '--warn',
-      '--ink',
-      '--surface',
-      '--canvas',
-      '--line',
-    ]) {
-      expect(defined, `${forbidden} is fixed by canon and must never be themed`).not.toContain(
-        forbidden,
-      )
+      for (const forbidden of ['--danger', '--ok', '--warn', '--ink', '--ink-mute']) {
+        expect(defined, `${forbidden} is fixed by canon and must never be themed`).not.toContain(
+          forbidden,
+        )
+      }
     }
   })
 
@@ -176,9 +196,10 @@ describe('skinCss', () => {
    */
   it('reads the theme without defining anything the theme owns', () => {
     for (const surface of ['light', 'dark'] as const) {
-      expect(skinVarNames(TEAL, surface).sort()).toEqual(
-        ['--acc', '--p', '--pfg', '--pstrong', '--t100', '--t300', '--t50'].sort(),
-      )
+      // Same token SET on both surfaces; only the values differ. A surface that
+      // emitted an extra key would be a rule the other theme cannot undo.
+      expect(skinVarNames(TEAL, surface).sort()).toEqual(skinVarNames(TEAL, 'light').sort())
+      expect(skinVarNames(TEAL, surface)).not.toContain('--ink')
     }
   })
 

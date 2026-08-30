@@ -1,4 +1,4 @@
-import { brandSkinVars } from './brand-theme'
+import { brandNeutralVars, brandSkinVars, type SkinSurface } from './brand-theme'
 import { SKIN_ATTR } from './skin-preference'
 import type { ThemeTokens } from '@sahoda/shared'
 
@@ -16,12 +16,20 @@ import type { ThemeTokens } from '@sahoda/shared'
  * Sahoda orange for ever. `read-theme.ts` even records the moment the shell
  * stopped calling it: "the shell caller the note referred to no longer exists".
  *
- * ── SEVEN VARIABLES, AND NOT ONE MORE ───────────────────────────────────────
- * Design System §2: only `--p --pfg --pstrong --acc --t50 --t100 --t300` are
- * themeable. Neutrals and semantics are fixed, and danger is crimson rather than
- * a brand colour, because a workspace whose brand is red must not have its
- * delete confirmations blend into its buttons. `brandSkinVars` returns exactly
- * those seven, so this emits its output and never a key of its own choosing.
+ * ── TWELVE VARIABLES, AND THE SEMANTICS ARE STILL NOT AMONG THEM ────────────
+ * Design System §2 made seven tokens themeable — `--p --pfg --pstrong --acc
+ * --t50 --t100 --t300` — and froze everything else. The founder unfroze the
+ * NEUTRALS on 2026-08-30, and only the neutrals: `--canvas --surface
+ * --surface-2 --surface-3 --line` now carry the brand hue at a chroma of 0.006,
+ * with their lightness copied from `tokens.css` unchanged.
+ *
+ * SEMANTICS REMAIN FROZEN and that is the half of §2 that was always load
+ * bearing: danger stays crimson whatever the brand, because a workspace whose
+ * brand is red must not have its delete confirmations blend into its buttons.
+ *
+ * This paragraph said "seven, and not one more" until the neutrals landed. It
+ * is written out rather than edited quietly, because the count is the kind of
+ * claim a reader trusts without checking.
  *
  * ── IT RE-DERIVES RATHER THAN REPLAYING THE STORED ROW ──────────────────────
  * The stored `tokens` carry a primary and an accent; the tints and the hover
@@ -94,8 +102,26 @@ export function skinCss(theme: ThemeTokens | null, scope: string = SKIN_SCOPE): 
    * block AND the light brand rule, by SPECIFICITY, with nothing resting on
    * where a build happens to put a stylesheet.
    */
-  const rule = (selector: string, s: Parameters<typeof brandSkinVars>[1]) =>
-    `${selector}{${Object.entries(brandSkinVars(colors, s))
+  /**
+   * ── AND THE NEUTRALS, WHICH IS §2 UNFROZEN ────────────────────────────────
+   * Founder's ruling, 2026-08-30. The seven brand tokens reach under 0.5% of the
+   * pixels on any screen and two guards keep them there on purpose, so Brand
+   * Skin recoloured one button and its verdict was "a pathetic failed attempt".
+   * Correct, and unfixable inside the seven.
+   *
+   * The five neutrals carry the brand HUE at a chroma of 0.006 with their
+   * lightness copied from `tokens.css` unchanged, so the tonal ladder and every
+   * contrast pair survive — bounded and measured in `brand-neutrals.test.ts`,
+   * worst drift 0.153:1. `tokens.css` aliases `--bg`, `--s1` and `--s2` at
+   * `var(--surface)` / `var(--canvas)` / `var(--surface-2)`, so overriding the
+   * bases carries the whole ladder with them and nothing downstream changes.
+   *
+   * SEMANTICS ARE STILL FROZEN, and that half of §2 is the important half: a
+   * workspace whose brand is red must not have its delete confirmation blend
+   * into its buttons.
+   */
+  const rule = (selector: string, s: SkinSurface) =>
+    `${selector}{${Object.entries({ ...brandSkinVars(colors, s), ...brandNeutralVars(colors, s) })
       .map(([name, value]) => `${name}:${value}`)
       .join(';')}}`
 
@@ -105,16 +131,44 @@ export function skinCss(theme: ThemeTokens | null, scope: string = SKIN_SCOPE): 
 /**
  * Every value that reaches the page, for a guard to check.
  *
- * Exported so a test can assert what is emitted without parsing CSS with a
- * regular expression, and so the "seven and no more" rule is checkable rather
- * than merely stated.
+ * ── IT MUST REPORT WHAT IS EMITTED, NOT WHAT IT USED TO BE ──────────────────
+ * When the neutrals were added to `skinCss` this function was left reporting
+ * only `brandSkinVars`, and the whole suite stayed green — including the test
+ * named "never DEFINES a neutral", which is the one test that existed to notice
+ * exactly this. It passed by not looking, which is the defect class this
+ * repository names in its one rule. Caught within the same commit and recorded
+ * because a guard that cannot see the change is worse than no guard.
  */
 export function skinVarNames(
   theme: ThemeTokens | null,
-  surface: Parameters<typeof brandSkinVars>[1] = 'light',
+  surface: SkinSurface = 'light',
 ): string[] {
   if (!theme) return []
-  return Object.keys(brandSkinVars([theme.primary, theme.accent], surface))
+
+  /**
+   * ── PARSED FROM THE CSS, NOT ASKED OF THE FUNCTIONS ───────────────────────
+   * This read the two derivation functions and reported their keys. MUTATION
+   * PROVED IT HOLLOW: adding `'--danger'` straight into the object literal
+   * `skinCss` builds left all 489 tests green, including the one named "never
+   * DEFINES a semantic token". The guard was checking two functions while the
+   * browser received a third thing.
+   *
+   * It now reads the rule that is actually emitted, so nothing can reach the
+   * page without passing through here. A declaration name is the text before
+   * the first colon in each `;`-separated chunk, which is why `--pfg:var(--ink)`
+   * reports `--pfg` and not `--ink`: referencing a fixed token is not defining
+   * it, and that distinction has its own test.
+   */
+  const css = skinCss(theme)
+  const marker = surface === 'dark' ? `${SKIN_SCOPE}[data-theme='dark']{` : `${SKIN_SCOPE}{`
+  const start = css.indexOf(marker)
+  if (start < 0) return []
+
+  const body = css.slice(start + marker.length, css.indexOf('}', start))
+  return body
+    .split(';')
+    .map((declaration) => declaration.slice(0, declaration.indexOf(':')).trim())
+    .filter((name) => name.startsWith('--'))
 }
 
 /**
