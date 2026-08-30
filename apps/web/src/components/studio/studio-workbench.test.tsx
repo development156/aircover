@@ -2,7 +2,7 @@ import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
-import { queueGeneration } from '@/app/actions/studio'
+import { queueGeneration, startPostFromPicture } from '@/app/actions/studio'
 import { StudioWorkbench } from '@/components/studio/studio-workbench'
 import { generatableFormats } from '@/lib/studio/formats'
 import { uploadAccept } from '@/lib/studio/upload'
@@ -24,7 +24,10 @@ import {
  */
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }))
-vi.mock('@/app/actions/studio', () => ({ queueGeneration: vi.fn() }))
+vi.mock('@/app/actions/studio', () => ({
+  queueGeneration: vi.fn(),
+  startPostFromPicture: vi.fn(),
+}))
 vi.mock('@/app/actions/assets', () => ({ uploadAsset: vi.fn() }))
 
 afterEach(cleanup)
@@ -39,6 +42,7 @@ const LIBRARY = [
 const MADE = [
   {
     imageId: 'p1',
+    assetId: 'asset-1',
     url: 'https://example.test/made-1.png',
     width: 1080,
     height: 1080,
@@ -50,6 +54,7 @@ const MADE = [
   },
   {
     imageId: 'p2',
+    assetId: 'asset-2',
     url: 'https://example.test/made-2.png',
     width: 1080,
     height: 1920,
@@ -372,6 +377,42 @@ describe('adding a picture from this device', () => {
     open([])
     await user.click(screen.getByRole('button', { name: /match a picture/i }))
     expect(screen.getByText(/add one from this device/i)).toBeTruthy()
+  })
+})
+
+describe('turning a picture into a post', () => {
+  /**
+   * THE STEP THAT WAS LOSING PICTURES. A picture that never becomes a post is
+   * the whole point of this product not happening, and the route there used to
+   * be: open the composer, find the library, recognise your own picture among
+   * everything else in it, attach it. Four places to stop.
+   */
+  test('the way in is on the picture itself, named as what it does', () => {
+    open(LIBRARY, MADE)
+    expect(screen.getByRole('button', { name: /use it in a post/i })).toBeTruthy()
+  })
+
+  test('it starts a post from the picture that is on the canvas', async () => {
+    const user = userEvent.setup()
+    vi.mocked(startPostFromPicture).mockResolvedValue({ ok: true, postId: 'post-1' })
+    open(LIBRARY, MADE)
+    await user.click(screen.getByRole('button', { name: /use it in a post/i }))
+    expect(startPostFromPicture).toHaveBeenCalledWith(MADE[0]!.assetId)
+  })
+
+  /**
+   * A refusal has to be visible where the press was, not swallowed. Somebody who
+   * pressed a button and saw nothing has no way to tell whether it worked.
+   */
+  test('a refusal is said out loud rather than swallowed', async () => {
+    const user = userEvent.setup()
+    vi.mocked(startPostFromPicture).mockResolvedValue({
+      ok: false,
+      message: 'Sign in to start a post.',
+    })
+    open(LIBRARY, MADE)
+    await user.click(screen.getByRole('button', { name: /use it in a post/i }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/sign in to start a post/i)
   })
 })
 

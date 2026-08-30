@@ -31,6 +31,8 @@ import { formatById } from '@/lib/studio/formats'
 import { MAX_TRIES_PER_PRESS, describeModeBlock } from '@/lib/studio/modes'
 import { ReferenceIdsSchema } from '@/lib/studio/reference-ids'
 import { conditionPrompt } from '@/lib/studio/prompt'
+import { attachAssetToPost } from '@/app/actions/assets'
+import { createPost } from '@/app/actions/posts'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { workspaceForWrite } from '@/lib/workspaces'
 
@@ -504,4 +506,79 @@ async function signReferences(
   return assetIds
     .map((id) => urls.get(id) ?? null)
     .filter((url): url is string => typeof url === 'string')
+}
+
+export type StartPostState = { ok: true; postId: string } | { ok: false; message: string }
+
+/**
+ * TURN A PICTURE INTO A POST, WITHOUT A TRIP THROUGH THE LIBRARY.
+ *
+ * ── THE STEP THAT WAS LOSING PICTURES ───────────────────────────────────────
+ * A picture was made, saved to the library, and then the person had to open the
+ * composer, find the library, recognise their own picture among everything else
+ * in it, and attach it. Every one of those is a place to stop, and a picture
+ * that never becomes a post is the whole point of this product not happening.
+ *
+ * ── THE DRAFT CARRIES THE WORDS THAT MADE IT ────────────────────────────────
+ * The title is the prompt. Somebody who makes four pictures in a morning is
+ * looking at four untitled drafts otherwise, and the words they typed are the
+ * only thing that tells them which is which.
+ *
+ * ── AND A FAILED ATTACH IS NOT A FAILED POST ────────────────────────────────
+ * The draft is created first and the picture attached second. If the attach
+ * fails, the DRAFT still exists and the person is sent to it with a sentence
+ * about the picture, rather than losing both. Deleting the draft to make the
+ * failure clean would throw away the half that worked.
+ */
+export async function startPostFromPicture(assetId: unknown): Promise<StartPostState> {
+  let workspaceId: string | undefined
+  try {
+    const parsed = z.uuid().safeParse(assetId)
+    if (!parsed.success) return { ok: false, message: 'That picture does not exist.' }
+
+    const { userId } = await auth()
+    if (!userId) return { ok: false, message: 'Sign in to start a post.' }
+
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    workspaceId = ws.workspace.id
+
+    // The prompt that made it, read through the same scoped path as everything
+    // else. A picture from another workspace is simply not found.
+    const supabase = createServerSupabase()
+    const found = await supabase
+      .from('studio_generation_images')
+      .select('generation_id')
+      .eq('workspace_id', ws.workspace.id)
+      .eq('asset_id', parsed.data)
+      .limit(1)
+      .maybeSingle()
+
+    let title = ''
+    if (found.data?.generation_id) {
+      const row = await supabase
+        .from('studio_generations')
+        .select('prompt_given')
+        .eq('workspace_id', ws.workspace.id)
+        .eq('id', found.data.generation_id)
+        .maybeSingle()
+      if (typeof row.data?.prompt_given === 'string') title = row.data.prompt_given
+    }
+
+    const post = await createPost(title)
+    if (!post.ok) return { ok: false, message: post.message }
+
+    const attached = await attachAssetToPost(post.postId, parsed.data)
+    if (!attached.ok) {
+      // The draft exists. Sending them to it with the picture missing beats
+      // losing the half that worked.
+      return { ok: false, message: attached.message }
+    }
+
+    revalidatePath('/posts')
+    return { ok: true, postId: post.postId }
+  } catch (error) {
+    reportServerError(error, { action: 'startPostFromPicture', workspaceId })
+    return { ok: false, message: 'Sahoda could not start a post from that picture. Try again.' }
+  }
 }

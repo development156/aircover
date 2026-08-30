@@ -1,8 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Check, Copy, Download, ImageDown, Maximize2, RotateCcw } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Check, Copy, Download, ImageDown, Maximize2, PenLine, RotateCcw } from 'lucide-react'
 
+import { startPostFromPicture } from '@/app/actions/studio'
 import type { CanvasPicture } from '@/lib/studio/canvas'
 import { canCopyImage, copyImageToClipboard } from '@/lib/studio/clipboard-image'
 import { describeCopyFailure } from '@/lib/studio/refusal-copy'
@@ -49,6 +51,9 @@ export function PictureActions({
   const [canCopy, setCanCopy] = useState(false)
   useEffect(() => setCanCopy(canCopyImage()), [])
 
+  const router = useRouter()
+  const [starting, setStarting] = useState(false)
+
   async function save() {
     setNote(null)
     setSaving(true)
@@ -85,6 +90,27 @@ export function PictureActions({
         {onDraw === undefined ? null : (
           <Action onClick={onDraw} Icon={ImageDown} label="Draw on it" />
         )}
+        {/* ── THE STEP THAT WAS LOSING PICTURES ────────────────────────────
+            A picture that never becomes a post is the whole point of this
+            product not happening, and the route there used to be: open the
+            composer, find the library, recognise your own picture, attach it.
+            Four places to stop. Only offered for a picture that still HAS a
+            file, since a post cannot carry one that was deleted. */}
+        <Action
+          onClick={async () => {
+            setNote(null)
+            setStarting(true)
+            const result = await startPostFromPicture(picture.assetId)
+            setStarting(false)
+            if (result.ok) {
+              router.push(`/posts/${result.postId}`)
+              return
+            }
+            setNote(result.message)
+          }}
+          Icon={PenLine}
+          label={starting ? 'Starting a post' : 'Use it in a post'}
+        />
         <Action onClick={save} Icon={Download} label={saving ? 'Saving' : 'Save it'} />
         {/* Dropped entirely where the browser will not take a picture. A button
             that always fails teaches people to distrust the row it sits in. */}
