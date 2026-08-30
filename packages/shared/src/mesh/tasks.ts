@@ -399,5 +399,16 @@ export const ImageGenerateOutputSchema = z.object({
   /** Raw base64, no data-URL prefix. */
   base64: z.string().min(1),
   mime: z.string(),
+  /**
+   * WHAT THE PROVIDER SAID THE GENERATION COST, in US dollars.
+   *
+   * Optional and additive. ABSENT when the provider reported nothing, and that
+   * absence must never be rendered as zero: the mesh's own `estimateCostUsd`
+   * applies CHAT token rates, which for a model billed per image produces a
+   * figure nobody quoted (docs/43 §1). This field is kept apart from
+   * `MeshUsage.costUsd` for exactly that reason, so a caller storing a price a
+   * customer will read can tell a reported figure from an estimate.
+   */
+  providerCostUsd: z.number().nonnegative().optional(),
 })
 export type ImageGenerateOutput = z.infer<typeof ImageGenerateOutputSchema>
