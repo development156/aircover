@@ -151,3 +151,31 @@ export function describeConditioning(input: {
   }
   return `Built from ${confirmed} confirmed and ${guessed} guessed thing${guessed === 1 ? '' : 's'} about your brand. Confirming the guesses makes the next image more like you.`
 }
+
+/**
+ * THINGS TO TRY, FOR A BOX NOBODY KNOWS WHAT TO PUT IN.
+ *
+ * ── THE MEASUREMENT THAT PRODUCED THIS ──────────────────────────────────────
+ * A feature nobody knows what to give stays empty. That is the Tone Setup
+ * ruling, made against the Brand Brain after three documents across 33
+ * workspaces, and a prompt box has exactly the same shape: a shop owner who has
+ * never described a photograph to a machine does not know whether to write two
+ * words or a paragraph.
+ *
+ * So these are not decoration. Each one demonstrates a DIFFERENT thing worth
+ * knowing: that a subject plus a surface plus a light is enough, that a time of
+ * day changes everything, that naming the season is allowed, that a picture of
+ * nobody is often the useful one.
+ *
+ * They fill the box rather than generating, so nothing is spent by trying one
+ * and the words can be edited first.
+ *
+ * Pure: no I/O, no clock, no database.
+ */
+export const PROMPT_STARTERS: readonly string[] = [
+  'A plate of fresh samosas on a wooden counter, morning light',
+  'The shopfront at dusk with the lights just on',
+  'Hands wrapping an order in paper, close up',
+  'A cup of chai beside a rain-streaked window',
+  'The counter laid out for a festival, seen from above',
+]

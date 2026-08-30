@@ -29,6 +29,7 @@ import {
   ruleFor,
 } from '@/lib/studio/modes'
 import type { LibraryPicture } from '@/lib/studio/read'
+import { PROMPT_STARTERS } from '@/lib/studio/prompt'
 import { describeInsufficient, describePartial } from '@/lib/studio/refusal-copy'
 import { savePicture } from '@/lib/studio/save-picture'
 
@@ -112,6 +113,19 @@ export function StudioWorkbench({
       setPicked((current) => current.filter((id) => id !== assetId))
       return
     }
+    // ── PICKING A PICTURE IN A MODE THAT IGNORES ONE ────────────────────────
+    // Explore uses no reference by definition, so a person who picks one has
+    // said something the mode cannot honour. Moving them to the mode that DOES
+    // is what they meant; refusing the press would be technically correct and
+    // useless. It says so, because a mode that changed itself silently would be
+    // the screen overruling a choice they made.
+    if (rule.maxReferences === 0) {
+      setMode('match')
+      setPicked([assetId])
+      setNote('Explore ignores a picture, so Sahoda moved you to Match a picture.')
+      return
+    }
+
     if (picked.length >= rule.maxReferences) {
       setNote(describeModeBlock({ mode, references: picked.length + 1 }))
       return
@@ -182,6 +196,7 @@ export function StudioWorkbench({
           <span className="type-sm text-muted">What should the picture show?</span>
           <Textarea
             value={wanted}
+            autoGrow
             rows={3}
             maxLength={1000}
             placeholder={promptHintFor(mode)}
@@ -189,6 +204,30 @@ export function StudioWorkbench({
             data-guide="studio-prompt"
           />
         </label>
+
+        {/* ── SOMETHING TO TRY ────────────────────────────────────────────────
+            A box nobody knows what to put in stays empty. These FILL the box
+            rather than generating, so nothing is spent by trying one and the
+            words can be edited first. Hidden once there is something to edit,
+            because then they are only in the way. */}
+        {wanted.trim() === '' ? (
+          <div className="flex flex-col gap-1" data-guide="studio-starters">
+            <span className="type-sm text-muted">Not sure what to write? Try one of these.</span>
+            <ul className="flex flex-wrap gap-2">
+              {PROMPT_STARTERS.map((starter) => (
+                <li key={starter}>
+                  <button
+                    type="button"
+                    onClick={() => setWanted(starter)}
+                    className="surface-ring rounded-card bg-s2 px-2 py-1 text-left type-sm text-muted transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  >
+                    {starter}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         <fieldset className="flex flex-col gap-2">
           <legend className="type-sm text-muted">How should Sahoda approach it?</legend>
@@ -211,87 +250,91 @@ export function StudioWorkbench({
         </fieldset>
 
         {/* ── WHAT TO MATCH ──────────────────────────────────────────────────
-            Shown only for a mode that can use one. Offering a picture picker to
-            Explore would invite a choice the mode then ignores. */}
-        {rule.maxReferences === 0 ? null : (
-          <fieldset className="flex flex-col gap-2" data-guide="studio-references">
-            <legend className="type-sm text-muted">
-              {rule.minReferences > 0
+            Shown in EVERY mode, including the one that ignores references.
+            This used to be hidden for Explore, on the reasoning that offering a
+            picker would invite a choice the mode then ignores. That reasoning
+            stopped being true the moment picking one MOVED you to the mode that
+            uses it: the choice is now honoured rather than ignored, and hiding
+            the control only hides the shortest route to what a person meant. */}
+        <fieldset className="flex flex-col gap-2" data-guide="studio-references">
+          <legend className="type-sm text-muted">
+            {rule.maxReferences === 0
+              ? 'Picking a picture here moves you to Match a picture.'
+              : rule.minReferences > 0
                 ? 'Which picture should Sahoda match?'
                 : 'Anything Sahoda should match? (optional)'}
-            </legend>
+          </legend>
 
-            <ReferenceUpload
-              disabled={picked.length >= rule.maxReferences}
-              onAdded={(assetId) => {
-                setNote(null)
-                // Selected at once. Somebody who adds a picture to match wants
-                // to match it, and it appears in the grid below on the refresh
-                // already chosen.
-                setPicked((current) =>
-                  current.includes(assetId) || current.length >= rule.maxReferences
-                    ? current
-                    : [...current, assetId],
+          <ReferenceUpload
+            disabled={picked.length >= rule.maxReferences}
+            onAdded={(assetId) => {
+              setNote(null)
+              // Selected at once. Somebody who adds a picture to match wants
+              // to match it, and it appears in the grid below on the refresh
+              // already chosen.
+              setPicked((current) =>
+                current.includes(assetId) || current.length >= rule.maxReferences
+                  ? current
+                  : [...current, assetId],
+              )
+              router.refresh()
+            }}
+          />
+
+          {library.length === 0 ? (
+            <p className="surface-ring rounded-card bg-s2 px-3 py-2 type-sm text-muted">
+              You have no pictures yet. Add one from this device, or make one below, and it appears
+              here to match.
+            </p>
+          ) : (
+            <ul className="grid grid-cols-4 gap-2">
+              {library.map((picture) => {
+                // The POSITION, not a yes. `signReferences` sends them in pick
+                // order and the first weighs most, so an order-free tick hides
+                // something the model acts on.
+                const at = picked.indexOf(picture.assetId)
+                const on = at !== -1
+                return (
+                  <li key={picture.assetId}>
+                    <button
+                      type="button"
+                      onClick={() => toggleReference(picture.assetId)}
+                      aria-pressed={on}
+                      aria-label={
+                        on
+                          ? `${picture.title ?? 'A picture in your library'}, picked ${at + 1} of ${picked.length}`
+                          : (picture.title ?? 'A picture in your library')
+                      }
+                      className={`surface-ring relative block w-full overflow-hidden rounded-card transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                        on ? 'ring-2 ring-accent' : ''
+                      }`}
+                    >
+                      {picture.url === null ? (
+                        <span className="flex aspect-square items-center justify-center bg-s2 type-sm text-muted">
+                          no preview
+                        </span>
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element -- a
+                        // short-lived signed URL from a private bucket cannot be
+                        // optimised without proxying the credential.
+                        <img
+                          src={picture.url}
+                          alt={picture.title ?? 'A picture in your library'}
+                          className="aspect-square w-full object-cover object-top"
+                        />
+                      )}
+                      {on ? (
+                        <span className="absolute right-1 top-1 flex size-[18px] items-center justify-center rounded-full bg-primary type-sm text-primary-foreground">
+                          <span className="num">{at + 1}</span>
+                        </span>
+                      ) : null}
+                    </button>
+                  </li>
                 )
-                router.refresh()
-              }}
-            />
-
-            {library.length === 0 ? (
-              <p className="surface-ring rounded-card bg-s2 px-3 py-2 type-sm text-muted">
-                You have no pictures yet. Add one from this device, or make one below, and it
-                appears here to match.
-              </p>
-            ) : (
-              <ul className="grid grid-cols-4 gap-2">
-                {library.map((picture) => {
-                  // The POSITION, not a yes. `signReferences` sends them in pick
-                  // order and the first weighs most, so an order-free tick hides
-                  // something the model acts on.
-                  const at = picked.indexOf(picture.assetId)
-                  const on = at !== -1
-                  return (
-                    <li key={picture.assetId}>
-                      <button
-                        type="button"
-                        onClick={() => toggleReference(picture.assetId)}
-                        aria-pressed={on}
-                        aria-label={
-                          on
-                            ? `${picture.title ?? 'A picture in your library'}, picked ${at + 1} of ${picked.length}`
-                            : (picture.title ?? 'A picture in your library')
-                        }
-                        className={`surface-ring relative block w-full overflow-hidden rounded-card transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-                          on ? 'ring-2 ring-accent' : ''
-                        }`}
-                      >
-                        {picture.url === null ? (
-                          <span className="flex aspect-square items-center justify-center bg-s2 type-sm text-muted">
-                            no preview
-                          </span>
-                        ) : (
-                          // eslint-disable-next-line @next/next/no-img-element -- a
-                          // short-lived signed URL from a private bucket cannot be
-                          // optimised without proxying the credential.
-                          <img
-                            src={picture.url}
-                            alt={picture.title ?? 'A picture in your library'}
-                            className="aspect-square w-full object-cover"
-                          />
-                        )}
-                        {on ? (
-                          <span className="absolute right-1 top-1 flex size-[18px] items-center justify-center rounded-full bg-primary type-sm text-primary-foreground">
-                            <span className="num">{at + 1}</span>
-                          </span>
-                        ) : null}
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </fieldset>
-        )}
+              })}
+            </ul>
+          )}
+        </fieldset>
 
         {/* ── HOW MANY TRIES ──────────────────────────────────────────────────
             Four separate calls, not a matching set: the routed model draws one
@@ -504,7 +547,10 @@ export function StudioWorkbench({
                       // prompt, and a screen reader announcing it twice makes a
                       // strip of twelve read as twenty-four things.
                       alt=""
-                      className="size-full object-cover"
+                      // Top-anchored: a square crop of a portrait photograph cuts
+                      // a face off at the chin, and this product's pictures are
+                      // food, shopfronts and people.
+                      className="size-full object-cover object-top"
                     />
                   </button>
                 </li>
