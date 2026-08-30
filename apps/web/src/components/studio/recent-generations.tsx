@@ -1,16 +1,23 @@
 import { ImageIcon } from 'lucide-react'
+import Link from 'next/link'
 
 import { CardEmpty } from '@/components/empty-state'
-import { countCertainty } from '@sahoda/shared'
+import { describeBuiltFrom, describePicture, describeStatus } from '@/lib/studio/card-copy'
 import type { GenerationsRead } from '@/lib/studio/read'
 
 /**
- * WHAT THIS WORKSPACE HAS ASKED FOR, AND WHAT EACH ONE WAS BUILT FROM.
+ * WHAT THIS WORKSPACE HAS MADE, AND WHAT EACH PICTURE WAS BUILT FROM.
+ *
+ * ── THE PICTURE IS THE POINT ────────────────────────────────────────────────
+ * Somebody spends credits here. Showing them a line of text afterwards and
+ * asking them to go and find the file is not a delivered feature, it is a
+ * receipt. So the picture is on this screen, at a size you can judge it at, with
+ * a link to the library beside it.
  *
  * ── THE PROVENANCE IS ON THE SCREEN, NOT ONLY IN THE DATABASE ───────────────
  * A person must be able to ask "why does this look like this" and get an answer.
- * So every request shows what conditioned it and how sure Sahoda was of each
- * part, in the product's own two words: confirmed and guessed.
+ * Every card says what conditioned it and how sure Sahoda was, in the product's
+ * own two words: confirmed and guessed.
  *
  * ── FOUR NOTHINGS, KEPT APART ───────────────────────────────────────────────
  * No workspace, a failed read, nothing made yet, and a list. Only the third has
@@ -40,48 +47,64 @@ export function RecentGenerations({ read }: { read: GenerationsRead }) {
         What you have made
       </h2>
 
-      {read.generations.length === 0 ? (
+      {read.cards.length === 0 ? (
         <CardEmpty
           lead={<ImageIcon className="size-[18px]" aria-hidden />}
           body="Nothing yet. Describe a picture above and Sahoda will draw it."
         />
       ) : (
-        <ul className="flex flex-col gap-2">
-          {read.generations.map((generation) => {
-            const signals = generation.brand_signals
-            const counted = signals === null ? null : countCertainty(signals)
-            return (
-              <li
-                key={generation.id}
-                className="surface-ring flex flex-col gap-1 rounded-card bg-surface px-3 py-2"
-              >
-                <span className="type-body font-[550]">{generation.prompt_given}</span>
-                <span className="type-sm text-muted">
-                  {generation.format_id ?? 'size not recorded'}
-                  {' · '}
-                  {generation.status === 'ready'
-                    ? 'ready'
-                    : generation.status === 'failed'
-                      ? 'did not work, and nothing was charged'
-                      : generation.status === 'cancelled'
-                        ? 'stopped'
-                        : 'still being drawn'}
-                </span>
-                {/* Null and empty are different claims and are said differently.
-                    Null means conditioning never ran; empty means it ran and
-                    used nothing, which is exactly right for Explore. */}
-                <span className="type-sm text-muted">
-                  {counted === null
-                    ? 'Built from your words alone.'
-                    : counted.confirmed + counted.inferred === 0
-                      ? 'Built from your words alone, on purpose.'
-                      : `Built from ${counted.confirmed} confirmed and ${counted.inferred} guessed thing${
-                          counted.inferred === 1 ? '' : 's'
-                        } about your brand.`}
-                </span>
-              </li>
-            )
-          })}
+        <ul className="grid gap-3 wide:grid-cols-3 max-wide:grid-cols-1">
+          {read.cards.map(({ generation, pictures }) => (
+            <li
+              key={generation.id}
+              className="surface-ring flex flex-col gap-2 rounded-card bg-surface p-3"
+            >
+              {pictures.map((picture) => {
+                const said = describePicture({
+                  status: generation.status,
+                  hasAsset: picture.assetId !== null,
+                  hasUrl: picture.url !== null,
+                })
+                return (
+                  <div key={picture.imageId} className="flex flex-col gap-1">
+                    {picture.url === null ? null : (
+                      // eslint-disable-next-line @next/next/no-img-element -- a
+                      // short-lived signed URL from a private bucket cannot be
+                      // optimised by next/image without proxying the credential.
+                      <img
+                        src={picture.url}
+                        alt={generation.prompt_given}
+                        width={picture.width ?? undefined}
+                        height={picture.height ?? undefined}
+                        className="surface-ring w-full rounded-card bg-s2"
+                      />
+                    )}
+                    {said === null ? null : <span className="type-sm text-muted">{said}</span>}
+                  </div>
+                )
+              })}
+
+              <span className="type-body font-[550]">{generation.prompt_given}</span>
+
+              <span className="type-sm text-muted">
+                {describeStatus(generation.status)}
+                {generation.format_id === null ? null : ` · ${generation.format_id}`}
+              </span>
+
+              <span className="type-sm text-muted">
+                {describeBuiltFrom(generation.brand_signals)}
+              </span>
+
+              {generation.status !== 'ready' ? null : (
+                <Link
+                  href="/assets"
+                  className="type-sm text-muted underline transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  Open your library
+                </Link>
+              )}
+            </li>
+          ))}
         </ul>
       )}
 
