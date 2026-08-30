@@ -44,6 +44,7 @@ function panel(props: Partial<React.ComponentProps<typeof BrandPanel>> = {}) {
   return (
     <BrandPanel
       logoUrl="https://example.test/logo.png"
+      current={null}
       skinOn={false}
       hasTheme
       onToggleSkin={onToggleSkin}
@@ -392,6 +393,79 @@ describe('the brand mark', () => {
 
     await vi.waitFor(() => expect(setBrandLogo).toHaveBeenCalledTimes(1))
     expect(screen.queryByRole('alert'), 'a stored file is not a failure').toBeNull()
+  })
+
+  /**
+   * ── FOUR BUTTONS WITH ONE NAME ────────────────────────────────────────────
+   * Every swatch carried the identical `aria-label="Use this colour"`, so the
+   * row was announced as four indistinguishable controls and the only thing
+   * separating them was the colour itself, which is also the signal a
+   * colour-blind reader does not get.
+   */
+  it('gives every swatch a name of its own', async () => {
+    render(panel())
+    const swatches = await screen.findAllByRole('button', { name: /use this colour/i })
+
+    const names = swatches.map((s) => s.getAttribute('aria-label'))
+    expect(new Set(names).size, 'two swatches are announced identically').toBe(names.length)
+  })
+
+  /**
+   * ── WHICH ONE IS ON ───────────────────────────────────────────────────────
+   * The panel said "your brand colours are on" and marked none of the swatches,
+   * so it named a state without ever saying which colour was in it.
+   */
+  it('says which colour is the one in use', async () => {
+    // The stored primary is the guard's output, not the extracted string, so the
+    // match is by hue. A teal at a different lightness is the same swatch.
+    render(panel({ skinOn: true, current: 'oklch(0.62 0.11 195)' }))
+
+    const marked = await screen.findAllByRole('button', { name: /in use now/i })
+    expect(marked).toHaveLength(1)
+    expect(marked[0]!.getAttribute('style')).toContain(TEAL)
+  })
+
+  /** Sahoda's colours are on, so no brand swatch may claim to be in use. */
+  it('marks nothing while the brand is switched off', async () => {
+    render(panel({ skinOn: false, current: 'oklch(0.62 0.11 195)' }))
+    await screen.findAllByRole('button', { name: /use this colour/i })
+
+    expect(screen.queryAllByRole('button', { name: /in use now/i })).toHaveLength(0)
+  })
+
+  /**
+   * ── FOUR SHADES OF ONE BLUE ───────────────────────────────────────────────
+   * MEASURED on the founder's screenshot: the chroma filter left four swatches
+   * that were all the same blue. Four choices, one outcome.
+   */
+  it('offers one blue rather than four shades of it', async () => {
+    extractPalette.mockReturnValue([
+      'oklch(0.5 0.18 250)',
+      'oklch(0.52 0.18 251)',
+      'oklch(0.49 0.17 249)',
+      TEAL,
+    ])
+    render(panel())
+
+    const swatches = await screen.findAllByRole('button', { name: /use this colour/i })
+    expect(swatches, 'three shades of one blue were offered as three choices').toHaveLength(2)
+  })
+
+  /**
+   * The panel replaces the logo and never showed the logo. On a workspace whose
+   * mark is wrong or somebody else's, the person had to close this and look at
+   * the topbar to find out what they were about to replace.
+   */
+  it('shows the logo it is offering to replace', () => {
+    render(panel())
+
+    expect(screen.getByAltText(/your logo/i)).toBeInTheDocument()
+  })
+
+  it('shows no logo when there is none', () => {
+    render(panel({ logoUrl: null, hasTheme: false }))
+
+    expect(screen.queryByAltText(/your logo/i)).toBeNull()
   })
 
   it('spends nothing and writes nothing just by being opened', async () => {
