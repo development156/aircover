@@ -2,767 +2,349 @@
 
 import { randomUUID } from 'node:crypto'
 import { auth } from '@clerk/nextjs/server'
-import { revalidatePath } from 'next/cache'
+import { createPgLedgerPort, createWithCredits, loadBillingEnv } from '@sahoda/billing'
+import { createMesh, type Mesh } from '@sahoda/mesh'
 import {
-  AssetSchema,
-  DesignDocumentSchema,
-  StudioDesignSchema,
-  blankDocument,
-  composeScene,
-  describeComposeFailure,
-  presetById,
-  renderSvg,
-  slotKeysOf,
-  slotLabelOf,
-  templateById,
-  type Palette,
-  type StudioDesign,
+  GenerationModeSchema,
+  MESH_TASK_ACTION,
+  StudioGenerationSchema,
+  type BrandSignal,
+  type WithCreditsFn,
 } from '@sahoda/shared'
+import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
-import { activeThemeTokens } from '@/lib/brand/read-theme'
+import { revalidateBalance } from '@/lib/actions/revalidate-balance'
 import { kindForProvenMime } from '@/lib/assets/kind'
 import { reportServerError } from '@/lib/observability/report'
-import { MEDIA_BUCKET } from '@/lib/posts/media-constants'
+import {
+  FAILURE_REASON,
+  chargeFailureState,
+  type ChargeFailureState,
+} from '@/lib/posts/charge-failure'
+import { MEDIA_BUCKET, MEDIA_UPLOAD_CAP_BYTES } from '@/lib/posts/media-constants'
 import { assetObjectPath } from '@/lib/posts/media-path'
 import { sniffImage } from '@/lib/posts/sniff-image'
-import {
-  EXPORT_REFUSALS,
-  EXPORT_STORED,
-  describeBatchExport,
-  planExport,
-  titleForPage,
-  type ExistingCopy,
-  type PageExport,
-} from '@/lib/studio/export-copy'
-import { copyTitle } from '@/lib/studio/copy-title'
-import { imageDataUri, resolvePageImages } from '@/lib/studio/images'
-import { TEMPLATE_KEPT, TEMPLATE_REFUSALS, TEMPLATE_RELEASED } from '@/lib/studio/template-copy'
-import { studioPalette } from '@/lib/studio/palette'
-import { rasterisePng } from '@/lib/studio/raster'
-import type {
-  DeleteDesignState,
-  DesignPhotoState,
-  ExportDesignState,
-  ExportPagesState,
-  SaveDesignState,
-  TemplateFlagState,
-} from '@/lib/studio/state'
+import { brandSignalsFor } from '@/lib/studio/brand-signals'
+import { formatById } from '@/lib/studio/formats'
+import { conditionPrompt } from '@/lib/studio/prompt'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { activeWorkspaceRead, workspaceForWrite } from '@/lib/workspaces'
+import { workspaceForWrite } from '@/lib/workspaces'
 
 /**
- * THE STUDIO'S WRITES.
+ * THE STUDIO'S ONE WRITE: ASK A MODEL FOR A PICTURE.
  *
- * ── EVERY BOUNDARY IS PARSED, INCLUDING THE ONE FROM OUR OWN EDITOR ─────────
- * The document arrives as JSON from a client component, which is to say from
- * the network, which is to say from anywhere. `DesignDocumentSchema` runs on it
- * here before it reaches a column, so a stored design is one this application
- * can open again. A row written unparsed is a card that fails to open later and
- * nothing that says why.
+ * ── THE ROW IS WRITTEN BEFORE THE MODEL IS CALLED, AND THAT IS THE DESIGN ───
+ * A generation takes between eight seconds and three minutes. MEASURED in this
+ * repository: a server action CANNOT outlive the navigation that triggered it
+ * (`components/posts/draft-recovery.ts` records `net::ERR_ABORTED` on a Back
+ * press), and a Back inside this app does not unmount the segment, so no
+ * cleanup, `pagehide` or `beforeunload` fires either.
  *
- * ── AND THE TEMPLATE AND PRESET HAVE TO EXIST ──────────────────────────────
- * A design naming a template nobody ships cannot be rendered, so it is refused
- * at the door rather than saved and discovered later. That refusal is cheap
- * here and expensive in a gallery.
+ * So the request is written to `studio_generations` FIRST. If the browser goes
+ * away mid-flight the row is still there, still says what was asked and what it
+ * cost, and the person finds it when they come back. Holding the request only in
+ * React state would mean a Back press destroyed something they had paid for.
+ *
+ * ── AND NOBODY PAYS FOR A FAILURE ───────────────────────────────────────────
+ * `withCredits` reserves the credits, the work runs inside the callback, and a
+ * THROW in there releases the hold so nothing is charged. Every refusal below is
+ * a throw for exactly that reason. The action string comes from
+ * `MESH_TASK_ACTION`, never a literal: the mesh task is `image_generate` and the
+ * pricing key is `image_standard`, and hardcoding either is how the two drift.
+ *
+ * ── THE BYTES GO THROUGH THE SAME GATE AS AN UPLOAD ─────────────────────────
+ * `sniffImage` reads the real format and dimensions from the BYTES rather than
+ * from the model's word for them. A generator that says PNG and returns WebP, or
+ * that returns 512x512 when asked for 1080x1350, produces a file a platform
+ * refuses at publish time. Catching it here costs a released hold; catching it
+ * there costs somebody a post that silently never went out.
  */
 
-/** A design's name. Matches the column's own CHECK, which is the real limit. */
-const TitleSchema = z.string().trim().min(1).max(80)
+// 'use server' modules may export only async functions, so these singletons stay
+// module-private. Built lazily: `createMesh()` throws SYNCHRONOUSLY on a missing
+// env var, and at module scope that 500s every route that imports this file.
+let meshSingleton: Mesh | undefined
+function getMesh(): Mesh {
+  return (meshSingleton ??= createMesh())
+}
 
-const SaveInputSchema = z.object({
-  id: z.uuid().optional(),
-  title: TitleSchema,
-  presetId: z.string().min(1).max(40),
-  doc: DesignDocumentSchema,
-  isTemplate: z.boolean().optional(),
+let withCreditsSingleton: WithCreditsFn | undefined
+function getWithCredits(): WithCreditsFn {
+  if (withCreditsSingleton) return withCreditsSingleton
+  const { databaseUrl } = loadBillingEnv()
+  withCreditsSingleton = createWithCredits(createPgLedgerPort({ connectionString: databaseUrl }))
+  return withCreditsSingleton
+}
+
+const GenerateInputSchema = z.object({
+  mode: GenerationModeSchema,
+  /** What the person typed. The same bounds the mesh's own input carries. */
+  wanted: z.string().trim().min(3).max(1000),
+  /** A preset id. Resolved through `formatById`, so a size the picker hid cannot be spent on. */
+  formatId: z.string().min(1).max(40),
 })
 
+export type QueueGenerationState =
+  | { ok: true; generationId: string; balanceAfter: number }
+  | { ok: false; insufficient: false; message: string }
+  | ChargeFailureState
+
 const REFUSALS = {
-  unknownTemplate: 'That layout is not one Sahoda offers, so this design was not saved.',
-  unknownPreset: 'That size is not one Sahoda offers, so this design was not saved.',
-  malformed: 'This design could not be saved because part of it was not readable.',
-  failed: 'This design could not be saved. Nothing was changed.',
-  notFound: 'That design is not in this workspace.',
-  deleteFailed: 'This design could not be deleted. Nothing was changed.',
+  signedOut: 'Sign in to make an image.',
+  malformed: 'Describe the picture you want, in a few words at least.',
+  unknownFormat: 'That size is not one Sahoda can make, so nothing was charged.',
+  failed: 'Sahoda could not make this image. Nothing was charged.',
+  unusable:
+    'The model returned something Sahoda could not read as a picture. Nothing was charged, and you can try again.',
+  stored: 'The image was made but could not be saved to your library. Nothing was charged.',
 } as const
 
 /**
- * One sentence for every reason a picture cannot be shown, and that is
- * deliberate rather than lazy: the reasons are "not in this workspace", "in the
- * trash", "bytes unreadable" and "not an image type", and telling a person
- * which would describe our storage to them. What they can act on is the same in
- * all four, and it is what this says.
- */
-const PHOTO_REFUSAL =
-  'That picture could not be opened, so it was not added to this design. It may have been deleted from your library.'
-
-/**
- * Create or update a design.
+ * Ask for one image.
  *
- * One action for both, because the editor does not know which it is doing: a
- * design saved for the first time and one saved for the twentieth are the same
- * gesture to the person making it.
+ * Returns as soon as the row exists and the model has answered. A series of
+ * slides is Phase 2 and is deliberately not faked here: `requested_count` stays
+ * at 1, so no row ever claims to have asked for more than was asked for.
  */
-export async function saveDesign(input: unknown): Promise<SaveDesignState> {
-  const workspace = await workspaceForWrite()
-  if (!workspace.ok) return { ok: false, message: workspace.message }
-
-  const parsed = SaveInputSchema.safeParse(input)
-  if (!parsed.success) return { ok: false, message: REFUSALS.malformed }
-  const { id, title, presetId, doc, isTemplate } = parsed.data
-
-  if (templateById(doc.templateId) === null) {
-    return { ok: false, message: REFUSALS.unknownTemplate }
-  }
-  if (presetById(presetId) === null) {
-    return { ok: false, message: REFUSALS.unknownPreset }
-  }
+export async function queueGeneration(input: unknown): Promise<QueueGenerationState> {
+  const action = MESH_TASK_ACTION.image_generate
+  let workspaceId: string | undefined
 
   try {
-    const supabase = createServerSupabase()
-    const row = {
-      workspace_id: workspace.workspace.id,
-      title,
-      preset_id: presetId,
-      doc,
-      is_template: isTemplate ?? false,
+    const { userId } = await auth()
+    if (!userId) return { ok: false, insufficient: false, message: REFUSALS.signedOut }
+
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, insufficient: false, message: ws.message }
+    const workspace = ws.workspace
+    workspaceId = workspace.id
+
+    const parsed = GenerateInputSchema.safeParse(input)
+    if (!parsed.success) return { ok: false, insufficient: false, message: REFUSALS.malformed }
+
+    // Through the SAME function the picker uses, so a hand-made request cannot
+    // reach a size the screen refused to offer.
+    const format = formatById(parsed.data.formatId)
+    if (format === null) {
+      return { ok: false, insufficient: false, message: REFUSALS.unknownFormat }
     }
 
-    // `id` present means update. The workspace filter is here as well as in RLS
-    // for the reason the read module gives: the policy admits every workspace
-    // this person belongs to, and an unscoped update would reach into another.
-    const query =
-      id === undefined
-        ? supabase.from('studio_designs').insert(row).select('*').single()
-        : supabase
-            .from('studio_designs')
-            .update(row)
-            .eq('id', id)
-            .eq('workspace_id', workspace.workspace.id)
-            .select('*')
-            .single()
+    // Read before anything is charged: a brain that cannot be read produces an
+    // unconditioned image, which is a worse picture and not a failure, and the
+    // screen says which happened.
+    const signals: BrandSignal[] = await brandSignalsFor(workspace.id)
+    const conditioned = conditionPrompt({
+      mode: parsed.data.mode,
+      wanted: parsed.data.wanted,
+      signals,
+    })
 
-    const { data, error } = await query
-    if (error || !data)
-      return { ok: false, message: id === undefined ? REFUSALS.failed : REFUSALS.notFound }
+    const supabase = createServerSupabase()
 
-    const saved = StudioDesignSchema.safeParse(data)
-    // The row went in and came back unreadable. That is our defect, not the
-    // customer's, so it is reported rather than shown to them as a refusal they
-    // could act on.
-    if (!saved.success) {
-      reportServerError(new Error('studio: saved design did not parse on read-back'), {
-        action: 'saveDesign',
+    // ── THE ROW, BEFORE THE MODEL ────────────────────────────────────────────
+    const queued = await supabase
+      .from('studio_generations')
+      .insert({
+        workspace_id: workspace.id,
+        status: 'queued',
+        mode: parsed.data.mode,
+        prompt_given: parsed.data.wanted,
+        prompt_sent: conditioned.prompt,
+        format_id: format.id,
+        width: format.width,
+        height: format.height,
+        requested_count: 1,
+        // Explore legitimately used nothing, and `[]` says that. A null here
+        // would mean conditioning never ran, which is a different claim.
+        brand_signals: conditioned.used,
+        created_by: userId,
       })
-      return { ok: false, message: REFUSALS.failed }
-    }
-
-    revalidatePath('/studio')
-    return { ok: true, design: saved.data }
-  } catch (error) {
-    reportServerError(error, { action: 'saveDesign' })
-    return { ok: false, message: REFUSALS.failed }
-  }
-}
-
-/**
- * Start a new design from one of the shipped layouts.
- *
- * Every declared slot is present and empty rather than absent, because "this
- * box exists and you have not filled it" is what the editor needs in order to
- * draw something to type into.
- */
-export async function createDesign(templateId: unknown): Promise<SaveDesignState> {
-  const id = z.string().safeParse(templateId)
-  if (!id.success) return { ok: false, message: REFUSALS.unknownTemplate }
-
-  const template = templateById(id.data)
-  if (template === null) return { ok: false, message: REFUSALS.unknownTemplate }
-
-  return saveDesign({
-    title: template.label,
-    presetId: template.presetId,
-    doc: blankDocument(template.id, slotKeysOf(template)),
-  })
-}
-
-/**
- * Delete a design.
- *
- * ── THIS CASCADES NOTHING, AND THAT IS WHY THERE IS NO GATE ─────────────────
- * A picture the design exported is a row in `assets` with its own bytes in the
- * bucket, and deleting the design does not touch it. `studio_exports` loses its
- * link, which is a record of where a file came from rather than the file.
- *
- * So there is no usage check to run and no confirmation to demand. A function
- * that warned here would be inventing a consequence, which `describeTrash` in
- * `@sahoda/shared` sets out at length as the thing not to do.
- */
-export async function deleteDesign(designId: unknown): Promise<DeleteDesignState> {
-  const workspace = await workspaceForWrite()
-  if (!workspace.ok) return { ok: false, message: workspace.message }
-
-  const id = z.uuid().safeParse(designId)
-  if (!id.success) return { ok: false, message: REFUSALS.notFound }
-
-  try {
-    const supabase = createServerSupabase()
-    const { error } = await supabase
-      .from('studio_designs')
-      .delete()
-      .eq('id', id.data)
-      .eq('workspace_id', workspace.workspace.id)
-
-    if (error) return { ok: false, message: REFUSALS.deleteFailed }
-    revalidatePath('/studio')
-    return { ok: true }
-  } catch (error) {
-    reportServerError(error, { action: 'deleteDesign' })
-    return { ok: false, message: REFUSALS.deleteFailed }
-  }
-}
-
-/**
- * ─────────────────────────────────────────────────────────────────────────────
- * EXPORTING A DESIGN INTO THE ASSETS LIBRARY.
- *
- * The studio's whole purpose is a picture a person can publish, and until this
- * existed the picture lived only on the screen. The export is the point where a
- * design stops being ours and becomes a file of theirs: a row in `assets`, with
- * bytes in the bucket, judged by the Constraint Engine exactly as an uploaded
- * photo is. Nothing about it is special-cased downstream, which is deliberate.
- *
- * ── IT COSTS NO CREDITS, AND THE PAGE SAYS SO TRUTHFULLY ────────────────────
- * There is no model call anywhere in this path. Drawing is our own arithmetic.
- * `apply_ledger_entry` is not reached and no price is read.
- *
- * ── THE DETERMINISM TRAP ────────────────────────────────────────────────────
- * The same design exported twice produces byte-identical PNGs, so the second
- * press would collide with the library's duplicate refusal. `export-copy.ts`
- * turns that collision into an answer. See its header.
- */
-
-/** Where these exact bytes already live in this workspace, if anywhere. */
-async function existingCopyOf(
-  supabase: ReturnType<typeof createServerSupabase>,
-  workspaceId: string,
-  designId: string,
-  sha256: string,
-): Promise<ExistingCopy | null> {
-  // A read FAILURE returns null, which means "store it", and that is the same
-  // trade `uploadAsset` makes for the same reason: the cost of being wrong here
-  // is one redundant file a person can delete, and the cost the other way is a
-  // design they cannot export.
-  try {
-    const priorExport = await supabase
-      .from('studio_exports')
-      .select('asset_id')
-      .eq('workspace_id', workspaceId)
-      .eq('design_id', designId)
-      .eq('content_sha256', sha256)
-      .maybeSingle()
-
-    const linkedId =
-      priorExport.error || !priorExport.data ? null : (priorExport.data.asset_id as string)
-
-    if (linkedId !== null) {
-      const asset = await supabase
-        .from('assets')
-        .select('id, title, deleted_at')
-        .eq('workspace_id', workspaceId)
-        .eq('id', linkedId)
-        .maybeSingle()
-
-      if (!asset.error && asset.data) {
-        return {
-          assetId: asset.data.id as string,
-          title: typeof asset.data.title === 'string' ? asset.data.title : null,
-          trashedAt: typeof asset.data.deleted_at === 'string' ? asset.data.deleted_at : null,
-        }
-      }
-      // The export record points at a row that is gone. The cascade should make
-      // that unreachable; if it happens, the bytes are not in the library and
-      // storing them again is the correct answer rather than a dead link.
-    }
-
-    // Not exported before, or the link is gone. The bytes may still be here:
-    // another design can produce the same picture, and a person can upload one
-    // they downloaded earlier. A live row wins over a trashed one.
-    const byHash = await supabase
-      .from('assets')
-      .select('id, title, deleted_at')
-      .eq('workspace_id', workspaceId)
-      .eq('content_sha256', sha256)
-      .order('deleted_at', { ascending: true, nullsFirst: true })
-      .limit(1)
-      .maybeSingle()
-
-    if (byHash.error || !byHash.data) return null
-    return {
-      assetId: byHash.data.id as string,
-      title: typeof byHash.data.title === 'string' ? byHash.data.title : null,
-      trashedAt: typeof byHash.data.deleted_at === 'string' ? byHash.data.deleted_at : null,
-    }
-  } catch {
-    return null
-  }
-}
-
-/** Record which file a design exported to. Never the reason an export fails; see the caller. */
-async function recordExport(
-  supabase: ReturnType<typeof createServerSupabase>,
-  row: { workspace_id: string; design_id: string; asset_id: string; content_sha256: string },
-): Promise<void> {
-  const { error } = await supabase.from('studio_exports').insert(row)
-  if (error) {
-    // The FILE is in the library and the LINK is not. That is worth knowing
-    // about and is not worth failing the export over: the next press finds the
-    // same bytes by content hash and answers correctly anyway, so this heals
-    // itself. Telling the person their export failed would be false.
-    reportServerError(new Error(`studio: export record not written (${error.code ?? 'unknown'})`), {
-      action: 'exportDesign',
-    })
-  }
-}
-
-const ExportInputSchema = z.object({
-  designId: z.uuid(),
-  /** Which page of a carousel. One design, one picture per press. */
-  pageIndex: z.number().int().min(0).optional(),
-})
-
-/**
- * One page of one design, drawn and stored.
- *
- * Split out of the action because a carousel exports every slide through this
- * same body. Two copies of it would drift on the day one of them learned
- * something about duplicates, and the duplicate rule is the whole reason this
- * path is more than an upload.
- */
-async function exportOnePage(
-  supabase: ReturnType<typeof createServerSupabase>,
-  input: {
-    workspaceId: string
-    userId: string
-    design: StudioDesign
-    pageIndex: number
-    palette: Palette
-  },
-): Promise<ExportDesignState> {
-  const { workspaceId, userId, design, pageIndex, palette } = input
-  let uploadedPath: string | null = null
-
-  const template = templateById(design.doc.templateId)
-  const preset = presetById(design.preset_id)
-  const page = design.doc.pages[pageIndex]
-  if (template === null || preset === null || page === undefined) {
-    return { ok: false, message: EXPORT_REFUSALS.unreadable }
-  }
-
-  try {
-    // A picture the design points at and we cannot read is a REFUSAL, never a
-    // gap. `composeScene` would refuse anyway once the slot is absent; naming
-    // the file here is the difference between "one of your pictures could not
-    // be read" and a compose failure a person cannot act on.
-    const resolved = await resolvePageImages(page, workspaceId)
-    if (resolved.missing.length > 0) return { ok: false, message: EXPORT_REFUSALS.missingPhoto }
-
-    const composed = composeScene(template, page, {
-      width: preset.width,
-      height: preset.height,
-      palette,
-      images: resolved.images,
-    })
-    if (!composed.ok) {
-      return {
-        ok: false,
-        message: describeComposeFailure(composed.failure, (key) => slotLabelOf(template, key)),
-      }
-    }
-
-    const markup = renderSvg(composed.scene)
-    if (markup === null) return { ok: false, message: EXPORT_REFUSALS.unrenderable }
-
-    const raster = await rasterisePng(markup, { width: preset.width, height: preset.height })
-    if (!raster.ok) return { ok: false, message: EXPORT_REFUSALS.unrenderable }
-
-    const existing = await existingCopyOf(supabase, workspaceId, design.id, raster.sha256)
-    const plan = planExport(existing)
-
-    if (plan.kind !== 'store') {
-      // Nothing is uploaded and nothing is written. A design already in the
-      // library costs no storage to press again, which is half the reason the
-      // check happens before the upload rather than after it.
-      if (plan.kind === 'linked') {
-        // The bytes are live but this design may never have been recorded
-        // against them, which is how an interrupted export heals.
-        await recordExport(supabase, {
-          workspace_id: workspaceId,
-          design_id: design.id,
-          asset_id: plan.assetId,
-          content_sha256: raster.sha256,
-        })
-      }
-      return {
-        ok: true,
-        outcome: plan.kind === 'linked' ? 'already' : 'in-trash',
-        assetId: plan.assetId,
-        message: plan.message,
-      }
-    }
-
-    // Every fact about the file comes from the BYTES, not from the pipeline
-    // that produced them. Same discipline the upload path applies to a browser's
-    // claims, and it is what makes an exported picture indistinguishable from an
-    // uploaded one everywhere downstream.
-    const sniffed = sniffImage(raster.bytes)
-    if (!sniffed.ok) return { ok: false, message: EXPORT_REFUSALS.unrenderable }
-    const kind = kindForProvenMime(sniffed.image.mime)
-    if (kind === null) return { ok: false, message: EXPORT_REFUSALS.unrenderable }
-
-    const assetId = randomUUID()
-    const objectPath = assetObjectPath({ workspaceId, assetId, mime: sniffed.image.mime })
-
-    const upload = await supabase.storage.from(MEDIA_BUCKET).upload(objectPath, raster.bytes, {
-      contentType: sniffed.image.mime,
-      upsert: false,
-    })
-    if (upload.error) return { ok: false, message: EXPORT_REFUSALS.failed }
-    uploadedPath = objectPath
-
-    const row = {
-      id: assetId,
-      workspace_id: workspaceId,
-      storage_path: objectPath,
-      kind,
-      mime: sniffed.image.mime,
-      bytes: raster.bytes.byteLength,
-      width: sniffed.image.width,
-      height: sniffed.image.height,
-      // A slide is named for the design and its position, because a library of
-      // ten files all called "Diwali offer" is a library nobody can use.
-      title: titleForPage(design.title, pageIndex, design.doc.pages.length),
-      created_by: userId,
-    }
-
-    // The `42703` retry is the same deploy-safety `uploadAsset` carries: the
-    // hash column arrives with a migration a human applies, and this code can
-    // ship before that happens. Without it every export would break until the
-    // migration lands, which is strictly worse than losing duplicate detection.
-    let { data, error } = await supabase
-      .from('assets')
-      .insert({ ...row, content_sha256: raster.sha256 })
-      .select('*')
+      .select('id')
       .single()
 
-    if (error?.code === '42703') {
-      const retry = await supabase.from('assets').insert(row).select('*').single()
-      data = retry.data
-      error = retry.error
+    if (queued.error || !queued.data) {
+      return { ok: false, insufficient: false, message: REFUSALS.failed }
+    }
+    const generationId = queued.data.id as string
+
+    const traceId = randomUUID()
+    // Fresh per invocation and server-derived. A stable ref would let a second
+    // press replay a spent hold: no charge, but the paid provider call still runs.
+    const objectRef = `studio:${workspace.id}:${generationId}`
+
+    // `delivered` is what makes a charge claim honest: only the caller can know
+    // whether the callback reached its end, and the error alone cannot say.
+    let failure: string | null = null
+    let delivered = false
+    let charged = 0
+
+    const credits = await getWithCredits()(
+      { workspaceId: workspace.id, action, objectRef },
+      async (ctx: { actionType: string; creditsCharged: number }) => {
+        await supabase
+          .from('studio_generations')
+          .update({ status: 'running', started_at: new Date().toISOString() })
+          .eq('id', generationId)
+          .eq('workspace_id', workspace.id)
+
+        const result = await getMesh().runImage(
+          {
+            prompt: conditioned.prompt,
+            size: 'square',
+            // The exact canvas, not one of three ratios. Without this a story
+            // comes back landscape with nothing saying so.
+            dims: { width: format.width, height: format.height },
+          },
+          {
+            workspaceId: workspace.id,
+            traceId,
+            userId,
+            actionType: ctx.actionType,
+            creditsCharged: ctx.creditsCharged,
+          },
+        )
+        // Our own copy, never `result.error.message`: that can carry provider text.
+        if (!result.ok) {
+          failure = FAILURE_REASON.MESH_ERROR
+          throw new Error('MESH_ERROR')
+        }
+
+        const bytes = Uint8Array.from(Buffer.from(result.data.base64, 'base64'))
+        if (bytes.byteLength === 0 || bytes.byteLength > MEDIA_UPLOAD_CAP_BYTES) {
+          failure = REFUSALS.unusable
+          throw new Error('IMAGE_UNUSABLE')
+        }
+
+        // Facts, not the model's claim. `result.data.mime` is deliberately unused.
+        const sniffed = sniffImage(bytes)
+        if (!sniffed.ok) {
+          failure = REFUSALS.unusable
+          throw new Error('IMAGE_UNREADABLE')
+        }
+        const kind = kindForProvenMime(sniffed.image.mime)
+        if (kind === null) {
+          failure = REFUSALS.unusable
+          throw new Error('IMAGE_UNSUPPORTED')
+        }
+
+        const newAssetId = randomUUID()
+        const objectPath = assetObjectPath({
+          workspaceId: workspace.id,
+          assetId: newAssetId,
+          mime: sniffed.image.mime,
+        })
+        const upload = await supabase.storage.from(MEDIA_BUCKET).upload(objectPath, bytes, {
+          contentType: sniffed.image.mime,
+          upsert: false,
+        })
+        if (upload.error) {
+          failure = REFUSALS.stored
+          throw new Error('STORAGE_FAILED')
+        }
+
+        const row = await supabase.from('assets').insert({
+          id: newAssetId,
+          workspace_id: workspace.id,
+          storage_path: objectPath,
+          kind,
+          mime: sniffed.image.mime,
+          bytes: bytes.byteLength,
+          width: sniffed.image.width,
+          height: sniffed.image.height,
+          created_by: userId,
+        })
+        if (row.error) {
+          // The object is already in storage and nothing points at it. Remove it
+          // rather than leaving bytes nobody can reach or delete.
+          await supabase.storage.from(MEDIA_BUCKET).remove([objectPath])
+          failure = REFUSALS.stored
+          throw new Error('ASSET_ROW_FAILED')
+        }
+
+        charged = ctx.creditsCharged
+        await supabase.from('studio_generation_images').insert({
+          workspace_id: workspace.id,
+          generation_id: generationId,
+          idx: 0,
+          asset_id: newAssetId,
+          width: sniffed.image.width,
+          height: sniffed.image.height,
+        })
+        delivered = true
+      },
+    )
+
+    if (!credits.ok) {
+      // The hold was released, so nothing was charged. The row records the
+      // attempt and says why, because somebody who watched a spinner and got
+      // nothing is owed an explanation they can find again tomorrow.
+      await supabase
+        .from('studio_generations')
+        .update({
+          status: 'failed',
+          finished_at: new Date().toISOString(),
+          error_code: credits.error.code,
+        })
+        .eq('id', generationId)
+        .eq('workspace_id', workspace.id)
+
+      // Through the SAME mapper every other paid action uses. It decides whether
+      // a charge claim is honest from `delivered`, which only the caller knows,
+      // and it is deliberately unable to read the provider's own message.
+      return chargeFailureState({ error: credits.error, action, delivered, reason: failure })
     }
 
-    if (error || !data) {
-      await removeExportObject(supabase, uploadedPath)
-      return { ok: false, message: EXPORT_REFUSALS.failed }
-    }
+    await supabase
+      .from('studio_generations')
+      .update({
+        status: 'ready',
+        finished_at: new Date().toISOString(),
+        cost_credits: charged,
+      })
+      .eq('id', generationId)
+      .eq('workspace_id', workspace.id)
 
-    const asset = AssetSchema.safeParse(data)
-    await recordExport(supabase, {
-      workspace_id: workspaceId,
-      design_id: design.id,
-      asset_id: assetId,
-      content_sha256: raster.sha256,
-    })
-
-    return {
-      ok: true,
-      outcome: 'stored',
-      assetId: asset.success ? asset.data.id : assetId,
-      message: EXPORT_STORED,
-    }
+    revalidateBalance()
+    revalidatePath('/studio')
+    revalidatePath('/assets')
+    return { ok: true, generationId, balanceAfter: credits.data.balanceAfter }
   } catch (error) {
-    reportServerError(error, { action: 'exportDesign', workspaceId })
-    if (uploadedPath !== null) await removeExportObject(supabase, uploadedPath)
-    return { ok: false, message: EXPORT_REFUSALS.failed }
+    reportServerError(error, { action: 'queueGeneration', workspaceId })
+    return { ok: false, insufficient: false, message: REFUSALS.failed }
   }
 }
 
-/** Load a design and everything drawing it needs, scoped to the workspace writing. */
-async function designForExport(
-  supabase: ReturnType<typeof createServerSupabase>,
-  workspaceId: string,
-  designId: string,
-): Promise<{ ok: true; design: StudioDesign; palette: Palette } | { ok: false; message: string }> {
-  const read = await supabase
-    .from('studio_designs')
+/** One generation and its images, for the screen. Parsed per row. */
+export async function readGeneration(
+  id: unknown,
+): Promise<
+  | { ok: true; generation: ReturnType<typeof StudioGenerationSchema.parse> }
+  | { ok: false; message: string }
+> {
+  const parsed = z.uuid().safeParse(id)
+  if (!parsed.success) return { ok: false, message: 'That image request does not exist.' }
+
+  const ws = await workspaceForWrite()
+  if (!ws.ok) return { ok: false, message: ws.message }
+
+  const supabase = createServerSupabase()
+  const { data, error } = await supabase
+    .from('studio_generations')
     .select('*')
-    .eq('workspace_id', workspaceId)
-    .eq('id', designId)
+    .eq('workspace_id', ws.workspace.id)
+    .eq('id', parsed.data)
     .maybeSingle()
 
-  if (read.error) return { ok: false, message: EXPORT_REFUSALS.unreadable }
-  if (!read.data) return { ok: false, message: EXPORT_REFUSALS.notFound }
+  if (error) return { ok: false, message: 'Sahoda could not read that image request just now.' }
+  if (!data) return { ok: false, message: 'That image request does not exist.' }
 
-  const design = StudioDesignSchema.safeParse(read.data)
-  if (!design.success) return { ok: false, message: EXPORT_REFUSALS.unreadable }
-
-  const tokens = await activeThemeTokens(workspaceId)
-  return { ok: true, design: design.data, palette: studioPalette(tokens).palette }
-}
-
-export async function exportDesign(input: unknown): Promise<ExportDesignState> {
-  const { userId } = await auth()
-  if (!userId) return { ok: false, message: 'Sign in to export a design.' }
-
-  const ws = await workspaceForWrite()
-  if (!ws.ok) return { ok: false, message: ws.message }
-
-  const parsed = ExportInputSchema.safeParse(input)
-  if (!parsed.success) return { ok: false, message: EXPORT_REFUSALS.notFound }
-
-  const supabase = createServerSupabase()
-  const loaded = await designForExport(supabase, ws.workspace.id, parsed.data.designId)
-  if (!loaded.ok) return loaded
-
-  const result = await exportOnePage(supabase, {
-    workspaceId: ws.workspace.id,
-    userId,
-    design: loaded.design,
-    pageIndex: parsed.data.pageIndex ?? 0,
-    palette: loaded.palette,
-  })
-
-  if (result.ok && result.outcome === 'stored') {
-    revalidatePath('/assets')
-    revalidatePath('/studio')
-  }
-  return result
-}
-
-/**
- * Every slide of a carousel, in one press.
- *
- * ── A SLIDE THAT FAILS DOES NOT UNDO THE ONES THAT WORKED ───────────────────
- * Each page is its own file and its own row, so there is nothing to roll back
- * and rolling back would be the wrong act anyway: deleting four good pictures
- * because the fifth would not draw destroys work over a problem the person can
- * fix. What matters is that the sentence afterwards is exact about which
- * slides are in the library and which are not, and `describeBatchExport` is
- * where that is argued and tested.
- *
- * Sequential rather than parallel, deliberately. Each page rasterises a full
- * canvas through sharp and uploads it; ten at once on a small server instance
- * is a memory spike for a person who would not notice the difference in speed.
- */
-export async function exportDesignPages(designId: unknown): Promise<ExportPagesState> {
-  const { userId } = await auth()
-  if (!userId) return { ok: false, message: 'Sign in to export a design.' }
-
-  const ws = await workspaceForWrite()
-  if (!ws.ok) return { ok: false, message: ws.message }
-
-  const id = z.uuid().safeParse(designId)
-  if (!id.success) return { ok: false, message: EXPORT_REFUSALS.notFound }
-
-  const supabase = createServerSupabase()
-  const loaded = await designForExport(supabase, ws.workspace.id, id.data)
-  if (!loaded.ok) return loaded
-
-  const pages: PageExport[] = []
-  for (let pageIndex = 0; pageIndex < loaded.design.doc.pages.length; pageIndex += 1) {
-    const result = await exportOnePage(supabase, {
-      workspaceId: ws.workspace.id,
-      userId,
-      design: loaded.design,
-      pageIndex,
-      palette: loaded.palette,
+  const row = StudioGenerationSchema.safeParse(data)
+  if (!row.success) {
+    reportServerError(new Error('studio: generation row did not parse'), {
+      action: 'readGeneration',
     })
-    pages.push(
-      result.ok
-        ? { pageIndex, ok: true, outcome: result.outcome, assetId: result.assetId }
-        : { pageIndex, ok: false, message: result.message },
-    )
+    return { ok: false, message: 'Sahoda could not read that image request just now.' }
   }
-
-  if (pages.some((page) => page.ok && page.outcome === 'stored')) {
-    revalidatePath('/assets')
-    revalidatePath('/studio')
-  }
-
-  return { ok: true, pages, message: describeBatchExport(pages) }
-}
-
-/** Undo a partial export. A stored object with no row is a file nobody can reach or delete. */
-async function removeExportObject(
-  supabase: ReturnType<typeof createServerSupabase>,
-  path: string,
-): Promise<void> {
-  try {
-    await supabase.storage.from(MEDIA_BUCKET).remove([path])
-  } catch {
-    // The row was never written, so the object is unreachable rather than
-    // dangling in front of anybody. Reporting a cleanup failure over the
-    // original one would bury the reason the export failed.
-  }
-}
-
-/**
- * The bytes of one picture, for the editor's preview.
- *
- * ── WHY THE EDITOR CANNOT JUST USE THE PICKER'S URL ─────────────────────────
- * The preview is the SAME SVG string the export rasterises, and the renderer
- * refuses any href that is not a data URI. A signed URL in the preview would
- * make the picture appear on screen and vanish from the exported file, which is
- * the exact class of failure the studio is built to make impossible.
- *
- * Fetched on demand rather than embedded in the page: a design with a 5 MB
- * photo would otherwise put 7 MB of base64 into the HTML of every visit.
- */
-export async function designPhoto(assetId: unknown): Promise<DesignPhotoState> {
-  const id = z.uuid().safeParse(assetId)
-  if (!id.success) return { ok: false, message: PHOTO_REFUSAL }
-
-  const workspace = await activeWorkspaceRead()
-  if (workspace.status !== 'ok') return { ok: false, message: PHOTO_REFUSAL }
-
-  const dataUri = await imageDataUri(id.data, workspace.workspace.id)
-  if (dataUri === null) return { ok: false, message: PHOTO_REFUSAL }
-  return { ok: true, dataUri }
-}
-
-/**
- * ─────────────────────────────────────────────────────────────────────────────
- * A CUSTOMER'S OWN STARTING POINTS.
- *
- * `template-copy.ts` carries the product argument. What matters here is that
- * these are two DIFFERENT acts and neither pretends to be the other: keeping a
- * design as a starting point MOVES it between shelves and copies nothing;
- * starting from one COPIES it and leaves the original alone.
- */
-
-/**
- * Keep this design as a starting point, or stop.
- *
- * A one-column update rather than a `saveDesign` round trip, and that is not
- * tidiness: `saveDesign` writes the whole row from what the browser holds, so
- * using it here would push the editor's in-memory document back over the stored
- * one as a side effect of ticking a box. Someone with an older tab open would
- * silently overwrite a newer save.
- */
-export async function setDesignTemplate(input: unknown): Promise<TemplateFlagState> {
-  const parsed = z.object({ designId: z.uuid(), isTemplate: z.boolean() }).safeParse(input)
-  if (!parsed.success) return { ok: false, message: TEMPLATE_REFUSALS.notFound }
-
-  const workspace = await workspaceForWrite()
-  if (!workspace.ok) return { ok: false, message: workspace.message }
-
-  try {
-    const supabase = createServerSupabase()
-    const { data, error } = await supabase
-      .from('studio_designs')
-      .update({ is_template: parsed.data.isTemplate })
-      .eq('id', parsed.data.designId)
-      .eq('workspace_id', workspace.workspace.id)
-      .select('is_template')
-      .single()
-
-    if (error || !data) return { ok: false, message: TEMPLATE_REFUSALS.flagFailed }
-
-    // The value that LANDED, read back, rather than the one that was asked for.
-    // A toggle that shows what it requested is a toggle that lies on the day the
-    // write is refused.
-    const isTemplate = data.is_template === true
-
-    revalidatePath('/studio')
-    return {
-      ok: true,
-      isTemplate,
-      message: isTemplate ? TEMPLATE_KEPT : TEMPLATE_RELEASED,
-    }
-  } catch (error) {
-    reportServerError(error, { action: 'setDesignTemplate' })
-    return { ok: false, message: TEMPLATE_REFUSALS.flagFailed }
-  }
-}
-
-/**
- * Start a new design from one of this workspace's own starting points.
- *
- * ── A COPY, AND THE ORIGINAL IS NOT TOUCHED ────────────────────────────────
- * The whole document is carried over: the words, and the asset ids of the
- * pictures. The two rows are independent from this moment, so editing the copy
- * never changes the starting point. Nothing is charged and no model is called.
- *
- * The pictures are referenced rather than duplicated, which is deliberate: two
- * designs pointing at one photograph is what the library is for, and copying
- * bytes would bill a person twice for the same file. It also means trashing
- * that photograph affects both, which is the same thing that was already true
- * of any two designs using one picture.
- */
-export async function startFromTemplate(designId: unknown): Promise<SaveDesignState> {
-  return copyOfDesign(designId, (title) => title, 'startFromTemplate')
-}
-
-/**
- * Duplicate a design, under a name that says it is a duplicate.
- *
- * The same copy `startFromTemplate` makes, and the difference is entirely the
- * NAME. A starting point and the design begun from it live on separate shelves,
- * so one title on both is unambiguous; a duplicate sits in the gallery beside
- * its original, where two identical cards can only be told apart by opening
- * both. `copyTitle` also keeps the new name inside what `TitleSchema` accepts,
- * which a title already at the limit would otherwise break.
- */
-export async function duplicateDesign(designId: unknown): Promise<SaveDesignState> {
-  return copyOfDesign(designId, copyTitle, 'duplicateDesign')
-}
-
-/**
- * Read one design and write a new one from it.
- *
- * Shared by both callers so a copy cannot drift into two behaviours. Pictures
- * are REFERENCED rather than duplicated: copying the bytes would bill somebody
- * twice for one file, and the new design points at the same rows in `assets`.
- */
-async function copyOfDesign(
-  designId: unknown,
-  nameIt: (title: string) => string,
-  action: string,
-): Promise<SaveDesignState> {
-  const id = z.uuid().safeParse(designId)
-  if (!id.success) return { ok: false, message: TEMPLATE_REFUSALS.notFound }
-
-  const workspace = await workspaceForWrite()
-  if (!workspace.ok) return { ok: false, message: workspace.message }
-
-  try {
-    const supabase = createServerSupabase()
-    const read = await supabase
-      .from('studio_designs')
-      .select('*')
-      .eq('workspace_id', workspace.workspace.id)
-      .eq('id', id.data)
-      .maybeSingle()
-
-    if (read.error) return { ok: false, message: TEMPLATE_REFUSALS.unreadable }
-    if (!read.data) return { ok: false, message: TEMPLATE_REFUSALS.notFound }
-
-    const source = StudioDesignSchema.safeParse(read.data)
-    if (!source.success) return { ok: false, message: TEMPLATE_REFUSALS.unreadable }
-
-    // Written through `saveDesign` rather than a second insert, so the copy
-    // passes the same template and preset checks a new design does. A starting
-    // point saved before a layout was retired must not produce a design nobody
-    // can open.
-    return saveDesign({
-      title: nameIt(source.data.title),
-      presetId: source.data.preset_id,
-      doc: source.data.doc,
-      isTemplate: false,
-    })
-  } catch (error) {
-    reportServerError(error, { action })
-    return { ok: false, message: TEMPLATE_REFUSALS.copyFailed }
-  }
+  return { ok: true, generation: row.data }
 }

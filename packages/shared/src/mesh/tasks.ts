@@ -361,6 +361,30 @@ export const ImageGenerateInputSchema = z.object({
   prompt: z.string().min(3).max(1000),
   /** Square by default — see IMAGE_SIZES. */
   size: z.enum(['square', 'portrait', 'landscape']).default('square'),
+  /**
+   * AN EXACT CANVAS, WHEN THE CALLER HAS ONE, AND WHY THIS EXISTS.
+   *
+   * The three named sizes cover three aspect ratios: 1.0, 0.8 and 1.25. The
+   * Studio's own canvases (`studio/presets.ts`) need six, and three of those
+   * six have no named size that matches: a story is 0.5625, a wide post is
+   * 1.78, a link card is 1.91. Asking for `landscape` and calling the answer a
+   * story returns a picture of the wrong shape with nothing saying so, which is
+   * exactly the class of silent substitution this codebase refuses elsewhere.
+   *
+   * Optional and additive: every existing caller passes `size` and is
+   * unaffected. When `dims` is present it WINS, and `size` is ignored.
+   *
+   * The bounds are the provider's, not a product rule. The floor is above
+   * instagram's 320×320 `imageDims` minimum so a generated file cannot fail
+   * publishing for being too small; the ceiling is what image endpoints
+   * generally accept.
+   */
+  dims: z
+    .object({
+      width: z.number().int().min(512).max(2048),
+      height: z.number().int().min(512).max(2048),
+    })
+    .optional(),
 })
 export type ImageGenerateInput = z.infer<typeof ImageGenerateInputSchema>
 

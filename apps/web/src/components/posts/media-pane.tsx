@@ -14,7 +14,6 @@ import { InlineNote } from './inline-error'
 import { LibraryPicker } from './library-picker'
 import { MediaAttach } from './media-attach'
 import { MediaRemoveButton } from './media-remove-button'
-import { StudioLink } from './studio-link'
 
 export interface MediaPaneProps {
   media: PostMedia[]
@@ -215,17 +214,17 @@ export function MediaPane({
 
       <LibraryPicker postId={postId} channels={channels} />
 
-      {/* ── WHERE PICTURES ARE MEANT TO COME FROM ────────────────────────────
-          Above the generator, because it is the answer: image work belongs in
-          Studio, not in a prompt box on a writing screen. `studio-link.tsx`
-          carries the full reasoning, including why the generator below it is
-          still here rather than deleted. */}
-      <StudioLink />
+      {/* ── THE GENERATOR IS STILL HERE, AND THAT IS TEMPORARY ───────────────
+          The Studio is being rebuilt as the generative layer and is meant to be
+          the ONLY place media enters the product, at which point this block and
+          its prompt box leave the writing screen for good.
 
-      {/* Below all three on purpose: bringing your own photo is the ordinary path
-          and costs nothing, Studio is where the work belongs, and generating from
-          a sentence is the paid fallback that happens to be the only one of the
-          three that can produce a file today. */}
+          It is still mounted because removing it first would leave a window in
+          which nothing in the product can make an image at all, and because the
+          two spend-at-zero guards that cover it (`ai-zero-balance.test.tsx` and
+          `spend-at-zero.test.tsx`) are the only tests in the repository proving
+          a paid action refuses honestly at a zero balance. Those move to the
+          Studio's own generator rather than being deleted. */}
       <GenerateImage postId={postId} />
 
       {/* ── BOTH OF THESE ARE ABOUT A PHOTO, SO THEY WAIT FOR ONE ─────────────
