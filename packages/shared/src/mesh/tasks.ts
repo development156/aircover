@@ -385,6 +385,19 @@ export const ImageGenerateInputSchema = z.object({
       height: z.number().int().min(512).max(2048),
     })
     .optional(),
+  /**
+   * PICTURES TO CONDITION ON, as links or data URLs.
+   *
+   * OpenRouter's Images API takes these as `input_references` and states they
+   * may be HTTP(S) URLs or base64 (docs/43 §2). This is what "make more like
+   * this one" is built on.
+   *
+   * The ceiling is the MODEL's, not a product rule: the capability endpoint
+   * reports 3 on `gemini-2.5-flash-image` and 14 on Seedream 4.5. Bounded at 14
+   * here so a malformed request cannot send a hundred, and bounded lower by
+   * `MAX_REFERENCES` where the product knows which model it routes to.
+   */
+  references: z.array(z.string().min(1)).max(14).optional(),
 })
 export type ImageGenerateInput = z.infer<typeof ImageGenerateInputSchema>
 

@@ -5,7 +5,7 @@ import { creditCost, toChannelSet } from '@sahoda/shared'
 
 import { GeneratePanel } from './generate-panel'
 import { InlineRewrite } from './inline-rewrite'
-import { GenerateForm } from '@/components/studio/generate-form'
+import { StudioWorkbench } from '@/components/studio/studio-workbench'
 import { generatableFormats } from '@/lib/studio/formats'
 
 /**
@@ -117,7 +117,13 @@ describe('making a picture, which now lives in the Studio', () => {
    * it: what is being protected is the REFUSAL, and the refusal moved.
    */
   test('names the price before the press, and picks the CHEAPER tier', () => {
-    render(<GenerateForm formats={generatableFormats()} cost={creditCost('image_standard')} />)
+    render(
+      <StudioWorkbench
+        formats={generatableFormats()}
+        cost={creditCost('image_standard')}
+        library={[]}
+      />,
+    )
     // `MESH_TASK_ACTION.image_generate` maps to `image_standard` (6), not
     // `image_premium` (12): a customer who asked for "a picture" and was charged
     // for a tier they never chose has been overcharged, and the reverse never
@@ -127,7 +133,13 @@ describe('making a picture, which now lives in the Studio', () => {
   })
 
   test('refuses with both numbers, and says nothing was charged', async () => {
-    render(<GenerateForm formats={generatableFormats()} cost={creditCost('image_standard')} />)
+    render(
+      <StudioWorkbench
+        formats={generatableFormats()}
+        cost={creditCost('image_standard')}
+        library={[]}
+      />,
+    )
     await userEvent.type(screen.getByPlaceholderText(/plate of fresh samosas/i), 'a cup of chai')
     await userEvent.click(screen.getByRole('button', { name: /make this picture/i }))
     await screen.findByText(/needs/i)

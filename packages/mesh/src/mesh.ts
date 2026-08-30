@@ -203,6 +203,7 @@ export function createMesh(opts: CreateMeshOptions = {}): Mesh {
         prompt: `${parsed.data.prompt}\n\nRender at ${size.width}x${size.height} pixels.`,
         width: size.width,
         height: size.height,
+        references: parsed.data.references,
       },
       ctx,
     )
