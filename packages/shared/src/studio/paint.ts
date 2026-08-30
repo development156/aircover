@@ -161,3 +161,21 @@ export function hexOf(paint: Paint): string | null {
   const pair = (channel: number): string => Math.round(channel).toString(16).padStart(2, '0')
   return `#${pair(paint.r)}${pair(paint.g)}${pair(paint.b)}`
 }
+
+/**
+ * THE FIVE ROLES A RENDERED IMAGE PAINTS WITH.
+ *
+ * Moved here from `template.ts` when the slot-based design editor was removed.
+ * These are RENDERING concepts, not design-document ones: a palette is what the
+ * server resolves a workspace's brand into before it draws anything, and it
+ * outlives the editor that first needed it. `lib/studio/palette.ts` builds one
+ * from `workspace_themes.tokens`, and the text-overlay layer will paint with
+ * exactly these five and no more.
+ *
+ * Five, deliberately. A sixth role is a decision about the brand that nobody
+ * made, and the Readability Guard grades pairs drawn from this set.
+ */
+export type PaletteRole = 'paper' | 'ink' | 'muted' | 'accent' | 'accentInk'
+
+/** Real colours for those roles, resolved from the workspace brand by the caller. */
+export type Palette = Record<PaletteRole, Paint>

@@ -188,7 +188,11 @@ export function createMesh(opts: CreateMeshOptions = {}): Mesh {
         error: appError('VALIDATION_ERROR', 'invalid image prompt', ctx.traceId),
       }
     }
-    const size = IMAGE_SIZES[parsed.data.size]
+    // `dims` wins when the caller gave one. A named size is a convenience for
+    // callers that do not care; a caller that DOES care about the shape has
+    // already worked out the exact canvas and must not have it rounded to one
+    // of three ratios.
+    const size = parsed.data.dims ?? IMAGE_SIZES[parsed.data.size]
     return runner.runImage(
       imageGenerateDef,
       // The size rides in the prompt as well as the structured field: not every
