@@ -125,7 +125,40 @@ export function skinCss(theme: ThemeTokens | null, scope: string = SKIN_SCOPE): 
       .map(([name, value]) => `${name}:${value}`)
       .join(';')}}`
 
-  return `${rule(scope, 'light')}${rule(`${scope}[data-theme='dark']`, 'dark')}`
+  /**
+   * ── AND THE RAIL, WHICH IS THE LARGEST SURFACE IN THE PRODUCT ─────────────
+   * Founder's ruling, 2026-08-30, after an adversarial review found the rail
+   * unreachable. `tokens.css`'s `[data-surface='inverse']` re-declares the whole
+   * dark ladder AND the `--bg`/`--s1`/`--s2` aliases ON THE ELEMENT ITSELF, so a
+   * rule on `:root` cannot reach inside it. At 62px collapsed and ~245px
+   * expanded the rail is roughly ten times the entire accent budget of the
+   * loudest screen, and it stayed Sahoda-dark while everything around it took
+   * the customer's hue.
+   *
+   * ALWAYS THE DARK GRADING, in both themes, because the rail is dark in both.
+   * That is not a detail. `--p`, `--pfg` and `--pstrong` are NOT among the tokens
+   * the inverse scope re-declares, so they were inheriting the LIGHT grading — a
+   * primary chosen to sit on white, painted on `#171717`. For a navy brand that
+   * is L 0.22 on an L 0.22 ground, which is exactly the invisible fill the
+   * fill-on-page guard was added to end, surviving in the one scope that guard
+   * cannot see.
+   *
+   * `--line` is deliberately NOT overridden. The inverse scope sets it to
+   * `rgba(255,255,255,0.1)`, an alpha rule that is hue-neutral and correct over
+   * any ground; replacing it with an opaque tint would change how the rail's
+   * hairlines behave, which is more than "follow the brand".
+   */
+  const railVars: Record<string, string> = {
+    ...brandSkinVars(colors, 'dark'),
+    ...brandNeutralVars(colors, 'dark'),
+  }
+  delete railVars['--line']
+
+  const rail = `${scope} [data-surface='inverse']{${Object.entries(railVars)
+    .map(([name, value]) => `${name}:${value}`)
+    .join(';')}}`
+
+  return `${rule(scope, 'light')}${rule(`${scope}[data-theme='dark']`, 'dark')}${rail}`
 }
 
 /**
