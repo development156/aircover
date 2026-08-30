@@ -131,11 +131,16 @@ export function BrandPanel({
         const form = new FormData()
         form.set('file', file)
         form.set('title', 'Logo')
-        const { uploadAsset } = await import('@/app/actions/assets')
-        const stored = await uploadAsset(form)
+        /**
+         * `setBrandLogo`, not `uploadAsset`. The library refuses a duplicate by
+         * content hash, which is right for a library and fatal here: the
+         * founder's logo was ALREADY in his library under its file name, so the
+         * one action that could make it findable was the one guaranteed to
+         * fail. `setBrandLogo` adopts those bytes instead of refusing them.
+         */
+        const { setBrandLogo } = await import('@/app/actions/brand-logo')
+        const stored = await setBrandLogo(form)
         if (!stored.ok) {
-          // The refusal names the file and, for a duplicate, points at where the
-          // existing copy is. It is more useful than anything composed here.
           setFailed(stored.message)
           return
         }
@@ -268,6 +273,20 @@ export function BrandPanel({
         className="sr-only"
         onChange={(e) => {
           const file = e.target.files?.[0]
+          /**
+           * ── THE VALUE IS CLEARED, AND THAT IS THE WHOLE SECOND BUG ────────
+           * A file input fires `change` only when its VALUE changes. Choosing
+           * the same file twice does not change it, so the second press and
+           * every press after it fired NOTHING: no handler, no request, no
+           * error, not a single line in the network tab.
+           *
+           * That is what "still not working" was. The founder was re-choosing
+           * the same logo to test, so after the first attempt he was clicking a
+           * control that had been inert since the moment he picked that file.
+           * The previous commit made the first attempt report its refusal and
+           * could not have helped with any attempt after it.
+           */
+          e.target.value = ''
           if (file) replace(file)
         }}
       />

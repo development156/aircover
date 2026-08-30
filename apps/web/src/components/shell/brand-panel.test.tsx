@@ -20,10 +20,12 @@ import { BrandPanel } from './brand-panel'
 
 const saveWorkspaceTheme = vi.hoisted(() => vi.fn())
 const uploadAsset = vi.hoisted(() => vi.fn())
+const setBrandLogo = vi.hoisted(() => vi.fn())
 const extractPalette = vi.hoisted(() => vi.fn())
 
 vi.mock('@/app/actions/theme', () => ({ saveWorkspaceTheme }))
 vi.mock('@/app/actions/assets', () => ({ uploadAsset }))
+vi.mock('@/app/actions/brand-logo', () => ({ setBrandLogo }))
 /* Loaded with `await import` inside the component, not at the top: it renders in
    the shell, so a top-level import is 9.8 kB on every page. `vi.mock` covers a
    dynamic import of the same specifier. */
@@ -61,6 +63,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   saveWorkspaceTheme.mockResolvedValue({ ok: true })
   uploadAsset.mockResolvedValue({ ok: true })
+  setBrandLogo.mockResolvedValue({ ok: true, adopted: false })
   // A real extraction: one colour the brand cannot use, two it can.
   extractPalette.mockReturnValue([GREY, BLUE, TEAL])
   // jsdom never fires load on an <img>, so the decode is resolved here.
@@ -179,9 +182,9 @@ describe('the brand mark', () => {
    */
   it('shows why the upload was refused, and does not close', async () => {
     const onClose = vi.fn()
-    uploadAsset.mockResolvedValue({
+    setBrandLogo.mockResolvedValue({
       ok: false,
-      message: 'You already have this file, named shopfront.png.',
+      message: 'Sahoda could not check your library. Try again.',
     })
     render(panel({ onClose }))
 
@@ -191,7 +194,7 @@ describe('the brand mark', () => {
     const file = new File([new Uint8Array([1, 2, 3])], 'logo.png', { type: 'image/png' })
     await userEvent.upload(input!, file)
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/already have this file/i)
+    expect(await screen.findByRole('alert')).toHaveTextContent(/could not check your library/i)
     expect(onClose, 'a refused upload must not look like a success').not.toHaveBeenCalled()
   })
 
@@ -267,11 +270,57 @@ describe('the brand mark', () => {
     expect(document.querySelector('input[type="color"]')).toBeNull()
   })
 
+  /**
+   * ── THE SAME FILE, TWICE ──────────────────────────────────────────────────
+   * A file input fires `change` only when its VALUE changes, so choosing the
+   * same file again fired NOTHING — no handler, no request, no error. The
+   * founder was re-choosing the same logo to test, so every attempt after the
+   * first was a press on a control that had gone inert.
+   *
+   * This is the guard for the clear. Without it the second upload never
+   * happens, and the test is the only place that would notice, because the
+   * browser reports nothing at all.
+   */
+  it('accepts the same file twice, which is how anyone retries', async () => {
+    render(panel())
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!
+    const file = new File([new Uint8Array([1, 2, 3])], 'logo.png', { type: 'image/png' })
+
+    await userEvent.upload(input, file)
+    await vi.waitFor(() => expect(setBrandLogo).toHaveBeenCalledTimes(1))
+    expect(input.value, 'the value must be cleared or `change` cannot fire again').toBe('')
+
+    await userEvent.upload(input, file)
+    await vi.waitFor(() => expect(setBrandLogo).toHaveBeenCalledTimes(2))
+  })
+
+  /**
+   * THE LIBRARY'S DUPLICATE RULE MUST NOT REACH THIS CONTROL. `uploadAsset`
+   * refuses bytes it already holds, which is right for a media library and
+   * fatal for "this is my logo": the founder's logo was already in his library
+   * under its file name, so the one action that could make it findable was the
+   * one guaranteed to fail.
+   */
+  it('goes through setBrandLogo, which adopts bytes already in the library', async () => {
+    render(panel())
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!
+    await userEvent.upload(
+      input,
+      new File([new Uint8Array([9])], 'logo.png', { type: 'image/png' }),
+    )
+
+    await vi.waitFor(() => expect(setBrandLogo).toHaveBeenCalledTimes(1))
+    expect(
+      uploadAsset,
+      'the library action refuses duplicates and must not be it',
+    ).not.toHaveBeenCalled()
+  })
+
   it('spends nothing and writes nothing just by being opened', async () => {
     render(panel())
     await screen.findAllByRole('button', { name: /use this colour/i })
 
     expect(saveWorkspaceTheme).not.toHaveBeenCalled()
-    expect(uploadAsset).not.toHaveBeenCalled()
+    expect(setBrandLogo).not.toHaveBeenCalled()
   })
 })
