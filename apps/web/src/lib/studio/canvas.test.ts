@@ -21,6 +21,7 @@ const generation = (over: Partial<GenerationCard['generation']> = {}) =>
     prompt_sent: 'a plate of samosas, warm light',
     format_id: 'square',
     brand_signals: [],
+    reference_asset_ids: [],
     ...over,
   }) as GenerationCard['generation']
 

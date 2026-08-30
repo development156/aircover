@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { credits, describeInsufficient, describePartial } from './refusal-copy'
+import { credits, describeCopyFailure, describeInsufficient, describePartial } from './refusal-copy'
 
 /**
  * THE REFUSAL A FUNDED WORKSPACE NEVER SEES.
@@ -93,5 +93,39 @@ describe('a partial result', () => {
 
   test('carries no em dash, which is the standing ruling for prose', () => {
     expect(describePartial({ made: 2, asked: 4 }) ?? '').not.toMatch(/[—–]/)
+  })
+})
+
+describe('a picture that would not copy', () => {
+  test('a copy that worked says nothing, because the button already did', () => {
+    expect(describeCopyFailure('copied')).toBeNull()
+  })
+
+  /**
+   * THE ONE THAT MATTERS. "This browser will not" and "that did not work" have
+   * DIFFERENT remedies. Collapsing them sends half the people who see this to a
+   * remedy that cannot work, which is the thing this product forbids by name.
+   */
+  test('a browser that will not, and a try that failed, are different sentences', () => {
+    const cannot = describeCopyFailure('unsupported')
+    const failed = describeCopyFailure('failed')
+    expect(cannot).not.toBe(failed)
+    expect(cannot).toMatch(/save it to your computer instead/i)
+    expect(failed).toMatch(/trying again/i)
+  })
+
+  /** Retrying a browser that will never do it is a remedy that cannot work. */
+  test('the unsupported sentence never suggests trying again', () => {
+    expect(describeCopyFailure('unsupported')).not.toMatch(/try again|trying again/i)
+  })
+
+  test('neither sentence suggests the picture is lost', () => {
+    expect(describeCopyFailure('failed')).toMatch(/safe in your library/i)
+  })
+
+  test('carries no em dash, which is the standing ruling for prose', () => {
+    for (const result of ['unsupported', 'failed'] as const) {
+      expect(describeCopyFailure(result) ?? '').not.toMatch(/[—–]/)
+    }
   })
 })

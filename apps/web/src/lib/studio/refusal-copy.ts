@@ -58,3 +58,23 @@ export function describePartial(input: { made: number; asked: number }): string 
     one ? 'one that arrived' : 'ones that arrived'
   } and for nothing else.`
 }
+
+/**
+ * What to say when a picture could not be put on the clipboard.
+ *
+ * ── THREE OUTCOMES, AND TWO OF THEM ARE NOT THE PICTURE'S FAULT ─────────────
+ * "Unsupported" means this browser will not take a picture at all, and the
+ * remedy is to save the file instead. "Failed" means it should have worked and
+ * did not, and the remedy is to try again. Collapsing them sends half the people
+ * who see this to a remedy that cannot work, which is the thing this product
+ * forbids by name.
+ *
+ * Null on success: a confirmation is the button's job, not a sentence's.
+ */
+export function describeCopyFailure(result: 'copied' | 'unsupported' | 'failed'): string | null {
+  if (result === 'copied') return null
+  if (result === 'unsupported') {
+    return 'This browser will not let a page copy a picture. Save it to your computer instead, and it is yours to paste anywhere.'
+  }
+  return 'Sahoda could not copy that picture just now. It is safe in your library, and trying again usually works.'
+}
