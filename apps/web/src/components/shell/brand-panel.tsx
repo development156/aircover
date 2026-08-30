@@ -246,15 +246,19 @@ export function BrandPanel({
         ) : null}
         <p className="type-sm text-ink">Your brand colours</p>
       </div>
-      {/* THE CLAIM TRACKS THE MECHANISM, WHICH HAS MOVED TWICE IN A DAY. It once
-          read "every button and link follows it" while the paint was
-          unconditional, then named two places while it was confined to the mark.
-          Both were true when written and false a few hours later. What is true
-          now: the colour paints the product WHILE the switch is on, and the
-          light and dark themes are a different switch. */}
+      {/* ── ONE LINE, AND EVERY CLAIM IN IT SURVIVED ──────────────────────────
+          Founder's report, 2026-08-30: "it is too wordy". Three body paragraphs
+          for a panel with three controls in it.
+
+          The long version said the colour came from the logo, that buttons and
+          links follow the one you choose, and that this holds while the brand is
+          switched on. The third of those is stated OUTRIGHT by the row below,
+          which reads "Brand colours are on" — so dropping it from here loses no
+          claim, and rule 1 is about claims rather than words. What went is the
+          mechanism ("the colour it saw most of"), which is our arithmetic and
+          not the reader's situation. */}
       <p className="type-xs mt-1 text-muted">
-        Sahoda picked the colour it saw most of in your logo. Choose another and your buttons and
-        links follow it while the brand is switched on.
+        Picked from your logo. Buttons and links follow the one you choose.
       </p>
 
       {/* ── THE COLOURS COME FIRST ────────────────────────────────────────────
@@ -302,11 +306,10 @@ export function BrandPanel({
       {monochrome ? (
         <div className="mt-3">
           <p className="type-xs text-muted">
-            Your logo is greys and blacks, so Sahoda found no brand colour in it. Pick one and
-            everything follows it.
+            Your logo is greys and blacks. Pick a colour and everything follows it.
           </p>
           <label className="surface-ring mt-2 flex items-center justify-between gap-2 rounded-control p-2">
-            <span className="type-xs text-ink">Pick your brand colour</span>
+            <span className="type-xs text-ink">Pick a colour</span>
             <input
               type="color"
               disabled={busy}
@@ -329,29 +332,24 @@ export function BrandPanel({
           guess that the way out is the button they just walked past, and because
           this is the only place that can say which state they are in.
 
-          `flex-wrap`: at 280px "Your brand colours are on" beside "Use Sahoda
-          colours" does not fit on one line, and without this the two were
-          squeezed into a ragged two-line span with the button jammed against it.
-          Wrapping puts the button on its own line instead. */}
+          A RULE, NOT A BOX. It was a bordered card with its own padding, which
+          made the rarest control in the panel the heaviest object in it. A hair
+          line separates it just as well and gives back the two lines the box
+          cost. `flex-wrap` stays: the pair can still overflow 280px in a wider
+          text size, and wrapping is a better failure than squeezing.
+
+          "Brand colours are on", not "Your brand colours are on". Same claim,
+          one line rather than two, and the heading four lines up already says
+          whose they are. */}
       {hasTheme ? (
-        <div className="surface-ring mt-3 flex flex-wrap items-center justify-between gap-2 rounded-control p-2">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
           <span className="type-xs text-ink">
-            {skinOn ? 'Your brand colours are on' : 'Sahoda colours are on'}
+            {skinOn ? 'Brand colours are on' : 'Sahoda colours are on'}
           </span>
           <Button variant="secondary" disabled={busy} onClick={onToggleSkin}>
             {skinOn ? 'Use Sahoda colours' : 'Use my colours'}
           </Button>
         </div>
-      ) : null}
-
-      {/* SAID NEXT TO THE SWITCH IT IS ABOUT. As the last line of the opening
-          paragraph it read as "light and dark stay on the moon", which assumes
-          the reader already knows the moon is the theme control. It belongs
-          beside the one switch a person might mistake for that one. */}
-      {hasTheme ? (
-        <p className="type-xs mt-1 text-muted">
-          The sun and moon in the top bar still switch light and dark.
-        </p>
       ) : null}
 
       {failed ? (
@@ -364,16 +362,12 @@ export function BrandPanel({
           uploaded a vector should not have to discover from the media library
           that Sahoda holds a picture of it. */}
       {converted ? (
-        <p className="type-xs mt-3 text-muted">
-          Sahoda saved your SVG as a high-resolution image, which is what social channels and image
-          generation can use.
-        </p>
+        <p className="type-xs mt-3 text-muted">Sahoda saved your SVG as a high-resolution image.</p>
       ) : null}
 
       {unreadable ? (
         <p className="type-xs mt-3 text-muted">
-          Sahoda could not read the colours out of your logo from here. Add it again below and it
-          will read them as the file uploads.
+          Sahoda could not read the colours from your logo. Replace it below and it will try again.
         </p>
       ) : null}
 
