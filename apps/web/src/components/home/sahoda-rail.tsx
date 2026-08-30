@@ -3,7 +3,7 @@ import type { Post } from '@sahoda/shared'
 
 import { AgencyBlade } from '@/components/posts/agency-blade'
 import { buttonVariants } from '@/components/ui/button'
-import { CardLabel } from '@/components/ui/card'
+import { HomeSection } from '@/components/home/section'
 import { creditWord } from '@/lib/credit-words'
 
 /**
@@ -28,9 +28,22 @@ export interface SahodaRailProps {
 
 export function SahodaRail({ drafted, planCost }: SahodaRailProps) {
   return (
-    <section aria-label="What Sahoda did this week">
-      <CardLabel>This week, from Sahoda</CardLabel>
+    /* ── IT IS A NAMED SECTION NOW, NOT A LABELLED BOX ────────────────────────
+       This rendered a `CardLabel` inside a `Card`, so the one region of Home
+       that reports what SAHODA did was the only one with no heading in the
+       document outline — invisible to anyone navigating by headings, and
+       visually a third grammar for "here is a section" on a page that now has
+       exactly one. The words are unchanged; they are an `h2` instead of a small
+       caps label.
 
+       IT CARRIES NO HEAD LINK, and that is deliberate rather than an omission.
+       `WeekStrip` sits directly opposite this card and its own head link is
+       `Open Planner` — MEASURED at 1440, the two landed within 4px of the same
+       baseline, so the page showed two identical links to one destination side
+       by side, under two headings both beginning "This week". The one on the
+       calendar is the one that belongs there. This card's own rows already open
+       the posts they name, and its empty state carries `Plan my week`. */
+    <HomeSection id="home-sahoda" title="This week, from Sahoda">
       {drafted.length === 0 ? (
         <div className="space-y-3">
           <p className="type-sm text-muted">Sahoda hasn&rsquo;t drafted anything this week.</p>
@@ -71,6 +84,6 @@ export function SahodaRail({ drafted, planCost }: SahodaRailProps) {
           ))}
         </ul>
       )}
-    </section>
+    </HomeSection>
   )
 }
