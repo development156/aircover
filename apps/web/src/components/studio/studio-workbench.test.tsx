@@ -174,6 +174,24 @@ describe('the canvas draws the picture, not a description of one', () => {
    * wide is not judging it. Both the canvas and the header offer the way in, so
    * neither a mouse habit nor a keyboard one has to be learned.
    */
+  /**
+   * A toolbar that appears on hover does not exist for a phone, for a keyboard,
+   * or for a screen reader. Half this product's users are shop owners holding a
+   * phone.
+   */
+  test('the actions are on the screen, not behind a hover', () => {
+    const { container } = open(LIBRARY, MADE)
+    const actions = container.querySelector('[data-guide="studio-canvas-actions"]') as HTMLElement
+    expect(actions).not.toBeNull()
+    expect(within(actions).getByRole('button', { name: /save it/i })).toBeTruthy()
+    expect(within(actions).getByRole('button', { name: /open it large/i })).toBeTruthy()
+  })
+
+  test('there is nothing to act on before anything is made', () => {
+    const { container } = open(LIBRARY, [])
+    expect(container.querySelector('[data-guide="studio-canvas-actions"]')).toBeNull()
+  })
+
   test('the picture opens large, and the way in is reachable by name', () => {
     open(LIBRARY, MADE)
     expect(screen.getByRole('button', { name: /open it large/i })).toBeTruthy()

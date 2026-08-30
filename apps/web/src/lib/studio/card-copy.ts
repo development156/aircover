@@ -116,3 +116,53 @@ export function describeFormat(formatId: string | null): string | null {
   if (format === null) return null
   return `${format.label}, ${format.width} by ${format.height}`
 }
+
+/**
+ * How long a picture may sit unfinished before the screen stops claiming it is
+ * being drawn.
+ *
+ * MEASURED: the provider call is seconds, and the whole request is written,
+ * sent, stored and settled inside one server action. Ten minutes is far beyond
+ * any real generation and well short of somebody's patience, so a row past it
+ * is not slow, it is stranded.
+ */
+export const STRANDED_AFTER_MS = 10 * 60 * 1000
+
+/**
+ * What to say about a picture that never finished.
+ *
+ * ── THE ROW THAT SAYS "BEING DRAWN NOW" FOREVER ─────────────────────────────
+ * The row is written BEFORE the model is called, deliberately, so that pressing
+ * Back does not lose the request. The cost of that is a row left at `running`
+ * when the process serving it died: nothing settles it, and the card goes on
+ * telling somebody their picture is being drawn, for as long as they keep the
+ * account.
+ *
+ * ── AND THE SENTENCE MUST NOT GUESS AT THE MONEY ────────────────────────────
+ * We do not know from the row alone whether the hold was released, so this says
+ * what IS known: no picture arrived, and the wallet is where the answer is. A
+ * card that promised "nothing was charged" would be a claim this data cannot
+ * support, and one that stayed silent would leave somebody watching a spinner
+ * that will never stop.
+ *
+ * Returns null for anything that is not a stranded row, including a settled one
+ * and a young one, so an ordinary generation says nothing extra.
+ */
+export function describeStranded(input: {
+  status: GenerationStatus
+  /** When the model call began. Null for a row that never got that far. */
+  startedAt: string | null
+  createdAt: string
+  now: number
+}): string | null {
+  if (input.status !== 'running' && input.status !== 'queued') return null
+
+  const began = Date.parse(input.startedAt ?? input.createdAt)
+  // An unparseable timestamp is not evidence of anything. Saying nothing is the
+  // honest answer; calling it stranded on a date we could not read would age
+  // out live generations at random.
+  if (Number.isNaN(began)) return null
+  if (input.now - began < STRANDED_AFTER_MS) return null
+
+  return 'This one stopped before it finished, and no picture arrived. Your wallet shows whether it was charged.'
+}
