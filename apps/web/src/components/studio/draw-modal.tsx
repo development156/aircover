@@ -8,6 +8,7 @@ import {
   Pencil,
   Redo2,
   Square,
+  Trash2,
   Type,
   Undo2,
 } from 'lucide-react'
@@ -21,6 +22,7 @@ import {
   commit,
   emptyDrawing,
   redo,
+  removeObject,
   undo,
   type DrawState,
   type DrawTool,
@@ -77,6 +79,7 @@ export function DrawModal({
   const [state, setState] = useState<DrawState>(emptyDrawing)
   const [image, setImage] = useState<HTMLImageElement | null>(null)
   const [note, setNote] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [busy, start] = useTransition()
   const inkColours = useRef<Ink>({ fill: 'transparent', edge: 'transparent' })
 
@@ -103,6 +106,7 @@ export function DrawModal({
       return
     }
     setState(emptyDrawing())
+    setSelectedId(null)
     setNote(null)
 
     let live = true
@@ -119,6 +123,64 @@ export function DrawModal({
       live = false
     }
   }, [picture])
+
+  /**
+   * ── SHORTCUTS, AND THE GUARD THAT MAKES THEM SAFE ─────────────────────────
+   * A bare letter for each tool is how a drawing tool is normally driven, and it
+   * is also how a drawing tool normally breaks: the text tool puts a REAL input
+   * on the screen, and without the `activeElement` check typing the word "eraser"
+   * into it would switch tools six times and lose what was being typed.
+   *
+   * Only while the dialog is open, so the Studio behind it keeps its own keys.
+   */
+  useEffect(() => {
+    if (!open) return
+
+    function onKey(event: KeyboardEvent) {
+      const target = document.activeElement
+      const typing =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        (target instanceof HTMLElement && target.isContentEditable)
+      if (typing) return
+      if (event.metaKey || event.ctrlKey) {
+        if (event.key.toLowerCase() === 'z') {
+          event.preventDefault()
+          setState((current) => (event.shiftKey ? redo(current) : undo(current)))
+        }
+        return
+      }
+      if (event.altKey) return
+
+      const keyed: Record<string, DrawTool> = {
+        v: 'pointer',
+        p: 'pencil',
+        r: 'rect',
+        a: 'arrow',
+        t: 'text',
+        e: 'eraser',
+      }
+      const next = keyed[event.key.toLowerCase()]
+      if (next !== undefined) {
+        event.preventDefault()
+        setTool(next)
+        return
+      }
+
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        event.preventDefault()
+        setState((current) =>
+          selectedId === null
+            ? current
+            : commit(current, removeObject(current.objects, selectedId)),
+        )
+        setSelectedId(null)
+      }
+    }
+
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, selectedId])
 
   function save() {
     if (picture === null || image === null) return
@@ -210,6 +272,24 @@ export function DrawModal({
           >
             <Redo2 className="size-[18px]" aria-hidden />
           </button>
+
+          {/* ── THE VISIBLE BUTTON MATTERS MORE THAN THE KEY ─────────────────
+              Nobody discovers Delete, and on a phone there is no Delete. It is
+              shown only when there is something picked, because a control that
+              does nothing is worse than one that is not there. */}
+          {selectedId === null ? null : (
+            <button
+              type="button"
+              onClick={() => {
+                setState(commit(state, removeObject(state.objects, selectedId)))
+                setSelectedId(null)
+              }}
+              className="surface-ring flex h-[44px] items-center gap-1 rounded-card bg-s2 px-3 type-sm text-muted transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <Trash2 className="size-[16px]" aria-hidden />
+              Remove this mark
+            </button>
+          )}
         </div>
 
         {tool === 'text' ? (
@@ -243,6 +323,8 @@ export function DrawModal({
             brush={Math.max(4, Math.round(size.width / 200))}
             state={state}
             onChange={setState}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
           />
         )}
 

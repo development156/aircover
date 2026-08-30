@@ -10,6 +10,7 @@ import {
   describeStatus,
   describeStranded,
 } from '@/lib/studio/card-copy'
+import { DiscardGeneration } from '@/components/studio/discard-generation'
 import type { GenerationsRead } from '@/lib/studio/read'
 
 /**

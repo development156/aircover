@@ -582,3 +582,61 @@ export async function startPostFromPicture(assetId: unknown): Promise<StartPostS
     return { ok: false, message: 'Sahoda could not start a post from that picture. Try again.' }
   }
 }
+
+export type DiscardGenerationState = { ok: true } | { ok: false; message: string }
+
+/**
+ * FORGET A REQUEST, WITHOUT THROWING AWAY THE PICTURE.
+ *
+ * ── TWO DIFFERENT THINGS, AND ONLY ONE OF THEM GOES ─────────────────────────
+ * A generation row is the RECORD: what was asked, what it cost, what
+ * conditioned it. The picture it produced is a file in the library, which the
+ * person may already have posted. Deleting the record must not delete the
+ * picture, and a screen that implied otherwise would stop people tidying up for
+ * fear of losing work they are using.
+ *
+ * The database enforces this rather than this function remembering it:
+ * `studio_generation_images.asset_id` is `on delete set null`, so the child rows
+ * cascade away and the assets do not. The library is the only place a picture
+ * is deleted, deliberately, because that is where its usage is checked.
+ *
+ * ── AND THE CHILD ROWS GO BY CASCADE, NOT BY HAND ───────────────────────────
+ * `studio_generation_images` is append-only: it has SELECT and INSERT policies
+ * and a `block_mutations` trigger, so nothing may delete a row directly. The
+ * trigger admits deletes at `pg_trigger_depth() > 1`, which is exactly a
+ * cascade. Deleting the parent is therefore the only route, and it is the one
+ * the schema was shaped for.
+ */
+export async function discardGeneration(id: unknown): Promise<DiscardGenerationState> {
+  let workspaceId: string | undefined
+  try {
+    const parsed = z.uuid().safeParse(id)
+    if (!parsed.success) return { ok: false, message: 'That request does not exist.' }
+
+    const { userId } = await auth()
+    if (!userId) return { ok: false, message: 'Sign in to remove a request.' }
+
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    workspaceId = ws.workspace.id
+
+    const supabase = createServerSupabase()
+    // Scoped here as well as in RLS: the policy admits every workspace this
+    // person belongs to, so an unscoped delete could reach another one's row.
+    const { error } = await supabase
+      .from('studio_generations')
+      .delete()
+      .eq('id', parsed.data)
+      .eq('workspace_id', ws.workspace.id)
+
+    if (error) {
+      return { ok: false, message: 'Sahoda could not remove that request. Nothing was changed.' }
+    }
+
+    revalidatePath('/studio')
+    return { ok: true }
+  } catch (error) {
+    reportServerError(error, { action: 'discardGeneration', workspaceId })
+    return { ok: false, message: 'Sahoda could not remove that request. Nothing was changed.' }
+  }
+}
