@@ -193,7 +193,7 @@ export function CostPreview({ cycleId, briefs, budgetCredits }: CostPreviewProps
       {preview.overBudget ? (
         <p
           role="status"
-          className="mt-3 flex items-start gap-2 rounded-input bg-warn-subtle p-3 type-sm text-ink"
+          className="mt-3 flex items-start gap-2 rounded-input bg-warn-bg p-3 type-sm text-ink"
         >
           <AlertTriangle size={15} strokeWidth={1.8} aria-hidden className="mt-[2px] shrink-0" />
           <span>
