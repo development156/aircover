@@ -4,6 +4,26 @@ import { countConfirmedFields } from '@/lib/brand/confirmed-count'
 /**
  * THE FOUR BRAND BRAIN FIELDS AUTOPILOT WILL NOT PUBLISH WITHOUT.
  *
+ * ── SETTLED 2026-08-29. DO NOT RE-LITIGATE THE SET. ──────────────────────────
+ * This was carried as an open question for two sessions — "a product judgement
+ * I made, it has not been ruled on". It is ruled on now: the set stays these
+ * four, named, and it is not a count.
+ *
+ * The ruling is narrow and worth stating exactly, because the next person to
+ * open this file will want to add a fifth. ADDING ONE IS A REAL CHANGE, not a
+ * tightening: the database enforces the same four in
+ * `20260828120000_loop_autopilot_l3.sql`, so a fifth added here alone would
+ * make the screen refuse an L3 the trigger would have allowed, and the two
+ * would disagree about what "ready" means. Move both, in one commit, or
+ * neither.
+ *
+ * That is not a convention. MEASURED 2026-08-29, both directions mutated and
+ * watched go red: emptying this array turns `loop_autopilot_l3.pglite.test.ts`
+ * red at "the SQL floor and the TypeScript floor name the same four fields",
+ * and so does adding a fifth. The same fifth also turns TWELVE of the
+ * dispatcher's own tests red, because `decideOne` refuses `BRAIN_BELOW_FLOOR`
+ * against this list. The set cannot drift in either direction in silence.
+ *
  * ── WHY A NAMED SET AND NOT A FRACTION ───────────────────────────────────────
  * "Nine of fifteen confirmed" is a number that sounds like a standard and is
  * not one: it is satisfied by confirming the nine easiest fields and leaves the

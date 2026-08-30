@@ -24,7 +24,7 @@ const vercelConfig = JSON.parse(readFileSync(resolve(WEB, 'vercel.json'), 'utf8'
 const middleware = readFileSync(resolve(WEB, 'src/middleware.ts'), 'utf8')
 
 describe('cron wiring', () => {
-  it('schedules exactly the five jobs, on their own cadences', () => {
+  it('schedules exactly the seven jobs, on their own cadences', () => {
     // Pinned as a SET of exact entries rather than a count, so a job cannot
     // arrive quietly and so a schedule cannot be edited without a decision. It
     // did its job when the third arrived, and again when the fourth did — the
@@ -69,6 +69,12 @@ describe('cron wiring', () => {
       { path: '/api/cron/playbooks', schedule: '0 6 * * *' },
       { path: '/api/cron/radar', schedule: '40 3 * * 1' },
       { path: '/api/cron/brain', schedule: '30 21 * * 0' },
+      // Added 2026-08-30 with the autopilot tick. Deliberate, and this guard
+      // failing is what made it deliberate. The cadence is set by the CANCEL
+      // WINDOW rather than by how often there is work: a customer is promised
+      // minutes to change their mind, and an hourly tick would let a post sit
+      // past a five-minute window for fifty-five minutes and then send it.
+      { path: '/api/cron/autopilot', schedule: '*/10 * * * *' },
     ])
   })
 
@@ -130,6 +136,13 @@ describe('cron wiring', () => {
         '/api/cron/playbooks',
         '/api/cron/radar',
         '/api/cron/brain',
+        // Added 2026-08-30 with the autopilot tick, and this guard's sibling is
+        // what caught it: the schedule had been declared in vercel.json and the
+        // exemption had not, which is the exact shape where the heartbeat
+        // reports green while every tick is a 307 to /sign-in. It authenticates
+        // itself in-route and does no work at all unless
+        // SAHODA_AUTOPILOT_ENABLED is set.
+        '/api/cron/autopilot',
         '/api/public/beta-apply',
         // Door one into `leads`, added 2026-08-21. Deliberate for the same reason
         // /api/cron/loop was: this guard failing is what made it deliberate. It

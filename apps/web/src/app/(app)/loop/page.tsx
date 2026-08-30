@@ -9,12 +9,15 @@ import {
 import { AutonomyDial } from '@/components/loop/autonomy-dial'
 import { CostPreview } from '@/components/loop/cost-preview'
 import { CycleStrip } from '@/components/loop/cycle-strip'
+import { GoingOut } from '@/components/loop/going-out'
 import { KillSwitch } from '@/components/loop/kill-switch'
 import { PendingLearnings } from '@/components/loop/learnings'
 import { LoopControls } from '@/components/loop/controls'
 import { PageTitle } from '@/components/page-title'
 import { explain, remedy } from '@/lib/loop/eligibility'
 import { readLoop, type LoopSnapshot } from '@/lib/loop/read'
+import { readGoingOut } from '@/lib/loop/autopilot/going-out'
+import { GOING_OUT_UNREADABLE } from '@/lib/loop/autopilot/going-out-copy'
 import { reflectSentence } from '@/lib/loop/reflect'
 import { loopVerdict } from '@/lib/loop/verdict'
 
@@ -42,7 +45,11 @@ export const metadata = { title: 'The Loop' }
  * no query behind this page has earned.
  */
 export default async function LoopPage() {
-  const read = await readLoop()
+  // Read alongside the Loop, not inside it. `readLoop`'s dial is typed with
+  // `AutonomyLevel`, which admits only 0-2, so an armed channel is invisible
+  // through it; `readGoingOut` reads the stored integer. Its own failures
+  // resolve to a state rather than throwing, so this cannot take the page down.
+  const [read, goingOut] = await Promise.all([readLoop(), readGoingOut()])
 
   // Two answers, two sentences, two remedies. `getActiveWorkspace()` collapsed
   // them into one null and this page said "Finish setting up your workspace" to
@@ -115,6 +122,17 @@ export default async function LoopPage() {
         chosen={chosen}
         defaultLevel={DEFAULT_AUTONOMY_LEVEL}
       />
+
+      {/* Between the dial that grants the permission and the switch that
+          revokes everything: what that permission means right now. A reader who
+          has armed nothing learns the setting exists; a reader who has armed
+          something sees exactly what is in the window. */}
+      {goingOut.status === 'no-workspace' ? null : (
+        <GoingOut
+          view={goingOut.status === 'ready' ? goingOut.view : GOING_OUT_UNREADABLE}
+          waiting={goingOut.status === 'ready' ? goingOut.waiting : []}
+        />
+      )}
 
       <KillSwitch />
     </div>
