@@ -1,4 +1,5 @@
 import { autopilotEnabled } from '@/lib/cron/autopilot-enabled'
+import { recordCronRun } from '@/lib/cron/heartbeat-store'
 import { isAuthorizedCronRequest } from '@/lib/cron/authorize'
 import { runAllAutopilotTicks } from '@/lib/loop/autopilot/tick-all'
 import { reportServerError } from '@/lib/observability/report'
@@ -6,13 +7,18 @@ import { reportServerError } from '@/lib/observability/report'
 /**
  * THE AUTOPILOT TICK — announce what may go out, then send what is due.
  *
- * ── THIS ROUTE IS NOT SCHEDULED, AND THAT IS THE SECOND GATE ─────────────────
- * `apps/web/vercel.json` lists six crons and this is not one of them. Adding it
- * is a separate, deliberate act by a person, on top of setting
- * SAHODA_AUTOPILOT_ENABLED. Two independent gates, because the thing behind
- * them is Sahoda posting to a customer's account with nobody watching, and one
- * switch is one mistake away from being flipped by somebody who did not read
- * what it meant.
+ * ── IT IS SCHEDULED NOW, AND THE FLAG IS WHAT STILL STOPS IT ─────────────────
+ * `apps/web/vercel.json` schedules this route every ten minutes. That period comes
+ * from the CANCEL WINDOW, not from how often there is work: a customer is
+ * promised minutes to change their mind, and an hourly tick would let a post
+ * sit past a five-minute window for fifty-five minutes and then send it, the
+ * promise broken by the schedule rather than by any code.
+ *
+ * The schedule firing does NOT mean autopilot runs. `SAHODA_AUTOPILOT_ENABLED`
+ * is absent in every environment, so every firing returns `enabled: false`
+ * having done nothing. That flag is now the single deliberate act between this
+ * code and unattended publishing, and it is deliberately a thing a person does
+ * in a settings screen rather than anything a deploy can carry.
  *
  * A third gate exists without being a gate: `AutonomyLevelSchema` refuses to
  * write a 3 through the application, so no workspace can have an armed channel
@@ -45,23 +51,17 @@ export async function GET(request: Request): Promise<Response> {
   // Read before any await, so the refusal costs nothing and cannot be mistaken
   // for a tick that ran and found no work. `enabled: false` is a different fact
   // from `workspaces: 0` and the response says which.
+  // ── THE HEARTBEAT IS RECORDED BEFORE THE FLAG IS READ ─────────────────────
+  // The heartbeat answers "did the schedule fire", which is true whether or not
+  // the flag lets any work happen. Recording it only on the enabled path would
+  // make a switched-off autopilot indistinguishable from a schedule that
+  // stopped firing, and those need completely different responses: one is
+  // correct, the other is an outage.
+  await recordCronRun('autopilot').catch(() => {})
+
   if (!autopilotEnabled()) {
     return Response.json({ ok: true, enabled: false, reason: 'SAHODA_AUTOPILOT_ENABLED' })
   }
-
-  // ── NO HEARTBEAT, AND THE ABSENCE IS THE HONEST CHOICE ────────────────────
-  // Every sibling route records one, and each is right to: the heartbeat
-  // answers "did the schedule fire". This route HAS no schedule — it is not in
-  // vercel.json — so there is no firing to miss.
-  //
-  // Recording one would mean adding `autopilot` to `CronJob`, which forces an
-  // entry in `CRON_SCHEDULES`, which requires a `periodMs`. There is no period.
-  // Inventing one makes `checkAndAlertHeartbeats` page somebody because a job
-  // that was never scheduled did not run — an alarm about a fiction.
-  //
-  // Whoever adds this route to vercel.json must add its schedule to
-  // CRON_SCHEDULES and this heartbeat in the SAME change. The two halves are
-  // one decision and splitting them is how a job ends up unmonitored.
 
   try {
     const result = await runAllAutopilotTicks(new Date())
