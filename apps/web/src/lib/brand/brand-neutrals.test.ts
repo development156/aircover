@@ -112,7 +112,10 @@ describe.each(SURFACES)('the %s neutrals', (surface) => {
       // climbs all the way. Either way the SHAPE must match the untinted one.
       const original = ([...TOKENS] as const)
         .filter((t) => t !== '--line')
-        .map((t) => parseOklch(rgbToOklch(STOPS[surface][t].r, STOPS[surface][t].g, STOPS[surface][t].b)).l)
+        .map(
+          (t) =>
+            parseOklch(rgbToOklch(STOPS[surface][t].r, STOPS[surface][t].g, STOPS[surface][t].b)).l,
+        )
 
       rungs.forEach((value, i) => {
         expect(value, `${TOKENS[i]} changed lightness`).toBeCloseTo(original[i]!, 3)
@@ -138,10 +141,7 @@ describe('the neutrals belong to the brand', () => {
   /** The same hue as the primary, or the tint is a second brand nobody chose. */
   it('uses the hue the primary settled on', () => {
     const brand = rgbToOklch(0, 128, 128)
-    expect(parseOklch(varsFor(brand, 'light')['--canvas']).h).toBeCloseTo(
-      parseOklch(brand).h,
-      0,
-    )
+    expect(parseOklch(varsFor(brand, 'light')['--canvas']).h).toBeCloseTo(parseOklch(brand).h, 0)
   })
 
   /**

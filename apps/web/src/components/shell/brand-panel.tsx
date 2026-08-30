@@ -61,6 +61,8 @@ export function BrandPanel({
    * to change something visible.
    */
   const [failed, setFailed] = useState<string | null>(null)
+  /** An SVG was turned into a PNG. Said out loud rather than done quietly. */
+  const [converted, setConverted] = useState(false)
   const [busy, startTransition] = useTransition()
   const [read, setRead] = useState(false)
 
@@ -125,6 +127,7 @@ export function BrandPanel({
   function replace(file: File): void {
     startTransition(async () => {
       setFailed(null)
+      setConverted(false)
       try {
         const { extractPalette } = await import('@/lib/brand/color-extract')
         const found = extractPalette(await load(URL.createObjectURL(file), false))
@@ -144,6 +147,7 @@ export function BrandPanel({
           setFailed(stored.message)
           return
         }
+        setConverted(stored.converted)
 
         if (found.length > 0) {
           const { saveWorkspaceTheme } = await import('@/app/actions/theme')
@@ -259,6 +263,16 @@ export function BrandPanel({
         </p>
       ) : null}
 
+      {/* A silent conversion is a surprise waiting to happen: somebody who
+          uploaded a vector should not have to discover from the media library
+          that Sahoda holds a picture of it. */}
+      {converted ? (
+        <p className="type-xs mt-3 text-muted">
+          Sahoda saved your SVG as a high-resolution image, which is what social channels and image
+          generation can use.
+        </p>
+      ) : null}
+
       {unreadable ? (
         <p className="type-xs mt-3 text-muted">
           Sahoda could not read the colours out of your logo from here. Add it again below and it
@@ -269,7 +283,11 @@ export function BrandPanel({
       <input
         ref={input}
         type="file"
-        accept="image/png,image/jpeg,image/webp"
+        /* SVG included, and it does not reach storage as one: `setBrandLogo`
+           rasterises it and discards the vector. Without this line the dialog
+           greys out the founder's own logo, which presents as the button doing
+           nothing at all. */
+        accept="image/png,image/jpeg,image/webp,image/svg+xml"
         className="sr-only"
         onChange={(e) => {
           const file = e.target.files?.[0]

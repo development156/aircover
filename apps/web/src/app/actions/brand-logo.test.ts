@@ -28,6 +28,7 @@ const state = vi.hoisted(() => ({
   lookupError: null as { code: string } | null,
   updates: [] as Record<string, unknown>[],
   uploadCalled: 0,
+  uploaded: null as FormData | null,
   uploadResult: { ok: true } as { ok: boolean; message?: string },
 }))
 
@@ -38,8 +39,9 @@ vi.mock('@/lib/workspaces', () => ({
 }))
 vi.mock('@/lib/observability/report', () => ({ reportServerError: vi.fn() }))
 vi.mock('./assets', () => ({
-  uploadAsset: () => {
+  uploadAsset: (data: FormData) => {
     state.uploadCalled += 1
+    state.uploaded = data
     return Promise.resolve(state.uploadResult)
   },
 }))
@@ -67,6 +69,15 @@ vi.mock('@/lib/supabase/server', () => ({
 
 const { setBrandLogo } = await import('./brand-logo')
 
+const svgForm = () => {
+  const data = new FormData()
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="blue"/></svg>'
+  data.set('file', new File([svg], 'brand.svg', { type: 'image/svg+xml' }))
+  data.set('title', 'Logo')
+  return data
+}
+
 const form = () => {
   const data = new FormData()
   data.set('file', new File([new Uint8Array([1, 2, 3])], 'logo.png', { type: 'image/png' }))
@@ -79,6 +90,7 @@ beforeEach(() => {
   state.lookupError = null
   state.updates = []
   state.uploadCalled = 0
+  state.uploaded = null
   state.uploadResult = { ok: true }
 })
 
@@ -89,7 +101,7 @@ describe('setBrandLogo', () => {
 
     const result = await setBrandLogo(form())
 
-    expect(result).toEqual({ ok: true, adopted: true })
+    expect(result).toEqual({ ok: true, adopted: true, converted: false })
     expect(state.updates[0]).toMatchObject({ title: 'Logo' })
     expect(state.uploadCalled, 'the library action would have refused this').toBe(0)
   })
@@ -107,7 +119,7 @@ describe('setBrandLogo', () => {
   it('uploads when the bytes are new', async () => {
     const result = await setBrandLogo(form())
 
-    expect(result).toEqual({ ok: true, adopted: false })
+    expect(result).toEqual({ ok: true, adopted: false, converted: false })
     expect(state.uploadCalled).toBe(1)
     expect(state.updates).toHaveLength(0)
   })
@@ -145,8 +157,51 @@ describe('setBrandLogo', () => {
   it('still uploads where the hash column does not exist yet', async () => {
     state.lookupError = { code: '42703' }
 
-    expect(await setBrandLogo(form())).toEqual({ ok: true, adopted: false })
+    expect(await setBrandLogo(form())).toEqual({ ok: true, adopted: false, converted: false })
     expect(state.uploadCalled).toBe(1)
+  })
+
+  /**
+   * ── AN SVG NEVER REACHES STORAGE ──────────────────────────────────────────
+   * The founder's logo is an SVG. Rather than sanitise a script container, it is
+   * rasterised and the original discarded, so everything downstream receives a
+   * PNG it already knows how to handle.
+   */
+  it('turns an SVG into a PNG and stores that', async () => {
+    const result = await setBrandLogo(svgForm())
+
+    expect(result).toEqual({ ok: true, adopted: false, converted: true })
+    expect(state.uploaded, 'the upload must receive the raster, not the vector').not.toBeNull()
+
+    const file = state.uploaded!.get('file') as File
+    expect(file.type).toBe('image/png')
+    expect(file.name).toBe('brand.png')
+    const head = [...new Uint8Array(await file.arrayBuffer()).slice(0, 4)]
+    expect(head, 'stored bytes must be a PNG').toEqual([0x89, 0x50, 0x4e, 0x47])
+  })
+
+  /**
+   * The hash is taken of what is STORED, so the same SVG uploaded twice adopts
+   * rather than duplicating. Rasterising the same input is deterministic, which
+   * is what makes that true.
+   */
+  it('adopts on a second upload of the same SVG', async () => {
+    state.match = { id: 'asset-1', deleted_at: null }
+
+    expect(await setBrandLogo(svgForm())).toEqual({ ok: true, adopted: true, converted: true })
+    expect(state.uploadCalled).toBe(0)
+  })
+
+  it('refuses a hostile SVG without storing anything', async () => {
+    const data = new FormData()
+    const hostile = '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'
+    data.set('file', new File([hostile], 'evil.svg', { type: 'image/svg+xml' }))
+
+    const result = await setBrandLogo(data)
+
+    expect(result.ok).toBe(false)
+    expect(state.uploadCalled).toBe(0)
+    expect(state.updates).toHaveLength(0)
   })
 
   it('refuses an empty file rather than storing nothing', async () => {
