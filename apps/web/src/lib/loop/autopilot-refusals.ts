@@ -52,5 +52,11 @@ export const AUTOPILOT_REFUSAL_COPY: Record<AutopilotRefusal, string> = {
   BRAIN_BELOW_FLOOR:
     'Sahoda does not know enough about your business to publish unattended, so nothing went out.',
   INSIDE_CANCEL_WINDOW: 'This post is still inside the window where you can stop it.',
-  CANCELLED: 'You stopped this post, so nothing went out.',
+  // Deliberately does NOT say "you". This name is reachable as a `wait` reason
+  // for a post somebody already cancelled, and the kill switch stopping a post
+  // is not the customer doing it. Who stopped it lives in the log's `actor`
+  // column, and `autopilotStatus` reads that to choose between "You stopped
+  // this" and "Sahoda stopped this". A sentence that guesses is worse than one
+  // that does not.
+  CANCELLED: 'This post was stopped, so nothing went out.',
 }

@@ -35,7 +35,22 @@ function open(): HTMLElement {
 }
 
 describe('the Autonomy Dial', () => {
-  it('offers exactly the three storable levels per connected channel', () => {
+  /**
+   * ── THESE THREE WERE RETARGETED, AND HERE IS THE MOVE ──────────────────────
+   * They asserted that L3 was NOT a control: three radios per channel, an
+   * "unavailable" label, and no input anywhere under Autopilot. Every one of
+   * those was true and correct while `AutonomyLevelSchema` stopped at 2.
+   *
+   * On 2026-08-30 the union opened to 3 and the database trigger became the
+   * thing that decides. CLAUDE.md's fifth copy rule says retarget rather than
+   * delete, and the claim these protected survives the change — it inverts. It
+   * was never "L3 must be absent": it was THE SCREEN MUST NOT OFFER A CONTROL
+   * THAT LEADS NOWHERE. A disabled button is a dead end wearing the costume of a
+   * control, and so is an enabled one whose refusal is a Postgres error string.
+   * So L3 is a real control now, and what makes that honest is that its three
+   * refusals are sentences — asserted in `autopilot-refusal-copy.test.ts`.
+   */
+  it('offers all four levels per connected channel, autopilot included', () => {
     const { container } = render(
       <AutonomyDial connected={['instagram', 'linkedin']} chosen={{}} defaultLevel={1} />,
     )
@@ -45,45 +60,54 @@ describe('the Autonomy Dial', () => {
     const pickers = [...container.querySelectorAll('fieldset')]
     expect(pickers).toHaveLength(2)
     for (const picker of pickers) {
-      const radios = within(picker).getAllByRole('radio')
-      // Three, not four. The fourth rung is not a control anywhere in this tree.
-      expect(radios).toHaveLength(3)
+      // Four, not three. The fourth rung is a control now.
+      expect(within(picker).getAllByRole('radio')).toHaveLength(4)
     }
   })
 
-  it('SHOWS L3 and its reason', () => {
+  it('SHOWS L3 and what it needs, without calling it unavailable', () => {
     render(<AutonomyDial connected={['instagram']} chosen={{}} defaultLevel={1} />)
     const ladder = open()
     expect(within(ladder).getByText(/L3/)).toBeTruthy()
     expect(within(ladder).getByText(/Autopilot/)).toBeTruthy()
-    // Labelled as unavailable, and the reason is stated rather than implied.
-    expect(within(ladder).getByText(/not available/i)).toBeTruthy()
+    // The label that must NOT survive: it stopped being true.
+    expect(within(ladder).queryByText(/not available/i)).toBeNull()
+    // The preconditions are still stated, because a reader who has not met them
+    // should learn that from the ladder rather than from a refusal.
     const l3 = AUTONOMY_LEVELS.find((l) => l.code === 'L3')!
     expect(within(ladder).getByText(new RegExp(l3.needs.slice(0, 40)))).toBeTruthy()
   })
 
-  it('renders L3 as TEXT — not a button, not disabled, not aria-disabled', () => {
+  it('renders L3 as a REAL control, never a disabled one', () => {
+    const { container } = render(
+      <AutonomyDial connected={['instagram']} chosen={{}} defaultLevel={1} />,
+    )
+    const radios = [...container.querySelectorAll('input[type="radio"]')]
+    const autopilot = radios.find((r) => /Autopilot/.test(r.closest('label')?.textContent ?? ''))
+
+    expect(autopilot).toBeTruthy()
+    // Not disabled and not aria-disabled. A dead end wearing the costume of a
+    // control is the defect, whichever direction it points: the refusal belongs
+    // to the database, and it answers in sentences.
+    expect(autopilot!.hasAttribute('disabled')).toBe(false)
+    expect(autopilot!.getAttribute('aria-disabled')).toBeNull()
+  })
+
+  it('keeps the unreachable-rung machinery, for the day there is one again', () => {
+    // `AUTONOMY_LEVELS` still carries `storable`, and the dial still branches on
+    // it. Nothing is unstorable today, so that block renders nothing — which is
+    // correct, and different from the branch having been deleted.
+    expect(AUTONOMY_LEVELS.every((l) => l.storable)).toBe(true)
+  })
+
+  it('shows no lock and no unavailable rung while every level is storable', () => {
     const { container } = render(
       <AutonomyDial connected={['instagram']} chosen={{}} defaultLevel={1} />,
     )
     open()
-    const autopilot = screen.getByText(/Autopilot/).closest('li')
-    expect(autopilot).toBeTruthy()
-    // Not a control of any kind.
-    expect(autopilot!.querySelector('button')).toBeNull()
-    expect(autopilot!.querySelector('input')).toBeNull()
-    expect(autopilot!.querySelector('[role="button"]')).toBeNull()
-    // And not pretending to be a momentarily-unavailable one either —
-    // aria-disabled describes a control that EXISTS, which would be untrue here.
-    expect(autopilot!.querySelector('[aria-disabled]')).toBeNull()
-    expect(autopilot!.hasAttribute('aria-disabled')).toBe(false)
-
-    // No level 3 radio exists anywhere in the whole tree, under any name.
-    const radios = [...container.querySelectorAll('input[type="radio"]')]
-    expect(radios).toHaveLength(3)
-    for (const r of radios) {
-      expect(r.closest('label')?.textContent).not.toMatch(/Autopilot/)
-    }
+    expect(screen.queryByText(/not available/i)).toBeNull()
+    // Four radios in the one picker: nothing is described-but-unreachable.
+    expect([...container.querySelectorAll('input[type="radio"]')]).toHaveLength(4)
   })
 
   it('says a channel is UNSET rather than claiming a level nobody picked', () => {
