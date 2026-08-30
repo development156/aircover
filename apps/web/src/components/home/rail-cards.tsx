@@ -3,6 +3,7 @@ import Link from 'next/link'
 import type { Channel, Connection } from '@sahoda/shared'
 
 import { ChannelLogo } from '@/components/connections/channel-logo'
+import { HomeSection } from '@/components/home/section'
 import { PLATFORM_LABELS } from '@/components/posts/channel-label'
 import { brainRing } from '@/lib/brand/brain-ring'
 import type { BrainRead } from '@/lib/brand/read-brain'
@@ -16,31 +17,31 @@ import type { BrainRead } from '@/lib/brand/read-brain'
  * tile is a link to the page that owns the data.
  */
 
-/** Shared card chrome so the rail reads as one stack, not three inventions. */
+/**
+ * Shared card chrome so the rail reads as one stack, not three inventions.
+ *
+ * It is now a thin adapter over `HomeSection`, which is the page's ONE card
+ * language. This used to hand-write a third copy of the same ruled header, and
+ * the drift was already visible: its trailing link had no arrow where the
+ * activity card's did, on cards sitting one above the other in the same column.
+ */
 function RailCard({
+  id,
   title,
   href,
   linkLabel,
   children,
 }: {
+  id: string
   title: string
   href: '/brain' | '/connections'
   linkLabel: string
   children: React.ReactNode
 }) {
   return (
-    <section className="surface-ring rounded-card bg-surface">
-      <header className="flex min-h-[46px] items-center gap-3 border-b border-line-soft px-4 py-3">
-        <h2 className="type-h3">{title}</h2>
-        <Link
-          href={href}
-          className="card-link ml-auto type-meta font-[550] text-muted hover:text-accent"
-        >
-          {linkLabel}
-        </Link>
-      </header>
+    <HomeSection id={id} title={title} action={{ href, label: linkLabel }}>
       {children}
-    </section>
+    </HomeSection>
   )
 }
 
@@ -68,9 +69,9 @@ export function BrainCard({
   knowledgeDocuments: number | null
 }) {
   return (
-    <RailCard title="Brand Brain" href="/brain" linkLabel="View all">
+    <RailCard id="home-brain" title="Brand Brain" href="/brain" linkLabel="View all">
       {brain.status === 'ok' ? (
-        <div className="px-4 py-4">
+        <div>
           <p className="flex items-baseline gap-2">
             <span className="type-h2 tabular-nums">{brainRing(brain.provenance).confirmed}</span>
             <span className="type-sm text-muted">
@@ -157,7 +158,7 @@ export function BrainCard({
           </dl>
         </div>
       ) : (
-        <p className="px-4 py-6 text-center type-sm text-muted">
+        <p className="type-sm text-muted">
           {brain.status === 'unreadable'
             ? 'Couldn’t read the Brand Brain just now.'
             : 'Sahoda doesn’t know your brand yet.'}
@@ -177,11 +178,9 @@ const CONNECTABLE: readonly Channel[] = ['instagram', 'linkedin', 'x', 'gbp']
 
 export function ConnectionsCard({ connections }: { connections: Connection[] | null }) {
   return (
-    <RailCard title="Connections" href="/connections" linkLabel="Manage">
+    <RailCard id="home-connections" title="Connections" href="/connections" linkLabel="Manage">
       {connections === null ? (
-        <p className="px-4 py-6 text-center type-sm text-muted">
-          Couldn&rsquo;t check your connections just now.
-        </p>
+        <p className="type-sm text-muted">Couldn&rsquo;t check your connections just now.</p>
       ) : connections.length === 0 ? (
         /* ── THE TILES STAND EVEN WITH NOTHING CONNECTED ──────────────────────
            This was one sentence, so a new workspace — which is every workspace
@@ -193,7 +192,7 @@ export function ConnectionsCard({ connections }: { connections: Connection[] | n
            writing and planning genuinely work without a connection: this is not
            a blocked state, it is an empty one. */
         <>
-          <ul className="grid grid-cols-2 gap-2 p-4 pb-2">
+          <ul className="grid grid-cols-2 gap-2">
             {CONNECTABLE.map((channel) => (
               <li key={channel}>
                 <Link
@@ -211,12 +210,12 @@ export function ConnectionsCard({ connections }: { connections: Connection[] | n
               </li>
             ))}
           </ul>
-          <p className="px-4 pb-4 type-meta text-muted">
+          <p className="mt-3 type-meta text-muted">
             You can write and plan without one. Connecting is what lets a post actually go out.
           </p>
         </>
       ) : (
-        <ul className="grid grid-cols-2 gap-2 p-4">
+        <ul className="grid grid-cols-2 gap-2">
           {connections.slice(0, 4).map((connection) => (
             <li key={connection.id}>
               <Link
