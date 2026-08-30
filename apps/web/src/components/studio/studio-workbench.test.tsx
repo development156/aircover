@@ -2,6 +2,7 @@ import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
+import { queueGeneration } from '@/app/actions/studio'
 import { StudioWorkbench } from '@/components/studio/studio-workbench'
 import { generatableFormats } from '@/lib/studio/formats'
 import { uploadAccept } from '@/lib/studio/upload'
@@ -200,12 +201,20 @@ describe('the canvas draws the picture, not a description of one', () => {
 })
 
 describe('matching a picture', () => {
-  test('the picker is hidden for a mode that ignores references', async () => {
+  /**
+   * RETARGETED, not deleted. This asserted that the picker was HIDDEN for a mode
+   * that ignores references, on the reasoning that offering one invites a choice
+   * the mode then ignores. That reasoning stopped being true when picking a
+   * picture began MOVING a person to the mode that uses it: the choice is now
+   * honoured. What still has to hold is that the mode never silently pretends to
+   * use a reference, so the legend states what will happen instead.
+   */
+  test('a mode that ignores references says what picking one will do', async () => {
     const user = userEvent.setup()
     open()
     await user.click(screen.getByRole('button', { name: /explore/i }))
     expect(screen.queryByText(/which picture should Sahoda match/i)).toBeNull()
-    expect(screen.queryByText(/anything Sahoda should match/i)).toBeNull()
+    expect(screen.getByText(/moves you to match a picture/i)).toBeTruthy()
   })
 
   test('matching asks for a picture before it will run', async () => {
@@ -358,6 +367,73 @@ describe('adding a picture from this device', () => {
     open([])
     await user.click(screen.getByRole('button', { name: /match a picture/i }))
     expect(screen.getByText(/add one from this device/i)).toBeTruthy()
+  })
+})
+
+describe('something to try, for a box nobody knows what to put in', () => {
+  /**
+   * A feature nobody knows what to give stays empty. That is the Tone Setup
+   * ruling, made against the Brand Brain after three documents across 33
+   * workspaces, and a prompt box has the same shape.
+   */
+  test('starters are offered while the box is empty', () => {
+    const { container } = open()
+    const starters = container.querySelector('[data-guide="studio-starters"]') as HTMLElement
+    expect(starters).not.toBeNull()
+    expect(within(starters).getAllByRole('button').length).toBeGreaterThan(2)
+  })
+
+  test('pressing one FILLS the box rather than spending anything', async () => {
+    const user = userEvent.setup()
+    const { container } = open()
+    const starters = container.querySelector('[data-guide="studio-starters"]') as HTMLElement
+    const first = within(starters).getAllByRole('button')[0]!
+    const words = first.textContent
+    await user.click(first)
+
+    expect(
+      (screen.getByLabelText(/what should the picture show/i) as HTMLTextAreaElement).value,
+    ).toBe(words)
+    expect(queueGeneration).not.toHaveBeenCalled()
+  })
+
+  test('they get out of the way once there is something to edit', async () => {
+    const user = userEvent.setup()
+    const { container } = open()
+    await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
+    expect(container.querySelector('[data-guide="studio-starters"]')).toBeNull()
+  })
+})
+
+describe('picking a picture in a mode that ignores one', () => {
+  /**
+   * Explore uses no reference by definition, so a person who picks one has said
+   * something the mode cannot honour. Refusing the press would be technically
+   * correct and useless; moving them to the mode that DOES is what they meant.
+   */
+  test('moves to the mode that uses it, and says so', async () => {
+    const user = userEvent.setup()
+    const { container } = open()
+    await user.click(screen.getByRole('button', { name: /explore/i }))
+
+    const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
+    await user.click(within(picker).getAllByRole('button')[0]!)
+
+    expect(screen.getByRole('button', { name: /match a picture/i })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(screen.getByRole('alert').textContent).toMatch(/moved you to match a picture/i)
+  })
+
+  test('the picture that was picked is the one that is now selected', async () => {
+    const user = userEvent.setup()
+    const { container } = open()
+    await user.click(screen.getByRole('button', { name: /explore/i }))
+    const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
+    await user.click(within(picker).getAllByRole('button')[1]!)
+
+    expect(within(picker).getByRole('button', { name: /picked 1 of 1/i })).toBeTruthy()
   })
 })
 

@@ -28,7 +28,8 @@ import { signMediaPreviews } from '@/lib/posts/media-url'
 import { sniffImage } from '@/lib/posts/sniff-image'
 import { brandSignalsFor } from '@/lib/studio/brand-signals'
 import { formatById } from '@/lib/studio/formats'
-import { MAX_REFERENCES, MAX_TRIES_PER_PRESS, describeModeBlock } from '@/lib/studio/modes'
+import { MAX_TRIES_PER_PRESS, describeModeBlock } from '@/lib/studio/modes'
+import { ReferenceIdsSchema } from '@/lib/studio/reference-ids'
 import { conditionPrompt } from '@/lib/studio/prompt'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { workspaceForWrite } from '@/lib/workspaces'
@@ -92,7 +93,7 @@ const GenerateInputSchema = z.object({
    * hand-made request meets: the screen's rule and the parser's bound have to
    * agree, and only one of them runs when somebody skips the screen.
    */
-  referenceAssetIds: z.array(z.uuid()).max(MAX_REFERENCES).default([]),
+  referenceAssetIds: ReferenceIdsSchema,
   /**
    * How many separate pictures to try. Bounded by the SAME constant the screen
    * shows, so a hand-made request cannot ask for a hundred and be charged for
