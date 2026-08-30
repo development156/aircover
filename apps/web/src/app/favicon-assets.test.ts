@@ -19,9 +19,14 @@ import { describe, expect, test } from 'vitest'
  *
  * ── WHAT IT CANNOT SEE ──────────────────────────────────────────────────────
  *  · WHETHER THE ICON IS THE MARK. It reads dimensions, alpha and a colour
- *    histogram. A plain orange square on a dark ground would pass every
- *    assertion in this file. Only a person looking at it can say the artwork is
- *    the Sahoda element, and only the founder can say it is the artwork he sent.
+ *    histogram. A shapeless orange blob with the right proportions of clear and
+ *    coloured pixels would pass every assertion here. Only a person looking at
+ *    it can say the artwork is the Sahoda element, and only the founder can say
+ *    it is the artwork he sent. The file he attached never reached the machine
+ *    this was built on, so the source was reconstructed by filling the alpha
+ *    channel of `favicon-dark.png` — the same artwork already committed here, as
+ *    one solid shape — with `--acc`. Nothing in this file can tell that apart
+ *    from his own bytes.
  *  · Whether Next actually emits the link tags. That is a build-time behaviour
  *    of the file conventions, not a property of the bytes; `layout.test.tsx`
  *    covers the half of it that lives in source, and the rendered `<head>` was
@@ -35,6 +40,21 @@ import { describe, expect, test } from 'vitest'
  */
 const APP = dirname(fileURLToPath(import.meta.url))
 const PUBLIC = join(APP, '..', '..', 'public', 'brand')
+
+/** The outputs that get composited by an operating system, so must be opaque. */
+const OPAQUE: ReadonlyArray<readonly [string]> = [
+  [join(APP, 'apple-icon.png')],
+  [join(PUBLIC, 'icon-192.png')],
+  [join(PUBLIC, 'icon-512.png')],
+]
+
+/** How many pixels of a file are not fully opaque. */
+async function seeThrough(path: string): Promise<number> {
+  const { data, info } = await sharp(path).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  let count = 0
+  for (let i = 3; i < data.length; i += info.channels) if ((data[i] ?? 255) < 255) count++
+  return count
+}
 
 /** Every square output, and the side it must have. */
 const SQUARES: ReadonlyArray<readonly [string, number]> = [
@@ -54,38 +74,65 @@ describe('the PNG icons', () => {
     expect(meta.height).toBe(meta.width)
   })
 
-  test('the Apple touch icon is fully opaque, because iOS composites to black', async () => {
-    // An alpha channel here is not cosmetic. iOS flattens a touch icon onto
-    // BLACK, so a transparent ground would swallow the dark half of a two-tone
-    // mark and leave one leaf floating. `gen-favicons.mjs` composites onto the
-    // dark canvas token for exactly this reason; this asserts it stayed done.
-    const { data, info } = await sharp(join(APP, 'apple-icon.png'))
-      .raw()
-      .toBuffer({ resolveWithObject: true })
-    if (info.channels < 4) return
-    let seeThrough = 0
-    for (let i = 3; i < data.length; i += info.channels) if ((data[i] ?? 255) < 255) seeThrough++
-    expect(seeThrough).toBe(0)
+  test.each(OPAQUE)('%s has no see-through pixel, because it gets composited', async (path) => {
+    // Not cosmetic. iOS flattens a touch icon onto BLACK and an Android launcher
+    // crops a maskable tile to its own shape; both need real pixels behind the
+    // mark. `gen-favicons.mjs` composites these onto the dark canvas token for
+    // exactly that reason, and this asserts it stayed done.
+    expect(await seeThrough(path)).toBe(0)
   })
 
-  test('carries the brand orange from the artwork, not a repaint of it', async () => {
-    // The source is `public/LOGOS/element.png` and its orange is #ff4b00. This
-    // is NOT `--acc` (#ff6600): the two differ, and the artwork's own value is
-    // the one that ships, because the instruction was to use the mark as drawn
-    // rather than to recolour it to the interface token. If a future change
-    // repaints the icon to the accent, this fails and asks for that to be a
-    // decision rather than a side effect.
+  test('the tab icon keeps its transparent ground, rather than a box', async () => {
+    // THE REGRESSION THIS PINS, and it is the one that shipped once already.
+    // A tab strip is light in one theme and dark in the other. An orange mark is
+    // legible on both, so a solid ground here solves nothing and draws a square
+    // around the mark on every tab. It became possible only once the mark was one
+    // colour: while the right leaf was white, transparency hid half of it on a
+    // light strip, and that is what a ground was covering up.
+    const total = 512 * 512
+    const clear = await seeThrough(join(APP, 'icon.png'))
+    expect(clear / total).toBeGreaterThan(0.3)
+  })
+
+  test('is one colour, with no second leaf left white', async () => {
+    // THE DEFECT THIS FILE WAS WRITTEN AFTER. The first version of this icon was
+    // cut from `public/LOGOS/element.png`, which is the on-dark lockup: its left
+    // leaf is orange and its RIGHT LEAF IS WHITE. On a light tab strip half the
+    // mark simply was not there. Counting white pixels is what tells those two
+    // artworks apart, and nothing else in this file would notice the difference.
+    const { data, info } = await sharp(join(APP, 'icon.png'))
+      .raw()
+      .toBuffer({ resolveWithObject: true })
+    let white = 0
+    for (let i = 0; i < data.length; i += info.channels) {
+      const a = info.channels === 4 ? (data[i + 3] ?? 255) : 255
+      if (a > 200 && (data[i] ?? 0) > 230 && (data[i + 1] ?? 0) > 230 && (data[i + 2] ?? 0) > 230) {
+        white++
+      }
+    }
+    // A handful of pale anti-aliased pixels is fine; a whole leaf is 20% of the
+    // square, so this bites long before it could be argued about.
+    expect(white).toBeLessThan(512 * 512 * 0.01)
+  })
+
+  test('carries the brand orange, and it is the token rather than a sampled guess', async () => {
+    // #ff6600 is `--acc` in packages/shared/tokens.css and the value the founder
+    // named as the primary brand colour. The FIRST cut of this icon used #ff4b00,
+    // the orange inside `public/LOGOS/element.png`, which is a different colour
+    // and was the wrong artwork. If a future change repaints the icon again, this
+    // fails and asks for that to be a decision rather than a side effect.
     const { data, info } = await sharp(join(APP, 'icon.png'))
       .raw()
       .toBuffer({ resolveWithObject: true })
     let orange = 0
     for (let i = 0; i < data.length; i += info.channels) {
+      const a = info.channels === 4 ? (data[i + 3] ?? 255) : 255
       const r = data[i] ?? 0
       const g = data[i + 1] ?? 0
       const b = data[i + 2] ?? 0
-      if (r > 240 && g > 55 && g < 95 && b < 20) orange++
+      if (a > 200 && r > 250 && g > 92 && g < 112 && b < 12) orange++
     }
-    expect(orange).toBeGreaterThan(512 * 512 * 0.1)
+    expect(orange).toBeGreaterThan(512 * 512 * 0.3)
   })
 })
 
