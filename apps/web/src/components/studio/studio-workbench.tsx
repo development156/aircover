@@ -14,6 +14,7 @@ const DrawModal = dynamic(() =>
   import('@/components/studio/draw-modal').then((mod) => mod.DrawModal),
 )
 
+import { PictureActions } from '@/components/studio/picture-actions'
 import { PictureViewer } from '@/components/studio/picture-viewer'
 import { ReferenceUpload } from '@/components/studio/reference-upload'
 import { Button } from '@/components/ui/button'
@@ -76,8 +77,6 @@ export function StudioWorkbench({
   const [made, setMade] = useState(false)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [viewing, setViewing] = useState<CanvasPicture | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [saveFailed, setSaveFailed] = useState(false)
   const [drawing, setDrawing] = useState<CanvasPicture | null>(null)
   const [busy, start] = useTransition()
 
@@ -139,6 +138,28 @@ export function StudioWorkbench({
     // Explore is unconditioned by definition, so keeping references selected
     // would leave a contradiction on screen that the person did not create.
     if (ruleFor(next).maxReferences === 0) setPicked([])
+  }
+
+  /**
+   * ── LOADS THE REQUEST BACK, AND DOES NOT SPEND ────────────────────────────
+   * The fastest useful action after a picture you almost like is the same
+   * request with one word changed, and that used to mean retyping the sentence
+   * and re-picking every reference. It fills the controls and stops: firing
+   * immediately would spend credits on a press that reads as "show me what I
+   * asked for", and the whole point is to change something first.
+   *
+   * A format since retired is dropped rather than selected, because a select
+   * holding a value that is not one of its options silently shows the first one
+   * and the person is charged for a size they did not choose.
+   */
+  function reuse(picture: CanvasPicture) {
+    setNote(null)
+    setWanted(picture.prompt)
+    setMode(picture.mode)
+    setPicked(picture.referenceAssetIds.slice(0, ruleFor(picture.mode).maxReferences))
+    if (picture.formatId !== null && formats.some((one) => one.id === picture.formatId)) {
+      setFormatId(picture.formatId)
+    }
   }
 
   function generate() {
@@ -429,47 +450,13 @@ export function StudioWorkbench({
           <h2 id="studio-canvas" className="type-h2">
             The canvas
           </h2>
-          {/* ── ALWAYS VISIBLE, NEVER HOVER-ONLY ────────────────────────────
-              A toolbar that appears on hover does not exist for a phone, for a
-              keyboard, or for anybody using a screen reader. These are the two
-              things a person does with a finished picture, so they are on the
-              screen. */}
           {active === null ? null : (
-            <div className="flex flex-wrap items-center gap-3" data-guide="studio-canvas-actions">
-              <button
-                type="button"
-                onClick={() => setViewing(active)}
-                className="flex items-center gap-1 type-sm text-muted underline underline-offset-2 transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
-                <Maximize2 className="size-[14px]" aria-hidden />
-                Open it large
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  setSaveFailed(false)
-                  setSaving(true)
-                  const ok = await savePicture(active)
-                  setSaveFailed(!ok)
-                  setSaving(false)
-                }}
-                className="flex items-center gap-1 type-sm text-muted underline underline-offset-2 transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
-                <Download className="size-[14px]" aria-hidden />
-                {saving ? 'Saving' : 'Save it'}
-              </button>
-              {/* Marking a picture is how somebody says WHERE, which a sentence
-                  cannot do. It switches to the mode that uses it, so the press
-                  leads somewhere rather than leaving a marked picture unused. */}
-              <button
-                type="button"
-                onClick={() => setDrawing(active)}
-                className="flex items-center gap-1 type-sm text-muted underline underline-offset-2 transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
-                <Pencil className="size-[14px]" aria-hidden />
-                Draw on it
-              </button>
-            </div>
+            <PictureActions
+              picture={active}
+              onOpen={() => setViewing(active)}
+              onReuse={() => reuse(active)}
+              onDraw={() => setDrawing(active)}
+            />
           )}
         </div>
 
@@ -558,13 +545,6 @@ export function StudioWorkbench({
             })}
           </ul>
         )}
-
-        {saveFailed ? (
-          <p role="alert" className="type-sm text-ink">
-            Sahoda could not save that picture to your computer just now. It is safe in your
-            library, and reloading this screen gives the link another try.
-          </p>
-        ) : null}
 
         <p className="type-sm text-muted">
           Every picture is saved to your library the moment it is made, so nothing is lost if you

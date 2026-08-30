@@ -45,6 +45,8 @@ const MADE = [
     prompt: 'a plate of samosas',
     formatId: 'square',
     mime: 'image/png',
+    mode: 'on_brand' as const,
+    referenceAssetIds: [],
   },
   {
     imageId: 'p2',
@@ -54,6 +56,8 @@ const MADE = [
     prompt: 'the shopfront at dawn',
     formatId: 'story',
     mime: 'image/webp',
+    mode: 'match' as const,
+    referenceAssetIds: ['a2'],
   },
 ]
 
@@ -182,15 +186,16 @@ describe('the canvas draws the picture, not a description of one', () => {
    */
   test('the actions are on the screen, not behind a hover', () => {
     const { container } = open(LIBRARY, MADE)
-    const actions = container.querySelector('[data-guide="studio-canvas-actions"]') as HTMLElement
+    const actions = container.querySelector('[data-guide="studio-picture-actions"]') as HTMLElement
     expect(actions).not.toBeNull()
     expect(within(actions).getByRole('button', { name: /save it/i })).toBeTruthy()
     expect(within(actions).getByRole('button', { name: /open it large/i })).toBeTruthy()
+    expect(within(actions).getByRole('button', { name: /use these words again/i })).toBeTruthy()
   })
 
   test('there is nothing to act on before anything is made', () => {
     const { container } = open(LIBRARY, [])
-    expect(container.querySelector('[data-guide="studio-canvas-actions"]')).toBeNull()
+    expect(container.querySelector('[data-guide="studio-picture-actions"]')).toBeNull()
   })
 
   test('the picture opens large, and the way in is reachable by name', () => {
@@ -367,6 +372,54 @@ describe('adding a picture from this device', () => {
     open([])
     await user.click(screen.getByRole('button', { name: /match a picture/i }))
     expect(screen.getByText(/add one from this device/i)).toBeTruthy()
+  })
+})
+
+describe('asking for the same thing again', () => {
+  /**
+   * THE FASTEST USEFUL ACTION after a picture you almost like is the same
+   * request with one word changed, and that used to mean retyping the sentence
+   * and re-picking every reference.
+   */
+  test('loads the words, the mode and the size back into the controls', async () => {
+    const user = userEvent.setup()
+    open(LIBRARY, MADE)
+    await user.click(screen.getByRole('button', { name: /use these words again/i }))
+
+    expect(
+      (screen.getByLabelText(/what should the picture show/i) as HTMLTextAreaElement).value,
+    ).toBe(MADE[0]!.prompt)
+    expect(screen.getByRole('button', { name: /on brand/i })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+  })
+
+  /**
+   * It FILLS the controls and stops. Firing immediately would spend credits on a
+   * press that reads as "show me what I asked for", and the whole point is to
+   * change something first.
+   */
+  test('spends nothing, because the point is to change something first', async () => {
+    const user = userEvent.setup()
+    open(LIBRARY, MADE)
+    await user.click(screen.getByRole('button', { name: /use these words again/i }))
+    expect(queueGeneration).not.toHaveBeenCalled()
+  })
+
+  test('a picture made in match mode brings its references back with it', async () => {
+    const user = userEvent.setup()
+    const { container } = open(LIBRARY, MADE)
+    const strip = container.querySelector('[data-guide="studio-strip"]') as HTMLElement
+    await user.click(within(strip).getAllByRole('button')[1]!)
+    await user.click(screen.getByRole('button', { name: /use these words again/i }))
+
+    expect(screen.getByRole('button', { name: /match a picture/i })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
+    expect(within(picker).getByRole('button', { name: /picked 1 of 1/i })).toBeTruthy()
   })
 })
 

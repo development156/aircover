@@ -1,3 +1,5 @@
+import type { GenerationMode } from '@sahoda/shared'
+
 import type { GenerationCard, GenerationPicture } from './read'
 
 /**
@@ -30,6 +32,14 @@ export type CanvasPicture = {
   prompt: string
   formatId: string | null
   mime: string | null
+  /**
+   * Everything needed to ask for this picture AGAIN, carried on the picture
+   * itself. The fastest useful action after a result you almost like is the same
+   * request with one word changed, and today that means retyping the sentence
+   * and re-picking the references.
+   */
+  mode: GenerationMode
+  referenceAssetIds: string[]
 }
 
 /**
@@ -55,6 +65,8 @@ export function canvasPictures(cards: readonly GenerationCard[]): CanvasPicture[
         prompt: card.generation.prompt_given,
         formatId: card.generation.format_id,
         mime: picture.mime,
+        mode: card.generation.mode,
+        referenceAssetIds: [...card.generation.reference_asset_ids],
       })
     }
   }
