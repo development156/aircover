@@ -36,3 +36,25 @@ export function describeInsufficient(input: { required: number; available: numbe
     input.available,
   )}. Nothing was charged. Top up and the picture is still one press away.`
 }
+
+/**
+ * What arrived, when it was not everything that was asked for.
+ *
+ * ── A PARTIAL RESULT IS ITS OWN ANSWER ──────────────────────────────────────
+ * Asking for four and getting three is neither a success nor a failure, and
+ * saying either is a lie. "Made" hides that a picture is missing; "could not
+ * make this" hides three that arrived and were paid for. So the sentence names
+ * both numbers and says what happened to the money, because the wallet is where
+ * a person will go to check.
+ *
+ * Returns null when everything asked for arrived. There is nothing to explain,
+ * and a screen that announced "4 of 4" on every press would be noise that
+ * teaches people to stop reading it.
+ */
+export function describePartial(input: { made: number; asked: number }): string | null {
+  if (input.made >= input.asked) return null
+  const one = input.made === 1
+  return `Sahoda made ${input.made} of the ${input.asked} pictures you asked for, then stopped. You were charged for the ${
+    one ? 'one that arrived' : 'ones that arrived'
+  } and for nothing else.`
+}

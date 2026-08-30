@@ -48,6 +48,27 @@ export type ModeRule = {
  */
 export const MAX_REFERENCES = 3
 
+/**
+ * How many pictures one press may ask for.
+ *
+ * ── WHY FOUR, AND WHY IT IS NOT THE DATABASE'S CEILING ──────────────────────
+ * A model draws what it was asked for, not what was meant, and the ordinary way
+ * to find the picture you wanted is to see several and pick. One at a time makes
+ * that a chore; unlimited makes it expensive without anybody noticing.
+ *
+ * Four is the product's bound, deliberately lower than `MAX_IMAGES_PER_GENERATION`
+ * (20), which is what the TABLE will hold. Four at the standard price is already
+ * twenty-four credits on a single press, and the screen names that total before
+ * anything is spent.
+ *
+ * ── AND THESE ARE FOUR TRIES, NOT A SET ─────────────────────────────────────
+ * The routed model reports max n = 1, so four pictures are four separate calls
+ * and will NOT match each other. That is exactly what "show me some options"
+ * means and exactly what "a set that matches" does not, which is why one is
+ * offered here and the other is refused in `MODE_RULES`.
+ */
+export const MAX_TRIES_PER_PRESS = 4
+
 export const MODE_RULES: readonly ModeRule[] = [
   {
     mode: 'on_brand',

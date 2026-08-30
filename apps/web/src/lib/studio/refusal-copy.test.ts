@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { credits, describeInsufficient } from './refusal-copy'
+import { credits, describeInsufficient, describePartial } from './refusal-copy'
 
 /**
  * THE REFUSAL A FUNDED WORKSPACE NEVER SEES.
@@ -51,5 +51,47 @@ describe('describeInsufficient', () => {
 
   test('the copy carries no em dash, which is the standing ruling for prose', () => {
     expect(describeInsufficient({ required: 6, available: 1 })).not.toMatch(/[—–]/)
+  })
+})
+
+describe('a partial result', () => {
+  /**
+   * Asking for four and getting three is neither a success nor a failure.
+   * "Made" hides a missing picture; "could not make this" hides three that
+   * arrived and were paid for. Both are lies about somebody's money.
+   */
+  test('names both numbers, so nobody has to count the pictures', () => {
+    const said = describePartial({ made: 3, asked: 4 })
+    expect(said).toContain('3')
+    expect(said).toContain('4')
+  })
+
+  test('says what happened to the money, which is the question being asked', () => {
+    expect(describePartial({ made: 2, asked: 4 })).toMatch(/charged for the ones that arrived/i)
+  })
+
+  test('is silent when everything asked for arrived', () => {
+    expect(describePartial({ made: 4, asked: 4 })).toBeNull()
+    expect(describePartial({ made: 1, asked: 1 })).toBeNull()
+  })
+
+  test('reads correctly at one, which is the value that breaks it', () => {
+    const said = describePartial({ made: 1, asked: 4 })
+    expect(said).toMatch(/the one that arrived/i)
+    expect(said).not.toMatch(/the ones that arrived/i)
+  })
+
+  /**
+   * Zero delivered never reaches this function: the action returns down the
+   * failure path, which has its own sentence saying nothing was charged. This
+   * asserts the function stays TRUTHFUL if it is ever called that way anyway,
+   * rather than claiming something arrived.
+   */
+  test('zero made states zero rather than implying something arrived', () => {
+    expect(describePartial({ made: 0, asked: 4 })).toMatch(/0 of the 4/)
+  })
+
+  test('carries no em dash, which is the standing ruling for prose', () => {
+    expect(describePartial({ made: 2, asked: 4 }) ?? '').not.toMatch(/[—–]/)
   })
 })

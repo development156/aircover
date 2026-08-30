@@ -28,7 +28,7 @@ import { signMediaPreviews } from '@/lib/posts/media-url'
 import { sniffImage } from '@/lib/posts/sniff-image'
 import { brandSignalsFor } from '@/lib/studio/brand-signals'
 import { formatById } from '@/lib/studio/formats'
-import { MAX_REFERENCES, describeModeBlock } from '@/lib/studio/modes'
+import { MAX_REFERENCES, MAX_TRIES_PER_PRESS, describeModeBlock } from '@/lib/studio/modes'
 import { conditionPrompt } from '@/lib/studio/prompt'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { workspaceForWrite } from '@/lib/workspaces'
@@ -93,10 +93,24 @@ const GenerateInputSchema = z.object({
    * agree, and only one of them runs when somebody skips the screen.
    */
   referenceAssetIds: z.array(z.uuid()).max(MAX_REFERENCES).default([]),
+  /**
+   * How many separate pictures to try. Bounded by the SAME constant the screen
+   * shows, so a hand-made request cannot ask for a hundred and be charged for
+   * a hundred.
+   */
+  count: z.number().int().min(1).max(MAX_TRIES_PER_PRESS).default(1),
 })
 
 export type QueueGenerationState =
-  | { ok: true; generationId: string; balanceAfter: number }
+  | {
+      ok: true
+      generationId: string
+      balanceAfter: number
+      /** How many pictures actually arrived. Never more than was asked for. */
+      made: number
+      /** How many were asked for, so a partial result can say which it was. */
+      asked: number
+    }
   | { ok: false; insufficient: false; message: string }
   | ChargeFailureState
 
@@ -190,7 +204,7 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
         format_id: format.id,
         width: format.width,
         height: format.height,
-        requested_count: 1,
+        requested_count: parsed.data.count,
         reference_asset_ids: parsed.data.referenceAssetIds,
         // Explore legitimately used nothing, and `[]` says that. A null here
         // would mean conditioning never ran, which is a different claim.
@@ -208,141 +222,185 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
     const traceId = randomUUID()
     // Fresh per invocation and server-derived. A stable ref would let a second
     // press replay a spent hold: no charge, but the paid provider call still runs.
-    const objectRef = `studio:${workspace.id}:${generationId}`
+    // The picture's index is part of it, because four pictures on one press are
+    // four separate charges and a shared ref would collapse them into one.
+    const objectRefFor = (idx: number) => `studio:${workspace.id}:${generationId}:${idx}`
 
-    // `delivered` is what makes a charge claim honest: only the caller can know
-    // whether the callback reached its end, and the error alone cannot say.
-    let failure: string | null = null
-    let delivered = false
-    let charged = 0
     let providerCostMicroUsd: number | null = null
 
-    const credits = await getWithCredits()(
-      { workspaceId: workspace.id, action, objectRef },
-      async (ctx: { actionType: string; creditsCharged: number }) => {
-        await supabase
-          .from('studio_generations')
-          .update({ status: 'running', started_at: new Date().toISOString() })
-          .eq('id', generationId)
-          .eq('workspace_id', workspace.id)
+    // ── FOUR PICTURES ARE FOUR CHARGES, NOT ONE ─────────────────────────────
+    //
+    // The routed model draws one picture per call (MEASURED, docs/43), so asking
+    // for four means four calls. Each one gets its OWN hold, which is the only
+    // arrangement where the money stays honest: if the third call fails, the
+    // first two were delivered and are charged, the third releases its hold, and
+    // the fourth is never attempted. One hold covering all four would either
+    // charge for pictures nobody received or refund pictures they did.
+    //
+    // And the loop STOPS at the first failure rather than pressing on. A call
+    // that just failed usually fails again for the same reason, and spending
+    // three more times to prove it is somebody else's money.
+    let delivered = 0
+    let charged = 0
+    let balanceAfter: number | null = null
+    let lastFailure: ChargeFailureState | null = null
+    // The ledger's own code, kept so the row records WHY rather than a word this
+    // file chose. Somebody reading the row tomorrow needs the real reason.
+    let lastErrorCode: string | null = null
 
-        const result = await getMesh().runImage(
-          {
-            prompt: conditioned.prompt,
-            size: 'square',
-            // The exact canvas, not one of three ratios. Without this a story
-            // comes back landscape with nothing saying so.
-            dims: { width: format.width, height: format.height },
-            // Absent when there are none. `openrouter.ts` drops the field
-            // entirely for an empty list, because a field carrying [] and a
-            // field that is not there are different requests.
-            references: referenceUrls,
-          },
-          {
+    for (let idx = 0; idx < parsed.data.count; idx += 1) {
+      // `deliveredThis` is what makes a charge claim honest: only the caller can
+      // know whether the callback reached its end, and the error alone cannot say.
+      let failure: string | null = null
+      let deliveredThis = false
+
+      const credits = await getWithCredits()(
+        { workspaceId: workspace.id, action, objectRef: objectRefFor(idx) },
+        async (ctx: { actionType: string; creditsCharged: number }) => {
+          if (idx === 0) {
+            await supabase
+              .from('studio_generations')
+              .update({ status: 'running', started_at: new Date().toISOString() })
+              .eq('id', generationId)
+              .eq('workspace_id', workspace.id)
+          }
+
+          const result = await getMesh().runImage(
+            {
+              prompt: conditioned.prompt,
+              size: 'square',
+              // The exact canvas, not one of three ratios. Without this a story
+              // comes back landscape with nothing saying so.
+              dims: { width: format.width, height: format.height },
+              // Absent when there are none. `openrouter.ts` drops the field
+              // entirely for an empty list, because a field carrying [] and a
+              // field that is not there are different requests.
+              references: referenceUrls,
+            },
+            {
+              workspaceId: workspace.id,
+              traceId,
+              userId,
+              actionType: ctx.actionType,
+              creditsCharged: ctx.creditsCharged,
+            },
+          )
+          // Our own copy, never `result.error.message`: that can carry provider text.
+          if (!result.ok) {
+            failure = FAILURE_REASON.MESH_ERROR
+            throw new Error('MESH_ERROR')
+          }
+          // What the PROVIDER said it cost, in whole ten-thousandths of a US cent.
+          // Undefined when it said nothing, and the column then stays null: an
+          // estimate rendered as a price is a figure nobody quoted, which is why
+          // the mesh hands this back separately from `usage.costUsd`.
+          const thisCost =
+            typeof result.data.providerCostUsd === 'number'
+              ? Math.round(result.data.providerCostUsd * 1_000_000)
+              : null
+          if (thisCost !== null) {
+            providerCostMicroUsd = (providerCostMicroUsd ?? 0) + thisCost
+          }
+
+          const bytes = Uint8Array.from(Buffer.from(result.data.base64, 'base64'))
+          if (bytes.byteLength === 0 || bytes.byteLength > MEDIA_UPLOAD_CAP_BYTES) {
+            failure = REFUSALS.unusable
+            throw new Error('IMAGE_UNUSABLE')
+          }
+
+          // Facts, not the model's claim. `result.data.mime` is deliberately unused.
+          const sniffed = sniffImage(bytes)
+          if (!sniffed.ok) {
+            failure = REFUSALS.unusable
+            throw new Error('IMAGE_UNREADABLE')
+          }
+          const kind = kindForProvenMime(sniffed.image.mime)
+          if (kind === null) {
+            failure = REFUSALS.unusable
+            throw new Error('IMAGE_UNSUPPORTED')
+          }
+
+          const newAssetId = randomUUID()
+          const objectPath = assetObjectPath({
             workspaceId: workspace.id,
-            traceId,
-            userId,
-            actionType: ctx.actionType,
-            creditsCharged: ctx.creditsCharged,
-          },
-        )
-        // Our own copy, never `result.error.message`: that can carry provider text.
-        if (!result.ok) {
-          failure = FAILURE_REASON.MESH_ERROR
-          throw new Error('MESH_ERROR')
-        }
-        // What the PROVIDER said it cost, in whole ten-thousandths of a US cent.
-        // Undefined when it said nothing, and the column then stays null: an
-        // estimate rendered as a price is a figure nobody quoted, which is why
-        // the mesh hands this back separately from `usage.costUsd`.
-        providerCostMicroUsd =
-          typeof result.data.providerCostUsd === 'number'
-            ? Math.round(result.data.providerCostUsd * 1_000_000)
-            : null
+            assetId: newAssetId,
+            mime: sniffed.image.mime,
+          })
+          const upload = await supabase.storage.from(MEDIA_BUCKET).upload(objectPath, bytes, {
+            contentType: sniffed.image.mime,
+            upsert: false,
+          })
+          if (upload.error) {
+            failure = REFUSALS.stored
+            throw new Error('STORAGE_FAILED')
+          }
 
-        const bytes = Uint8Array.from(Buffer.from(result.data.base64, 'base64'))
-        if (bytes.byteLength === 0 || bytes.byteLength > MEDIA_UPLOAD_CAP_BYTES) {
-          failure = REFUSALS.unusable
-          throw new Error('IMAGE_UNUSABLE')
-        }
+          const row = await supabase.from('assets').insert({
+            id: newAssetId,
+            workspace_id: workspace.id,
+            storage_path: objectPath,
+            kind,
+            mime: sniffed.image.mime,
+            bytes: bytes.byteLength,
+            width: sniffed.image.width,
+            height: sniffed.image.height,
+            created_by: userId,
+          })
+          if (row.error) {
+            // The object is already in storage and nothing points at it. Remove it
+            // rather than leaving bytes nobody can reach or delete.
+            await supabase.storage.from(MEDIA_BUCKET).remove([objectPath])
+            failure = REFUSALS.stored
+            throw new Error('ASSET_ROW_FAILED')
+          }
 
-        // Facts, not the model's claim. `result.data.mime` is deliberately unused.
-        const sniffed = sniffImage(bytes)
-        if (!sniffed.ok) {
-          failure = REFUSALS.unusable
-          throw new Error('IMAGE_UNREADABLE')
-        }
-        const kind = kindForProvenMime(sniffed.image.mime)
-        if (kind === null) {
-          failure = REFUSALS.unusable
-          throw new Error('IMAGE_UNSUPPORTED')
-        }
+          charged += ctx.creditsCharged
+          await supabase.from('studio_generation_images').insert({
+            workspace_id: workspace.id,
+            generation_id: generationId,
+            idx,
+            asset_id: newAssetId,
+            width: sniffed.image.width,
+            height: sniffed.image.height,
+          })
+          deliveredThis = true
+        },
+      )
 
-        const newAssetId = randomUUID()
-        const objectPath = assetObjectPath({
-          workspaceId: workspace.id,
-          assetId: newAssetId,
-          mime: sniffed.image.mime,
-        })
-        const upload = await supabase.storage.from(MEDIA_BUCKET).upload(objectPath, bytes, {
-          contentType: sniffed.image.mime,
-          upsert: false,
-        })
-        if (upload.error) {
-          failure = REFUSALS.stored
-          throw new Error('STORAGE_FAILED')
-        }
+      if (credits.ok) {
+        delivered += 1
+        balanceAfter = credits.data.balanceAfter
+        continue
+      }
 
-        const row = await supabase.from('assets').insert({
-          id: newAssetId,
-          workspace_id: workspace.id,
-          storage_path: objectPath,
-          kind,
-          mime: sniffed.image.mime,
-          bytes: bytes.byteLength,
-          width: sniffed.image.width,
-          height: sniffed.image.height,
-          created_by: userId,
-        })
-        if (row.error) {
-          // The object is already in storage and nothing points at it. Remove it
-          // rather than leaving bytes nobody can reach or delete.
-          await supabase.storage.from(MEDIA_BUCKET).remove([objectPath])
-          failure = REFUSALS.stored
-          throw new Error('ASSET_ROW_FAILED')
-        }
+      // This picture's hold was released, so it was not charged. Through the SAME
+      // mapper every other paid action uses: it decides whether a charge claim is
+      // honest from `delivered`, which only the caller knows, and it is
+      // deliberately unable to read the provider's own message.
+      lastErrorCode = credits.error.code
+      lastFailure = chargeFailureState({
+        error: credits.error,
+        action,
+        delivered: deliveredThis,
+        reason: failure,
+      })
+      break
+    }
 
-        charged = ctx.creditsCharged
-        await supabase.from('studio_generation_images').insert({
-          workspace_id: workspace.id,
-          generation_id: generationId,
-          idx: 0,
-          asset_id: newAssetId,
-          width: sniffed.image.width,
-          height: sniffed.image.height,
-        })
-        delivered = true
-      },
-    )
-
-    if (!credits.ok) {
-      // The hold was released, so nothing was charged. The row records the
-      // attempt and says why, because somebody who watched a spinner and got
-      // nothing is owed an explanation they can find again tomorrow.
+    // ── NOTHING ARRIVED ──────────────────────────────────────────────────────
+    if (delivered === 0) {
       await supabase
         .from('studio_generations')
         .update({
           status: 'failed',
           finished_at: new Date().toISOString(),
-          error_code: credits.error.code,
+          error_code: lastErrorCode,
         })
         .eq('id', generationId)
         .eq('workspace_id', workspace.id)
 
-      // Through the SAME mapper every other paid action uses. It decides whether
-      // a charge claim is honest from `delivered`, which only the caller knows,
-      // and it is deliberately unable to read the provider's own message.
-      return chargeFailureState({ error: credits.error, action, delivered, reason: failure })
+      revalidateBalance()
+      return lastFailure ?? { ok: false, insufficient: false, message: REFUSALS.failed }
     }
 
     await supabase
@@ -360,7 +418,15 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
     revalidateBalance()
     revalidatePath('/studio')
     revalidatePath('/assets')
-    return { ok: true, generationId, balanceAfter: credits.data.balanceAfter }
+    return {
+      ok: true,
+      generationId,
+      // Never null here: at least one picture was delivered, and every delivery
+      // came back through a successful charge that carried a balance.
+      balanceAfter: balanceAfter ?? 0,
+      made: delivered,
+      asked: parsed.data.count,
+    }
   } catch (error) {
     reportServerError(error, { action: 'queueGeneration', workspaceId })
     return { ok: false, insufficient: false, message: REFUSALS.failed }
