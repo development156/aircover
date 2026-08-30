@@ -37,10 +37,15 @@ const SURFACES: SkinSurface[] = ['light', 'dark']
 const BRANDS: Record<string, string> = {
   teal: rgbToOklch(0, 128, 128),
   crimson: rgbToOklch(190, 20, 40),
-  navy: rgbToOklch(10, 30, 90),
   'neon yellow': rgbToOklch(240, 255, 20),
   'near-white': rgbToOklch(248, 248, 250),
   'near-black': rgbToOklch(8, 8, 10),
+  // The four the fill-on-page guard exists for. Measured at 1.02, 1.09, 1.22
+  // and 1.41 against their own page before it, and passing every other check.
+  navy: rgbToOklch(8, 20, 70),
+  'deep purple': rgbToOklch(40, 10, 90),
+  lime: rgbToOklch(190, 255, 20),
+  yellow: rgbToOklch(255, 214, 0),
 }
 
 const rgbOf = (value: string): Rgb => {
@@ -54,7 +59,12 @@ describe.each(SURFACES)('on the %s surface', (surface) => {
 
     /** The Readability Guard's whole promise, restated per surface. */
     it('carries readable text on the primary fill', () => {
-      const fg = vars['--pfg'] === 'white' ? { r: 255, g: 255, b: 255 } : PAGE[surface].r > 128 ? INK.light : { r: 13, g: 13, b: 13 }
+      const fg =
+        vars['--pfg'] === 'white'
+          ? { r: 255, g: 255, b: 255 }
+          : PAGE[surface].r > 128
+            ? INK.light
+            : { r: 13, g: 13, b: 13 }
       expect(contrastRatio(rgbOf(vars['--p']), fg)).toBeGreaterThanOrEqual(4.5)
     })
 
@@ -80,6 +90,65 @@ describe.each(SURFACES)('on the %s surface', (surface) => {
     it.each(['--t50', '--t100'] as const)('separates the %s fill from the page', (token) => {
       expect(contrastRatio(rgbOf(vars[token]), PAGE[surface])).toBeGreaterThan(1.02)
     })
+
+    /**
+     * ── THE BUTTON MUST BE VISIBLE AS A BUTTON ────────────────────────────
+     * Founder's rule, 2026-08-29, in the research pasted that day: clamp the
+     * primary's lightness rather than letting the extracted value stand. I
+     * declined it, and wrote the reason into `brand-theme.ts`: "the guard below
+     * moves it until the contrast is real, which is a stronger statement than a
+     * band."
+     *
+     * That reasoning had a hole. The guard measures TEXT AGAINST THE FILL and
+     * never the FILL AGAINST THE PAGE, so a label can be perfectly legible on a
+     * button that is the same colour as the background behind it. MEASURED
+     * before this guard existed, fill against page:
+     *
+     *   navy         dark    1.02:1     the button IS the page
+     *   deep purple  dark    1.09:1
+     *   lime         light   1.22:1
+     *   yellow       light   1.41:1
+     *
+     * All four passed every check in the suite. WCAG 1.4.11 asks 3:1 for the
+     * boundary of a user-interface component, and that is the threshold here:
+     * it is about seeing the control at all, which is a lower bar than reading
+     * words and a real one.
+     *
+     * SCOPED TO `--p`, deliberately. A tint is meant to be a subtle wash and
+     * holding it to 3:1 would destroy what it is for; the tint's own guarantee
+     * is the ink that sits on it, asserted above. What has to read as a distinct
+     * pressable object is the primary fill.
+     */
+    it('is visible as a shape against the page it sits on', () => {
+      expect(contrastRatio(rgbOf(vars['--p']), PAGE[surface])).toBeGreaterThanOrEqual(3)
+    })
+
+    /** The hover step moves away from the page, so it can only be clearer. */
+    it('keeps the hover step visible too', () => {
+      expect(contrastRatio(rgbOf(vars['--pstrong']), PAGE[surface])).toBeGreaterThanOrEqual(3)
+    })
+  })
+})
+
+/**
+ * The hue is what makes it theirs, and moving lightness is what makes it usable.
+ * Both have to survive, or the guard has traded a real defect for a different
+ * one: a navy brand lightened until it reads must still be navy.
+ */
+describe('the fill-on-page guard keeps the brand recognisable', () => {
+  it.each([
+    ['navy', [8, 20, 70]],
+    ['deep purple', [40, 10, 90]],
+    ['lime', [190, 255, 20]],
+    ['yellow', [255, 214, 0]],
+  ] as const)('holds %s to its own hue while moving its lightness', (_name, rgb) => {
+    const input = parseOklch(rgbToOklch(rgb[0], rgb[1], rgb[2]))
+
+    for (const surface of SURFACES) {
+      const out = parseOklch(brandSkinVars([rgbToOklch(rgb[0], rgb[1], rgb[2])], surface)['--p'])
+      const gap = Math.abs(out.h - input.h)
+      expect(Math.min(gap, 360 - gap), `${_name} on ${surface} was repainted`).toBeLessThan(6)
+    }
   })
 })
 
