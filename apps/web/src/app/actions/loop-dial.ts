@@ -6,7 +6,11 @@ import {
   AutonomyLevelSchema,
   ChannelSchema,
   DEFAULT_WEEKLY_BUDGET_CREDITS,
+  MAX_AUTOPILOT_CANCEL_MINUTES,
+  MAX_AUTOPILOT_DAILY_CAP,
   MAX_WEEKLY_BUDGET_CREDITS,
+  MIN_AUTOPILOT_CANCEL_MINUTES,
+  MIN_AUTOPILOT_DAILY_CAP,
 } from '@sahoda/shared'
 
 import { reportServerError } from '@/lib/observability/report'
@@ -97,6 +101,8 @@ export async function setChannelAutonomy(channel: unknown, level: unknown): Prom
 export async function setLoopSettings(input: {
   paused?: unknown
   weeklyBudgetCredits?: unknown
+  autopilotDailyCap?: unknown
+  autopilotCancelMinutes?: unknown
 }): Promise<DialState> {
   let workspaceId: string | undefined
   try {
@@ -122,6 +128,40 @@ export async function setLoopSettings(input: {
         }
       }
       patch.weekly_budget_credits = n
+    }
+
+    // ── THE TWO AUTOPILOT PROMISES ──────────────────────────────────────────
+    // Bounded here as well as in their columns, for the same reason as the
+    // budget above: a value past the end must read as a sentence rather than as
+    // a constraint violation. The bounds come from @sahoda/shared, so the form,
+    // this check and the column cannot drift apart.
+    //
+    // A cap of 0 is a real choice, not an empty field — it means autopilot may
+    // announce nothing today — so `Number()` and an integer check are used
+    // rather than any truthiness test.
+    if (input.autopilotDailyCap !== undefined) {
+      const n = Number(input.autopilotDailyCap)
+      if (!Number.isInteger(n) || n < MIN_AUTOPILOT_DAILY_CAP || n > MAX_AUTOPILOT_DAILY_CAP) {
+        return {
+          ok: false,
+          message: `Pick how many posts a day, between ${MIN_AUTOPILOT_DAILY_CAP} and ${MAX_AUTOPILOT_DAILY_CAP}.`,
+        }
+      }
+      patch.autopilot_daily_cap = n
+    }
+    if (input.autopilotCancelMinutes !== undefined) {
+      const n = Number(input.autopilotCancelMinutes)
+      if (
+        !Number.isInteger(n) ||
+        n < MIN_AUTOPILOT_CANCEL_MINUTES ||
+        n > MAX_AUTOPILOT_CANCEL_MINUTES
+      ) {
+        return {
+          ok: false,
+          message: `Pick how long you get to stop a post, between ${MIN_AUTOPILOT_CANCEL_MINUTES} minutes and ${MAX_AUTOPILOT_CANCEL_MINUTES / 60} hours.`,
+        }
+      }
+      patch.autopilot_cancel_minutes = n
     }
 
     const supabase = createServerSupabase()

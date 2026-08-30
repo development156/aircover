@@ -7,6 +7,7 @@ import {
 } from '@sahoda/shared'
 
 import { AutonomyDial } from '@/components/loop/autonomy-dial'
+import { AutopilotLimits } from '@/components/loop/autopilot-limits'
 import { CostPreview } from '@/components/loop/cost-preview'
 import { CycleStrip } from '@/components/loop/cycle-strip'
 import { GoingOut } from '@/components/loop/going-out'
@@ -121,6 +122,17 @@ export default async function LoopPage() {
         lapsed={snapshot.lapsed}
         chosen={chosen}
         defaultLevel={DEFAULT_AUTONOMY_LEVEL}
+      />
+
+      {/* Directly under the dial, because these two numbers only mean anything
+          once a channel is set to L3, and a reader who has just chosen that
+          needs to see them before anything else. Shown whether or not one is
+          armed: they are what WOULD hold, and a limit nobody can see before
+          they need it is a limit set on their behalf. */}
+      <AutopilotLimits
+        dailyCap={snapshot.autopilotDailyCap}
+        cancelMinutes={snapshot.autopilotCancelMinutes}
+        armed={[...snapshot.dial.values()].some((level) => level === 3)}
       />
 
       {/* Between the dial that grants the permission and the switch that
