@@ -180,7 +180,21 @@ export async function expectPostSaved(page: Page): Promise<void> {
  * whole job is to prove this helper is not silently a no-op EVERYWHERE, which is
  * the failure a permissive helper would otherwise hide.
  */
+const offerDismissed = new WeakSet<Page>()
+
 export async function dismissPlanOffer(page: Page): Promise<void> {
+  /**
+   * ── ONCE PER PAGE, AND THE SECOND CALL IS FREE ───────────────────────────
+   * The dismissal is recorded in `localStorage` against the sign-in, so after
+   * the first close the dialog never opens again in this context — and every
+   * later call then sat through the FULL wait below before giving up.
+   * `shell-widths.spec.ts` calls this once per width per account state, so a
+   * spec that dismisses once was paying roughly 165 seconds to wait for a
+   * dialog that could not appear. A longer spec is a flakier spec, and that is
+   * how a helper meant to steady the suite ends up destabilising it.
+   */
+  if (offerDismissed.has(page)) return
+
   const offer = page.getByRole('dialog').filter({ hasText: 'Choose the right plan for you' })
   try {
     /**
@@ -197,4 +211,5 @@ export async function dismissPlanOffer(page: Page): Promise<void> {
   }
   await offer.getByRole('button', { name: 'Close' }).click()
   await offer.waitFor({ state: 'hidden', timeout: 10_000 })
+  offerDismissed.add(page)
 }
