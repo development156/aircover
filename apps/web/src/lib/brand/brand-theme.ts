@@ -29,6 +29,115 @@ const MIN_CONTRAST = 4.5
 const DARKEN_STEP = 0.03
 const MAX_DARKEN_ITERATIONS = 32
 
+/**
+ * ── THE SURFACE THE BRAND IS BEING GRADED AGAINST ───────────────────────────
+ *
+ * Founder's report, 2026-08-29, with a screenshot of the wallet: the selected
+ * plan card was a near-white fill carrying near-white text, and the day/night
+ * toggle appeared to be changing the BRAND rather than the theme.
+ *
+ * Both halves of that were this module. Everything here graded against white
+ * and nothing else: `--acc` was darkened until it read on `#ffffff`, which is
+ * precisely the accent that CANNOT be read on `#171717`; and the three tints
+ * were pinned at lightness 0.97 / 0.93 / 0.78, which are near-white fills
+ * whatever the theme. In dark, `--ink` is `#ffffff`, so a near-white tint fill
+ * carrying ink is white on white. That is the invisible card in the screenshot,
+ * and it was not a component defect: it was this function answering a question
+ * about a light surface and having its answer applied to a dark one.
+ *
+ * So the derivation now takes the surface. Two sets of constants, mirroring
+ * `tokens.css`'s light block and its `[data-theme='dark']` block, and
+ * `guard-neutrals.test.ts` reads the real token file so they cannot drift.
+ */
+export type SkinSurface = 'light' | 'dark'
+
+interface SurfaceSpec {
+  /** The card surface accent TEXT is graded against — `--surface`. */
+  surface: Rgb
+  /** The dark text candidate for `--pfg`, as a token this theme resolves darkly. */
+  darkText: { css: string; rgb: Rgb }
+  /** Lightness targets for the three tint fills, relative to that surface. */
+  tints: { t50: number; t100: number; t300: number }
+  /**
+   * Which way the guard walks lightness to gain contrast.
+   *
+   * On light it DARKENS: a dark fill on a white page reads, and carries white
+   * text. On dark it LIGHTENS, and that is not symmetry for its own sake — a
+   * fill darkened to clear 4.5:1 against white text is a fill that has
+   * disappeared into a `#171717` page. Every dark interface puts a BRIGHT
+   * primary button with dark text on a dark ground, for this reason.
+   */
+  step: number
+}
+
+const SURFACES: Record<SkinSurface, SurfaceSpec> = {
+  light: {
+    surface: SURFACE_RGB,
+    darkText: { css: 'var(--ink)', rgb: INK_RGB },
+    tints: { t50: 0.97, t100: 0.93, t300: 0.78 },
+    step: -DARKEN_STEP,
+  },
+  dark: {
+    // tokens.css dark `--surface: #171717`. The page beneath is `--canvas`
+    // #0d0d0d, so clearing the lighter of the two clears both, exactly as the
+    // light spec grades against the lighter `#ffffff`.
+    surface: { r: 23, g: 23, b: 23 },
+    // NOT `var(--ink)`, which is `#ffffff` in dark and would hand back white
+    // text on a bright fill. `--canvas` is the token that is dark in the dark
+    // theme, so the "point a themeable token at a fixed one" property survives
+    // without the value being wrong.
+    darkText: { css: 'var(--canvas)', rgb: { r: 13, g: 13, b: 13 } },
+    // Sitting just above `--surface-2` (#212121, L 0.27) and `--surface-3`
+    // (#292929, L 0.31), so a tint still reads as a tint rather than as the
+    // card it is painted on.
+    tints: { t50: 0.28, t100: 0.34, t300: 0.52 },
+    step: DARKEN_STEP,
+  },
+}
+
+/**
+ * ── GUARDRAILS ON THE COLOUR ITSELF, BEFORE ANY OF THE ABOVE ────────────────
+ * From the founder's research, 2026-08-29, and each one answers a case this
+ * product has actually hit.
+ *
+ * A LOGO THAT IS BASICALLY GREY GETS SAHODA'S ORANGE. The founder's own logo
+ * is mostly grey and white, the extractor correctly reported grey as the most
+ * frequent colour, and the product went washed out. A near-zero chroma is not a
+ * brand colour, it is the absence of one, and the honest answer is to keep ours
+ * rather than paint the interface in a colour nobody chose.
+ *
+ * AND CHROMA IS CLAMPED AT BOTH ENDS. Too little and every button is a grey
+ * button; too much and a neon logo gives an interface that glows. The band
+ * keeps the colour recognisably theirs without either failure.
+ *
+ * Lightness is NOT clamped here, deliberately: the guard below moves it until
+ * the contrast is real, which is a stronger statement than a band, and a band
+ * applied first would only give the guard less room.
+ */
+const MIN_BRAND_CHROMA = 0.03
+const MAX_BRAND_CHROMA = 0.16
+
+function guardedInput(input: { l: number; c: number; h: number }): {
+  l: number
+  c: number
+  h: number
+} {
+  if (!Number.isFinite(input.c) || input.c < MIN_BRAND_CHROMA) return DEFAULT_PRIMARY
+  return { l: input.l, c: Math.min(input.c, MAX_BRAND_CHROMA), h: input.h }
+}
+
+/**
+ * The accent, when the logo yielded only one colour.
+ *
+ * SPLIT-COMPLEMENTARY, at +150 degrees, rather than the strict 180 opposite.
+ * The founder's research is right about this and it is not merely taste: exact
+ * complements of saturated hues vibrate against each other on a screen, and the
+ * split lands the same contrast step without that. It also matters that the
+ * previous answer was WORSE than either: with one colour the accent reused the
+ * primary's own hue, so the accent was the primary and nothing popped at all.
+ */
+const SPLIT_COMPLEMENT_DEGREES = 150
+
 // Default brand orange (tokens.css --p: #FF6600 = rgb(255,102,0)) — the
 // fallback primary when no logo/colors were extracted yet.
 const DEFAULT_PRIMARY = parseOklch(rgbToOklch(255, 102, 0))
@@ -69,21 +178,25 @@ function guardPrimaryForeground(
   l: number,
   c: number,
   h: number,
+  spec: SurfaceSpec,
 ): { primary: string; foreground: string } {
   let lightness = l
   for (let step = 0; step <= MAX_DARKEN_ITERATIONS; step += 1) {
     const rgb = oklchToRgb(lightness, c, h)
     const contrastWhite = contrastRatio(rgb, WHITE_RGB)
-    const contrastInk = contrastRatio(rgb, INK_RGB)
-    if (contrastWhite >= MIN_CONTRAST || contrastInk >= MIN_CONTRAST) {
-      const foreground = contrastInk >= contrastWhite ? 'var(--ink)' : 'white'
+    const contrastDark = contrastRatio(rgb, spec.darkText.rgb)
+    if (contrastWhite >= MIN_CONTRAST || contrastDark >= MIN_CONTRAST) {
+      const foreground = contrastDark >= contrastWhite ? spec.darkText.css : 'white'
       return { primary: formatOklch(lightness, c, h), foreground }
     }
-    lightness = Math.max(0, lightness - DARKEN_STEP)
+    lightness = Math.min(1, Math.max(0, lightness + spec.step))
   }
-  // Exhausted the darkening budget on a pathological input — force a
-  // near-black primary with white text, which always clears 4.5:1.
-  return { primary: readableBlack(), foreground: 'white' }
+  // Exhausted the budget on a pathological input. The fallback goes to whichever
+  // end this surface was walking towards, so a dark theme never lands on a
+  // near-black button that has vanished into its own page.
+  return spec.step < 0
+    ? { primary: readableBlack(), foreground: 'white' }
+    : { primary: formatOklch(1, 0, 0), foreground: spec.darkText.css }
 }
 
 /**
@@ -93,14 +206,16 @@ function guardPrimaryForeground(
  * accent-text colour, and the surfaces it lands on are --surface and --canvas.
  * --surface is the lighter of the two, so clearing it clears both.
  */
-function darkenForTextOnSurface(l: number, c: number, h: number): string {
+function textOnSurface(l: number, c: number, h: number, spec: SurfaceSpec): string {
   let lightness = l
   for (let step = 0; step <= MAX_DARKEN_ITERATIONS; step += 1) {
     const rgb = oklchToRgb(lightness, c, h)
-    if (contrastRatio(rgb, SURFACE_RGB) >= MIN_CONTRAST) return formatOklch(lightness, c, h)
-    lightness = Math.max(0, lightness - DARKEN_STEP)
+    if (contrastRatio(rgb, spec.surface) >= MIN_CONTRAST) return formatOklch(lightness, c, h)
+    lightness = Math.min(1, Math.max(0, lightness + spec.step))
   }
-  return readableBlack()
+  // Whichever end this surface reads against. A near-black link on a near-black
+  // page was the exact failure this parameter exists to end.
+  return spec.step < 0 ? readableBlack() : formatOklch(1, 0, 0)
 }
 
 /**
@@ -110,23 +225,30 @@ function darkenForTextOnSurface(l: number, c: number, h: number): string {
  * --acc, darkened until it reads as text on a light surface. Tints are
  * light/pale steps along the primary's hue.
  */
-export function brandSkinVars(colors: string[]): BrandSkinVars {
-  const primaryInput = colors[0] ? parseOklch(colors[0]) : DEFAULT_PRIMARY
+export function brandSkinVars(colors: string[], surface: SkinSurface = 'light'): BrandSkinVars {
+  const spec = SURFACES[surface]
+  const primaryInput = colors[0] ? guardedInput(parseOklch(colors[0])) : DEFAULT_PRIMARY
   const { primary, foreground } = guardPrimaryForeground(
     primaryInput.l,
     primaryInput.c,
     primaryInput.h,
+    spec,
   )
   const { l, c, h } = parseOklch(primary)
 
-  const pstrong = formatOklch(Math.max(0, l - 0.1), c, h)
+  // The hover step moves AWAY from the page, in whichever direction that is.
+  // Darkening a dark-theme button on hover moved it towards its own background,
+  // so the loudest control in the product got quieter when you reached for it.
+  const pstrong = formatOklch(Math.min(1, Math.max(0, l + spec.step * 3.5)), c, h)
 
-  const accentInput = colors[1] ? parseOklch(colors[1]) : { l, c, h }
-  const acc = darkenForTextOnSurface(accentInput.l, accentInput.c, accentInput.h)
+  const accentInput = colors[1]
+    ? guardedInput(parseOklch(colors[1]))
+    : { l, c, h: (h + SPLIT_COMPLEMENT_DEGREES) % 360 }
+  const acc = textOnSurface(accentInput.l, accentInput.c, accentInput.h, spec)
 
-  const t50 = formatOklch(0.97, Math.min(c, 0.02), h)
-  const t100 = formatOklch(0.93, Math.min(c, 0.05), h)
-  const t300 = formatOklch(0.78, Math.min(Math.max(c, 0.08), 0.16), h)
+  const t50 = formatOklch(spec.tints.t50, Math.min(c, 0.02), h)
+  const t100 = formatOklch(spec.tints.t100, Math.min(c, 0.05), h)
+  const t300 = formatOklch(spec.tints.t300, Math.min(Math.max(c, 0.08), 0.16), h)
 
   return {
     '--p': primary,
