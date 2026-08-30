@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
 import { describe, it, expect } from 'vitest'
 
 import { brandNeutralVars, type BrandNeutralVars, type SkinSurface } from './brand-theme'
@@ -125,8 +128,129 @@ describe.each(SURFACES)('the %s neutrals', (surface) => {
     /** A cast, not a colour. Chroma this low is felt rather than seen. */
     it.each(TOKENS)('tints %s without colouring it', (token) => {
       expect(parseOklch(vars[token]).c).toBeLessThanOrEqual(0.02)
-      expect(parseOklch(vars[token]).c).toBeGreaterThan(0)
     })
+  })
+})
+
+/**
+ * ── THE TINT HAS TO BE VISIBLE, AND `c > 0` DID NOT SAY THAT ───────────────
+ * MUTATION-PROVED by an adversarial review: setting `NEUTRAL_CHROMA` from 0.006
+ * to 0.001 left 512 of 512 tests green while reducing the entire feature to an
+ * invisible no-op — light `--canvas` moved by one channel of 1/255 and dark
+ * `--surface-2` did not move at all. The old floor was `c > 0`, defeated only by
+ * `formatOklch` rounding to zero.
+ *
+ * A guard on the INPUT constant cannot see this; the question is whether the
+ * emitted colour differs from the token it came from by an amount an eye can
+ * find. So it is asserted in rendered channels, against the real stop.
+ */
+/**
+ * ── THE MIRROR, PINNED TO THE REAL FILE ─────────────────────────────────────
+ * `brand-theme.ts`'s NEUTRAL_STOPS says "`guard-neutrals.test.ts` reads the real
+ * token file". Review measured that claim FALSE: that test never references
+ * NEUTRAL_STOPS and reads only the light `:root` block, so all ten values —
+ * including the entire dark ladder — were unpinned. A mirror nobody checks is
+ * the defect this project already hit once, when these constants silently held
+ * v2 greys through the v3 swap and the Guard graded tenant brands against
+ * surfaces the app had stopped painting.
+ *
+ * So the claim is made true here instead of being deleted.
+ */
+describe('the mirrored token values', () => {
+  const css = readFileSync(
+    fileURLToPath(new URL('../../../../../packages/shared/tokens.css', import.meta.url)),
+    'utf8',
+  )
+
+  /** The declarations inside one block, so light and dark cannot be confused. */
+  const blockOf = (start: RegExp) => {
+    const at = css.search(start)
+    return at < 0 ? '' : css.slice(at, css.indexOf('}', at))
+  }
+  const BLOCKS: Record<SkinSurface, string> = {
+    light: blockOf(/^:root \{/m),
+    dark: blockOf(/^:root\[data-theme='dark'\],/m),
+  }
+
+  const hexOf = ({ r, g, b }: Rgb) =>
+    `#${[r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('')}`
+
+  it.each(SURFACES)('match tokens.css in %s', (surface) => {
+    expect(BLOCKS[surface], 'the block was not found — has tokens.css moved?').not.toBe('')
+
+    for (const token of TOKENS) {
+      const declared = new RegExp(`${token}:\\s*(#[0-9a-f]{6})`, 'i').exec(BLOCKS[surface])?.[1]
+      expect(declared, `${token} is not declared in the ${surface} block`).toBeDefined()
+      expect(declared!.toLowerCase(), `${token} has drifted from tokens.css`).toBe(
+        hexOf(STOPS[surface][token]),
+      )
+    }
+  })
+})
+
+describe('the tint is actually visible', () => {
+  const TINTABLE = TOKENS.filter((t) => !(t === '--surface'))
+
+  it.each(TINTABLE)('moves %s away from its untinted value in light', (token) => {
+    const before = STOPS.light[token]
+    const after = rgbOf(varsFor(BRANDS.teal!, 'light')[token])
+    const moved = Math.max(
+      Math.abs(after.r - before.r),
+      Math.abs(after.g - before.g),
+      Math.abs(after.b - before.b),
+    )
+
+    expect(moved, `${token} is indistinguishable from the untinted token`).toBeGreaterThanOrEqual(3)
+  })
+
+  it.each(TINTABLE)('moves %s away from its untinted value in dark', (token) => {
+    const before = STOPS.dark[token]
+    const after = rgbOf(varsFor(BRANDS.teal!, 'dark')[token])
+    const moved = Math.max(
+      Math.abs(after.r - before.r),
+      Math.abs(after.g - before.g),
+      Math.abs(after.b - before.b),
+    )
+
+    expect(moved, `${token} is indistinguishable from the untinted token`).toBeGreaterThanOrEqual(3)
+  })
+
+  /**
+   * ── AND LIGHT `--surface` IS THE ONE THAT MUST NOT MOVE ───────────────────
+   * `#ffffff` is L=1.0 and sRGB has no headroom for chroma there, so asking for
+   * some CLAMPS lightness instead of adding hue. MEASURED by the review: the
+   * canvas-to-surface step fell from 1.0438:1 to 1.0298:1, under the 1.03 floor
+   * `tonal-ladder.test.ts` enforces — dissolving the only thing that separates a
+   * card from the page in light mode.
+   */
+  it('leaves light --surface exactly as tokens.css has it', () => {
+    const after = rgbOf(varsFor(BRANDS.crimson!, 'light')['--surface'])
+    expect(after).toEqual(STOPS.light['--surface'])
+  })
+})
+
+/**
+ * The step that makes a card a card, held across the whole hue circle rather
+ * than at the four brands the rest of this file samples. docs/26 §2.1 and
+ * tokens.css:147 put the light adjacent-pair floor at 1.03:1.
+ */
+describe('the tonal ladder keeps its steps', () => {
+  const FLOOR = 1.03
+
+  it('keeps canvas and surface apart at every hue', () => {
+    let worst = Infinity
+    let at = 0
+
+    for (let hue = 0; hue < 360; hue += 4) {
+      const vars = varsFor(`oklch(0.55 0.12 ${hue})`, 'light')
+      const step = contrastRatio(rgbOf(vars['--canvas']), rgbOf(vars['--surface']))
+      if (step < worst) {
+        worst = step
+        at = hue
+      }
+    }
+
+    expect(worst, `the card/page step collapsed to ${worst.toFixed(4)}:1 at hue ${at}`).toBeGreaterThanOrEqual(FLOOR)
   })
 })
 

@@ -268,6 +268,12 @@ const NEUTRAL_STOPS: Record<SkinSurface, Record<keyof BrandNeutralVars, Rgb>> = 
  */
 const NEUTRAL_CHROMA = 0.006
 
+/**
+ * Above this lightness sRGB has no room for chroma, so asking for some costs
+ * LIGHTNESS instead of adding hue. See the note in `brandNeutralVars`.
+ */
+const MAX_TINTABLE_LIGHTNESS = 0.99
+
 export function brandNeutralVars(colors: string[], surface: SkinSurface): BrandNeutralVars {
   const { h } = colors[0] ? guardedInput(parseOklch(colors[0])) : DEFAULT_PRIMARY
   const stops = NEUTRAL_STOPS[surface]
@@ -277,7 +283,27 @@ export function brandNeutralVars(colors: string[], surface: SkinSurface): BrandN
     const { r, g, b } = stops[key]
     // The LIGHTNESS of the real token, unchanged. Only chroma and hue are ours.
     const { l } = parseOklch(rgbToOklch(r, g, b))
-    out[key] = formatOklch(l, NEUTRAL_CHROMA, h)
+
+    /**
+     * ── NO CHROMA WHERE THERE IS NO ROOM FOR IT ─────────────────────────────
+     * Light `--surface` is `#ffffff`, which is L=1.0, and at L=1.0 sRGB has no
+     * headroom for any chroma at all. Asking for some does not tint the card, it
+     * makes `oklchToRgb` CLAMP — and what it clamps is lightness.
+     *
+     * MEASURED by an adversarial review: the canvas-to-surface step fell from
+     * 1.0438:1 to 1.0298:1 at hue 352, under the 1.03 light adjacent-pair floor
+     * that `tonal-ladder.test.ts` enforces, with up to 32% of the step gone
+     * across the hue circle. That step is the ONLY thing separating a card from
+     * the page in v5 — "a card is a card because it is BRIGHTER than the page"
+     * — and `--line` is tinted by the same rule, so the hairline cannot make up
+     * for it. The tint was quietly dissolving every card boundary in light mode.
+     *
+     * So a stop with no room keeps its exact value. One rung of five carries no
+     * hue in light; the other four and all five in dark do, and the ladder is
+     * intact, which is worth far more than tinting the one colour that cannot
+     * hold a tint anyway.
+     */
+    out[key] = l >= MAX_TINTABLE_LIGHTNESS ? rgbToOklch(r, g, b) : formatOklch(l, NEUTRAL_CHROMA, h)
   }
   return out
 }
