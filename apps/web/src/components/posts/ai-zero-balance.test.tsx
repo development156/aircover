@@ -122,6 +122,7 @@ describe('making a picture, which now lives in the Studio', () => {
         formats={generatableFormats()}
         cost={creditCost('image_standard')}
         library={[]}
+        pictures={[]}
       />,
     )
     // `MESH_TASK_ACTION.image_generate` maps to `image_standard` (6), not
@@ -138,6 +139,7 @@ describe('making a picture, which now lives in the Studio', () => {
         formats={generatableFormats()}
         cost={creditCost('image_standard')}
         library={[]}
+        pictures={[]}
       />,
     )
     await userEvent.type(screen.getByPlaceholderText(/plate of fresh samosas/i), 'a cup of chai')

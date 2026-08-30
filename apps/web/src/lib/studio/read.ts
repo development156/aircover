@@ -42,6 +42,12 @@ export type GenerationPicture = {
   url: string | null
   width: number | null
   height: number | null
+  /**
+   * The mime we PROVED by sniffing the stored bytes, never the model's claim
+   * about them. Null when the file is gone or the asset row could not be read,
+   * and a download then carries no extension rather than a wrong one.
+   */
+  mime: string | null
 }
 
 export type GenerationCard = {
@@ -139,15 +145,19 @@ async function picturesFor(
 
   // One round trip for the paths, one for the signatures.
   const paths = new Map<string, string>()
+  const mimes = new Map<string, string>()
   if (assetIds.length > 0) {
     const assets = await supabase
       .from('assets')
-      .select('id, storage_path')
+      .select('id, storage_path, mime')
       .eq('workspace_id', workspaceId)
       .in('id', assetIds)
     for (const row of assets.data ?? []) {
       if (typeof row.id === 'string' && typeof row.storage_path === 'string') {
         paths.set(row.id, row.storage_path)
+      }
+      if (typeof row.id === 'string' && typeof row.mime === 'string') {
+        mimes.set(row.id, row.mime)
       }
     }
   }
@@ -168,6 +178,7 @@ async function picturesFor(
       url: image.asset_id === null ? null : (urls.get(image.asset_id) ?? null),
       width: image.width,
       height: image.height,
+      mime: image.asset_id === null ? null : (mimes.get(image.asset_id) ?? null),
     })
     grouped.set(image.generation_id, list)
   }

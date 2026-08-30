@@ -3,13 +3,15 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Check, Sparkles } from 'lucide-react'
+import { Check, Maximize2, Sparkles } from 'lucide-react'
 import type { GenerationMode } from '@sahoda/shared'
 
 import { queueGeneration } from '@/app/actions/studio'
+import { PictureViewer } from '@/components/studio/picture-viewer'
 import { Button } from '@/components/ui/button'
 import { CostLabel } from '@/components/ui/cost-label'
 import { Textarea } from '@/components/ui/textarea'
+import type { CanvasPicture } from '@/lib/studio/canvas'
 import type { StudioFormat } from '@/lib/studio/formats'
 import { MAX_REFERENCES, describeModeBlock, readyModes, ruleFor } from '@/lib/studio/modes'
 import type { LibraryPicture } from '@/lib/studio/read'
@@ -38,11 +40,14 @@ export function StudioWorkbench({
   formats,
   cost,
   library,
+  pictures,
 }: {
   formats: StudioFormat[]
   cost: number
   /** Pictures already in this workspace, offered as things to match. */
   library: LibraryPicture[]
+  /** What this workspace has already made, newest first, for the canvas. */
+  pictures: CanvasPicture[]
 }) {
   const router = useRouter()
   const [wanted, setWanted] = useState('')
@@ -51,8 +56,18 @@ export function StudioWorkbench({
   const [picked, setPicked] = useState<string[]>([])
   const [note, setNote] = useState<string | null>(null)
   const [short, setShort] = useState(false)
-  const [made, setMade] = useState<{ url: string | null; prompt: string } | null>(null)
+  const [made, setMade] = useState(false)
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [viewing, setViewing] = useState<CanvasPicture | null>(null)
   const [busy, start] = useTransition()
+
+  /**
+   * Position zero unless somebody has clicked back through the strip. The reader
+   * already sorted newest first, so after a generation the refreshed data puts
+   * the picture that was just paid for at zero and the canvas shows it with no
+   * effect, no id to track, and no chance of showing yesterday's.
+   */
+  const active = pictures.find((one) => one.imageId === activeId) ?? pictures[0] ?? null
 
   const rule = ruleFor(mode)
   const chosen = formats.find((f) => f.id === formatId) ?? null
@@ -92,7 +107,10 @@ export function StudioWorkbench({
         referenceAssetIds: picked,
       })
       if (result.ok) {
-        setMade({ url: null, prompt: wanted })
+        setMade(true)
+        // Back to position zero, so the refreshed data shows the NEW picture
+        // rather than whichever older one was being looked at when it started.
+        setActiveId(null)
         // The picture itself arrives with the refreshed server data, which also
         // carries its signed link. Holding bytes in state here would put a
         // megabyte in the browser that the next navigation throws away.
@@ -269,35 +287,112 @@ export function StudioWorkbench({
 
       {/* ── THE CANVAS ──────────────────────────────────────────────────────── */}
       <section aria-labelledby="studio-canvas" className="flex flex-col gap-2">
-        <h2 id="studio-canvas" className="type-h2">
-          The canvas
-        </h2>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="studio-canvas" className="type-h2">
+            The canvas
+          </h2>
+          {active === null ? null : (
+            <button
+              type="button"
+              onClick={() => setViewing(active)}
+              className="flex items-center gap-1 type-sm text-muted underline underline-offset-2 transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <Maximize2 className="size-[14px]" aria-hidden />
+              Open it large
+            </button>
+          )}
+        </div>
+
         <div
-          className="surface-ring flex items-center justify-center rounded-card bg-s2 p-6"
+          className="surface-ring relative flex items-center justify-center overflow-hidden rounded-card bg-s2"
           style={{
             aspectRatio: chosen === null ? '1 / 1' : `${chosen.width} / ${chosen.height}`,
           }}
           data-guide="studio-canvas"
         >
-          <p className="max-w-[38ch] text-center type-sm text-muted">
-            {busy ? (
-              'Sahoda is drawing this now. It usually takes a few seconds, and you can leave this screen without losing it.'
-            ) : made === null ? (
-              <>
-                <Sparkles className="mx-auto mb-2 size-[18px]" aria-hidden />
-                Your picture appears here, at the size you picked, so you can judge it before you
-                use it.
-              </>
-            ) : (
-              'Made. It is in the list below and in your library.'
-            )}
-          </p>
+          {/* ── THE PICTURE, WHEN THERE IS ONE ──────────────────────────────
+              Shown UNDER the drawing message rather than replaced by it, so a
+              second press does not blank the picture somebody is still looking
+              at. Nothing is lost while the next one is being made. */}
+          {active === null ? null : (
+            <button
+              type="button"
+              onClick={() => setViewing(active)}
+              aria-label={`Open "${active.prompt}" large`}
+              className="absolute inset-0 block focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element -- a
+                  short-lived signed URL from a private bucket cannot be
+                  optimised by next/image without proxying the credential. */}
+              <img
+                src={active.url}
+                alt={active.prompt}
+                width={active.width ?? undefined}
+                height={active.height ?? undefined}
+                className={`size-full object-contain transition-micro ${busy ? 'opacity-40' : ''}`}
+              />
+            </button>
+          )}
+
+          {busy || active === null ? (
+            <p className="pointer-events-none relative max-w-[38ch] px-6 text-center type-sm text-muted">
+              {busy ? (
+                'Sahoda is drawing this now. It usually takes a few seconds, and you can leave this screen without losing it.'
+              ) : made ? (
+                'Made. It is saved to your library, and it appears here in a moment.'
+              ) : (
+                <>
+                  <Sparkles className="mx-auto mb-2 size-[18px]" aria-hidden />
+                  Your picture appears here, at the size you picked, so you can judge it before you
+                  use it.
+                </>
+              )}
+            </p>
+          ) : null}
         </div>
+
+        {/* ── THE STRIP ───────────────────────────────────────────────────────
+            Every picture this workspace has made that can actually be drawn,
+            newest first. Judging one against the last one is the work, and it
+            cannot be done by scrolling to a grid and back. */}
+        {pictures.length === 0 ? null : (
+          <ul className="flex gap-2 overflow-x-auto pb-1" data-guide="studio-strip">
+            {pictures.map((picture) => {
+              const on = picture.imageId === (active?.imageId ?? null)
+              return (
+                <li key={picture.imageId} className="shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setActiveId(picture.imageId)}
+                    aria-pressed={on}
+                    aria-label={picture.prompt}
+                    className={`surface-ring block size-[64px] overflow-hidden rounded-card transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                      on ? 'ring-2 ring-accent' : ''
+                    }`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element -- as above. */}
+                    <img
+                      src={picture.url}
+                      // Empty on purpose: the BUTTON is already labelled with the
+                      // prompt, and a screen reader announcing it twice makes a
+                      // strip of twelve read as twenty-four things.
+                      alt=""
+                      className="size-full object-cover"
+                    />
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+
         <p className="type-sm text-muted">
           Every picture is saved to your library the moment it is made, so nothing is lost if you
           leave.
         </p>
       </section>
+
+      <PictureViewer picture={viewing} onClose={() => setViewing(null)} />
     </div>
   )
 }
