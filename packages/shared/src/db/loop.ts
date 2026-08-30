@@ -27,13 +27,20 @@ import { ChannelSetSchema } from './channel-set'
  * the failure surfacing as a raw constraint violation rather than as a refusal
  * anyone wrote.
  *
- * L3 still has to be DESCRIBED — it is on the Loop screen, it is what the ladder
- * is climbing towards, and hiding it would misrepresent the product. So the
- * description lives in `AUTONOMY_LEVELS` below, which includes L3, and the
- * storable type does not. Those are different questions and this file answers
- * them separately.
+ * ── L3 IS STORABLE NOW, AND THE PARAGRAPH ABOVE IS WHY THAT COST WORK ────────
+ * `20260828120000_loop_autopilot_l3.sql` widened the column to 0-3 and put a
+ * trigger in front of it that refuses three NAMED ways:
+ * AUTOPILOT_NEEDS_SUPERVISED_CYCLE, AUTOPILOT_NEEDS_BRAIN and
+ * AUTOPILOT_BRAIN_UNCONFIRMED. Opening this union without translating those
+ * would have produced exactly the defect described above — a customer pressing
+ * Autopilot and reading a Postgres error string. `setChannelAutonomy` names all
+ * three and its tests assert the sentences, so the refusal a person meets is
+ * one somebody wrote.
+ *
+ * The DEFAULT is still L1. Nothing moves to autopilot by upgrade, and the
+ * database still refuses a workspace that has not earned it.
  */
-export const AutonomyLevelSchema = z.union([z.literal(0), z.literal(1), z.literal(2)])
+export const AutonomyLevelSchema = z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)])
 export type AutonomyLevel = z.infer<typeof AutonomyLevelSchema>
 
 /** FSD §0.2: "Default L1" — Sahoda writes, and nothing it writes reaches anyone. */
@@ -77,10 +84,10 @@ export const AUTONOMY_LEVELS = [
     level: 3,
     code: 'L3',
     name: 'Autopilot',
-    storable: false,
-    may: 'Sahoda publishes without asking, inside the limits you set.',
+    storable: true,
+    may: 'Sahoda publishes without asking, inside the limits you set. You get a few minutes to stop each post before it goes.',
     needs:
-      'Not built. Publishing to your accounts with nobody watching is a different risk from everything above it, and Sahoda will not offer it until a person has walked the whole cycle first.',
+      'One week you have already run and reported yourself, and a Brand Brain with your promise, your customer, your voice and your red lines confirmed. Sahoda checks all four before it accepts this setting.',
   },
 ] as const
 
