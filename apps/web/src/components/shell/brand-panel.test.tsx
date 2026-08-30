@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -52,14 +52,17 @@ function panel(props: Partial<React.ComponentProps<typeof BrandPanel>> = {}) {
   )
 }
 
+/** Chroma 0.01, below the derivation's floor. It must never be OFFERED. */
 const GREY = 'oklch(0.8 0.01 250)'
 const BLUE = 'oklch(0.5 0.18 250)'
+const TEAL = 'oklch(0.55 0.12 195)'
 
 beforeEach(() => {
   vi.clearAllMocks()
   saveWorkspaceTheme.mockResolvedValue({ ok: true })
   uploadAsset.mockResolvedValue({ ok: true })
-  extractPalette.mockReturnValue([GREY, BLUE])
+  // A real extraction: one colour the brand cannot use, two it can.
+  extractPalette.mockReturnValue([GREY, BLUE, TEAL])
   // jsdom never fires load on an <img>, so the decode is resolved here.
   Object.defineProperty(globalThis.Image.prototype, 'src', {
     configurable: true,
@@ -84,11 +87,12 @@ describe('the brand mark', () => {
     render(panel())
 
     const swatches = await screen.findAllByRole('button', { name: /use this colour/i })
+    // TWO, not three: the grey is below the chroma floor and is not offered.
     expect(swatches).toHaveLength(2)
     await userEvent.click(swatches[1]!)
 
     expect(saveWorkspaceTheme).toHaveBeenCalledTimes(1)
-    expect(saveWorkspaceTheme.mock.calls[0]![0][0]).toBe(BLUE)
+    expect(saveWorkspaceTheme.mock.calls[0]![0][0]).toBe(TEAL)
   })
 
   /** The colours it did not pick stay available, in order, behind the new one. */
@@ -98,7 +102,7 @@ describe('the brand mark', () => {
     const swatches = await screen.findAllByRole('button', { name: /use this colour/i })
     await userEvent.click(swatches[1]!)
 
-    expect(saveWorkspaceTheme.mock.calls[0]![0]).toEqual([BLUE, GREY])
+    expect(saveWorkspaceTheme.mock.calls[0]![0]).toEqual([TEAL, BLUE])
   })
 
   /**
@@ -203,6 +207,60 @@ describe('the brand mark', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/could not be read/i)
     expect(onClose).not.toHaveBeenCalled()
     expect(onUseBrand, 'nothing was saved, so nothing may be applied').not.toHaveBeenCalled()
+  })
+
+  /**
+   * ── THE FIVE DECOYS ───────────────────────────────────────────────────────
+   * MEASURED on the founder's logo: five extracted swatches, every one chroma
+   * 0.0000, every one falling back to Sahoda orange. Five choices that could not
+   * do anything, which is what `no-impossible-remedy.spec.ts` exists to forbid.
+   */
+  it('never offers a colour the brand cannot use', async () => {
+    render(panel())
+    const swatches = await screen.findAllByRole('button', { name: /use this colour/i })
+
+    for (const swatch of swatches) {
+      expect(swatch.getAttribute('style'), 'an unusable colour was offered').not.toContain(GREY)
+    }
+  })
+
+  /**
+   * A LOGO WITH NO COLOUR IN IT. Founder's ruling, 2026-08-30: pick-a-colour.
+   * His own logo is grey, white and black, so the extractor was right and there
+   * was nothing to offer. Say so, and hand over a picker.
+   */
+  it('offers a picker when the logo is monochrome', async () => {
+    extractPalette.mockReturnValue([GREY, 'oklch(0.2 0.001 250)'])
+    render(panel())
+
+    expect(await screen.findByText(/greys and blacks/i)).toBeInTheDocument()
+    expect(screen.queryAllByRole('button', { name: /use this colour/i })).toHaveLength(0)
+
+    const picker = document.querySelector<HTMLInputElement>('input[type="color"]')
+    expect(picker, 'a monochrome logo must still let a brand colour be chosen').not.toBeNull()
+  })
+
+  /** And the picked colour is saved as the primary, like any swatch. */
+  it('saves the colour picked by hand', async () => {
+    extractPalette.mockReturnValue([GREY])
+    render(panel())
+    await screen.findByText(/greys and blacks/i)
+
+    const picker = document.querySelector<HTMLInputElement>('input[type="color"]')!
+    fireEvent.change(picker, { target: { value: '#1e6fd9' } })
+
+    await vi.waitFor(() => expect(saveWorkspaceTheme).toHaveBeenCalledTimes(1))
+    // 250-ish is the blue hue of #1e6fd9. The guard may move its lightness; it
+    // must never repaint the hue the person chose.
+    expect(saveWorkspaceTheme.mock.calls[0]![0][0]).toMatch(/oklch\([^)]*2[45][0-9]/)
+  })
+
+  /** With colour in the logo there is nothing to pick by hand. */
+  it('offers no picker when the logo has usable colour', async () => {
+    render(panel())
+    await screen.findAllByRole('button', { name: /use this colour/i })
+
+    expect(document.querySelector('input[type="color"]')).toBeNull()
   })
 
   it('spends nothing and writes nothing just by being opened', async () => {
