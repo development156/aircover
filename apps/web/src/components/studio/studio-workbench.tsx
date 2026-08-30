@@ -3,10 +3,17 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Download, Maximize2, Sparkles } from 'lucide-react'
+import dynamic from 'next/dynamic'
+import { Download, Maximize2, Pencil, Sparkles } from 'lucide-react'
 import type { GenerationMode } from '@sahoda/shared'
 
 import { queueGeneration } from '@/app/actions/studio'
+// Lazy: a canvas editor is a large chunk that most visits never open, and the
+// Studio's first paint is where a person is deciding whether to spend.
+const DrawModal = dynamic(() =>
+  import('@/components/studio/draw-modal').then((mod) => mod.DrawModal),
+)
+
 import { PictureViewer } from '@/components/studio/picture-viewer'
 import { ReferenceUpload } from '@/components/studio/reference-upload'
 import { Button } from '@/components/ui/button'
@@ -70,6 +77,7 @@ export function StudioWorkbench({
   const [viewing, setViewing] = useState<CanvasPicture | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveFailed, setSaveFailed] = useState(false)
+  const [drawing, setDrawing] = useState<CanvasPicture | null>(null)
   const [busy, start] = useTransition()
 
   /**
@@ -407,6 +415,17 @@ export function StudioWorkbench({
                 <Download className="size-[14px]" aria-hidden />
                 {saving ? 'Saving' : 'Save it'}
               </button>
+              {/* Marking a picture is how somebody says WHERE, which a sentence
+                  cannot do. It switches to the mode that uses it, so the press
+                  leads somewhere rather than leaving a marked picture unused. */}
+              <button
+                type="button"
+                onClick={() => setDrawing(active)}
+                className="flex items-center gap-1 type-sm text-muted underline underline-offset-2 transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
+                <Pencil className="size-[14px]" aria-hidden />
+                Draw on it
+              </button>
             </div>
           )}
         </div>
@@ -508,6 +527,29 @@ export function StudioWorkbench({
       </section>
 
       <PictureViewer picture={viewing} onClose={() => setViewing(null)} />
+
+      <DrawModal
+        open={drawing !== null}
+        onClose={() => setDrawing(null)}
+        picture={
+          drawing === null || drawing.width === null || drawing.height === null
+            ? null
+            : {
+                url: drawing.url,
+                width: drawing.width,
+                height: drawing.height,
+                prompt: drawing.prompt,
+              }
+        }
+        onSaved={(assetId) => {
+          setNote(null)
+          // Straight into the mode that uses it, with it already picked. A
+          // marked picture left unselected is a press that led nowhere.
+          setMode('edit')
+          setPicked([assetId])
+          router.refresh()
+        }}
+      />
     </div>
   )
 }
