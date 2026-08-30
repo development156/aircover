@@ -272,6 +272,10 @@ export async function uploadAsset(formData: FormData): Promise<UploadAssetState>
     }
 
     revalidatePath('/assets')
+    // The Studio's reference picker reads the same rows, and a picture added
+    // from that screen has to appear on that screen. Without this the person
+    // uploads, sees nothing arrive, and uploads again.
+    revalidatePath('/studio')
     return { ok: true, asset: parsed.data, unusable: unusableChannels(candidate) }
   } catch (error) {
     console.error('[assets] upload threw', error instanceof Error ? error.message : 'unknown')
