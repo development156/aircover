@@ -161,6 +161,50 @@ describe('the brand mark', () => {
     expect(onUseBrand).toHaveBeenCalledTimes(1)
   })
 
+  /**
+   * ── THE SILENT FAILURE, WHICH IS WHY THIS BLOCK EXISTS ────────────────────
+   * `replace()` was `await uploadAsset(form)` with the result discarded.
+   * `uploadAsset` refuses a duplicate, an oversized file, unreadable bytes, a
+   * storage failure and a missing workspace, and every one of those closed the
+   * panel and refreshed as though it had worked.
+   *
+   * MEASURED on the founder's workspace: "Replace logo" appeared to do nothing,
+   * repeatedly. The file was refused as a DUPLICATE against the copy already in
+   * the library, and the refusal was thrown away here. A control whose whole job
+   * is to change something visible must never fail quietly.
+   */
+  it('shows why the upload was refused, and does not close', async () => {
+    const onClose = vi.fn()
+    uploadAsset.mockResolvedValue({
+      ok: false,
+      message: 'You already have this file, named shopfront.png.',
+    })
+    render(panel({ onClose }))
+
+    // The input is `sr-only` and carries no label on purpose: the visible
+    // control is the button that clicks it. So it is addressed by type.
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')
+    const file = new File([new Uint8Array([1, 2, 3])], 'logo.png', { type: 'image/png' })
+    await userEvent.upload(input!, file)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/already have this file/i)
+    expect(onClose, 'a refused upload must not look like a success').not.toHaveBeenCalled()
+  })
+
+  /** The same discipline on the other write in this panel. */
+  it('shows why saving a colour was refused', async () => {
+    const onClose = vi.fn()
+    saveWorkspaceTheme.mockResolvedValue({ ok: false, message: 'That palette could not be read.' })
+    render(panel({ onClose }))
+
+    const swatches = await screen.findAllByRole('button', { name: /use this colour/i })
+    await userEvent.click(swatches[0]!)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/could not be read/i)
+    expect(onClose).not.toHaveBeenCalled()
+    expect(onUseBrand, 'nothing was saved, so nothing may be applied').not.toHaveBeenCalled()
+  })
+
   it('spends nothing and writes nothing just by being opened', async () => {
     render(panel())
     await screen.findAllByRole('button', { name: /use this colour/i })
