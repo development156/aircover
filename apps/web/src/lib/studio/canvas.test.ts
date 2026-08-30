@@ -67,6 +67,25 @@ describe('what reaches the canvas', () => {
     expect(out).toHaveLength(0)
   })
 
+  /**
+   * A picture with a link but no FILE cannot happen through today's reader, which
+   * only signs a link for a row that has one. It is asserted anyway: `assetId` is
+   * typed non-null on the canvas so that "use it in a post" can attach it without
+   * a cast, and the only thing standing behind that type is this check. A reader
+   * change that broke the pairing would otherwise ship a post attaching nothing.
+   */
+  test('a picture with no file behind it never reaches the canvas, link or not', () => {
+    const out = canvasPictures([
+      { generation: generation(), pictures: [picture({ assetId: null })] },
+    ])
+    expect(out).toHaveLength(0)
+  })
+
+  test('every picture on the canvas carries the id a post would attach', () => {
+    const out = canvasPictures([{ generation: generation(), pictures: [picture()] }])
+    expect(out[0]!.assetId).toBe('a1')
+  })
+
   test('order is the reader’s order, so position zero is the newest thing made', () => {
     const out = canvasPictures([
       { generation: generation({ id: 'new', prompt_given: 'newest' }), pictures: [picture()] },

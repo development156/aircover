@@ -24,6 +24,13 @@ import type { GenerationCard, GenerationPicture } from './read'
 /** One picture the canvas can actually draw, with what it was asked for. */
 export type CanvasPicture = {
   imageId: string
+  /**
+   * Never null here, and that is a consequence rather than an assertion: a
+   * picture only reaches the canvas when it has a signed link, and the reader
+   * only produces a link for a row whose file still exists. A picture deleted
+   * from the library has no link, so it never gets in.
+   */
+  assetId: string
   /** Never null here. A picture with no link cannot be shown, so it never gets in. */
   url: string
   width: number | null
@@ -56,9 +63,13 @@ export function canvasPictures(cards: readonly GenerationCard[]): CanvasPicture[
   for (const card of cards) {
     if (card.generation.status !== 'ready') continue
     for (const picture of card.pictures) {
-      if (picture.url === null) continue
+      // Both, not one: the link is what the canvas draws and the id is what a
+      // post attaches. The reader ties them together, and checking both here is
+      // what lets `assetId` be a string rather than a cast.
+      if (picture.url === null || picture.assetId === null) continue
       out.push({
         imageId: picture.imageId,
+        assetId: picture.assetId,
         url: picture.url,
         width: picture.width,
         height: picture.height,

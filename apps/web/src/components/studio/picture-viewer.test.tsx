@@ -28,10 +28,14 @@ beforeAll(() => {
   Element.prototype.releasePointerCapture = vi.fn()
 })
 
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('@/app/actions/studio', () => ({ startPostFromPicture: vi.fn() }))
+
 afterEach(cleanup)
 
 const PICTURE: CanvasPicture = {
   imageId: 'p1',
+  assetId: 'asset-1',
   url: 'https://example.test/1.png',
   width: 1080,
   height: 1920,
