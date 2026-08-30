@@ -71,7 +71,7 @@ vi.mock('@/app/actions/remix-run', () => ({
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
-import { GenerateForm } from './studio/generate-form'
+import { StudioWorkbench } from './studio/studio-workbench'
 import { generatableFormats } from '@/lib/studio/formats'
 import { GeneratePanel } from './posts/generate-panel'
 import { InlineRewrite } from './posts/inline-rewrite'
@@ -135,7 +135,7 @@ const CONTROLS: ReadonlyArray<{
     name: 'Make a picture',
     press: async () => {
       const user = userEvent.setup()
-      render(<GenerateForm formats={generatableFormats()} cost={6} />)
+      render(<StudioWorkbench formats={generatableFormats()} cost={6} library={[]} />)
       await user.type(screen.getByPlaceholderText(/plate of fresh samosas/i), 'a warm shopfront')
       await user.click(screen.getByRole('button', { name: /make this picture/i }))
     },
@@ -221,7 +221,7 @@ describe.each(CONTROLS)('$name, with an empty wallet', ({ press }) => {
 
 describe('the spend controls do not pre-disable on a balance they did not read', () => {
   test('Make a picture stays pressable so a top-up in another tab still works', async () => {
-    render(<GenerateForm formats={generatableFormats()} cost={6} />)
+    render(<StudioWorkbench formats={generatableFormats()} cost={6} library={[]} />)
 
     // Only the prompt gates it. A client-side balance check here would refuse a
     // customer who has just paid, and the server gate is the real enforcement.

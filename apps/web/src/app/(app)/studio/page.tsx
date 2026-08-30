@@ -1,10 +1,10 @@
 import { MESH_TASK_ACTION, creditCost } from '@sahoda/shared'
 
 import { PageTitle } from '@/components/page-title'
-import { GenerateForm } from '@/components/studio/generate-form'
+import { StudioWorkbench } from '@/components/studio/studio-workbench'
 import { RecentGenerations } from '@/components/studio/recent-generations'
 import { generatableFormats } from '@/lib/studio/formats'
-import { readGenerations } from '@/lib/studio/read'
+import { readGenerations, readLibraryPictures } from '@/lib/studio/read'
 
 export const metadata = { title: 'Studio' }
 
@@ -23,10 +23,9 @@ export const metadata = { title: 'Studio' }
  * ordinary pictures forever while believing that is all Sahoda can do.
  */
 export default async function StudioPage() {
-  // Three independent reads would be sequential inside one component. There is
-  // only one here today; the shape is kept so adding the queue does not
-  // reintroduce a waterfall.
-  const [recent] = await Promise.all([readGenerations()])
+  // In parallel, deliberately. Sequentially the picker would wait on the
+  // gallery and the screen would take twice as long to draw for no reason.
+  const [recent, library] = await Promise.all([readGenerations(), readLibraryPictures()])
 
   const formats = generatableFormats()
   const cost = creditCost(MESH_TASK_ACTION.image_generate)
@@ -37,7 +36,7 @@ export default async function StudioPage() {
         Studio
       </PageTitle>
 
-      <GenerateForm formats={formats} cost={cost} />
+      <StudioWorkbench formats={formats} cost={cost} library={library} />
 
       <RecentGenerations read={recent} />
     </div>

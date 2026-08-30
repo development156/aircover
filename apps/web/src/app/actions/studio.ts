@@ -24,9 +24,11 @@ import {
 } from '@/lib/posts/charge-failure'
 import { MEDIA_BUCKET, MEDIA_UPLOAD_CAP_BYTES } from '@/lib/posts/media-constants'
 import { assetObjectPath } from '@/lib/posts/media-path'
+import { signMediaPreviews } from '@/lib/posts/media-url'
 import { sniffImage } from '@/lib/posts/sniff-image'
 import { brandSignalsFor } from '@/lib/studio/brand-signals'
 import { formatById } from '@/lib/studio/formats'
+import { MAX_REFERENCES, describeModeBlock } from '@/lib/studio/modes'
 import { conditionPrompt } from '@/lib/studio/prompt'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { workspaceForWrite } from '@/lib/workspaces'
@@ -83,6 +85,14 @@ const GenerateInputSchema = z.object({
   wanted: z.string().trim().min(3).max(1000),
   /** A preset id. Resolved through `formatById`, so a size the picker hid cannot be spent on. */
   formatId: z.string().min(1).max(40),
+  /**
+   * Pictures from this workspace's own library to condition on.
+   *
+   * Bounded here as well as by `describeModeBlock`, because the schema is what a
+   * hand-made request meets: the screen's rule and the parser's bound have to
+   * agree, and only one of them runs when somebody skips the screen.
+   */
+  referenceAssetIds: z.array(z.uuid()).max(MAX_REFERENCES).default([]),
 })
 
 export type QueueGenerationState =
@@ -130,6 +140,14 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
       return { ok: false, insufficient: false, message: REFUSALS.unknownFormat }
     }
 
+    // The mode's own rule, asked through the SAME function the screen asks, so
+    // a request that skipped the screen cannot reach a mode the screen refused.
+    const blocked = describeModeBlock({
+      mode: parsed.data.mode,
+      references: parsed.data.referenceAssetIds.length,
+    })
+    if (blocked !== null) return { ok: false, insufficient: false, message: blocked }
+
     // Read before anything is charged: a brain that cannot be read produces an
     // unconditioned image, which is a worse picture and not a failure, and the
     // screen says which happened.
@@ -141,6 +159,24 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
     })
 
     const supabase = createServerSupabase()
+
+    // ── REFERENCES, RESOLVED TO LINKS THE PROVIDER CAN FETCH ─────────────────
+    //
+    // Signed URLs rather than base64. The Images API accepts either, and a
+    // 1080x1350 photograph as base64 is over a megabyte of request body per
+    // reference; three of them would be four megabytes on every press. The links
+    // are short-lived and scoped to this workspace's own bucket.
+    //
+    // A reference that cannot be signed is DROPPED rather than failing the
+    // generation, and the row records which ids were asked for either way. A
+    // person who picked three pictures and got two of them conditioning the
+    // result still gets a picture; failing outright would spend nothing and give
+    // them nothing.
+    const referenceUrls = await signReferences(
+      supabase,
+      workspace.id,
+      parsed.data.referenceAssetIds,
+    )
 
     // ── THE ROW, BEFORE THE MODEL ────────────────────────────────────────────
     const queued = await supabase
@@ -155,6 +191,7 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
         width: format.width,
         height: format.height,
         requested_count: 1,
+        reference_asset_ids: parsed.data.referenceAssetIds,
         // Explore legitimately used nothing, and `[]` says that. A null here
         // would mean conditioning never ran, which is a different claim.
         brand_signals: conditioned.used,
@@ -196,6 +233,10 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
             // The exact canvas, not one of three ratios. Without this a story
             // comes back landscape with nothing saying so.
             dims: { width: format.width, height: format.height },
+            // Absent when there are none. `openrouter.ts` drops the field
+            // entirely for an empty list, because a field carrying [] and a
+            // field that is not there are different requests.
+            references: referenceUrls,
           },
           {
             workspaceId: workspace.id,
@@ -358,4 +399,42 @@ export async function readGeneration(
     return { ok: false, message: 'Sahoda could not read that image request just now.' }
   }
   return { ok: true, generation: row.data }
+}
+
+/**
+ * Turn asset ids into links a provider can fetch, in the order they were picked.
+ *
+ * Order matters: reference conditioning is not commutative, and the first
+ * picture generally weighs most. Anything that could not be resolved is left
+ * out rather than substituted, so what reaches the model is a subset of what was
+ * asked for and never something else.
+ */
+async function signReferences(
+  supabase: ReturnType<typeof createServerSupabase>,
+  workspaceId: string,
+  assetIds: readonly string[],
+): Promise<string[]> {
+  if (assetIds.length === 0) return []
+
+  const { data, error } = await supabase
+    .from('assets')
+    .select('id, storage_path')
+    // Scoped to the workspace as well as by RLS: the policy admits every
+    // workspace this person belongs to, so an unscoped read would let one
+    // workspace's picture condition another's.
+    .eq('workspace_id', workspaceId)
+    .in('id', [...assetIds])
+
+  if (error || !data) return []
+
+  const rows = data.filter(
+    (row): row is { id: string; storage_path: string } =>
+      typeof row.id === 'string' && typeof row.storage_path === 'string',
+  )
+  const signed = await signMediaPreviews(rows)
+  const urls = new Map(signed.map((one) => [one.id, one.url]))
+
+  return assetIds
+    .map((id) => urls.get(id) ?? null)
+    .filter((url): url is string => typeof url === 'string')
 }

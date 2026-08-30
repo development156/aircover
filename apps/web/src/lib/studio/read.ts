@@ -174,3 +174,56 @@ async function picturesFor(
 
   return grouped
 }
+
+/** One picture already in the library, offered as something to match. */
+export type LibraryPicture = {
+  assetId: string
+  url: string | null
+  title: string | null
+}
+
+/**
+ * Recent pictures from this workspace, newest first, for the reference picker.
+ *
+ * Images only, and live only: a trashed file is not something to build a look
+ * from, and offering one would let somebody condition a paid generation on a
+ * picture they had already decided to throw away.
+ *
+ * Returns an EMPTY list on a failed read. The picker then says there is nothing
+ * to match, which is wrong in a harmless direction: the person can still make a
+ * picture. Failing the screen over a picker would be worse.
+ */
+export async function readLibraryPictures(limit = 12): Promise<LibraryPicture[]> {
+  const workspace = await activeWorkspaceRead()
+  if (workspace.status !== 'ok') return []
+
+  const supabase = createServerSupabase()
+  const { data, error } = await supabase
+    .from('assets')
+    .select('id, storage_path, title')
+    .eq('workspace_id', workspace.workspace.id)
+    .eq('kind', 'image')
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error || !data) return []
+
+  const rows = data
+    .filter((row) => typeof row.id === 'string' && typeof row.storage_path === 'string')
+    .map((row) => ({
+      id: row.id as string,
+      storage_path: row.storage_path as string,
+      title: typeof row.title === 'string' ? row.title : null,
+    }))
+  const signed = await signMediaPreviews(rows)
+  const urls = new Map(signed.map((one) => [one.id, one.url]))
+
+  return rows.map((row) => ({
+    assetId: row.id,
+    // Null when the link would not sign. The picker shows the card anyway,
+    // because the picture exists and can still be picked.
+    url: urls.get(row.id) ?? null,
+    title: row.title !== null && row.title !== '' ? row.title : null,
+  }))
+}
