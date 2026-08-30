@@ -5,7 +5,9 @@ import { resolve } from 'node:path'
 vi.mock('server-only', () => ({}))
 vi.mock('./store', () => ({ readWorkspaceIds: vi.fn() }))
 vi.mock('./tick', () => ({ runWorkspaceAutopilotTick: vi.fn() }))
+vi.mock('@sahoda/jobs/publish', () => ({ publishPostDeps: vi.fn() }))
 
+import { publishPostDeps } from '@sahoda/jobs/publish'
 import { readWorkspaceIds } from './store'
 import { runWorkspaceAutopilotTick } from './tick'
 import { runAllAutopilotTicks } from './tick-all'
@@ -28,8 +30,28 @@ const EMPTY = {
   publishFailed: 0,
 }
 
+const PASS = {
+  decision: 'pass',
+  findings: [],
+  ruleSet: { rules: [], version: 1 },
+  brandVersion: 3,
+  checks: { hard: 'ran', classifier: 'ran' },
+}
+
+/** The gate the publish path builds. Each test bends one thing about it. */
+const check = vi.fn()
+
+/** Drives the `gateFor` the tick was handed, for one candidate row. */
+async function askTheGate(row = { postId: 'p1', variantId: 'v1', channel: 'x', body: 'the body' }) {
+  await runAllAutopilotTicks(new Date())
+  const deps = vi.mocked(runWorkspaceAutopilotTick).mock.calls[0]?.[0]
+  return deps!.gateFor(row as never)
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
+  check.mockResolvedValue(PASS)
+  vi.mocked(publishPostDeps).mockReturnValue({ gate: { check } } as never)
   vi.mocked(readWorkspaceIds).mockResolvedValue(['ws-1', 'ws-2'])
   vi.mocked(runWorkspaceAutopilotTick).mockResolvedValue(EMPTY)
 })
@@ -78,27 +100,119 @@ describe('one workspace failing never strands the rest', () => {
   })
 })
 
-describe('the gate handed to each tick FAILS CLOSED', () => {
-  it('is a hold, never a pass — no real gate is wired yet', async () => {
-    // The single line that decides whether this branch is a product that posts
-    // unattended. A `pass` here, with a real armed workspace, would announce.
-    await runAllAutopilotTicks(new Date())
-    const passed = vi.mocked(runWorkspaceAutopilotTick).mock.calls[0]?.[0]
-    const verdict = await passed?.gateFor({
-      postId: 'p',
-      variantId: 'v',
+describe('the gate handed to each tick is the REAL one', () => {
+  it('asks the same gate the publish path uses, with the body as it stands', async () => {
+    const verdict = await askTheGate()
+
+    expect(check).toHaveBeenCalledTimes(1)
+    expect(check).toHaveBeenCalledWith({
+      workspaceId: 'ws-1',
+      postId: 'p1',
+      variantId: 'v1',
       channel: 'x',
-      body: 'anything at all',
+      text: 'the body',
+      jobRunId: 'autopilot:p1',
     })
-    expect(verdict?.decision).toBe('hold')
+    expect(verdict).toEqual(PASS)
+  })
+
+  it('names the run autopilot, not web and not cron', async () => {
+    await askTheGate()
+    const arg = check.mock.calls[0]![0] as { jobRunId: string }
+    expect(arg.jobRunId).toMatch(/^autopilot:/)
+  })
+
+  it('builds the gate ONCE for the whole tick, not once per candidate', async () => {
+    await runAllAutopilotTicks(new Date())
+
+    // Drive the gate the way a real tick would: every workspace, several
+    // candidates each. Asserting the count without CALLING gateFor was the
+    // first version of this test and it could not fail — a build moved inside
+    // the callback left it green, which is the whole defect it exists to catch.
+    for (const call of vi.mocked(runWorkspaceAutopilotTick).mock.calls) {
+      for (const id of ['p1', 'p2']) {
+        await call[0].gateFor({ postId: id, variantId: 'v', channel: 'x', body: 'b' } as never)
+      }
+    }
+
+    expect(check).toHaveBeenCalledTimes(4)
+    // `publishPostDeps` opens a Zernio client and a pool. One per candidate
+    // would be four connections for four checks that read one row and write one.
+    expect(publishPostDeps).toHaveBeenCalledTimes(1)
+  })
+
+  it('REFUSES when no gate could be built, and says so rather than blaming the post', async () => {
+    vi.mocked(publishPostDeps).mockImplementation(() => {
+      throw new Error('missing configuration')
+    })
+
+    const verdict = (await askTheGate()) as { decision: string; checks: { classifier: string } }
+
+    // A gate we could not build is not a gate that approves.
+    expect(verdict.decision).toBe('hold')
+    // 'unavailable', never 'skipped-no-rules': nothing was skipped, the check
+    // could not be made at all, and those are different facts.
+    expect(verdict.checks.classifier).toBe('unavailable')
+  })
+
+  it('reports gateUnavailable, because "no gate to ask" is not "the gate said no"', async () => {
+    vi.mocked(publishPostDeps).mockImplementation(() => {
+      throw new Error('missing configuration')
+    })
+
+    const r = await runAllAutopilotTicks(new Date())
+
+    expect(r.gateUnavailable).toBe(true)
+    // The tick still ran every workspace. A missing gate refuses posts; it does
+    // not strand the fleet.
+    expect(r.workspaces).toBe(2)
+    expect(runWorkspaceAutopilotTick).toHaveBeenCalledTimes(2)
+  })
+
+  it('leaves gateUnavailable unset on the normal path', async () => {
+    const r = await runAllAutopilotTicks(new Date())
+    expect(r.gateUnavailable).toBeUndefined()
+  })
+
+  it('refuses rather than throwing when the gate itself throws', async () => {
+    // The port says a gate MUST NOT THROW. This is the belt for the day one
+    // does: one bad post must not lose a whole workspace's tick and be reported
+    // as "the workspace failed".
+    check.mockRejectedValue(new Error('the model went away'))
+
+    const verdict = (await askTheGate()) as { decision: string }
+
+    expect(verdict.decision).toBe('hold')
+  })
+
+  it('passes a real pass through, so the gate can actually let something out', async () => {
+    // The counterpart to every refusal test. A gate that could only ever hold
+    // would be indistinguishable from the stub this replaced.
+    const verdict = (await askTheGate()) as { decision: string }
+    expect(verdict.decision).toBe('pass')
   })
 })
 
-describe('the two gates in front of this, asserted from the files themselves', () => {
+/**
+ * ── THIS BLOCK WAS RETARGETED, AND HERE IS THE MOVE ──────────────────────────
+ * It used to assert that the route was NOT in `vercel.json`, because at the time
+ * registering it was an act nobody had taken. Its stated purpose was to fail
+ * loudly if somebody registered it "and make them add the heartbeat schedule in
+ * the same change".
+ *
+ * The route is registered now, so that exact assertion is gone. CLAUDE.md's
+ * fifth copy rule says retarget rather than delete, and the claim it protected
+ * survives the change — it just inverts. What mattered was never the absence of
+ * a line in a JSON file: it was that A SCHEDULED JOB IS A MONITORED JOB, and
+ * that the flag remains the thing standing between the schedule and unattended
+ * publishing. Both are asserted below, and the second is now the only gate left.
+ */
+describe('what a registered schedule brings with it, asserted from the files themselves', () => {
   const routeSrc = readFileSync(
     resolve(import.meta.dirname, '../../../app/api/cron/autopilot/route.ts'),
     'utf8',
   )
+  const vercel = readFileSync(resolve(import.meta.dirname, '../../../../vercel.json'), 'utf8')
 
   it('the route refuses unless SAHODA_AUTOPILOT_ENABLED is set', () => {
     expect(routeSrc).toContain('autopilotEnabled()')
@@ -106,11 +220,25 @@ describe('the two gates in front of this, asserted from the files themselves', (
     expect(routeSrc).toMatch(/enabled: false/)
   })
 
-  it('the route is NOT registered in vercel.json, which is the second gate', () => {
-    // Adding it there is a separate deliberate act. If somebody registers it,
-    // this fails and they are made to read the header explaining what the two
-    // gates are for — and to add the heartbeat schedule in the same change.
-    const vercel = readFileSync(resolve(import.meta.dirname, '../../../../vercel.json'), 'utf8')
-    expect(vercel).not.toContain('/api/cron/autopilot')
+  it('the schedule exists, so the flag is the ONLY thing left in front of it', () => {
+    expect(vercel).toContain('/api/cron/autopilot')
+  })
+
+  it('the schedule came with a heartbeat, which is what makes it monitored', () => {
+    // A job nobody watches is worse than no job: it fails quietly and the first
+    // person to notice is a customer. `heartbeat.test.ts` separately asserts
+    // that every registered cron has an entry in CRON_SCHEDULES, so these two
+    // together mean a registered route cannot be unmonitored.
+    expect(routeSrc).toContain("recordCronRun('autopilot')")
+  })
+
+  it('records the heartbeat BEFORE reading the flag, so "off" is not "stopped"', () => {
+    // The heartbeat answers "did the schedule fire", which is true whether or
+    // not the flag lets work happen. Recording it only on the enabled path
+    // would make a switched-off autopilot look exactly like a schedule that
+    // died, and those need opposite responses.
+    expect(routeSrc.indexOf("recordCronRun('autopilot')")).toBeLessThan(
+      routeSrc.indexOf('if (!autopilotEnabled())'),
+    )
   })
 })
