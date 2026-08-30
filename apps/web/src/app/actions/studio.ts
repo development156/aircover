@@ -178,6 +178,7 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
     let failure: string | null = null
     let delivered = false
     let charged = 0
+    let providerCostMicroUsd: number | null = null
 
     const credits = await getWithCredits()(
       { workspaceId: workspace.id, action, objectRef },
@@ -209,6 +210,14 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
           failure = FAILURE_REASON.MESH_ERROR
           throw new Error('MESH_ERROR')
         }
+        // What the PROVIDER said it cost, in whole ten-thousandths of a US cent.
+        // Undefined when it said nothing, and the column then stays null: an
+        // estimate rendered as a price is a figure nobody quoted, which is why
+        // the mesh hands this back separately from `usage.costUsd`.
+        providerCostMicroUsd =
+          typeof result.data.providerCostUsd === 'number'
+            ? Math.round(result.data.providerCostUsd * 1_000_000)
+            : null
 
         const bytes = Uint8Array.from(Buffer.from(result.data.base64, 'base64'))
         if (bytes.byteLength === 0 || bytes.byteLength > MEDIA_UPLOAD_CAP_BYTES) {
@@ -301,6 +310,8 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
         status: 'ready',
         finished_at: new Date().toISOString(),
         cost_credits: charged,
+        provider_cost_micro_usd: providerCostMicroUsd,
+        provider: 'openrouter',
       })
       .eq('id', generationId)
       .eq('workspace_id', workspace.id)
