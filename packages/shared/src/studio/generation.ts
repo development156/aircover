@@ -26,17 +26,32 @@ import { z } from 'zod'
  *             look over time rather than a folder of unrelated pictures.
  *   series    N slides with consistency locked across them. The carousel.
  */
-export const GENERATION_MODES = ['on_brand', 'explore', 'match', 'series'] as const
+export const GENERATION_MODES = ['on_brand', 'explore', 'match', 'edit', 'series'] as const
 export const GenerationModeSchema = z.enum(GENERATION_MODES)
 export type GenerationMode = z.infer<typeof GenerationModeSchema>
 
 /**
  * Where a generation has got to.
  *
- * There is deliberately no 'partial'. A series that produced three of five
- * images is `failed` with three images beneath it, and the screen says exactly
- * that. Calling it `ready` would be a claim the row cannot support, and a person
- * would post a carousel with two slides missing.
+ * ── THERE IS DELIBERATELY NO 'partial' ──────────────────────────────────────
+ * `ready` means AT LEAST ONE picture arrived and is in the library. How many
+ * were asked for is already on the row (`requested_count`) and how many arrived
+ * is countable from the child rows, so partialness is a FACT the data carries
+ * rather than a status word, and the screen states it in a sentence that names
+ * both numbers.
+ *
+ * ── AND WHY THAT IS RIGHT FOR OPTIONS AND WOULD BE WRONG FOR A SET ──────────
+ * Three of four OPTIONS is a usable result: they were never meant to relate to
+ * each other, the person picks one, and marking it `failed` would hide three
+ * pictures they paid for and can use. Three of five SLIDES is not a usable
+ * result, because a carousel with two slides missing cannot be posted, and
+ * calling that `ready` would be a claim the row cannot support.
+ *
+ * The distinction is the mode's, not the status's. Today only options ship;
+ * `series` is refused outright rather than faked (`lib/studio/modes.ts`), so no
+ * row can currently be a partial SET. When a model that draws a whole set in one
+ * call is routed, that mode settles its own partial as `failed`, and this
+ * comment is where to come back to.
  */
 export const GENERATION_STATUSES = ['queued', 'running', 'ready', 'failed', 'cancelled'] as const
 export const GenerationStatusSchema = z.enum(GENERATION_STATUSES)

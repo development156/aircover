@@ -1,5 +1,7 @@
 import { countCertainty, type BrandSignal, type GenerationStatus } from '@sahoda/shared'
 
+import { formatById } from './formats'
+
 /**
  * WHAT A GENERATION'S CARD SAYS ABOUT ITSELF.
  *
@@ -71,4 +73,46 @@ export function describePicture(input: {
   if (input.status === 'failed' || input.status === 'cancelled') return null
   if (!input.hasAsset) return 'This picture was deleted from your library.'
   return 'The picture is in your library. Its preview could not be loaded just now.'
+}
+
+/**
+ * How many pictures arrived, when it was not how many were asked for.
+ *
+ * ── SILENT WHEN ONLY ONE WAS ASKED FOR ──────────────────────────────────────
+ * "1 option" on every ordinary card is arithmetic nobody needed, and a card that
+ * announces its own arithmetic teaches people to stop reading cards, which costs
+ * the sentences that matter. Four of four DOES speak, because the card holds
+ * four pictures and saying so is what makes the extra thumbnails legible.
+ *
+ * ── AND THE ROW IS WHERE THIS COMES FROM ────────────────────────────────────
+ * `requested_count` against the pictures actually beneath the row, never a
+ * figure the screen worked out for itself. A count no query produced is exactly
+ * the kind of number this product refuses to render.
+ */
+export function describeCount(input: { made: number; asked: number }): string | null {
+  if (input.asked <= 1) return null
+  if (input.made >= input.asked) {
+    return `${input.asked} options, and you can use any of them.`
+  }
+  return `${input.made} of the ${input.asked} options you asked for arrived. You were charged for those and for nothing else.`
+}
+
+/**
+ * The size a picture was made at, in words a shop owner reads.
+ *
+ * ── THE ROW HOLDS A KEY, NOT A LABEL ────────────────────────────────────────
+ * `format_id` is `link-card`, `business-update`, `on_brand`. Printing it puts an
+ * internal identifier on a customer's screen, which is the same defect as
+ * leaking a column name: it is not wrong, it is simply not addressed to them.
+ *
+ * ── AND A PRESET WE NO LONGER OFFER IS NOT AN ERROR ─────────────────────────
+ * Old rows outlive the list of sizes. A picture made at a size since retired is
+ * still a real picture, so this returns null and the card says nothing about
+ * size rather than printing a key nobody can look up.
+ */
+export function describeFormat(formatId: string | null): string | null {
+  if (formatId === null) return null
+  const format = formatById(formatId)
+  if (format === null) return null
+  return `${format.label}, ${format.width} by ${format.height}`
 }

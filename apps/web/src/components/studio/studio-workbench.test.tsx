@@ -4,7 +4,13 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 
 import { StudioWorkbench } from '@/components/studio/studio-workbench'
 import { generatableFormats } from '@/lib/studio/formats'
-import { MAX_REFERENCES, MAX_TRIES_PER_PRESS } from '@/lib/studio/modes'
+import {
+  MAX_REFERENCES,
+  MAX_TRIES_PER_PRESS,
+  describeModeBlock,
+  promptHintFor,
+  readyModes,
+} from '@/lib/studio/modes'
 
 /**
  * THE WORKBENCH, AND THE RULES IT MUST NOT RE-IMPLEMENT.
@@ -194,7 +200,7 @@ describe('matching a picture', () => {
     const user = userEvent.setup()
     open()
     await user.click(screen.getByRole('button', { name: /match a picture/i }))
-    await user.type(screen.getByPlaceholderText(/plate of fresh samosas/i), 'a cup of chai')
+    await user.type(screen.getByLabelText(/what should the picture show/i), 'a cup of chai')
     await user.click(screen.getAllByRole('button', { pressed: false })[3]!)
     expect(screen.queryByText(/pick one picture/i)).toBeNull()
   })
@@ -249,6 +255,70 @@ describe('matching a picture', () => {
     open([])
     await user.click(screen.getByRole('button', { name: /match a picture/i }))
     expect(screen.getByText(/you have no pictures yet/i)).toBeTruthy()
+  })
+})
+
+describe('a press that changes nothing must say why', () => {
+  /**
+   * THE DEFECT THIS TEST EXISTS FOR. Clicking a fifth picture used to be
+   * silently dropped: the tile did not select, nothing moved, nothing was said.
+   * A control that ignores a press without explaining is worse than a refusal,
+   * because the person cannot tell whether they missed the target or the app is
+   * broken.
+   */
+  test('a pick beyond the limit is explained rather than ignored', async () => {
+    const user = userEvent.setup()
+    const { container } = open()
+    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+
+    const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
+    const thumbs = within(picker).getAllByRole('button')
+    for (const thumb of thumbs) await user.click(thumb)
+
+    expect(screen.getByRole('alert').textContent).toMatch(/3 pictures at once/i)
+  })
+
+  test('the sentence is the one the action would refuse with, not a second wording', async () => {
+    const user = userEvent.setup()
+    const { container } = open()
+    await user.click(screen.getByRole('button', { name: /change a picture/i }))
+
+    const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
+    const thumbs = within(picker).getAllByRole('button')
+    await user.click(thumbs[0]!)
+    await user.click(thumbs[1]!)
+
+    // Trimmed: the paragraph carries a trailing space before the top-up link
+    // slot. The CLAIM is the sentence, and it must be the module's, character
+    // for character, not a second wording the screen invented.
+    expect(screen.getByRole('alert').textContent?.trim()).toBe(
+      describeModeBlock({ mode: 'edit', references: 2 }),
+    )
+  })
+})
+
+describe('the box says what to type for the mode that is chosen', () => {
+  /**
+   * The mode buttons change what the box is FOR. One fixed sentence answers the
+   * first mode and misleads the rest, and the cost is somebody typing the wrong
+   * kind of prompt and paying for the result.
+   */
+  test('the hint changes with the mode', async () => {
+    const user = userEvent.setup()
+    open()
+    const box = screen.getByLabelText(/what should the picture show/i)
+    const first = box.getAttribute('placeholder')
+
+    await user.click(screen.getByRole('button', { name: /explore/i }))
+    expect(box.getAttribute('placeholder')).not.toBe(first)
+
+    await user.click(screen.getByRole('button', { name: /change a picture/i }))
+    expect(box.getAttribute('placeholder')).toMatch(/background/i)
+  })
+
+  test('every mode on offer has its own hint', () => {
+    const hints = readyModes().map((rule) => promptHintFor(rule.mode))
+    expect(new Set(hints).size).toBe(hints.length)
   })
 })
 
@@ -307,7 +377,7 @@ describe('before any spend', () => {
     open()
     const button = screen.getByRole('button', { name: /make this picture/i })
     expect(button).toBeDisabled()
-    await user.type(screen.getByPlaceholderText(/plate of fresh samosas/i), 'a shopfront')
+    await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
     expect(button).toBeEnabled()
   })
 })

@@ -2,7 +2,14 @@ import { describe, expect, test } from 'vitest'
 
 import type { BrandSignal } from '@sahoda/shared'
 
-import { describeBuiltFrom, describePicture, describeStatus } from './card-copy'
+import {
+  describeBuiltFrom,
+  describeCount,
+  describeFormat,
+  describePicture,
+  describeStatus,
+} from './card-copy'
+import { generatableFormats } from './formats'
 
 const confirmed: BrandSignal = { field: 'voice', certainty: 'confirmed', value: 'warm' }
 const guessed: BrandSignal = { field: 'colours', certainty: 'guessed', value: 'blue' }
@@ -100,5 +107,69 @@ describe('describePicture', () => {
       describePicture({ status: 'ready', hasAsset: false, hasUrl: false }),
     ]
     for (const said of all) expect(said ?? '').not.toMatch(/[—–]/)
+  })
+})
+
+describe('how many pictures a card holds', () => {
+  test('says nothing when only one was ever asked for', () => {
+    expect(describeCount({ made: 1, asked: 1 })).toBeNull()
+    expect(describeCount({ made: 0, asked: 1 })).toBeNull()
+  })
+
+  test('a full set of options says so, which is what makes the thumbnails legible', () => {
+    expect(describeCount({ made: 4, asked: 4 })).toMatch(/4 options/)
+  })
+
+  /**
+   * THE ONE THAT MATTERS. Three of four is neither a success nor a failure, and
+   * the card is where somebody looks tomorrow when they are trying to work out
+   * what they were charged for.
+   */
+  test('a partial result names both numbers and what happened to the money', () => {
+    const said = describeCount({ made: 3, asked: 4 })
+    expect(said).toContain('3')
+    expect(said).toContain('4')
+    expect(said).toMatch(/charged for those and for nothing else/i)
+  })
+
+  test('carries no em dash, which is the standing ruling for prose', () => {
+    for (const [made, asked] of [
+      [1, 1],
+      [4, 4],
+      [2, 4],
+    ] as const) {
+      expect(describeCount({ made, asked }) ?? '').not.toMatch(/[—–]/)
+    }
+  })
+})
+
+describe('the size a picture was made at', () => {
+  /**
+   * `format_id` is `link-card`. Printing it puts an internal identifier on a
+   * customer's screen, which is not wrong so much as not addressed to them.
+   */
+  test('is the label a person reads, never the row’s key', () => {
+    const said = describeFormat('link-card')
+    expect(said).not.toContain('link-card')
+    expect(said).toMatch(/link card/i)
+    expect(said).toMatch(/1200 by 628/)
+  })
+
+  /**
+   * Old rows outlive the list of sizes. A picture made at a size since retired
+   * is still a real picture, so the card says nothing about size rather than
+   * printing a key nobody can look up.
+   */
+  test('a size we no longer offer says nothing rather than showing a key', () => {
+    expect(describeFormat('a-preset-that-was-retired')).toBeNull()
+    expect(describeFormat(null)).toBeNull()
+  })
+
+  test('every size the picker offers has a readable label', () => {
+    for (const format of generatableFormats()) {
+      const said = describeFormat(format.id)
+      expect(said, format.id).not.toBeNull()
+      expect(said, format.id).not.toContain(format.id)
+    }
   })
 })

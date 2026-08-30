@@ -95,6 +95,18 @@ export const MODE_RULES: readonly ModeRule[] = [
     ready: true,
   },
   {
+    mode: 'edit',
+    label: 'Change a picture',
+    what: 'Start from a picture you already have and change one thing about it, keeping the rest.',
+    minReferences: 1,
+    // ONE, not three. An edit is a change to a specific picture, and handing a
+    // model three sources leaves it to decide which one it is editing. Match
+    // takes three because blending several looks is the point there; here it
+    // would be a different feature wearing this one's label.
+    maxReferences: 1,
+    ready: true,
+  },
+  {
     mode: 'series',
     label: 'A set that matches',
     what: 'Several slides that belong together, for a carousel.',
@@ -133,17 +145,45 @@ export function describeModeBlock(input: {
 
   if (input.references < rule.minReferences) {
     return rule.minReferences === 1
-      ? 'Pick one picture for Sahoda to match, then this is ready.'
+      ? input.mode === 'edit'
+        ? 'Pick the picture you want changed, then this is ready.'
+        : 'Pick one picture for Sahoda to match, then this is ready.'
       : `Pick at least ${rule.minReferences} pictures for Sahoda to match.`
   }
 
   if (input.references > rule.maxReferences) {
     return rule.maxReferences === 0
       ? 'Explore does not use a picture to match. Switch to Match a picture, or take these off.'
-      : `Sahoda can look at ${rule.maxReferences} pictures at once. Take ${
-          input.references - rule.maxReferences
-        } off and try again.`
+      : rule.maxReferences === 1
+        ? 'Sahoda changes one picture at a time. Keep the one you want changed and take the others off.'
+        : `Sahoda can look at ${rule.maxReferences} pictures at once. Take ${
+            input.references - rule.maxReferences
+          } off and try again.`
   }
 
   return null
+}
+
+/**
+ * What to put in the box, for the mode that is chosen.
+ *
+ * ── A BOX WHOSE LABEL NEVER CHANGES TEACHES ONE THING ───────────────────────
+ * The mode buttons above change what the box is FOR. On brand wants a subject.
+ * Explore wants a direction. Match wants what to keep and what to change about
+ * a picture already chosen. One fixed sentence about samosas answers the first
+ * and misleads the other three, and the cost of that is somebody typing the
+ * wrong kind of prompt and paying for the result.
+ */
+export function promptHintFor(mode: GenerationMode): string {
+  switch (mode) {
+    case 'explore':
+      return 'A drink that feels like a Sunday morning'
+    case 'match':
+      return 'The same look, but a cup of chai instead'
+    case 'edit':
+      return 'Make the background a plain wall'
+    case 'series':
+    case 'on_brand':
+      return 'A plate of fresh samosas on a wooden counter, morning light'
+  }
 }

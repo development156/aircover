@@ -86,7 +86,7 @@ create table studio_generations (
   -- 'explore'  loose, high variation, cheap model, for finding a direction
   -- 'match'    conditioned on one existing image the person picked
   -- 'series'   N slides with consistency locked across them
-  mode text not null check (mode in ('on_brand', 'explore', 'match', 'series')),
+  mode text not null check (mode in ('on_brand', 'explore', 'match', 'edit', 'series')),
 
   -- ── THE PROVENANCE HALF ─────────────────────────────────────────────────────
 
