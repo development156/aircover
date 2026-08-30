@@ -5,6 +5,7 @@ import { auth } from '@clerk/nextjs/server'
 import { revalidatePath } from 'next/cache'
 
 import { reportServerError } from '@/lib/observability/report'
+import { looksLikeSvg, rasteriseSvgLogo } from '@/lib/brand/svg-logo'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { workspaceForWrite } from '@/lib/workspaces'
 
@@ -43,9 +44,17 @@ import { uploadAsset } from './assets'
  * library; this is the logo's policy, and it lives with the logo.
  */
 
-export type SetBrandLogoState = { ok: true; adopted: boolean } | { ok: false; message: string }
+export type SetBrandLogoState =
+  { ok: true; adopted: boolean; converted: boolean } | { ok: false; message: string }
 
 const LOGO_TITLE = 'Logo'
+
+/** `brand.svg` -> `brand`. The stored file is a PNG and its name should say so. */
+function baseName(name: string): string {
+  const trimmed = typeof name === 'string' ? name.trim() : ''
+  const stem = trimmed.replace(/\.[^.]+$/, '')
+  return stem === '' ? 'logo' : stem
+}
 
 export async function setBrandLogo(formData: FormData): Promise<SetBrandLogoState> {
   let workspaceId: string | undefined
@@ -62,7 +71,45 @@ export async function setBrandLogo(formData: FormData): Promise<SetBrandLogoStat
       return { ok: false, message: 'Pick a logo to use.' }
     }
 
-    const bytes = new Uint8Array(await file.arrayBuffer())
+    let bytes = new Uint8Array(await file.arrayBuffer())
+    let payload = formData
+    let converted = false
+
+    /**
+     * ── AN SVG BECOMES A PNG HERE, AND THE SVG IS DISCARDED ─────────────────
+     * The founder's logo is an SVG, and the file dialog would not even let him
+     * select one — a third, separate "nothing happens".
+     *
+     * `lib/assets/kind.ts` had the reason and it is correct: "an SVG is a script
+     * container that no channel accepts". Rather than sanitise it — a blacklist
+     * is defeatable and a whitelist sanitiser is its own piece of software with
+     * its own CVE history — the vector is RASTERISED and the original thrown
+     * away. Nothing that reaches storage, a signed link, a browser or a model is
+     * ever an SVG.
+     *
+     * Everything downstream then works unchanged: the bytes sniff as a PNG, the
+     * Constraint Engine can judge them, the library can hold them and image
+     * generation can use them. `kind.ts`'s objection is answered rather than
+     * routed around, which is why this needs no exception anywhere else.
+     *
+     * The hash is taken AFTER conversion, of what is actually stored, so
+     * re-uploading the same SVG produces the same PNG and adopts rather than
+     * duplicating.
+     */
+    if (looksLikeSvg(bytes)) {
+      const raster = await rasteriseSvgLogo(bytes)
+      if (!raster.ok) return { ok: false, message: raster.message }
+
+      bytes = raster.png
+      converted = true
+      payload = new FormData()
+      payload.set(
+        'file',
+        new File([raster.png], `${baseName(file.name)}.png`, { type: 'image/png' }),
+      )
+      payload.set('title', LOGO_TITLE)
+    }
+
     const contentHash = createHash('sha256').update(bytes).digest('hex')
 
     const supabase = createServerSupabase()
@@ -101,15 +148,15 @@ export async function setBrandLogo(formData: FormData): Promise<SetBrandLogoStat
       if (claimed) return { ok: false, message: 'Could not set that as your logo. Try again.' }
 
       revalidatePath('/assets')
-      return { ok: true, adopted: true }
+      return { ok: true, adopted: true, converted }
     }
 
     // Not here yet, so it is an ordinary upload — with every check that carries,
     // including the sniffing that proves the bytes are an image at all.
-    const stored = await uploadAsset(formData)
+    const stored = await uploadAsset(payload)
     if (!stored.ok) return { ok: false, message: stored.message }
 
-    return { ok: true, adopted: false }
+    return { ok: true, adopted: false, converted }
   } catch (error) {
     reportServerError(error, { action: 'setBrandLogo', workspaceId })
     return { ok: false, message: 'Could not set that as your logo. Try again.' }

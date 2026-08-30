@@ -139,10 +139,7 @@ export function skinCss(theme: ThemeTokens | null, scope: string = SKIN_SCOPE): 
  * repository names in its one rule. Caught within the same commit and recorded
  * because a guard that cannot see the change is worse than no guard.
  */
-export function skinVarNames(
-  theme: ThemeTokens | null,
-  surface: SkinSurface = 'light',
-): string[] {
+export function skinVarNames(theme: ThemeTokens | null, surface: SkinSurface = 'light'): string[] {
   if (!theme) return []
 
   /**

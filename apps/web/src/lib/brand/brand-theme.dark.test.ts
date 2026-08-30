@@ -59,7 +59,12 @@ describe.each(SURFACES)('on the %s surface', (surface) => {
 
     /** The Readability Guard's whole promise, restated per surface. */
     it('carries readable text on the primary fill', () => {
-      const fg = vars['--pfg'] === 'white' ? { r: 255, g: 255, b: 255 } : PAGE[surface].r > 128 ? INK.light : { r: 13, g: 13, b: 13 }
+      const fg =
+        vars['--pfg'] === 'white'
+          ? { r: 255, g: 255, b: 255 }
+          : PAGE[surface].r > 128
+            ? INK.light
+            : { r: 13, g: 13, b: 13 }
       expect(contrastRatio(rgbOf(vars['--p']), fg)).toBeGreaterThanOrEqual(4.5)
     })
 

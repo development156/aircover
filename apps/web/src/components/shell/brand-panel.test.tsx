@@ -316,6 +316,24 @@ describe('the brand mark', () => {
     ).not.toHaveBeenCalled()
   })
 
+  /**
+   * ── THE SYMPTOM ITSELF ────────────────────────────────────────────────────
+   * The founder's logo is an SVG. Without `image/svg+xml` in `accept`, the file
+   * dialog greys it out — he cannot select it, no event fires, and the button
+   * presents as doing nothing at all. That was the third of three separate
+   * "Replace logo is not working" reports.
+   *
+   * MUTATION FOUND THIS GAP: removing the type from the attribute left all 51
+   * tests green while restoring the exact defect. The user-visible symptom lived
+   * in one HTML attribute that nothing asserted.
+   */
+  it('lets an SVG be selected at all', () => {
+    render(panel())
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!
+
+    expect(input.accept, 'a greyed-out file reads as a broken button').toContain('image/svg+xml')
+  })
+
   it('spends nothing and writes nothing just by being opened', async () => {
     render(panel())
     await screen.findAllByRole('button', { name: /use this colour/i })
