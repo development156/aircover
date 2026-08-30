@@ -27,8 +27,36 @@ const LIBRARY = [
   { assetId: 'a4', url: 'https://example.test/4.png', title: null },
 ]
 
-const open = (library = LIBRARY) =>
-  render(<StudioWorkbench formats={generatableFormats()} cost={6} library={library} />)
+const MADE = [
+  {
+    imageId: 'p1',
+    url: 'https://example.test/made-1.png',
+    width: 1080,
+    height: 1080,
+    prompt: 'a plate of samosas',
+    formatId: 'square',
+    mime: 'image/png',
+  },
+  {
+    imageId: 'p2',
+    url: 'https://example.test/made-2.png',
+    width: 1080,
+    height: 1920,
+    prompt: 'the shopfront at dawn',
+    formatId: 'story',
+    mime: 'image/webp',
+  },
+]
+
+const open = (library = LIBRARY, pictures: typeof MADE = []) =>
+  render(
+    <StudioWorkbench
+      formats={generatableFormats()}
+      cost={6}
+      library={library}
+      pictures={pictures}
+    />,
+  )
 
 describe('the modes on offer', () => {
   test('offers the three that work and not the one that cannot be made honestly', () => {
@@ -91,6 +119,57 @@ describe('the canvas', () => {
 
     expect(canvas.style.aspectRatio).toBe(`${story!.width} / ${story!.height}`)
     expect(canvas.style.aspectRatio).not.toBe(before)
+  })
+})
+
+describe('the canvas draws the picture, not a description of one', () => {
+  /**
+   * THE POINT OF THE SCREEN. Somebody spends credits and then has to decide
+   * whether to use what came back. A line of text saying "made" is a receipt,
+   * not a delivered feature: the decision needs the picture, at its real shape.
+   */
+  test('shows the newest picture this workspace has made', () => {
+    open(LIBRARY, MADE)
+    const shown = screen.getByAltText('a plate of samosas')
+    expect(shown.getAttribute('src')).toBe('https://example.test/made-1.png')
+  })
+
+  test('says what will appear only while there is nothing to show', () => {
+    open(LIBRARY, MADE)
+    expect(screen.queryByText(/your picture appears here/i)).toBeNull()
+  })
+
+  test('the strip carries every picture, so one can be judged against the last', () => {
+    const { container } = open(LIBRARY, MADE)
+    const strip = container.querySelector('[data-guide="studio-strip"]') as HTMLElement
+    expect(within(strip).getAllByRole('button')).toHaveLength(MADE.length)
+  })
+
+  test('clicking an older one puts it on the canvas', async () => {
+    const user = userEvent.setup()
+    const { container } = open(LIBRARY, MADE)
+    const strip = container.querySelector('[data-guide="studio-strip"]') as HTMLElement
+    await user.click(within(strip).getAllByRole('button')[1]!)
+
+    const canvas = container.querySelector('[data-guide="studio-canvas"]') as HTMLElement
+    expect(within(canvas).getByAltText('the shopfront at dawn')).toBeTruthy()
+  })
+
+  test('with nothing made, there is no strip to scroll rather than an empty one', () => {
+    const { container } = open(LIBRARY, [])
+    expect(container.querySelector('[data-guide="studio-strip"]')).toBeNull()
+    expect(screen.getByText(/your picture appears here/i)).toBeTruthy()
+  })
+
+  /**
+   * The picture is a control, not decoration: judging a photograph at 400 pixels
+   * wide is not judging it. Both the canvas and the header offer the way in, so
+   * neither a mouse habit nor a keyboard one has to be learned.
+   */
+  test('the picture opens large, and the way in is reachable by name', () => {
+    open(LIBRARY, MADE)
+    expect(screen.getByRole('button', { name: /open it large/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /open "a plate of samosas" large/i })).toBeTruthy()
   })
 })
 

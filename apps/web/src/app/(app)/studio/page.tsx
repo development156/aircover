@@ -3,6 +3,7 @@ import { MESH_TASK_ACTION, creditCost } from '@sahoda/shared'
 import { PageTitle } from '@/components/page-title'
 import { StudioWorkbench } from '@/components/studio/studio-workbench'
 import { RecentGenerations } from '@/components/studio/recent-generations'
+import { canvasPictures } from '@/lib/studio/canvas'
 import { generatableFormats } from '@/lib/studio/formats'
 import { readGenerations, readLibraryPictures } from '@/lib/studio/read'
 
@@ -29,6 +30,11 @@ export default async function StudioPage() {
 
   const formats = generatableFormats()
   const cost = creditCost(MESH_TASK_ACTION.image_generate)
+  // An empty canvas on a FAILED read, deliberately. A read that failed produced
+  // no pictures, and the list below is where that distinction is stated: the
+  // canvas inventing a reason would be a second, vaguer answer to the same
+  // question.
+  const pictures = recent.status === 'ok' ? canvasPictures(recent.cards) : []
 
   return (
     <div className="space-y-grid">
@@ -36,7 +42,7 @@ export default async function StudioPage() {
         Studio
       </PageTitle>
 
-      <StudioWorkbench formats={formats} cost={cost} library={library} />
+      <StudioWorkbench formats={formats} cost={cost} library={library} pictures={pictures} />
 
       <RecentGenerations read={recent} />
     </div>
