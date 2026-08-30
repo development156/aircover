@@ -4,7 +4,12 @@ import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { Button } from '@/components/ui/button'
-import { isUsableBrandColor } from '@/lib/brand/brand-theme'
+import {
+  currentSwatchIndex,
+  distinctBrandColors,
+  isUsableBrandColor,
+} from '@/lib/brand/brand-theme'
+import { colorNames } from '@/lib/brand/color-name'
 import { rgbToOklch } from '@/lib/brand/oklch'
 
 /**
@@ -25,6 +30,7 @@ import { rgbToOklch } from '@/lib/brand/oklch'
  */
 export function BrandPanel({
   logoUrl,
+  current,
   skinOn,
   hasTheme,
   onToggleSkin,
@@ -32,6 +38,11 @@ export function BrandPanel({
   onClose,
 }: {
   logoUrl: string | null
+  /**
+   * The primary the workspace is stored with, so the row can say which swatch is
+   * the one in use. Guard-adjusted, which is why the lookup is by hue.
+   */
+  current: string | null
   /** Whether the customer's colours are painting the product right now. */
   skinOn: boolean
   /** Whether a brand has been stored at all. With none, there is nothing to switch to. */
@@ -92,7 +103,17 @@ export function BrandPanel({
    * the derivation's own predicate is the difference between a palette and a
    * row of decoys.
    */
-  const usable = (palette ?? []).filter(isUsableBrandColor)
+  /**
+   * ── AND ONLY ONCE EACH ────────────────────────────────────────────────────
+   * The chroma filter above removes the greys and says nothing about whether the
+   * survivors differ from each other. MEASURED on the founder's screenshot after
+   * that fix: four swatches, all blue, all a shade apart. A logo drawn in one
+   * colour at four opacities yields exactly that, and it is the five-decoys
+   * defect again in a weaker form: four choices, one outcome.
+   */
+  const usable = distinctBrandColors((palette ?? []).filter(isUsableBrandColor))
+  const names = colorNames(usable)
+  const inUse = skinOn ? currentSwatchIndex(usable, current) : -1
   /** The logo was read successfully and simply has no colour in it. */
   const monochrome = palette !== null && palette.length > 0 && usable.length === 0
 
@@ -209,7 +230,22 @@ export function BrandPanel({
          hangs off its button rather than covering the viewport. */
       className="surface-ring-firm absolute top-[calc(100%+8px)] left-0 z-15 w-[280px] rounded-card bg-surface p-3 shadow-pop"
     >
-      <p className="type-sm text-ink">Your brand colour</p>
+      {/* ── THE LOGO ITSELF, IN THE PANEL THAT REPLACES IT ────────────────────
+          "Replace logo" sat in a panel that never showed what was being
+          replaced. On a workspace whose mark is small, or wrong, or somebody
+          else's, the person had to close this and look at the topbar to find
+          out. It is the subject of every control below it. */}
+      <div className="flex items-center gap-2">
+        {logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={logoUrl}
+            alt="Your logo"
+            className="surface-ring h-7 w-auto max-w-[72px] shrink-0 rounded-control bg-s2 object-contain px-1"
+          />
+        ) : null}
+        <p className="type-sm text-ink">Your brand colours</p>
+      </div>
       {/* THE CLAIM TRACKS THE MECHANISM, WHICH HAS MOVED TWICE IN A DAY. It once
           read "every button and link follows it" while the paint was
           unconditional, then named two places while it was confined to the mark.
@@ -217,36 +253,41 @@ export function BrandPanel({
           now: the colour paints the product WHILE the switch is on, and the
           light and dark themes are a different switch. */}
       <p className="type-xs mt-1 text-muted">
-        Sahoda picks the colour it saw most of. Choose a different one and your buttons and links
-        follow it while your brand colours are switched on. Light and dark stay on the moon.
+        Sahoda picked the colour it saw most of in your logo. Choose another and your buttons and
+        links follow it while the brand is switched on.
       </p>
 
-      {/* ── THE SWITCH, STATED AS WHAT IT IS ────────────────────────────────────
-          Pressing the logo does this too. It is repeated here because a person
-          who opened the menu to fix an unreadable screen should not have to
-          guess that the way out is the button they just walked past, and because
-          this is the only place that can say which state they are in. */}
-      {hasTheme ? (
-        <div className="surface-ring mt-3 flex items-center justify-between gap-2 rounded-control p-2">
-          <span className="type-xs text-ink">
-            {skinOn ? 'Your brand colours are on' : 'Sahoda colours are on'}
-          </span>
-          <Button variant="secondary" disabled={busy} onClick={onToggleSkin}>
-            {skinOn ? 'Use Sahoda colours' : 'Use my colours'}
-          </Button>
-        </div>
-      ) : null}
-
+      {/* ── THE COLOURS COME FIRST ────────────────────────────────────────────
+          The switch below used to sit here. Picking a colour is why almost
+          anybody opens this; switching the whole thing off is the rare act, and
+          it was the one in the first position. */}
       {usable.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-2">
-          {usable.map((color) => (
+          {usable.map((color, index) => (
             <button
               key={color}
               type="button"
               disabled={busy}
               onClick={() => choose(color)}
-              aria-label="Use this colour"
-              className="surface-ring size-8 rounded-control"
+              /* ── NOT FOUR BUTTONS WITH ONE NAME ───────────────────────────
+                 Every swatch carried the identical "Use this colour", so a
+                 screen reader announced the row as four indistinguishable
+                 controls and the only thing telling them apart was the colour,
+                 which is also what a colour-blind reader does not get. */
+              aria-label={
+                index === inUse
+                  ? `Use this colour: ${names[index]}, in use now`
+                  : `Use this colour: ${names[index]}`
+              }
+              aria-current={index === inUse ? true : undefined}
+              /* The mark sits OUTSIDE the swatch. A tick drawn on top would need
+                 its own contrast ruling against an arbitrary customer colour;
+                 an outline on the page behind it needs none. */
+              className={
+                index === inUse
+                  ? 'size-8 rounded-control outline-2 outline-offset-2 outline-ink'
+                  : 'surface-ring size-8 rounded-control'
+              }
               style={{ background: color }}
             />
           ))}
@@ -280,6 +321,37 @@ export function BrandPanel({
             />
           </label>
         </div>
+      ) : null}
+
+      {/* ── THE SWITCH, STATED AS WHAT IT IS ────────────────────────────────────
+          Pressing the logo does this too. It is repeated here because a person
+          who opened the menu to fix an unreadable screen should not have to
+          guess that the way out is the button they just walked past, and because
+          this is the only place that can say which state they are in.
+
+          `flex-wrap`: at 280px "Your brand colours are on" beside "Use Sahoda
+          colours" does not fit on one line, and without this the two were
+          squeezed into a ragged two-line span with the button jammed against it.
+          Wrapping puts the button on its own line instead. */}
+      {hasTheme ? (
+        <div className="surface-ring mt-3 flex flex-wrap items-center justify-between gap-2 rounded-control p-2">
+          <span className="type-xs text-ink">
+            {skinOn ? 'Your brand colours are on' : 'Sahoda colours are on'}
+          </span>
+          <Button variant="secondary" disabled={busy} onClick={onToggleSkin}>
+            {skinOn ? 'Use Sahoda colours' : 'Use my colours'}
+          </Button>
+        </div>
+      ) : null}
+
+      {/* SAID NEXT TO THE SWITCH IT IS ABOUT. As the last line of the opening
+          paragraph it read as "light and dark stay on the moon", which assumes
+          the reader already knows the moon is the theme control. It belongs
+          beside the one switch a person might mistake for that one. */}
+      {hasTheme ? (
+        <p className="type-xs mt-1 text-muted">
+          The sun and moon in the top bar still switch light and dark.
+        </p>
       ) : null}
 
       {failed ? (
