@@ -58,36 +58,54 @@ export const metadata: Metadata = {
   title: { default: 'Sahoda', template: '%s · Sahoda' },
   description: 'AI Marketing OS',
   /**
-   * The tab strip is browser chrome — it follows the OS colour scheme, not our
-   * in-app theme toggle, so this is `prefers-color-scheme` and never `data-theme`.
-   * (docs/ui-package/sahoda-labs/SPECIFICATION.md, asset rules.)
+   * THE ANDROID HALF OF "IT WORKS ON A HOME SCREEN".
    *
-   * BOTH PNG entries carry a media query on purpose. The package says "media
-   * variant first, plain one last as the Safari fallback", but an UNQUALIFIED
-   * entry declared last is picked by last-wins browsers regardless of scheme,
-   * which would silently kill the dark variant. The unqualified fallback is
-   * `app/favicon.ico` instead: Next `unshift`s a file-based favicon onto the
-   * front of this array (resolve-metadata.js), so it coexists with these two
-   * rather than overriding them, and it is guaranteed to be first.
+   * iOS reads `app/apple-icon.png` and nothing else. Chrome on Android reads a
+   * web manifest, and with none it falls back to whatever `rel="icon"` it can
+   * find and scales it, which is how a 16px tab icon becomes a blurry tile.
    *
-   * Naming reads backwards at a glance: favicon-dark.png is the DARK-INK mark,
-   * so it belongs on a light tab strip — which is exactly how bottom-nav.tsx
-   * uses it (`dark:hidden`).
+   * It is a STATIC file rather than an `app/manifest.ts` route, and that is a
+   * measurement: the route convention adds `/manifest.webmanifest/route` to the
+   * build, and `scripts/perf/js-budget.mjs` correctly refuses a route it has no
+   * budget for. Recording a 590 kB budget line for a document that ships no
+   * client JavaScript would put a number in that file which means nothing and
+   * which somebody would later have to explain. A file in `public/` has no route
+   * and no budget line.
    *
-   * No `apple` entry, deliberately. Both marks are 594x508, and iOS composites a
-   * touch icon into a SQUARE — so pointing at either one hands Apple the exact
-   * distortion the .ico is padded to 594x594 to avoid. Padding one properly needs
-   * a background colour decision (transparent composites to black on iOS, which
-   * would swallow the dark-ink mark), and there is no token that says which.
-   * That is an owner call, not a defect fix; until then iOS falls back to its own
-   * page snapshot rather than to a squashed logo.
+   * What the manifest deliberately OMITS is `display` and `theme_color`. Chrome
+   * needs `display: standalone` before it offers to install a site, and this
+   * change was asked to fix an icon rather than to turn the product into an
+   * installable app. Icons on a home screen work without it.
    */
-  icons: {
-    icon: [
-      { url: '/brand/favicon-dark.png', type: 'image/png', media: '(prefers-color-scheme: light)' },
-      { url: '/brand/favicon-white.png', type: 'image/png', media: '(prefers-color-scheme: dark)' },
-    ],
-  },
+  manifest: '/site.webmanifest',
+  /**
+   * ── NO `icons` HERE, AND THAT IS THE FIX ───────────────────────────────────
+   *
+   * This used to declare two PNGs qualified by `prefers-color-scheme`, pointing
+   * at `/brand/favicon-dark.png` and `/brand/favicon-white.png`. Every part of
+   * that was wrong once the real brand element was available:
+   *
+   *   - Both files are 594x508. A tab strip, a bookmark row, a pinned tab and a
+   *     home-screen tile all draw into a SQUARE, so all four were squashing the
+   *     mark by 15%, and each was a browser's own downscale of a 594px image at
+   *     the 16px it is actually read at.
+   *   - Neither file is the brand mark. They are black-and-white silhouettes;
+   *     `public/LOGOS/element.png` is the Sahoda element in the brand orange.
+   *   - There was no Apple touch icon at all, so an iPhone home screen fell back
+   *     to a snapshot of the page.
+   *
+   * The icons are now FILE CONVENTIONS — `app/favicon.ico`, `app/icon.png` and
+   * `app/apple-icon.png`. Next reads their real pixel dimensions, writes the
+   * `sizes` and `type` attributes itself and fingerprints the URLs, so the
+   * declaration cannot drift from the bytes. That is the whole reason this key
+   * is gone rather than rewritten: a `metadata.icons` array ALSO emits link
+   * tags, and two declarations of the same icon is how the dark variant would
+   * quietly win over the light one again. One source, and it is the files.
+   *
+   * Regenerate every size from the artwork with `node scripts/gen-favicons.mjs`.
+   * `favicon-assets.test.ts` fails if an output goes missing or stops being
+   * square; `layout.test.tsx` fails if this key comes back.
+   */
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

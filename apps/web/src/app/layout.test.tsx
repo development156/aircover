@@ -23,47 +23,43 @@ vi.mock('next/font/google', () => ({
 import { metadata } from './layout'
 
 /**
- * Every route in the app 404'd on `GET /favicon.ico` because the root layout —
- * the only `Metadata` export in the app — declared no icons at all.
+ * Every route in the app 404'd on `GET /favicon.ico` because the root layout,
+ * the only `Metadata` export in the app, declared no icons at all.
  *
- * These tests pin the two halves of the fix that are easy to undo by accident:
- * the scheme-qualification of the PNG entries, and the existence of the
- * unqualified `.ico` fallback that browsers and crawlers request by path
- * regardless of what `<link>` tags say.
+ * The fix for that was a `metadata.icons` array of two PNGs qualified by
+ * `prefers-color-scheme`, and these tests pinned its two fragile halves. That
+ * array is now GONE, and these tests are retargeted rather than deleted, because
+ * the claim they were protecting has not gone anywhere: exactly one declaration
+ * of the icon, so no entry can win by being declared last.
+ *
+ * What changed is where the declaration lives. `app/favicon.ico`, `app/icon.png`
+ * and `app/apple-icon.png` are Next FILE CONVENTIONS: Next emits the link tags
+ * from the files themselves, reading their real pixel dimensions for `sizes`. A
+ * `metadata.icons` array emits link tags TOO, so reintroducing one would restore
+ * the double declaration these tests exist to prevent. That is the regression
+ * the first test now pins, and it is a stronger guard than the old one, which
+ * could only check that the second declaration was well formed.
+ *
+ * The size and squareness of the bytes themselves are `favicon-assets.test.ts`.
  */
 
-type Icon = { url: string; type?: string; media?: string }
-
-function iconEntries(): Icon[] {
-  const icons = metadata.icons as { icon?: Icon[] } | undefined
-  expect(icons, 'root metadata declares no icons at all').toBeDefined()
-  expect(Array.isArray(icons?.icon)).toBe(true)
-  return icons?.icon as Icon[]
-}
-
-test('declares a tab icon for each colour scheme, mapped to the matching mark', () => {
-  const byScheme = new Map(iconEntries().map((i) => [i.media, i.url]))
-
-  // The dark-INK mark belongs on a LIGHT tab strip, and vice versa. Getting this
-  // backwards renders an invisible mark, which no typecheck can catch.
-  expect(byScheme.get('(prefers-color-scheme: light)')).toBe('/brand/favicon-dark.png')
-  expect(byScheme.get('(prefers-color-scheme: dark)')).toBe('/brand/favicon-white.png')
+test('declares no icons in metadata, so the files are the only declaration', () => {
+  // THE REGRESSION THIS PINS. Adding `icons: { icon: [...] }` back here does not
+  // replace the file-convention tags, it ADDS to them: two rel="icon" links for
+  // one icon, and the last one wins in some browsers and not in others. The
+  // 594x508 scheme-qualified pair that used to live here is exactly that shape.
+  expect(metadata.icons).toBeUndefined()
 })
 
-test('leaves no unqualified PNG entry that could win by being declared last', () => {
-  // The regression this pins: appending a plain `{ url: '...' }` with no media
-  // query. Last-wins browsers pick it whatever the scheme, silently killing the
-  // dark variant. The unqualified fallback is the `.ico`, which Next unshifts to
-  // the front of this array — it is never allowed to be one of these entries.
-  const unqualified = iconEntries().filter((i) => !i.media)
-  expect(unqualified).toEqual([])
-})
-
-test('ships the app-directory favicon.ico that answers the literal request', () => {
-  // A metadata-only test cannot see this: Next injects it at build time from the
-  // file's presence in app/. Its absence is the original 404.
+test('ships the three app-directory icon files that answer every request', () => {
+  // A metadata-only test cannot see these: Next injects the tags at build time
+  // from the files' presence in app/. The absence of the .ico is the original
+  // 404; the absence of apple-icon.png is an iPhone home screen falling back to
+  // a snapshot of the page.
   // `new URL(...)` would be jsdom's URL class here, not Node's; `existsSync`
   // brand-checks it and quietly answers false. Hand it a plain string.
   const appDir = dirname(fileURLToPath(import.meta.url))
-  expect(existsSync(join(appDir, 'favicon.ico'))).toBe(true)
+  for (const file of ['favicon.ico', 'icon.png', 'apple-icon.png']) {
+    expect(existsSync(join(appDir, file)), `app/${file} is missing`).toBe(true)
+  }
 })
