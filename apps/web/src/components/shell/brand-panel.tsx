@@ -4,6 +4,8 @@ import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { Button } from '@/components/ui/button'
+import { isUsableBrandColor } from '@/lib/brand/brand-theme'
+import { rgbToOklch } from '@/lib/brand/oklch'
 
 /**
  * The brand panel: the colours found in the logo, and the way to replace it.
@@ -80,9 +82,31 @@ export function BrandPanel({
     })()
   }
 
+  /**
+   * ── ONLY THE COLOURS THAT CAN ACTUALLY BECOME A BRAND ────────────────────
+   * MEASURED on the founder's logo, which is grey, white and black: all five
+   * extracted swatches had chroma 0.0000, every one fell back to Sahoda orange,
+   * and the panel offered five choices that could not do anything. Filtering by
+   * the derivation's own predicate is the difference between a palette and a
+   * row of decoys.
+   */
+  const usable = (palette ?? []).filter(isUsableBrandColor)
+  /** The logo was read successfully and simply has no colour in it. */
+  const monochrome = palette !== null && palette.length > 0 && usable.length === 0
+
+  function pick(hex: string): void {
+    const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex)
+    if (!m) return
+    choose(rgbToOklch(parseInt(m[1]!, 16), parseInt(m[2]!, 16), parseInt(m[3]!, 16)))
+  }
+
   function choose(color: string): void {
     startTransition(async () => {
-      const rest = (palette ?? []).filter((c) => c !== color)
+      // FROM THE USABLE LIST, and the test that found this is worth keeping in
+      // mind: `colors[1]` becomes the ACCENT, and an unusable colour there falls
+      // back to Sahoda orange. Carrying the greys along would have handed a
+      // customer who picked teal an orange accent.
+      const rest = usable.filter((c) => c !== color)
       setFailed(null)
       const { saveWorkspaceTheme } = await import('@/app/actions/theme')
       const saved = await saveWorkspaceTheme([color, ...rest])
@@ -179,9 +203,9 @@ export function BrandPanel({
         </div>
       ) : null}
 
-      {palette && palette.length > 0 ? (
+      {usable.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-2">
-          {palette.map((color) => (
+          {usable.map((color) => (
             <button
               key={color}
               type="button"
@@ -192,6 +216,30 @@ export function BrandPanel({
               style={{ background: color }}
             />
           ))}
+        </div>
+      ) : null}
+
+      {/* ── A LOGO WITH NO COLOUR IN IT ───────────────────────────────────────
+          Founder's ruling, 2026-08-30: pick-a-colour. His own logo is grey,
+          white and black, so the extractor was right and there was simply
+          nothing to offer. Saying that plainly and handing over a picker is the
+          honest answer; five grey decoys was not. */}
+      {monochrome ? (
+        <div className="mt-3">
+          <p className="type-xs text-muted">
+            Your logo is greys and blacks, so Sahoda found no brand colour in it. Pick one and
+            everything follows it.
+          </p>
+          <label className="surface-ring mt-2 flex items-center justify-between gap-2 rounded-control p-2">
+            <span className="type-xs text-ink">Pick your brand colour</span>
+            <input
+              type="color"
+              disabled={busy}
+              defaultValue="#ff6600"
+              onChange={(e) => pick(e.target.value)}
+              className="size-8 cursor-pointer rounded-control border-0 bg-transparent p-0"
+            />
+          </label>
         </div>
       ) : null}
 

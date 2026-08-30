@@ -137,6 +137,30 @@ const SURFACES: Record<SkinSurface, SurfaceSpec> = {
 const MIN_BRAND_CHROMA = 0.03
 const MAX_BRAND_CHROMA = 0.16
 
+/**
+ * Can this colour actually become a brand, or will it fall back to ours?
+ *
+ * ── WHY THIS IS EXPORTED ────────────────────────────────────────────────────
+ * MEASURED on the founder's own logo, which is grey, white and black: the panel
+ * offered five swatches and every one of them had chroma 0.0000, so every one
+ * fell through `guardedInput` to Sahoda orange. Five choices, five no-ops, and
+ * a panel that then announced "your brand colours are on" while the product was
+ * painted in ours.
+ *
+ * `no-impossible-remedy.spec.ts` exists in this repository because offering an
+ * action that cannot work is a defect of its own. The panel therefore asks this
+ * question BEFORE it draws a swatch, and the answer comes from the same constant
+ * the derivation uses rather than a second copy of the rule that could drift.
+ */
+export function isUsableBrandColor(css: string): boolean {
+  try {
+    const { c } = parseOklch(css)
+    return Number.isFinite(c) && c >= MIN_BRAND_CHROMA
+  } catch {
+    return false
+  }
+}
+
 function guardedInput(input: { l: number; c: number; h: number }): {
   l: number
   c: number
