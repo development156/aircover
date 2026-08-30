@@ -68,7 +68,7 @@ test.describe('the composer across widths @smoke', () => {
     await bootstrapWorkspace(page)
     const postId = await startPost(page, 'x')
     await page.locator('[data-channel-tile="linkedin"]').click()
-    await page.getByLabel('Your post').fill(BODY)
+    await page.getByLabel('Your post', { exact: true }).fill(BODY)
     // Waited for, not assumed. The body is written on a debounce, and the loop
     // below opens a SEPARATE browser context — so a capture taken before the
     // write lands photographs an empty composer and proves nothing about how a
