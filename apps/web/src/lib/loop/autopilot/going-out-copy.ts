@@ -34,7 +34,7 @@ import type { Channel } from '@sahoda/shared'
  * and it answers three outcomes rather than two for exactly this reason.
  */
 
-export type GoingOutState = 'not-armed' | 'armed-idle' | 'waiting'
+export type GoingOutState = 'not-armed' | 'armed-idle' | 'waiting' | 'unreadable'
 
 export interface GoingOutView {
   state: GoingOutState
@@ -57,6 +57,27 @@ export interface GoingOutInput {
   armed: readonly Channel[]
   /** Posts autopilot has announced and nothing has resolved. */
   waiting: readonly { channel: Channel }[]
+}
+
+/**
+ * THE FOURTH NOTHING: we could not look.
+ *
+ * A read that fell over must not render as an empty section and must not render
+ * as nothing at all. Hiding the panel is the quieter version of the same lie —
+ * the reader is left with a screen that looks exactly like one where autopilot
+ * has nothing pending, on the strength of a query that never answered.
+ *
+ * This was a defect in the first version of the Loop page mount, which returned
+ * null for an unreadable read. It was caught by turning the component's own
+ * "the panel is present in every state" guard on the page.
+ */
+export const GOING_OUT_UNREADABLE: GoingOutView = {
+  state: 'unreadable',
+  sentence: 'Sahoda could not check what is set to go out just now.',
+  // Says what is unchanged, because the reader's real question is whether
+  // something went out while the screen was blind. Nothing here changed it.
+  remedy: 'Try again in a moment. Nothing was sent and nothing was stopped.',
+  count: 0,
 }
 
 export function goingOutView({ armed, waiting }: GoingOutInput): GoingOutView {
