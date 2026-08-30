@@ -2,7 +2,13 @@ import { ImageIcon } from 'lucide-react'
 import Link from 'next/link'
 
 import { CardEmpty } from '@/components/empty-state'
-import { describeBuiltFrom, describePicture, describeStatus } from '@/lib/studio/card-copy'
+import {
+  describeBuiltFrom,
+  describeCount,
+  describeFormat,
+  describePicture,
+  describeStatus,
+} from '@/lib/studio/card-copy'
 import type { GenerationsRead } from '@/lib/studio/read'
 
 /**
@@ -54,57 +60,66 @@ export function RecentGenerations({ read }: { read: GenerationsRead }) {
         />
       ) : (
         <ul className="grid gap-3 wide:grid-cols-3 max-wide:grid-cols-1">
-          {read.cards.map(({ generation, pictures }) => (
-            <li
-              key={generation.id}
-              className="surface-ring flex flex-col gap-2 rounded-card bg-surface p-3"
-            >
-              {pictures.map((picture) => {
-                const said = describePicture({
-                  status: generation.status,
-                  hasAsset: picture.assetId !== null,
-                  hasUrl: picture.url !== null,
-                })
-                return (
-                  <div key={picture.imageId} className="flex flex-col gap-1">
-                    {picture.url === null ? null : (
-                      // eslint-disable-next-line @next/next/no-img-element -- a
-                      // short-lived signed URL from a private bucket cannot be
-                      // optimised by next/image without proxying the credential.
-                      <img
-                        src={picture.url}
-                        alt={generation.prompt_given}
-                        width={picture.width ?? undefined}
-                        height={picture.height ?? undefined}
-                        className="surface-ring w-full rounded-card bg-s2"
-                      />
-                    )}
-                    {said === null ? null : <span className="type-sm text-muted">{said}</span>}
-                  </div>
-                )
-              })}
+          {read.cards.map(({ generation, pictures }) => {
+            // Counted from the rows themselves, never from the request. A card
+            // that reported what was ASKED for as what arrived would be a figure
+            // no query produced, which is the defect this product names by name.
+            const arrived = pictures.filter((one) => one.assetId !== null).length
+            const howMany = describeCount({ made: arrived, asked: generation.requested_count })
+            return (
+              <li
+                key={generation.id}
+                className="surface-ring flex flex-col gap-2 rounded-card bg-surface p-3"
+              >
+                {pictures.map((picture) => {
+                  const said = describePicture({
+                    status: generation.status,
+                    hasAsset: picture.assetId !== null,
+                    hasUrl: picture.url !== null,
+                  })
+                  return (
+                    <div key={picture.imageId} className="flex flex-col gap-1">
+                      {picture.url === null ? null : (
+                        // eslint-disable-next-line @next/next/no-img-element -- a
+                        // short-lived signed URL from a private bucket cannot be
+                        // optimised by next/image without proxying the credential.
+                        <img
+                          src={picture.url}
+                          alt={generation.prompt_given}
+                          width={picture.width ?? undefined}
+                          height={picture.height ?? undefined}
+                          className="surface-ring w-full rounded-card bg-s2"
+                        />
+                      )}
+                      {said === null ? null : <span className="type-sm text-muted">{said}</span>}
+                    </div>
+                  )
+                })}
 
-              <span className="type-body font-[550]">{generation.prompt_given}</span>
+                <span className="type-body font-[550]">{generation.prompt_given}</span>
 
-              <span className="type-sm text-muted">
-                {describeStatus(generation.status)}
-                {generation.format_id === null ? null : ` · ${generation.format_id}`}
-              </span>
+                <span className="type-sm text-muted">
+                  {describeStatus(generation.status)}
+                  {generation.format_id === null ? null : ` · ${generation.format_id}`}
+                </span>
 
-              <span className="type-sm text-muted">
-                {describeBuiltFrom(generation.brand_signals)}
-              </span>
+                <span className="type-sm text-muted">
+                  {describeBuiltFrom(generation.brand_signals)}
+                </span>
 
-              {generation.status !== 'ready' ? null : (
-                <Link
-                  href="/assets"
-                  className="type-sm text-muted underline transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                >
-                  Open your library
-                </Link>
-              )}
-            </li>
-          ))}
+                {howMany === null ? null : <span className="type-sm text-muted">{howMany}</span>}
+
+                {generation.status !== 'ready' ? null : (
+                  <Link
+                    href="/assets"
+                    className="type-sm text-muted underline transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  >
+                    Open your library
+                  </Link>
+                )}
+              </li>
+            )
+          })}
         </ul>
       )}
 

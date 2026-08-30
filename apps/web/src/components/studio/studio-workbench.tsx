@@ -14,9 +14,9 @@ import { Textarea } from '@/components/ui/textarea'
 import type { CanvasPicture } from '@/lib/studio/canvas'
 import type { StudioFormat } from '@/lib/studio/formats'
 import {
-  MAX_REFERENCES,
   MAX_TRIES_PER_PRESS,
   describeModeBlock,
+  promptHintFor,
   readyModes,
   ruleFor,
 } from '@/lib/studio/modes'
@@ -82,17 +82,29 @@ export function StudioWorkbench({
   const blocked = describeModeBlock({ mode, references: picked.length })
   const ready = wanted.trim().length >= 3 && chosen !== null && blocked === null
 
+  /**
+   * ── A PRESS THAT CHANGES NOTHING MUST SAY WHY ─────────────────────────────
+   * This silently dropped the click once the mode's reference limit was reached:
+   * the tile did not select, nothing moved, and nothing was said. A control that
+   * ignores a press without explaining is exactly the dead end this product
+   * forbids, and it is worse than a refusal because the person cannot tell
+   * whether they missed the target or the app is broken.
+   *
+   * The sentence comes from `modes.ts`, the same one the server action would
+   * refuse with, so the screen never invents its own wording for a rule it does
+   * not own.
+   */
   function toggleReference(assetId: string) {
     setNote(null)
-    setPicked((current) =>
-      current.includes(assetId)
-        ? current.filter((id) => id !== assetId)
-        : // Bounded here as well as in the rule, so the list cannot grow past
-          // what the model will look at even for a moment.
-          current.length >= MAX_REFERENCES
-          ? current
-          : [...current, assetId],
-    )
+    if (picked.includes(assetId)) {
+      setPicked((current) => current.filter((id) => id !== assetId))
+      return
+    }
+    if (picked.length >= rule.maxReferences) {
+      setNote(describeModeBlock({ mode, references: picked.length + 1 }))
+      return
+    }
+    setPicked((current) => [...current, assetId])
   }
 
   function chooseMode(next: GenerationMode) {
@@ -160,7 +172,7 @@ export function StudioWorkbench({
             value={wanted}
             rows={3}
             maxLength={1000}
-            placeholder="A plate of fresh samosas on a wooden counter, morning light"
+            placeholder={promptHintFor(mode)}
             onChange={(event) => setWanted(event.target.value)}
             data-guide="studio-prompt"
           />

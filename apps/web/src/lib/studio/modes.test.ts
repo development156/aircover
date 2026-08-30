@@ -28,8 +28,29 @@ describe('the modes on offer', () => {
     expect(readyModes().map((r) => r.mode)).not.toContain('series')
   })
 
-  test('the three that are offered are the three that work', () => {
-    expect(readyModes().map((r) => r.mode)).toEqual(['on_brand', 'explore', 'match'])
+  test('the ones offered are exactly the ones that work', () => {
+    expect(readyModes().map((r) => r.mode)).toEqual(['on_brand', 'explore', 'match', 'edit'])
+  })
+
+  /**
+   * An edit is a change to a SPECIFIC picture. Handing a model three sources
+   * leaves it to decide which one it is editing, which is a different feature
+   * wearing this one's label.
+   */
+  test('changing a picture takes exactly one, where matching takes three', () => {
+    expect(ruleFor('edit').minReferences).toBe(1)
+    expect(ruleFor('edit').maxReferences).toBe(1)
+    expect(ruleFor('match').maxReferences).toBe(MAX_REFERENCES)
+  })
+
+  test('a second picture on an edit says which one to keep, not just that it is wrong', () => {
+    const said = describeModeBlock({ mode: 'edit', references: 2 })
+    expect(said).toMatch(/one picture at a time/i)
+    expect(said).toMatch(/take the others off/i)
+  })
+
+  test('an edit with nothing picked names the fix in its own words', () => {
+    expect(describeModeBlock({ mode: 'edit', references: 0 })).toMatch(/picture you want changed/i)
   })
 
   test('an unknown mode falls back to the default rather than throwing', () => {
@@ -96,7 +117,7 @@ describe('describeModeBlock', () => {
   })
 
   test('the copy carries no em dash, which is the standing ruling for prose', () => {
-    for (const mode of ['on_brand', 'explore', 'match', 'series'] as const) {
+    for (const mode of ['on_brand', 'explore', 'match', 'edit', 'series'] as const) {
       for (const references of [0, 1, 9]) {
         expect(describeModeBlock({ mode, references }) ?? '').not.toMatch(/[—–]/)
       }

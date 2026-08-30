@@ -74,6 +74,7 @@ const MODE_DIRECTION: Record<GenerationMode, string> = {
   on_brand: 'Match the brand described below exactly.',
   explore: 'Explore freely. Vary composition, colour and mood.',
   match: 'Match the style, lighting and composition of the reference images provided.',
+  edit: 'Change the image provided as described. Keep everything else about it unchanged: the subject, the framing, the lighting and the background stay as they are.',
   series: 'One image in a set. Keep style, lighting and palette identical across the set.',
 }
 
