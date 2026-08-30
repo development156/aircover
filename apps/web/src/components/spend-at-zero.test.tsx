@@ -44,8 +44,8 @@ const state = vi.hoisted(() => ({
   remix: {} as Record<string, unknown>,
 }))
 
-vi.mock('@/app/actions/posts-image', () => ({
-  generateImage: () => Promise.resolve(state.image),
+vi.mock('@/app/actions/studio', () => ({
+  queueGeneration: () => Promise.resolve(state.image),
 }))
 vi.mock('@/app/actions/posts-ai', () => ({
   generateVariants: () => Promise.resolve(state.variants),
@@ -71,7 +71,8 @@ vi.mock('@/app/actions/remix-run', () => ({
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
-import { GenerateImage } from './posts/generate-image'
+import { GenerateForm } from './studio/generate-form'
+import { generatableFormats } from '@/lib/studio/formats'
 import { GeneratePanel } from './posts/generate-panel'
 import { InlineRewrite } from './posts/inline-rewrite'
 import { PlanWeekPanel } from './planner/plan-week-panel'
@@ -127,12 +128,16 @@ const CONTROLS: ReadonlyArray<{
   press: () => Promise<void>
 }> = [
   {
-    name: 'Make an image',
+    // RETARGETED, NOT DELETED. This drove the composer's own image generator
+    // until the Studio replaced it as the only place media enters the product.
+    // What is guarded is the refusal at a zero balance, and the refusal moved
+    // with the control.
+    name: 'Make a picture',
     press: async () => {
       const user = userEvent.setup()
-      render(<GenerateImage postId="p1" />)
-      await user.type(screen.getByPlaceholderText(/describe the picture/i), 'a warm shopfront')
-      await user.click(screen.getByRole('button', { name: /make an image/i }))
+      render(<GenerateForm formats={generatableFormats()} cost={6} />)
+      await user.type(screen.getByPlaceholderText(/plate of fresh samosas/i), 'a warm shopfront')
+      await user.click(screen.getByRole('button', { name: /make this picture/i }))
     },
   },
   {
@@ -215,14 +220,14 @@ describe.each(CONTROLS)('$name, with an empty wallet', ({ press }) => {
 })
 
 describe('the spend controls do not pre-disable on a balance they did not read', () => {
-  test('Make an image stays pressable so a top-up in another tab still works', async () => {
-    render(<GenerateImage postId="p1" />)
+  test('Make a picture stays pressable so a top-up in another tab still works', async () => {
+    render(<GenerateForm formats={generatableFormats()} cost={6} />)
 
     // Only the prompt gates it. A client-side balance check here would refuse a
     // customer who has just paid, and the server gate is the real enforcement.
-    const button = screen.getByRole('button', { name: /make an image/i })
+    const button = screen.getByRole('button', { name: /make this picture/i })
     expect(button).toBeDisabled() // no prompt yet
-    await userEvent.type(screen.getByPlaceholderText(/describe the picture/i), 'a shopfront')
+    await userEvent.type(screen.getByPlaceholderText(/plate of fresh samosas/i), 'a shopfront')
     expect(button).toBeEnabled()
   })
 })
