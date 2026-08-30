@@ -233,7 +233,7 @@ export default async function ReportPage() {
           ) : (
             <ul className="grid gap-2">
               {learnings.map((learning, index) => (
-                <li key={index} className="rounded-input bg-subtle p-3">
+                <li key={index} className="rounded-input bg-surface-2 p-3">
                   <p className="type-body text-ink">{learning.summary}</p>
                   <p className="type-sm mt-1 text-muted">
                     {learning.status === 'accepted'
@@ -257,7 +257,7 @@ export default async function ReportPage() {
           ) : (
             <ul className="grid gap-2">
               {written.map((brief) => (
-                <li key={brief.id} className="rounded-input bg-subtle p-3">
+                <li key={brief.id} className="rounded-input bg-surface-2 p-3">
                   <p className="type-body text-ink">{brief.title}</p>
                   <p className="type-sm mt-1 text-muted">
                     {brief.channels.join(' · ')}

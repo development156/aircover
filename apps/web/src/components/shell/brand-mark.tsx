@@ -114,7 +114,7 @@ export function BrandMark({
             })}
         data-guide="topbar.brand"
         onClick={() => (hasTheme ? toggleSkin() : setOpen(true))}
-        className="surface-ring grid h-8 min-w-8 place-items-center overflow-hidden rounded-l-control bg-s2 px-1.5 transition-micro hover:bg-s3 active:scale-[.97]"
+        className="surface-ring grid h-8 min-w-8 place-items-center overflow-hidden rounded-l-control bg-s2 px-1.5 transition-micro hover:bg-surface-3 active:scale-[.97]"
       >
         {logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -137,7 +137,7 @@ export function BrandMark({
         aria-expanded={open}
         aria-label="Open brand options"
         onClick={() => setOpen((was) => !was)}
-        className="surface-ring -ml-px grid h-8 w-5 place-items-center rounded-r-control bg-s2 text-muted transition-micro hover:bg-s3 hover:text-ink active:scale-[.97]"
+        className="surface-ring -ml-px grid h-8 w-5 place-items-center rounded-r-control bg-s2 text-muted transition-micro hover:bg-surface-3 hover:text-ink active:scale-[.97]"
       >
         <ChevronDown size={13} strokeWidth={1.8} aria-hidden />
       </button>
