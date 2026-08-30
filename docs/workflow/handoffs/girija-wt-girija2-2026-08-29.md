@@ -378,3 +378,94 @@ and Vercel had quietly kept serving the old one.
   is a known compromise, written down in `lib/brand/logo.ts`. A customer who
   titles some other picture `Logo` by hand would see it in the topbar. Visible,
   reversible, costs nothing, and a column is a founder decision.
+
+---
+
+## Brand Skin becomes a switch (`dd5c4d4f`)
+
+**Third go at the same ruling, and the first two are why it is a switch.**
+
+| attempt | scope | what was wrong |
+| ------- | ----- | -------------- |
+| `47e2a935` | `:root:root` | painted the whole product from an automatic read of one PNG, **with no way out**. A grey-and-white logo washed the interface out |
+| `ba47a1a3` | `[data-brand-skin]` on the mark | safe and **useless**: paints nothing, so there is nothing to switch |
+| `dd5c4d4f` | `:root[data-brand-skin='on']` | paints the product, **gated on an attribute a person controls** |
+
+The founder's words: *"I want Brand Skin separate from platform theme and it can
+be switched back and forth between Brand Skin and Sahoda themes. It will give
+the user more options if Brand Skin breaks the readability."*
+
+### Two switches that must not touch each other
+
+| control | owns | states |
+| ------- | ---- | ------ |
+| moon / sun | Sahoda's platform theme | light ↔ dark. **Never** the brand |
+| the logo | Brand Skin | on ↔ off. **Never** light/dark |
+
+**They compose.** Brand colours over dark neutrals is a real and reachable
+combination, because only seven tokens are themeable and every neutral and
+semantic belongs to the theme (Design System §2). That is the reason the two
+can be independent at all: they are answers to two different questions, not two
+answers to one.
+
+### How the switch works
+
+`(app)/layout.tsx` **always** emits the brand rule, scoped to
+`:root[data-brand-skin='on']` — 0,1,1 against `tokens.css`'s bare `:root` at
+0,0,1, so the brand wins while it is on, with no `!important`. `ThemeScript`
+sets the attribute before the first paint from `localStorage['sahoda-skin']`,
+so there is no flash and the switch itself is one attribute write: no round
+trip, no revalidation.
+
+**Off is the default.** A workspace that never asks keeps the palette whose
+contrast steps were measured. Repainting a product from a colour histogram is a
+thing to be asked for, not defaulted into.
+
+**Per person, not per workspace**, in the same storage as the theme and for the
+same reason: it is a preference about how somebody wants to look at the
+product. Two people in one workspace can disagree and neither is wrong.
+
+### The mark is a split control
+
+Pressing the **logo** switches: one press, no menu, instantly reversible. The
+**chevron** beside it opens the panel, where choosing which extracted colour is
+primary and replacing the file live. With no brand stored the logo press opens
+the panel instead, because a toggle that toggles nothing reports a state change
+that did not happen.
+
+### Mutation
+
+| mutation | result |
+| -------- | ------ |
+| the gate dropped from the scope (`:root:root` again) | **RED** |
+| a one-way switch (`nextSkinState` always returns `on`) | **RED** ×2 |
+| any truthy stored value turns it on | **RED** |
+| the brand press also writes `data-theme` | **RED** |
+| the pre-paint script stops restoring the brand | **RED** ×4 |
+| all five at once | **RED**, 9 tests in 4 files |
+| all five reverted | **PASS**, 263 tests in 28 files |
+
+### Gate
+
+| leg | result |
+| --- | ------ |
+| `turbo typecheck lint test` | **PASS**, 27 of 27, **4m20.9s**. `@sahoda/web:test`: **489 files, 6,114 passed, 13 skipped**. `typecheck` a cache MISS, so it really ran |
+| root vitest | **PASS**, 223 in 15 files |
+| `test:smoke` | **UNRUN.** `clerkSetup()` cannot reach Clerk's API from this sandbox |
+| `prettier --check .` | **PASS** |
+| `pnpm --filter @sahoda/web build` | **PASS.** `js-budget ok: 82 routes within budget` |
+
+**One hazard recorded.** While the panel test was being retargeted, vitest
+reported `238 passed` alongside `2 errors` — an unhandled `TypeError` thrown
+inside a click handler did NOT fail the run. A suite can be green and throwing
+at the same time. Read the error block, not only the count.
+
+### Still open
+
+- **The Readability Guard is light-oriented.** Brand Skin on top of the DARK
+  theme has not been measured; the guard runs on every render, but its
+  thresholds were set against light surfaces. If a brand reads badly in dark,
+  that is the thing to measure first. The off switch is the mitigation, not
+  the fix.
+- **A logo uploaded before `ba47a1a3` is still not findable** — the row carries
+  the file name. Re-upload through the chevron menu.
