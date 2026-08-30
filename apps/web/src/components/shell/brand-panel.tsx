@@ -43,6 +43,22 @@ export function BrandPanel({
   const input = useRef<HTMLInputElement>(null)
   const [palette, setPalette] = useState<string[] | null>(null)
   const [unreadable, setUnreadable] = useState(false)
+  /**
+   * ── WHAT WENT WRONG, SHOWN ────────────────────────────────────────────────
+   * `replace()` used to be `await uploadAsset(form)` with the result thrown
+   * away. `uploadAsset` refuses a duplicate file, an oversized one, unreadable
+   * bytes, a storage failure and a missing workspace, and every one of those
+   * closed this panel and refreshed the page as though it had worked.
+   *
+   * MEASURED on the founder's own workspace: "Replace logo" appeared to do
+   * nothing, over and over. The file was being refused as a DUPLICATE — it
+   * matches by content hash against the copy already in the library — and the
+   * refusal, which names the file and points at the trash, was discarded here.
+   *
+   * A silent failure is worse than a loud one on a control whose entire job is
+   * to change something visible.
+   */
+  const [failed, setFailed] = useState<string | null>(null)
   const [busy, startTransition] = useTransition()
   const [read, setRead] = useState(false)
 
@@ -67,8 +83,13 @@ export function BrandPanel({
   function choose(color: string): void {
     startTransition(async () => {
       const rest = (palette ?? []).filter((c) => c !== color)
+      setFailed(null)
       const { saveWorkspaceTheme } = await import('@/app/actions/theme')
-      await saveWorkspaceTheme([color, ...rest])
+      const saved = await saveWorkspaceTheme([color, ...rest])
+      if (!saved.ok) {
+        setFailed(saved.message)
+        return
+      }
       // Choosing a colour IS asking for it, so it takes effect rather than being
       // stored against a switch the person has not met.
       onUseBrand()
@@ -79,6 +100,7 @@ export function BrandPanel({
 
   function replace(file: File): void {
     startTransition(async () => {
+      setFailed(null)
       try {
         const { extractPalette } = await import('@/lib/brand/color-extract')
         const found = extractPalette(await load(URL.createObjectURL(file), false))
@@ -86,11 +108,21 @@ export function BrandPanel({
         form.set('file', file)
         form.set('title', 'Logo')
         const { uploadAsset } = await import('@/app/actions/assets')
-        await uploadAsset(form)
+        const stored = await uploadAsset(form)
+        if (!stored.ok) {
+          // The refusal names the file and, for a duplicate, points at where the
+          // existing copy is. It is more useful than anything composed here.
+          setFailed(stored.message)
+          return
+        }
 
         if (found.length > 0) {
           const { saveWorkspaceTheme } = await import('@/app/actions/theme')
-          await saveWorkspaceTheme(found)
+          const saved = await saveWorkspaceTheme(found)
+          if (!saved.ok) {
+            setFailed(saved.message)
+            return
+          }
           setPalette(found)
           setUnreadable(false)
         } else {
@@ -102,7 +134,7 @@ export function BrandPanel({
         onClose()
         router.refresh()
       } catch {
-        setUnreadable(true)
+        setFailed('Sahoda could not read that file. Try a PNG or a JPEG.')
       }
     })
   }
@@ -161,6 +193,12 @@ export function BrandPanel({
             />
           ))}
         </div>
+      ) : null}
+
+      {failed ? (
+        <p className="type-xs mt-3 text-danger" role="alert">
+          {failed}
+        </p>
       ) : null}
 
       {unreadable ? (
