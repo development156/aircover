@@ -26,6 +26,12 @@ export const SURFACE_RGB: Rgb = { r: 255, g: 255, b: 255 }
 export const INK_RGB: Rgb = { r: 0, g: 0, b: 0 }
 
 const MIN_CONTRAST = 4.5
+/**
+ * WCAG 1.4.11: the boundary of a user-interface component needs 3:1 against
+ * what is behind it. Lower than the text bar on purpose — this is about seeing
+ * the control at all, not reading words on it.
+ */
+const MIN_SHAPE_CONTRAST = 3
 const DARKEN_STEP = 0.03
 const MAX_DARKEN_ITERATIONS = 32
 
@@ -110,9 +116,23 @@ const SURFACES: Record<SkinSurface, SurfaceSpec> = {
  * button; too much and a neon logo gives an interface that glows. The band
  * keeps the colour recognisably theirs without either failure.
  *
- * Lightness is NOT clamped here, deliberately: the guard below moves it until
- * the contrast is real, which is a stronger statement than a band, and a band
- * applied first would only give the guard less room.
+ * ── LIGHTNESS IS NOT CLAMPED HERE, AND THE REASON WAS WRONG ONCE ────────────
+ * The founder's research also asked for a lightness BAND, 45–60%. This comment
+ * used to decline it: "the guard below moves it until the contrast is real,
+ * which is a stronger statement than a band."
+ *
+ * The claim was right about bands and wrong about the guard. The guard measured
+ * TEXT AGAINST THE FILL and nothing else, so a label could be perfectly legible
+ * on a button that was the same colour as the page behind it. MEASURED, fill
+ * against page, with every other check passing: navy on dark **1.02:1**, deep
+ * purple **1.09:1**, lime on light **1.22:1**, yellow **1.41:1**.
+ *
+ * `guardPrimaryForeground` now measures that pair too, at WCAG 1.4.11's 3:1.
+ * So the original sentence is finally true rather than merely confident: the
+ * guard moves lightness until BOTH contrasts are real, which is strictly better
+ * than a fixed band because it adapts to the surface and to the hue. A band
+ * would refuse a deep navy that a dark theme can actually carry, and admit a
+ * yellow that a white page cannot.
  */
 const MIN_BRAND_CHROMA = 0.03
 const MAX_BRAND_CHROMA = 0.16
@@ -185,7 +205,21 @@ function guardPrimaryForeground(
     const rgb = oklchToRgb(lightness, c, h)
     const contrastWhite = contrastRatio(rgb, WHITE_RGB)
     const contrastDark = contrastRatio(rgb, spec.darkText.rgb)
-    if (contrastWhite >= MIN_CONTRAST || contrastDark >= MIN_CONTRAST) {
+    const readableText = contrastWhite >= MIN_CONTRAST || contrastDark >= MIN_CONTRAST
+    // ── AND THE FILL ITSELF HAS TO BE VISIBLE ─────────────────────────────
+    // The loop used to stop the moment the LABEL was legible, which says
+    // nothing about whether the button can be seen. MEASURED: a navy brand on
+    // the dark theme came back at 1.02:1 against `#171717` — white text
+    // floating on a rectangle exactly the colour of the page behind it — and
+    // it passed every check in the suite. Founder's rule, 2026-08-29, and the
+    // threshold is WCAG 1.4.11's 3:1 for the boundary of a UI component.
+    //
+    // The same walk serves both: darkening on a white page separates the fill
+    // AND helps white text, lightening on a near-black page does the mirror.
+    // So this costs extra steps, never a contradiction, and the fallbacks
+    // below are reachable exactly as before.
+    const visibleShape = contrastRatio(rgb, spec.surface) >= MIN_SHAPE_CONTRAST
+    if (readableText && visibleShape) {
       const foreground = contrastDark >= contrastWhite ? spec.darkText.css : 'white'
       return { primary: formatOklch(lightness, c, h), foreground }
     }
