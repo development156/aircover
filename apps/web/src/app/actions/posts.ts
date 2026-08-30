@@ -225,6 +225,11 @@ export async function saveVariant(
       body,
       hashtags: cleanExtras.hashtags,
       hasLink: hasLink(body),
+      // The stored count is read where the live meter is not — the posts list,
+      // the planner. Without the writer's brackets choice it counted a caption
+      // nobody was going to publish, two characters per keyword adrift from the
+      // meter on the screen that wrote it.
+      keywordBrackets: cleanExtras.keywordBrackets,
     })
 
     const patch = PostVariantUpdateSchema.parse({

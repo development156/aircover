@@ -31,7 +31,7 @@ export async function BrainSections({ only }: { only: readonly BrainSectionKey[]
       <EmptyState
         icon={BrainCircuit}
         title="Sahoda doesn’t know your brand yet"
-        body="These fields are what every caption, campaign and reply is written from. There is nothing to show until the Brand Brain has been resolved once."
+        body="These fields are what Sahoda writes your captions, your weekly plan and your website from. There is nothing to show until the Brand Brain has been resolved once."
       />
     )
   }
@@ -45,8 +45,8 @@ export async function BrainSections({ only }: { only: readonly BrainSectionKey[]
     return (
       <div className="space-y-grid">
         <p className="text-[13px] text-muted">
-          Nothing has been resolved yet. These are the fields every caption, campaign and reply is
-          written from.
+          Nothing has been resolved yet. These are the fields Sahoda writes your captions, your
+          weekly plan and your website from.
         </p>
         <div className="grid gap-grid wide:grid-cols-2">
           {sections.map((section) => (
