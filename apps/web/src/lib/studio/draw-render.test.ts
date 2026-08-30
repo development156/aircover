@@ -1,7 +1,14 @@
 import { describe, expect, test, vi } from 'vitest'
 
 import type { DrawObject } from './draw-objects'
-import { composite, drawOne, redraw, type Ink, type RenderTarget } from './draw-render'
+import {
+  composite,
+  drawOne,
+  drawSelection,
+  redraw,
+  type Ink,
+  type RenderTarget,
+} from './draw-render'
 
 /**
  * WHAT ACTUALLY REACHES THE CANVAS, IN WHAT ORDER.
@@ -238,5 +245,66 @@ describe('the module is pure', () => {
     // handed one, and it is not.
     expect(() => redraw(ctx, SIZE, [stroke], INK)).not.toThrow()
     expect(spy).not.toHaveBeenCalled()
+  })
+})
+
+describe('showing which mark is picked up', () => {
+  /**
+   * THE MISSING HALF OF THE POINTER TOOL. It could pick a mark up and move it,
+   * and nothing ever said which mark was picked, so a person dragged, watched
+   * something else move, and concluded the tool was broken.
+   */
+  test('a selected mark gets a box drawn round it', () => {
+    const { ctx, calls } = recorder()
+    redraw(ctx, SIZE, [stroke], INK, null, { x: 10, y: 10, w: 20, h: 20 })
+    expect(calls.some((c) => c.op === 'strokeRect')).toBe(true)
+  })
+
+  test('nothing selected draws no box', () => {
+    const { ctx, calls } = recorder()
+    redraw(ctx, SIZE, [stroke], INK, null, null)
+    expect(calls.some((c) => c.op === 'strokeRect')).toBe(false)
+  })
+
+  /** Over the mark it describes, never under it. */
+  test('the box is drawn last, so the mark cannot cover it', () => {
+    const { ctx, calls } = recorder()
+    redraw(ctx, SIZE, [stroke], INK, null, { x: 0, y: 0, w: 5, h: 5 })
+    const lastMark = calls.map((c) => c.op).lastIndexOf('stroke')
+    const box = calls.findIndex((c) => c.op === 'strokeRect')
+    expect(box).toBeGreaterThan(lastMark)
+  })
+
+  /**
+   * Padded outwards, so the box sits AROUND the mark rather than through it.
+   * A box drawn exactly on the bounds is indistinguishable from a rectangle
+   * somebody drew.
+   */
+  test('the box sits outside the mark, not on top of its edge', () => {
+    const { ctx, calls } = recorder()
+    // NO pad argument: the DEFAULT is what every caller gets, and a test that
+    // passes its own padding proves nothing about it. Zero padding draws the box
+    // exactly on the bounds, where it is indistinguishable from a rectangle
+    // somebody drew themselves.
+    drawSelection(ctx, { x: 100, y: 100, w: 50, h: 50 }, INK)
+    const drawn = calls.find((c) => c.op === 'strokeRect')!
+    const [x, y, w, h] = drawn.args as number[]
+    expect(x!).toBeLessThan(100)
+    expect(y!).toBeLessThan(100)
+    expect(w!).toBeGreaterThan(50)
+    expect(h!).toBeGreaterThan(50)
+  })
+
+  test('it uses the same two ink colours as everything else', () => {
+    const { ctx } = recorder()
+    const styles: string[] = []
+    const spy = new Proxy(ctx, {
+      set(target, key, value) {
+        if (key === 'strokeStyle') styles.push(value as string)
+        return Reflect.set(target, key, value)
+      },
+    })
+    drawSelection(spy as RenderTarget, { x: 0, y: 0, w: 1, h: 1 }, INK)
+    expect(styles).toEqual([INK.edge, INK.fill])
   })
 })

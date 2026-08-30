@@ -156,10 +156,13 @@ export function redraw(
   objects: readonly DrawObject[],
   ink: Ink,
   inProgress: DrawObject | null = null,
+  selected: { x: number; y: number; w: number; h: number } | null = null,
 ): void {
   ctx.clearRect(0, 0, size.width, size.height)
   for (const object of objects) drawOne(ctx, object, ink)
   if (inProgress !== null) drawOne(ctx, inProgress, ink)
+  // Last, so it sits OVER the mark it describes rather than under it.
+  if (selected !== null) drawSelection(ctx, selected, ink)
 }
 
 /**
@@ -180,4 +183,36 @@ export function composite(
   ctx.clearRect(0, 0, size.width, size.height)
   ctx.drawImage(background, 0, 0, size.width, size.height)
   for (const object of objects) drawOne(ctx, object, ink)
+}
+
+/**
+ * The dashed box around the mark that is selected.
+ *
+ * ── A SELECTION NOBODY CAN SEE IS NOT A SELECTION ───────────────────────────
+ * The pointer tool could pick a mark up and move it, and nothing on the screen
+ * ever said which mark was picked. So a person dragged, watched something else
+ * move, and concluded the tool was broken. This is the missing half of that
+ * feature rather than decoration.
+ *
+ * Drawn in the SAME two colours as everything else, and always last, so it sits
+ * over the mark it describes instead of under it.
+ */
+export function drawSelection(
+  ctx: RenderTarget,
+  box: { x: number; y: number; w: number; h: number },
+  ink: Ink,
+  pad = 8,
+): void {
+  ctx.save()
+  ctx.lineCap = 'butt'
+  ctx.lineJoin = 'miter'
+  for (const [colour, width] of [
+    [ink.edge, 5],
+    [ink.fill, 2],
+  ] as const) {
+    ctx.strokeStyle = colour
+    ctx.lineWidth = width
+    ctx.strokeRect(box.x - pad, box.y - pad, box.w + pad * 2, box.h + pad * 2)
+  }
+  ctx.restore()
 }

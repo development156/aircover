@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import {
+  boundsOf,
   commit,
   objectAt,
   removeObject,
@@ -44,6 +45,8 @@ export function DrawCanvas({
   brush,
   state,
   onChange,
+  selectedId,
+  onSelect,
 }: {
   /** The loaded photograph. Null until it decodes. */
   background: CanvasImageSource | null
@@ -52,6 +55,9 @@ export function DrawCanvas({
   brush: number
   state: DrawState
   onChange: (next: DrawState) => void
+  /** Which mark is picked up, so the toolbar can offer to remove it. */
+  selectedId: string | null
+  onSelect: (id: string | null) => void
 }) {
   const photo = useRef<HTMLCanvasElement>(null)
   const ink = useRef<HTMLCanvasElement>(null)
@@ -93,8 +99,14 @@ export function DrawCanvas({
     if (canvas === null) return
     const ctx = canvas.getContext('2d')
     if (ctx === null) return
-    redraw(ctx, size, state.objects, colours, live)
-  }, [state.objects, live, size, colours])
+    // The selection box follows the mark being dragged, not its resting place,
+    // so it does not detach from the shape mid-drag.
+    const picked =
+      live !== null && live.id === selectedId
+        ? live
+        : (state.objects.find((one) => one.id === selectedId) ?? null)
+    redraw(ctx, size, state.objects, colours, live, picked === null ? null : boundsOf(picked))
+  }, [state.objects, live, size, colours, selectedId])
 
   const pointOf = useCallback(
     (event: React.PointerEvent): Point => {
@@ -120,12 +132,19 @@ export function DrawCanvas({
       const hit = objectAt(state.objects, at)
       // Erases a MARK, never pixels. Nothing to erase is not a failure and says
       // nothing: a person sweeping an empty corner has not done anything wrong.
-      if (hit !== null) onChange(commit(state, removeObject(state.objects, hit.id)))
+      if (hit !== null) {
+        if (hit.id === selectedId) onSelect(null)
+        onChange(commit(state, removeObject(state.objects, hit.id)))
+      }
       return
     }
 
     if (tool === 'pointer') {
       const hit = objectAt(state.objects, at)
+      // Selected on press, including a press that hits nothing, which clears it.
+      // A selection that survives a click on empty space is one a person cannot
+      // get rid of.
+      onSelect(hit?.id ?? null)
       if (hit !== null) drag.current = { kind: 'move', original: hit, from: at }
       return
     }
