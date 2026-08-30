@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { goingOutView } from './going-out-copy'
+import { GOING_OUT_UNREADABLE, goingOutView } from './going-out-copy'
 
 /**
  * The three nothings, and the claims each one is allowed to make.
@@ -73,8 +73,32 @@ describe('when posts are in the window', () => {
   })
 })
 
+describe('when the read could not answer', () => {
+  const v = GOING_OUT_UNREADABLE
+
+  it('says Sahoda could not look, never that nothing is waiting', () => {
+    expect(v.state).toBe('unreadable')
+    // The whole defect: a failed read that reads as an empty queue is the
+    // product asserting something about the customer's posts on the strength
+    // of a query that never answered.
+    expect(v.sentence).not.toMatch(/nothing is waiting/i)
+    expect(v.sentence.toLowerCase()).toContain('could not')
+  })
+
+  it('answers the question the reader actually has: did something go out', () => {
+    expect(v.remedy).not.toBeNull()
+    expect(v.remedy!.toLowerCase()).toContain('nothing was sent')
+  })
+
+  it('reports zero without implying it measured zero', () => {
+    expect(v.count).toBe(0)
+    expect(v.sentence).not.toMatch(/\b0\b|\bno posts\b/i)
+  })
+})
+
 describe('what no state is allowed to claim', () => {
   const all = [
+    GOING_OUT_UNREADABLE,
     goingOutView({ armed: [], waiting: [] }),
     goingOutView({ armed: ['x'], waiting: [] }),
     goingOutView({ armed: ['x'], waiting: [post, post] }),
