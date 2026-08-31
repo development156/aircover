@@ -93,7 +93,7 @@ test.describe('the composer keeps one body per channel @smoke', () => {
     //      confirmed. It used to rewrite it as soon as the row was created, one
     //      round trip earlier, and a reload in that window produced a real post
     //      with no channels on it.
-    await page.getByLabel('Your post').fill(SOURCE_BODY)
+    await page.getByLabel('Your post', { exact: true }).fill(SOURCE_BODY)
     await page.waitForURL(/\/posts\/[0-9a-f-]{36}$/, { timeout: 60_000 })
     const postId = new URL(page.url()).pathname.split('/').pop() as string
     expect(postId).toMatch(/^[0-9a-f-]{36}$/)
@@ -136,7 +136,7 @@ test.describe('the composer keeps one body per channel @smoke', () => {
     await expect(xBody).toHaveValue(X_TEXT)
     await expect(linkedinBody).toHaveValue(LINKEDIN_TEXT)
     // The source is untouched by either.
-    await expect(page.getByLabel('Your post')).toHaveValue(SOURCE_BODY)
+    await expect(page.getByLabel('Your post', { exact: true })).toHaveValue(SOURCE_BODY)
 
     // Fixing X cleared X's objection and gave LinkedIn nothing to answer for.
     await expect(xCard.getByRole('alert')).toHaveCount(0)
@@ -162,7 +162,7 @@ test.describe('the composer keeps one body per channel @smoke', () => {
     await page.reload()
     await expect(page.locator('[data-variant-editor="x"]')).toHaveValue(X_TEXT)
     await expect(page.locator('[data-variant-editor="linkedin"]')).toHaveValue(LINKEDIN_TEXT)
-    await expect(page.getByLabel('Your post')).toHaveValue(SOURCE_BODY)
+    await expect(page.getByLabel('Your post', { exact: true })).toHaveValue(SOURCE_BODY)
 
     // ── 10. READ BACK #1 — the rows themselves, with no app code in the path.
     test.skip(admin === null, 'no service key in this environment')
