@@ -71,8 +71,30 @@ export default {
     {
       name: 'the ack wipes the whole outbox, the way clearPending used to',
       file: 'scripts/lib/ops-state.mjs',
-      find: '  writeState(name, { ...state, [key]: rows.slice(count) })',
-      replace: '  writeState(name, { ...state, [key]: [] })',
+      find: '  const fromBaseline = Math.min(count, baseline.length - drained)',
+      replace: '  const fromBaseline = baseline.length - drained',
+    },
+
+    // ── where the drain is WRITTEN, which is a different failure ────────────
+    //
+    // Added 2026-08-31. Both of these were the shipped behaviour until then,
+    // and neither loses a row: they put the queue's churn into a TRACKED file
+    // that `.githooks/pre-commit` refuses by name, so the working tree carried
+    // 2,121 deleted lines that could not be committed and would not go away.
+    // A queue that is durable and unusable is still a defect.
+    {
+      name: 'the drain rewrites the tracked pending file again',
+      file: 'scripts/lib/ops-state.mjs',
+      find: '  writeOverlay(repoRoot, overlay)\n}\n\n/** Stable-enough id',
+      replace:
+        '  writeState(name, { ...readState(name), [ROWS[name]]: baseline.slice(nextDrained) })\n' +
+        '  writeOverlay(repoRoot, overlay)\n}\n\n/** Stable-enough id',
+    },
+    {
+      name: 'a QA run is appended to the tracked file again',
+      file: 'scripts/lib/ops-state.mjs',
+      find: '  if (!OVERLAY_APPENDS[name]) {',
+      replace: '  if (true) {',
     },
     {
       name: 'the sync drops more than it sent',
