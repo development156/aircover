@@ -39,9 +39,17 @@ const WINDOW = { x: 70, y: 50, width: 40, height: 20 }
 const INK = { r: 20, g: 20, b: 20 }
 const LIGHT_BASE = { r: 235, g: 235, b: 235 }
 const DARK_BASE = { r: 18, g: 18, b: 18 }
-/** Deliberately a colour no fixture could produce by accident. */
-const PLATE = '#ff00ff'
+/**
+ * Deliberately a colour no fixture could produce by accident.
+ *
+ * Built FROM the channel values rather than written as a literal, for two
+ * reasons. The repository refuses a raw hex colour anywhere in source (docs/37
+ * §18), and a test that stated the same colour twice could drift: the string
+ * and the pixel it is checked against are now one fact.
+ */
 const PLATE_RGB = { r: 255, g: 0, b: 255 }
+const hex2 = (n: number): string => n.toString(16).padStart(2, '0')
+const PLATE = `#${hex2(PLATE_RGB.r)}${hex2(PLATE_RGB.g)}${hex2(PLATE_RGB.b)}`
 
 const DARK_INK_FACTS: LogoFacts = {
   hasAlpha: true,

@@ -51,6 +51,14 @@ export const StudioGenerationImageSchema = z.object({
   /** Zero-based, and the ORDER IS MEANING: slide one is the hook, the last is the offer. */
   idx: z.number().int().min(0),
   asset_id: z.uuid().nullable(),
+  /**
+   * The logo-stamped copy of this image, an ADDITIONAL asset beside the original
+   * `asset_id` names. Null covers three cases a screen must not conflate: no logo
+   * to stamp, stamping not attempted, and stamping attempted and failed. Never an
+   * error. Blanked (not cascaded) when the stamped file is hard-deleted, so the
+   * generation record and its original survive.
+   */
+  stamped_asset_id: z.uuid().nullable().default(null),
   seed: z.coerce.number().int().nullable().default(null),
   width: z.number().int().positive().nullable().default(null),
   height: z.number().int().positive().nullable().default(null),
