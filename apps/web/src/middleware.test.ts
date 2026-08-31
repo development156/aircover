@@ -80,6 +80,11 @@ const PUBLIC_PATTERNS = [
   // worth re-reading with a fifth entry in hand.
   '/api/cron/radar',
   '/api/cron/brain',
+  // The seventh, 2026-08-30: the autopilot tick, every ten minutes. Same shape,
+  // same reason. This one is the sharpest of the set, because behind the
+  // middleware a customer who armed a channel would see nothing go out and the
+  // heartbeat would report the schedule as healthy the whole time.
+  '/api/cron/autopilot',
 ]
 
 /**
@@ -137,6 +142,7 @@ const CLERK_BYPASS_PATHS = [
   '/api/cron/playbooks',
   '/api/cron/radar',
   '/api/cron/brain',
+  '/api/cron/autopilot',
   '/api/webhooks/cashfree',
   '/api/webhooks/clerk',
   // Added 2026-08-23, by two lanes independently, and both reasons are kept

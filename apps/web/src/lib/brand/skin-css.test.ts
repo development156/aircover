@@ -32,6 +32,13 @@ const theme = (primary: string, accent: string): ThemeTokens =>
 
 const TEAL = theme('oklch(0.55 0.12 195)', 'oklch(0.6 0.14 190)')
 
+/** The declarations inside the rail's own rule, and nothing else's. */
+const railRuleOf = (css: string): string => {
+  const marker = `${SKIN_SCOPE} [data-surface='inverse']{`
+  const at = css.indexOf(marker)
+  return at < 0 ? '' : css.slice(at + marker.length, css.indexOf('}', at))
+}
+
 describe('skinCss', () => {
   /**
    * The assertion names the customer's hue rather than ours, deliberately: the
@@ -50,32 +57,98 @@ describe('skinCss', () => {
   })
 
   /**
-   * THE RULE THAT KEEPS IT SAFE. Design System §2: seven tokens are themeable
-   * and nothing else. A workspace whose brand is red must not have its delete
-   * confirmation blend into its buttons, so danger stays crimson and every
-   * neutral stays fixed.
+   * ── SEVEN BECAME TWELVE, AND THE FIVE ARE NAMED ───────────────────────────
+   * Founder's ruling, 2026-08-30, unfreezing the NEUTRALS in Design System §2
+   * and nothing else. The seven brand tokens reach under 0.5% of the pixels on
+   * any screen — two guards hold them there deliberately — so Brand Skin
+   * recoloured one button and his verdict was "a pathetic failed attempt".
+   *
+   * The list is exhaustive on purpose. A token added here without a ruling is
+   * the drift this assertion exists to catch, and the count in `skin-css.ts`'s
+   * header moves in the same commit as this line.
    */
-  it('emits the seven themeable tokens and no others', () => {
+  it('emits exactly the twelve tokens the rulings allow', () => {
     expect(skinVarNames(TEAL).sort()).toEqual(
-      ['--acc', '--p', '--pfg', '--pstrong', '--t100', '--t300', '--t50'].sort(),
+      [
+        '--acc',
+        '--p',
+        '--pfg',
+        '--pstrong',
+        '--t100',
+        '--t300',
+        '--t50',
+        '--canvas',
+        '--surface',
+        '--surface-2',
+        '--surface-3',
+        '--line',
+      ].sort(),
     )
   })
 
-  it('never DEFINES a neutral or a semantic token', () => {
-    const defined = skinVarNames(TEAL)
+  /**
+   * ── THE RAIL, WHICH IS THE LARGEST SURFACE IN THE PRODUCT ─────────────────
+   * Founder's ruling, 2026-08-30, after an adversarial review found it
+   * unreachable. `[data-surface='inverse']` re-declares the dark ladder AND the
+   * `--bg`/`--s1`/`--s2` aliases ON THE ELEMENT, so a rule on `:root` cannot get
+   * inside it: the rail stayed Sahoda-dark while everything else took the hue.
+   */
+  it('reaches inside the inverse scope, where a :root rule cannot', () => {
+    expect(skinCss(TEAL)).toContain(`${SKIN_SCOPE} [data-surface='inverse']{`)
+  })
 
-    for (const forbidden of [
-      '--danger',
-      '--ok',
-      '--warn',
-      '--ink',
-      '--surface',
-      '--canvas',
-      '--line',
-    ]) {
-      expect(defined, `${forbidden} is fixed by canon and must never be themed`).not.toContain(
-        forbidden,
-      )
+  /**
+   * ── AND IT USES THE DARK GRADING, IN BOTH THEMES ──────────────────────────
+   * The rail is dark whatever the theme, and `--p`/`--pfg`/`--pstrong` are NOT
+   * among the tokens the inverse scope re-declares — so they inherited the LIGHT
+   * grading, a primary chosen to sit on white, painted on `#171717`. For a navy
+   * brand that is L 0.22 on an L 0.22 ground: the invisible fill the
+   * fill-on-page guard exists to end, surviving where it cannot see.
+   */
+  it('grades the rail for a dark ground, not for the page theme', () => {
+    const navy = theme('oklch(0.22 0.09 267)', 'oklch(0.3 0.1 267)')
+    const lightness = Number(/--p:oklch\(([0-9.]+)/.exec(railRuleOf(skinCss(navy)))?.[1])
+
+    expect(lightness, 'the rail primary is as dark as the rail itself').toBeGreaterThan(0.4)
+  })
+
+  /** Its own ladder too, or the rail's wells and pills sit at the wrong depth. */
+  it('gives the rail the dark neutrals', () => {
+    const rail = railRuleOf(skinCss(TEAL))
+
+    for (const token of ['--canvas', '--surface', '--surface-2', '--surface-3']) {
+      const lightness = Number(new RegExp(`${token}:oklch\\(([0-9.]+)`).exec(rail)?.[1])
+      expect(lightness, `${token} must be a dark rung inside the rail`).toBeLessThan(0.4)
+    }
+  })
+
+  /**
+   * `--line` is deliberately left alone: the inverse scope sets it to an alpha
+   * white, which is hue-neutral and correct over any ground. Replacing it with
+   * an opaque tint changes how hairlines behave, which is more than "follow the
+   * brand".
+   */
+  it('leaves the rail hairline as the alpha rule tokens.css chose', () => {
+    expect(railRuleOf(skinCss(TEAL))).not.toContain('--line:')
+  })
+
+  /**
+   * ── THE HALF OF §2 THAT WAS ALWAYS LOAD BEARING ───────────────────────────
+   * The neutrals were unfrozen. The SEMANTICS were not, and never will be by
+   * this route: a workspace whose brand is red must not have its delete
+   * confirmation blend into its buttons. `--ink` stays fixed for the same
+   * reason — it is what every tinted surface is read against, so theming it
+   * would move both sides of every pair at once.
+   */
+  it('never DEFINES a semantic token, whatever the brand', () => {
+    for (const surface of ['light', 'dark'] as const) {
+      const defined = skinVarNames(TEAL, surface)
+
+      for (const forbidden of ['--danger', '--ok', '--warn', '--ink', '--ink-mute']) {
+        expect(defined, `${forbidden} is fixed by canon and must never be themed`).not.toContain(
+          forbidden,
+        )
+      }
     }
   })
 
@@ -176,9 +249,10 @@ describe('skinCss', () => {
    */
   it('reads the theme without defining anything the theme owns', () => {
     for (const surface of ['light', 'dark'] as const) {
-      expect(skinVarNames(TEAL, surface).sort()).toEqual(
-        ['--acc', '--p', '--pfg', '--pstrong', '--t100', '--t300', '--t50'].sort(),
-      )
+      // Same token SET on both surfaces; only the values differ. A surface that
+      // emitted an extra key would be a rule the other theme cannot undo.
+      expect(skinVarNames(TEAL, surface).sort()).toEqual(skinVarNames(TEAL, 'light').sort())
+      expect(skinVarNames(TEAL, surface)).not.toContain('--ink')
     }
   })
 
