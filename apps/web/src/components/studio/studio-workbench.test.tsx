@@ -5,13 +5,14 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 import { queueGeneration, startPostFromPicture } from '@/app/actions/studio'
 import { StudioWorkbench } from '@/components/studio/studio-workbench'
 import { generatableFormats } from '@/lib/studio/formats'
+import { routedModels } from '@/lib/studio/models'
 import { uploadAccept } from '@/lib/studio/upload'
 import {
-  MAX_REFERENCES,
   MAX_TRIES_PER_PRESS,
   describeModeBlock,
   promptHintFor,
   readyModes,
+  ruleFor,
 } from '@/lib/studio/modes'
 
 /**
@@ -75,6 +76,58 @@ const open = (library = LIBRARY, pictures: typeof MADE = []) =>
       pictures={pictures}
     />,
   )
+
+describe('choosing which model draws it', () => {
+  test('the reachable models are offered by what they are good at, never by id', () => {
+    const { container } = open()
+    const picker = container.querySelector('[data-guide="studio-model"]') as HTMLElement
+    expect(picker).not.toBeNull()
+
+    // One button per reachable model, and each label and description present.
+    // Matched by TEXT rather than by accessible name: the name of a card is its
+    // whole content, so a word in one model's description collides with
+    // another's label and `getByRole` finds two.
+    expect(within(picker).getAllByRole('button')).toHaveLength(routedModels().length)
+    for (const model of routedModels()) {
+      expect(picker.textContent, model.id).toContain(model.label)
+      expect(picker.textContent, model.id).toContain(model.goodAt)
+      // The id is for the router, never for a shop owner.
+      expect(picker.textContent, model.id).not.toContain(model.id)
+    }
+  })
+
+  /**
+   * Hiding a model we cannot reach would be tidier and would leave somebody
+   * wondering whether the product can make a carousel at all. Listed, visibly
+   * not selectable, with the reason: a door rather than a wall.
+   */
+  test('a model we cannot reach is shown with the reason, not hidden', () => {
+    const { container } = open()
+    const waiting = container.querySelector('[data-guide="studio-model-waiting"]') as HTMLElement
+    expect(waiting).not.toBeNull()
+    expect(waiting.textContent).toMatch(/waiting on the connection/i)
+    expect(within(waiting).queryByRole('button')).toBeNull()
+  })
+
+  /**
+   * THE ONE THAT MAKES THE PICKER REAL. `series` is refused because the routed
+   * model draws one picture per call. That was never a fact about the mode. If
+   * a model that draws a whole set does not make the mode appear, the picker is
+   * decoration.
+   */
+  test('a matching set is refused for a model that draws one at a time', () => {
+    expect(readyModes('google/gemini-2.5-flash-image').map((r) => r.mode)).not.toContain('series')
+  })
+
+  test('and offered for a model that draws the whole set in one call', () => {
+    expect(readyModes('bytedance-seed/seedream-4.5').map((r) => r.mode)).toContain('series')
+  })
+
+  test('the model also decides how many pictures may be matched against', () => {
+    expect(ruleFor('match', 'google/gemini-2.5-flash-image').maxReferences).toBe(3)
+    expect(ruleFor('match', 'bytedance-seed/seedream-4.5').maxReferences).toBe(14)
+  })
+})
 
 describe('the modes on offer', () => {
   test('offers the three that work and not the one that cannot be made honestly', () => {
@@ -261,7 +314,10 @@ describe('matching a picture', () => {
     const pressed = within(picker)
       .getAllByRole('button')
       .filter((b) => b.getAttribute('aria-pressed') === 'true')
-    expect(pressed).toHaveLength(MAX_REFERENCES)
+    // The CHOSEN MODEL's ceiling, not the catalogue's outer bound.
+    // `MAX_REFERENCES` is now 14 (the most any model takes) and the number a
+    // person meets on the default model is 3, which is what the picker enforces.
+    expect(pressed).toHaveLength(ruleFor('match').maxReferences)
   })
 
   test('switching to a mode that ignores references clears them, rather than leaving a contradiction', async () => {

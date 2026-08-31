@@ -1,5 +1,7 @@
 import type { GenerationMode } from '@sahoda/shared'
 
+import { defaultModelId, modelById, type StudioModel } from './models'
+
 /**
  * WHAT EACH MODE NEEDS BEFORE IT CAN SPEND ANYTHING.
  *
@@ -38,15 +40,29 @@ export type ModeRule = {
 }
 
 /**
- * The reference ceiling.
+ * The most references ANY model in the catalogue will look at.
  *
- * MEASURED per model at OpenRouter's capability endpoint: 3 on
- * `gemini-2.5-flash-image`, 14 on Seedream 4.5. Three is the bound that applies
- * to what this product actually routes to, so it is the bound the screen shows.
- * A caller that sent more would have them silently dropped by some providers,
- * which is a defect nobody reports.
+ * ── THIS IS AN OUTER BOUND, NOT THE ONE A PERSON MEETS ──────────────────────
+ * The bound that applies to a given press is the CHOSEN MODEL's, and it is much
+ * lower on the everyday one: MEASURED at OpenRouter's capability endpoint,
+ * 3 on `gemini-2.5-flash-image` and 14 on Seedream (docs/43 §3). `ruleFor`
+ * applies that, and the screen shows it.
+ *
+ * What this constant is for is the SCHEMA, which validates a request before any
+ * model has been resolved and must therefore refuse only what no model could
+ * accept. A hand-made request for a hundred references is refused here; one for
+ * eight is refused later, by the rule, with a sentence naming the model.
  */
-export const MAX_REFERENCES = 3
+export const MAX_REFERENCES = 14
+
+/**
+ * What a mode wants, before the model has its say.
+ *
+ * `MODEL_DECIDES` means "as many as the model will take". A mode that says 1
+ * means ONE whatever the model could accept, because an edit is a change to a
+ * specific picture and three sources leave the model choosing which.
+ */
+const MODEL_DECIDES = MAX_REFERENCES
 
 /**
  * How many pictures one press may ask for.
@@ -75,7 +91,7 @@ export const MODE_RULES: readonly ModeRule[] = [
     label: 'On brand',
     what: 'Uses what Sahoda knows about your business, so the picture looks like you.',
     minReferences: 0,
-    maxReferences: MAX_REFERENCES,
+    maxReferences: MODEL_DECIDES,
     ready: true,
   },
   {
@@ -91,7 +107,7 @@ export const MODE_RULES: readonly ModeRule[] = [
     label: 'Match a picture',
     what: 'Pick a picture you already have and get more in the same style. This is how a business builds a look.',
     minReferences: 1,
-    maxReferences: MAX_REFERENCES,
+    maxReferences: MODEL_DECIDES,
     ready: true,
   },
   {
@@ -111,18 +127,54 @@ export const MODE_RULES: readonly ModeRule[] = [
     label: 'A set that matches',
     what: 'Several slides that belong together, for a carousel.',
     minReferences: 0,
-    maxReferences: MAX_REFERENCES,
+    maxReferences: MODEL_DECIDES,
+    // Overridden by `ruleFor`: a model that draws the whole set in one call
+    // makes this true. See that function's header.
     ready: false,
   },
 ]
 
-export function ruleFor(mode: GenerationMode): ModeRule {
+/**
+ * The base rule for a mode, before any model is taken into account.
+ *
+ * Callers almost always want `ruleFor`, which applies the chosen model. This is
+ * exported for the tests that pin the vocabulary itself.
+ */
+export function baseRuleFor(mode: GenerationMode): ModeRule {
   return MODE_RULES.find((rule) => rule.mode === mode) ?? MODE_RULES[0]!
 }
 
-/** The modes a person may actually choose. */
-export function readyModes(): ModeRule[] {
-  return MODE_RULES.filter((rule) => rule.ready)
+/**
+ * ── THE MODEL DECIDES WHAT A MODE CAN DO ──────────────────────────────────
+ * `series` was refused outright because the routed model draws ONE picture per
+ * call, and N separate calls cost N times as much and produce N unrelated
+ * pictures. That was never a fact about the mode; it was a fact about the
+ * model. So choosing a model that draws a whole set in one go is what makes a
+ * matching set possible, and this function is where that becomes true rather
+ * than a sentence somebody wrote.
+ *
+ * The reference ceiling moves the same way: 3 on the everyday model, 14 on
+ * Seedream. Both come from `models.ts`, which took them from docs/43.
+ */
+export function ruleFor(mode: GenerationMode, modelId: string = defaultModelId()): ModeRule {
+  const base = baseRuleFor(mode)
+  const model = modelById(modelId)
+  if (model === null) return base
+
+  return {
+    ...base,
+    // A set needs a model that draws the whole set in ONE call. Anything else
+    // is N unrelated pictures wearing the word "set".
+    ready: base.mode === 'series' ? model.maxPerPress > 1 : base.ready,
+    // Never above what the model will look at, and never above what the mode
+    // wants: an edit takes one reference whatever the model could accept.
+    maxReferences: Math.min(base.maxReferences, model.maxReferences),
+  }
+}
+
+/** The modes a person may actually choose, for the model they have chosen. */
+export function readyModes(modelId: string = defaultModelId()): ModeRule[] {
+  return MODE_RULES.map((rule) => ruleFor(rule.mode, modelId)).filter((rule) => rule.ready)
 }
 
 /**
@@ -136,11 +188,12 @@ export function readyModes(): ModeRule[] {
 export function describeModeBlock(input: {
   mode: GenerationMode
   references: number
+  modelId?: string
 }): string | null {
-  const rule = ruleFor(input.mode)
+  const rule = ruleFor(input.mode, input.modelId)
 
   if (!rule.ready) {
-    return 'A set that matches needs a model that draws every slide in one go, so the slides belong together. Sahoda is not routing to one yet, and making them one at a time would cost more and give you pictures that do not match.'
+    return 'A set that matches needs a model that draws every slide in one go, so the slides belong together. The model you have chosen draws one at a time, and making a set that way would cost more and give you pictures that do not match. Choose a model that makes a matching set.'
   }
 
   if (input.references < rule.minReferences) {

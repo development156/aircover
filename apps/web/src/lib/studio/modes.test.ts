@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 
 import { MAX_REFERENCES, MODE_RULES, describeModeBlock, readyModes, ruleFor } from './modes'
+import { defaultModelId, modelById } from './models'
 
 /**
  * WHAT EACH MODE PROMISES, AND WHAT IT REFUSES TO PRETEND.
@@ -37,10 +38,23 @@ describe('the modes on offer', () => {
    * leaves it to decide which one it is editing, which is a different feature
    * wearing this one's label.
    */
-  test('changing a picture takes exactly one, where matching takes three', () => {
+  /**
+   * RETARGETED. This asserted `match` allows `MAX_REFERENCES`, which meant 3
+   * when the everyday model was the only one. `MAX_REFERENCES` is now the outer
+   * bound across the whole catalogue (14) and the number a person MEETS is the
+   * chosen model's. The claim that survives is the one that was always the
+   * point: an edit takes one whatever the model could accept, and matching
+   * takes as many as the model will look at.
+   */
+  test('changing a picture takes exactly one, whatever the model could accept', () => {
     expect(ruleFor('edit').minReferences).toBe(1)
     expect(ruleFor('edit').maxReferences).toBe(1)
-    expect(ruleFor('match').maxReferences).toBe(MAX_REFERENCES)
+    expect(ruleFor('edit', 'bytedance-seed/seedream-4.5').maxReferences).toBe(1)
+  })
+
+  test('matching takes as many as the chosen model will look at', () => {
+    expect(ruleFor('match').maxReferences).toBe(modelById(defaultModelId())!.maxReferences)
+    expect(ruleFor('match', 'bytedance-seed/seedream-4.5').maxReferences).toBe(14)
   })
 
   test('a second picture on an edit says which one to keep, not just that it is wrong', () => {
@@ -84,13 +98,31 @@ describe('describeModeBlock', () => {
   })
 
   test('too many pictures says how many to remove, not just that there are too many', () => {
-    const said = describeModeBlock({ mode: 'match', references: MAX_REFERENCES + 2 })
-    expect(said).toContain(`${MAX_REFERENCES} pictures`)
+    const ceiling = ruleFor('match').maxReferences
+    const said = describeModeBlock({ mode: 'match', references: ceiling + 2 })
+    expect(said).toContain(`${ceiling} pictures`)
     expect(said).toContain('Take 2 off')
   })
 
   test('exactly the maximum is allowed, because the bound is inclusive', () => {
-    expect(describeModeBlock({ mode: 'match', references: MAX_REFERENCES })).toBeNull()
+    const ceiling = ruleFor('match').maxReferences
+    expect(describeModeBlock({ mode: 'match', references: ceiling })).toBeNull()
+  })
+
+  /**
+   * THE UNLOCK, ASSERTED. Eight references are too many for the everyday model
+   * and fine for Seedream. If this ever stops being true the model picker has
+   * become decoration.
+   */
+  test('a count the everyday model refuses is allowed by a model that takes more', () => {
+    expect(describeModeBlock({ mode: 'match', references: 8 })).not.toBeNull()
+    expect(
+      describeModeBlock({
+        mode: 'match',
+        references: 8,
+        modelId: 'bytedance-seed/seedream-4.5',
+      }),
+    ).toBeNull()
   })
 
   /**
