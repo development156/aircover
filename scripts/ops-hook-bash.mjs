@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { execFileSync, execFileSync as run } from 'node:child_process'
 import { warn } from './lib/ops-env.mjs'
-import { readState, writeState, clientId } from './lib/ops-state.mjs'
+import { readState, writeState, readPending, appendPending, clientId } from './lib/ops-state.mjs'
 import { appendCapped, ceilingWarning } from './lib/ops-queue.mjs'
 import {
   classifyBashRuns,
@@ -82,25 +82,28 @@ function currentTaskCode() {
  * instead of evicting, and says so.
  */
 function recordQaRuns(entries) {
-  const qa = readState('qa')
+  const queued = readPending('qa')
   const now = new Date().toISOString()
   const task_code = currentTaskCode()
 
-  const { items, accepted, refused } = appendCapped(
-    qa.runs,
-    entries.map((entry) => ({
-      client_id: clientId('qa'),
-      task_code,
-      kind: 'auto',
-      actor: 'claude',
-      started_at: now,
-      finished_at: now,
-      ...entry,
-    })),
-  )
+  const arriving = entries.map((entry) => ({
+    client_id: clientId('qa'),
+    task_code,
+    kind: 'auto',
+    actor: 'claude',
+    started_at: now,
+    finished_at: now,
+    ...entry,
+  }))
 
-  qa.runs = items
-  writeState('qa', qa)
+  const { items, accepted, refused } = appendCapped(queued, arriving)
+
+  // The ceiling is decided against the WHOLE queue (baseline plus overlay) and
+  // then only the accepted rows are appended. `items` is not written anywhere:
+  // writing it back would put this session's scratch QA runs into a tracked file
+  // that `.githooks/pre-commit` refuses by name, which is the contradiction this
+  // whole overlay exists to end.
+  appendPending('qa', arriving.slice(0, accepted))
 
   const warning = ceilingWarning({ queue: 'QA', refused, queued: items.length })
   if (warning) console.error(warning)

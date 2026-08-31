@@ -231,6 +231,26 @@ MEASURED at `1c8422f2` unless stated. Nothing piped; exit codes read directly.
 | GitHub `gate` on `0522c045` | **PASS** — run [33330565161](https://github.com/development156/sahodalabs/actions/runs/33330565161) |
 | GitHub `gate` on `1c8422f2` | **IN PROGRESS** at handoff time — run [33357808902](https://github.com/development156/sahodalabs/actions/runs/33357808902). Its `smoke` job already failed on the missing secrets; the `checks` job had not finished |
 
+### Re-gated after the trunk merge, at `138f4c1e`
+
+`lane-sync push` took **61** `wt-core` commits into the lane before pushing, so
+every figure above was measured on a tree that no longer exists. The gate was run
+again on the merged result, `TURBO_FORCE`, **0 cached**, output redirected and the
+exit code read separately rather than piped.
+
+| Leg | Result |
+| --- | --- |
+| `turbo run typecheck lint test --force` | **PASS** — 27/27 tasks, 0 cached, 11m58s |
+| `@sahoda/web` inside it | **PASS** — 6,771 passed, 13 skipped, 521 files |
+| `prettier --check .` | **PASS**, repo-wide, exit 0 |
+
+The web count moved 6,234 → 6,771 because of what the merge brought, not because
+of anything this lane wrote.
+
+**`wt-core` was NOT pushed to.** The gate above is green and that is the
+precondition, not the permission: promoting a lane is the one gated step in this
+system and nobody asked for it.
+
 **GitHub Actions is working again, but not uniformly.** MEASURED across ~30 runs
 on 29–31 August: most execute for 8–14 minutes and reach real conclusions, and a
 minority still die in 3–4 seconds with `get_job_logs` returning HTTP 404 — the
