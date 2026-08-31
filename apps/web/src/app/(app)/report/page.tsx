@@ -358,8 +358,8 @@ export default async function ReportPage() {
             >
               <p className="type-body max-w-[68ch] text-ink">{slotSentence}</p>
               <p className="type-sm mt-1 text-muted">
-                Worked out from every post you have published, each read at the same age so an
-                older post does not win for being older.{' '}
+                Worked out from every post you have published, each read at the same age so an older
+                post does not win for being older.{' '}
                 <Link href="/analytics" className="underline-offset-2 hover:underline">
                   See the grid behind this
                 </Link>
