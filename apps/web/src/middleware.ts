@@ -113,6 +113,14 @@ const isPublicRoute = createRouteMatcher([
   // empty and every report block that reads it says the customer has published
   // too little to notice anything about.
   '/api/cron/brain',
+
+  // The autopilot tick, every ten minutes. Same reasoning, same exact-path
+  // form, and the quiet failure it prevents is the worst of the set: behind the
+  // middleware this route answers a 307, the heartbeat records a run that
+  // fired, and a customer who armed a channel sees nothing go out and nothing
+  // explain why. `isAuthorizedCronRequest` guards it, and SAHODA_AUTOPILOT_ENABLED
+  // is what decides whether it does any work at all.
+  '/api/cron/autopilot',
 ])
 
 // The `/admin` surface and its authenticated APIs. The token-authed ingest route
@@ -351,12 +359,12 @@ export const config = {
     // It is a marketing animation shown to every new customer, with nothing in
     // it that is theirs — the same category as the poster beside it, which has
     // been public all along.
-    '/((?!api/cron/sweeps$|api/cron/metrics$|api/cron/loop$|api/cron/playbooks$|api/cron/radar$|api/cron/brain$|api/webhooks/cashfree$|api/webhooks/clerk$|api/webhooks/zernio$|_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|mp4|webm|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/((?!api/cron/sweeps$|api/cron/metrics$|api/cron/loop$|api/cron/playbooks$|api/cron/radar$|api/cron/brain$|api/cron/autopilot$|api/webhooks/cashfree$|api/webhooks/clerk$|api/webhooks/zernio$|_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|mp4|webm|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
     // Shaped as `/(…)` — ONE group holding the whole expression — because that is the
     // only place Next accepts a raw regex. `'/(?!…)(api|trpc)(.*)'` reads to
     // path-to-regexp as a group opening with invalid content and fails the BUILD with
     // `Error parsing … invalid-route-source`. Loud and before deploy, which is the right
     // direction for this file, but it is why the lookahead lives inside the parentheses.
-    '/((?!api/cron/sweeps$|api/cron/metrics$|api/cron/loop$|api/cron/playbooks$|api/cron/radar$|api/cron/brain$|api/webhooks/cashfree$|api/webhooks/clerk$|api/webhooks/zernio$)(?:api|trpc).*)',
+    '/((?!api/cron/sweeps$|api/cron/metrics$|api/cron/loop$|api/cron/playbooks$|api/cron/radar$|api/cron/brain$|api/cron/autopilot$|api/webhooks/cashfree$|api/webhooks/clerk$|api/webhooks/zernio$)(?:api|trpc).*)',
   ],
 }
