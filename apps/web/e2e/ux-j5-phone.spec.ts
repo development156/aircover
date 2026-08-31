@@ -143,7 +143,7 @@ test.describe('ux j5 phone', () => {
     await timedGoto(page, '/posts/new')
     await shot(page, { journey: JOURNEY, stop: 'P3-composer-phone', width: 390, theme: 'light' })
 
-    const body = page.getByLabel('Your post')
+    const body = page.getByLabel('Your post', { exact: true })
     if (await body.isVisible().catch(() => false)) {
       await body.click()
       await body.type('Saturday cupping is open again.', { delay: 12 })

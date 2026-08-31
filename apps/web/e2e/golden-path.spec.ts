@@ -60,7 +60,7 @@ test.describe('golden path @smoke', () => {
     // and the id then arrives in the address bar without the screen changing.
     await page.locator('[data-channel-tile="instagram"]').click()
 
-    const body = page.getByLabel('Your post')
+    const body = page.getByLabel('Your post', { exact: true })
     await expect(body).toBeVisible()
     await body.fill('Fresh chai every morning at the corner shop.')
 
@@ -87,7 +87,9 @@ test.describe('golden path @smoke', () => {
     // ── 5. The post is really persisted — a reload is the honest check, not
     //      the in-memory state we just typed into.
     await page.reload()
-    await expect(page.getByLabel('Your post')).toHaveValue(/Fresh chai every morning/)
+    await expect(page.getByLabel('Your post', { exact: true })).toHaveValue(
+      /Fresh chai every morning/,
+    )
 
     // ── 6. It shows up in the list.
     await page.goto('/posts')

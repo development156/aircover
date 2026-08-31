@@ -88,6 +88,32 @@ const SYSTEM_ENV: ReadonlySet<string> = new Set([
 ])
 
 /**
+ * Vars this application ASSIGNS for a native library, and never reads as
+ * configuration.
+ *
+ * A third category, and it needs to exist rather than being folded into either
+ * of the other two. Declaring one in `turbo.json` would be wrong twice over: it
+ * is not configuration anybody supplies, and pinning it into the build cache key
+ * would key the cache on a path we generate at runtime. Calling it a SYSTEM var
+ * would be a plain falsehood, because the platform does not set it.
+ *
+ * `FONTCONFIG_FILE` is written by `lib/studio/fonts.ts` at server start to point
+ * fontconfig at the typefaces bundled beside the app. Nothing reads it back.
+ *
+ * ── THE EXEMPTION IS EARNED PER FILE, NOT GRANTED BY NAME ───────────────────
+ * A name here is excused ONLY while every occurrence in shipping code is an
+ * assignment. The moment any file READS it, the exemption stops applying and the
+ * var must be declared like any other, which is what `assignedNotRead` below
+ * enforces. Without that, this list would be a hole: a var could be added here
+ * for a legitimate write and later read as configuration with nothing noticing.
+ */
+const SET_BY_US: ReadonlySet<string> = new Set(['FONTCONFIG_FILE'])
+
+/** `process.env.NAME =` or `process.env['NAME'] =`, an assignment rather than a read. */
+const ENV_WRITE =
+  /process\.env(?:\.([A-Za-z_][A-Za-z0-9_]*)|\[\s*['"]([A-Za-z_][A-Za-z0-9_]*)['"]\s*\])\s*=[^=]/g
+
+/**
  * Files that do NOT run inside `turbo run build`, so strict mode never touches
  * them: they get the full ambient environment from vitest, playwright or node.
  *
@@ -138,6 +164,24 @@ function envReadsInShippedCode(): Map<string, string[]> {
   return reads
 }
 
+/** Every occurrence of this var in shipping code is an assignment, never a read. */
+function assignedNotRead(name: string): boolean {
+  let writes = 0
+  let mentions = 0
+  for (const file of sourceFiles(WEB)) {
+    const rel = relative(WEB, file).split('\\').join('/')
+    if (runsOutsideTheBuild(rel)) continue
+    const source = readFileSync(file, 'utf8')
+    for (const match of source.matchAll(ENV_READ)) {
+      if ((match[1] ?? match[2]) === name) mentions += 1
+    }
+    for (const match of source.matchAll(ENV_WRITE)) {
+      if ((match[1] ?? match[2]) === name) writes += 1
+    }
+  }
+  return mentions > 0 && mentions === writes
+}
+
 describe('turbo.json env allowlist covers what apps/web reads', () => {
   test('every env var read by shipping code is declared', () => {
     const declared = new Set(allowlist())
@@ -147,6 +191,8 @@ describe('turbo.json env allowlist covers what apps/web reads', () => {
       // it would be redundant, so it must NOT be required here.
       .filter(([name]) => !name.startsWith('NEXT_PUBLIC_'))
       .filter(([name]) => !SYSTEM_ENV.has(name))
+      // Excused only while it is written and never read. See SET_BY_US.
+      .filter(([name]) => !(SET_BY_US.has(name) && assignedNotRead(name)))
       .filter(([name]) => !declared.has(name))
       .map(([name, files]) => `${name} (read in ${[...new Set(files)].join(', ')})`)
       .sort()
@@ -155,8 +201,23 @@ describe('turbo.json env allowlist covers what apps/web reads', () => {
       undeclared,
       'Turborepo runs envMode: strict, so these are STRIPPED from the build no matter what ' +
         'is set in Vercel. Add each to turbo.json `@sahoda/web#build.env`, or — if the ' +
-        'platform sets it rather than us — to SYSTEM_ENV here with a note.',
+        'platform sets it rather than us — to SYSTEM_ENV here with a note. A var this ' +
+        'code only ASSIGNS, for a native library, belongs in SET_BY_US instead.',
     ).toEqual([])
+  })
+
+  /**
+   * Guards the exemption itself. A category that excused a var unconditionally
+   * would be a way around the whole test, so this asserts the condition rather
+   * than trusting the list.
+   */
+  test('a var is only excused as ours to set while nothing reads it', () => {
+    for (const name of SET_BY_US) {
+      expect(assignedNotRead(name), `${name} is in SET_BY_US`).toBe(true)
+    }
+    // And the predicate says no to a var that IS read, which is what makes the
+    // line above mean something.
+    expect(assignedNotRead('NODE_ENV')).toBe(false)
   })
 
   test('the allowlist has no duplicate entries', () => {
