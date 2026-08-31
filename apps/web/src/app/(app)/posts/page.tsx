@@ -5,6 +5,7 @@ import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-b
 import { PageTitle } from '@/components/page-title'
 import { CreatePostButton } from '@/components/posts/create-post-button'
 import { PostCard } from '@/components/posts/post-card'
+import { getActiveWorkspace } from '@/lib/workspaces'
 import { listPostMetrics } from '@/lib/analytics/post-metrics'
 import { forDisplay } from '@/lib/posts/display-post'
 import { readPosts, listVariantStates, LIST_LIMIT } from '@/lib/posts/read'
@@ -36,14 +37,22 @@ export default async function PostsPage({
   // which case every chip renders the weaker claim rather than a solid publish.
   const postIds = posts.map((post) => post.id)
   // Batched for the whole page: one query, not one per card.
-  const [variantStates, connected] = await Promise.all([
+  const [variantStates, connected, workspace] = await Promise.all([
     listVariantStates(postIds),
     readConnectedChannels(),
+    // Alongside the other reads, never after them: `read-waterfall.test.ts`
+    // counts sequential server reads per route and refuses a new one, which is
+    // how this page stays one round trip deep instead of ten.
+    getActiveWorkspace(),
   ])
   // Read the clock once and pass it down, so every card on the page agrees on
   // which scheduled posts are past due. See `AutoPublishNote`.
   const autoPublish = autoPublishEnabled()
   const now = new Date()
+  // The workspace's own timezone, so every scheduled time on this page reads in
+  // the clock the customer chose rather than a hardcoded one. Null for a
+  // workspace that has not set one, which the formatter renders as it always did.
+  const zone = workspace?.timezone ?? null
 
   // Metrics last, because they need the variant rows: the analytics key is
   // `post_variants.platform_post_id`, and a channel without one is never asked
@@ -128,6 +137,7 @@ export default async function PostsPage({
                       of posts does not take a second and a half to arrive. */}
                   <StaggerItem i={i}>
                     <PostCard
+                      zone={zone}
                       post={post}
                       now={now}
                       variantStates={variantStates.get(post.id) ?? []}
