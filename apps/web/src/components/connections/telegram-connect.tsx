@@ -120,7 +120,7 @@ export function TelegramConnect({
       <div className="flex w-full flex-col gap-2">
         <ol className="type-sm flex flex-col gap-1.5 text-muted">
           <li>
-            1. Add <span className="font-medium text-fg">@{phase.botUsername}</span> as an admin of
+            1. Add <span className="font-medium text-ink">@{phase.botUsername}</span> as an admin of
             your channel.
           </li>
           <li>2. Open a chat with the bot and send it this code, then your @channel.</li>

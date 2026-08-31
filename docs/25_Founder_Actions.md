@@ -597,3 +597,67 @@ The cycle stops at a cost preview and charges nothing until somebody approves it
 The ledger's nine invariants were checked against production on 28 August and all
 nine hold with zero violations, so the balance you see before the run is the
 number to compare against afterwards.
+
+## 16. Autopilot is built and switched off three ways — 29 August 2026
+
+L3 is the level where Sahoda posts with nobody reading the draft. The
+dispatcher for it is finished and on `wt-divas`, and **nothing in the product
+can reach it**. This section is what would have to be true for it to run, so
+that turning it on is a decision rather than a discovery.
+
+### What it does when it is on
+
+It runs on a schedule and, per workspace, does two things. First it looks at the
+posts the Loop planned for channels you armed to L3 and decides, for each one,
+whether it may go out. Every refusal is written down by name: the channel was
+never armed, the words crossed a line you set, the post does not fit the
+channel, your Brand Brain is not confirmed, the day is full, the week's budget
+is spent. Second it takes anything it announced earlier whose cancel window has
+closed and hands it to the ordinary publishing queue.
+
+**It never posts directly.** It marks the post as scheduled, and the same sweep
+that publishes anything you schedule by hand takes it from there — through the
+Constraint Engine, the refusal gate, and the account check that has been
+verified against production. Autopilot does not get a second, less-tested route
+to your customers' accounts, and your emergency stop reaches its posts with no
+new code.
+
+**Every post is announced before it goes out**, and you have a window to stop
+it. Thirty minutes by default; five is the shortest the database will accept,
+because a window of zero is not autopilot with a fast cancel, it is autopilot
+with no cancel.
+
+### The three things standing in the way, and none is an accident
+
+**16a · `SAHODA_AUTOPILOT_ENABLED` is not set anywhere.** It is its own switch,
+not one of the three that already exist, because those three mean "the Loop may
+plan", "the sweep may classify" and "the sweep may publish". This is a fourth
+thing and nobody has consented to it by setting the others. Only the exact
+value `true` turns it on.
+
+**16b · The schedule is not registered.** `apps/web/vercel.json` lists six cron
+jobs and autopilot is not one of them. A test asserts that absence, so whoever
+adds it is made to read why first — and has to add its monitoring in the same
+change, because a job with a heartbeat and no schedule pages somebody about a
+job that was never meant to run.
+
+**16c · The safety check is hard-wired to refuse.** Before any post goes out
+autopilot asks the refusal gate whether the words are acceptable. That question
+is currently answered "no" for every post, always, by a placeholder. Wiring the
+real gate in is a deliberate change by a person; leaving it as it is means that
+even with the switch on and the schedule registered, nothing is published.
+
+A fourth thing is also true and is **not** being counted as a safeguard: the
+application refuses to set any channel to L3 at all, so no workspace can have
+one today. That is a fact about the current data rather than a decision somebody
+made, and it could change without anybody noticing. The three above are
+decisions.
+
+### What you should watch the first time
+
+The day's cap is three posts by default and is counted in **your** workspace's
+timezone, not UTC, so "three a day" means your day. Publishing itself costs no
+credits: a Loop post is paid for when the plan is approved, not when it is sent,
+so nothing new appears on your bill at this step. And every decision autopilot
+makes leaves a row you can read afterwards, including the ones where it decided
+not to post and why.

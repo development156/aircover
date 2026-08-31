@@ -149,7 +149,7 @@ async function run(page: Page, width: number, theme: Theme): Promise<void> {
   // Step one, then step two. The composer is a numbered sequence: the channel
   // step is refused until the post says something, so a journey that ticked a
   // channel on a blank screen was photographing a state a person cannot reach.
-  const body = page.getByLabel('Your post')
+  const body = page.getByLabel('Your post', { exact: true })
   if (await present(body, 5000)) {
     await body.fill('Saturday cupping is open again. Five seats, no charge, 9am.')
     await page.waitForURL(/\/posts\/[0-9a-f-]{36}$/, { timeout: 60_000 }).catch(() => {})

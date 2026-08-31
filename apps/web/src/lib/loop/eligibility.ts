@@ -8,6 +8,8 @@ import { cycleCost } from '@/lib/loop/cost'
 // comments too — and would have matched the example.)
 import { credits } from '@/lib/credit-words'
 
+import { LOOP_SCHEDULE_PHRASE } from './schedule'
+
 /**
  * WHY THE LOOP WILL NOT PLAN FOR A WORKSPACE — one named cause, never a boolean.
  *
@@ -271,7 +273,72 @@ function list(channels: readonly Channel[]): string {
  * every `toBe(false)` assertion still passes; the sentence is the thing that
  * would actually be wrong on somebody's screen.
  */
-export function explain(verdict: LoopVerdict): string {
+/**
+ * Whether the Sunday schedule is armed in this environment.
+ *
+ * `armed` is the state every sentence below was written for. `off` means
+ * `SAHODA_LOOP_CRON_MODE` is not `on`, so `api/cron/loop/route.ts` returns
+ * before reading anything and NO cycle is ever opened automatically, for any
+ * workspace, however eligible.
+ *
+ * It is a separate argument rather than a fact on the verdict because it is not
+ * a fact about the workspace: `assess()` answers "would the Loop plan for this
+ * business", and this answers "is anything going to ask it on Sunday". Folding
+ * the two together would let a system-wide outage read as the customer's own
+ * settings being wrong.
+ */
+export interface ExplainOptions {
+  autoSchedule: 'armed' | 'off'
+}
+
+/** What a reader is owed when nothing is going to run on Sunday. */
+const NO_AUTO_SCHEDULE =
+  'Sahoda is not planning weeks automatically at the moment, so plan yours here whenever you want one.'
+
+export function explain(verdict: LoopVerdict, options?: ExplainOptions): string {
+  // ── THE PROMISE THAT NOTHING CHECKED ──────────────────────────────────────
+  // Every sentence below promises a plan "every Sunday", and until this argument
+  // existed none of them could know whether anything runs on Sunday. The switch
+  // defaults OFF on purpose, because the job spends 20 credits per workspace and
+  // no deploy may start charging people who never opened this screen. So the
+  // promise was made most loudly in exactly the state where it was least true.
+  //
+  // The workspace's own reason is kept and this is added to it: a paused Loop is
+  // still paused, and swapping one wrong sentence for a different wrong sentence
+  // would be no fix at all.
+  if (options?.autoSchedule === 'off') {
+    return `${withoutSundayPromise(verdict)} ${NO_AUTO_SCHEDULE}`
+  }
+  return explainArmed(verdict)
+}
+
+/**
+ * The workspace's own reason, with any claim about automatic weekly planning
+ * removed — never with the reason itself removed.
+ */
+function withoutSundayPromise(verdict: LoopVerdict): string {
+  if (verdict.eligible) {
+    const channels = list(verdict.channels)
+    const base = verdict.advisory.suggestOnly
+      ? `A week planned here would cover ${channels}, as suggestions. Every channel is set to suggest only.`
+      : `A week planned here would cover ${channels}.`
+    return verdict.advisory.brainUnconfirmed
+      ? `${base} Nothing in your Brand Brain is confirmed yet, so it will write in a voice it guessed at.`
+      : base
+  }
+  switch (verdict.reason) {
+    case 'never_enabled':
+      return 'Turn the Loop on to plan a week here.'
+    case 'paused':
+      return 'The Loop is paused. Resume it to plan a week here.'
+    default:
+      // Every other reason names something about this workspace and says nothing
+      // about Sunday, so it is already true whatever the switch says.
+      return explainArmed(verdict)
+  }
+}
+
+function explainArmed(verdict: LoopVerdict): string {
   // NO EM DASH IN ANY SENTENCE BELOW. These were written when the only reader
   // was the cron's JSON, and they now render on /loop — where the founder's
   // 2026-08-23 ruling applies: a dash joining two independent clauses becomes a
@@ -291,7 +358,9 @@ export function explain(verdict: LoopVerdict): string {
   }
   switch (verdict.reason) {
     case 'never_enabled':
-      return 'Turn the Loop on and Sahoda will plan your week every Sunday.'
+      // The day comes from the deployment's cron, never typed here. Moving the
+      // schedule used to leave this sentence naming the old day for ever.
+      return `Turn the Loop on and Sahoda will plan your week ${LOOP_SCHEDULE_PHRASE}.`
     case 'paused':
       return 'The Loop is paused. Resume it and Sahoda will plan your next week.'
     case 'no_channel':
