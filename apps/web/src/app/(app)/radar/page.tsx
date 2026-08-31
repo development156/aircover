@@ -1,12 +1,14 @@
 import Link from 'next/link'
-import { Radar as RadarIcon, Timer } from 'lucide-react'
+import { Activity, Radar as RadarIcon, Timer } from 'lucide-react'
 import { creditCost } from '@sahoda/shared'
 
 import { EmptyState } from '@/components/empty-state'
 import { PageTitle } from '@/components/page-title'
 import { creditWord } from '@/lib/credit-words'
 import { ChangeFeed } from '@/components/radar/change-feed'
-import { WatchList } from '@/components/radar/watch-list'
+import { RadarScope } from '@/components/radar/radar-scope'
+import { WatchForm, WatchRows } from '@/components/radar/watch-list'
+import { WatchSummary } from '@/components/radar/watch-summary'
 import { connectedChannels } from '@/app/actions/radar'
 import { radarStore } from '@/lib/radar/read'
 import { getActiveWorkspace } from '@/lib/workspaces'
@@ -41,6 +43,17 @@ export const metadata = { title: 'Radar' }
  * organised against, one level up from the per-day gaps in `ChangeFeed`. A
  * product that distinguishes "their page did not load" from "their week was
  * quiet" and then blurs its own three states has not understood its own point.
+ *
+ * ── THE 2026-08-29 REDESIGN, AND THE ONE THING IT WAS NOT ALLOWED TO DO ─────
+ * The founder asked for a hero, a live radar and a two-column grid. All three
+ * are here. What they also asked for, and what is deliberately absent, is a
+ * radar full of pretty data points on a screen where nobody is being watched.
+ *
+ * `RadarScope` takes the REAL number of watches and draws that many marks, so a
+ * first-time reader sees an empty sky rather than a picture of somebody else's
+ * competitors. And the sweep only turns when `collector !== 'absent'` — an
+ * animated scan over a collector that is not built is an animation claiming
+ * work nobody is doing, which is the same defect as a fabricated number, moving.
  */
 export default async function RadarPage() {
   const workspace = await getActiveWorkspace()
@@ -64,11 +77,33 @@ export default async function RadarPage() {
     connectedChannels(),
   ])
 
+  const scanning = snapshot.collector !== 'absent'
+
   return (
     <div className="space-y-grid">
-      <PageTitle sub="What the businesses beside you are doing, and what your brand would say about it.">
-        Radar
-      </PageTitle>
+      {/* ── THE HERO ────────────────────────────────────────────────────────
+          The eyebrow, the headline and the radar, in one band. `PageTitle` is
+          NOT used here and this is the second screen to make that call
+          deliberately (see `greeting-banner.tsx` on /home): a product feature
+          that has to explain itself to a first-time reader needs a headline
+          that is a sentence, and `PageTitle` renders a noun. The `h1` is still
+          an `h1`, so `every-section-loads.spec.ts` and the document outline are
+          unchanged — it just says something. */}
+      <section className="grid items-center gap-6 wide:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
+        <div className="min-w-0">
+          <p className="type-eyebrow flex items-center gap-2 text-accent">
+            <RadarIcon size={15} strokeWidth={1.9} aria-hidden />
+            Radar
+          </p>
+          <h1 className="mt-2 type-display max-w-[24ch] text-ink">Stay ahead of what matters.</h1>
+          <p className="type-body mt-2 max-w-[52ch] text-muted">
+            What the businesses beside you are doing, and what your brand would say about it.
+          </p>
+        </div>
+        <div className="mx-auto w-full max-w-[420px] max-narrow:max-w-[300px]">
+          <RadarScope marks={snapshot.competitors.length} scanning={scanning} />
+        </div>
+      </section>
 
       {snapshot.collector === 'absent' ? (
         /* ── NOT COLLECTING ────────────────────────────────────────────────
@@ -109,46 +144,69 @@ export default async function RadarPage() {
         </section>
       ) : (
         <>
-          <WatchList competitors={snapshot.competitors} />
+          {/* Twelve columns of intent, in two: the summary and the form on the
+              left, the feed on the right. `items-start` rather than `stretch`
+              so the feed does not grow to match a short left column, which is
+              what turns a grid into two boxes of empty space. */}
+          <div className="grid items-start gap-4 wide:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
+            <div className="flex flex-col gap-4">
+              <WatchSummary competitors={snapshot.competitors} />
+              <WatchForm />
+            </div>
 
-          <section aria-labelledby="radar-changes" className="flex flex-col gap-3">
-            <h2 id="radar-changes" className="type-h2">
-              What changed
-            </h2>
+            <section
+              aria-labelledby="radar-changes"
+              className="surface-ring flex flex-col gap-3 rounded-card bg-surface p-5"
+            >
+              <div>
+                <h2 id="radar-changes" className="type-h3 flex items-center gap-2 text-ink">
+                  <Activity size={16} strokeWidth={1.8} aria-hidden className="text-accent" />
+                  What changed
+                </h2>
+                <p className="type-sm mt-1.5 max-w-[60ch] text-muted">
+                  Radar reads the businesses you named and surfaces what actually moved.
+                </p>
+              </div>
 
-            {snapshot.competitors.length === 0 ? (
-              /* WATCHING NOBODY — and the empty state teaches rather than
+              {snapshot.competitors.length === 0 ? (
+                /* WATCHING NOBODY — and the empty state teaches rather than
                  reports. "No competitors yet" tells a reader something they can
                  already see; what they cannot see is what naming one would get
                  them. */
-              <EmptyState
-                icon={RadarIcon}
-                title="You are not watching anyone yet"
-                body="Name a business above and Radar reads its public pages once a week, then tells you what moved (a new offer, a price that changed, a posting rhythm that shifted) and what your own brand would say back."
-                tip="Watch the shop your customers compare you against, not the biggest name in your category."
-              />
-            ) : snapshot.collector === 'watch-list-only' ? (
-              /* WATCHING, BUT THIS SCREEN CANNOT READ THE READINGS.
+                <EmptyState
+                  icon={RadarIcon}
+                  title="You are not watching anyone yet"
+                  body="Name a business above and Radar reads its public pages once a week, then tells you what moved (a new offer, a price that changed, a posting rhythm that shifted) and what your own brand would say back."
+                  tip="Watch the shop your customers compare you against, not the biggest name in your category."
+                />
+              ) : snapshot.collector === 'watch-list-only' ? (
+                /* WATCHING, BUT THIS SCREEN CANNOT READ THE READINGS.
                  An empty feed here would be a CLAIM — "nothing changed" — and
                  this binding has not earned it. See lib/radar/store.ts. */
-              <p className="surface-ring rounded-card bg-surface p-4 type-body text-muted">
-                Your watch list is stored, and the weekly readings are not wired into this screen
-                yet. This is not &ldquo;nothing changed&rdquo; &mdash; it is Radar not being able to
-                tell you either way, and those are different things.
-              </p>
-            ) : snapshot.days.length === 0 ? (
-              <p className="surface-ring rounded-card bg-surface p-4 type-body text-muted">
-                Nothing has been read yet. The first scan runs within the week, and what it finds
-                appears here newest first.
-              </p>
-            ) : (
-              <ChangeFeed
-                days={snapshot.days}
-                competitors={snapshot.competitors}
-                channels={channels}
-              />
-            )}
-          </section>
+                <p className="surface-ring rounded-card bg-surface p-4 type-body text-muted">
+                  Your watch list is stored, and the weekly readings are not wired into this screen
+                  yet. This is not &ldquo;nothing changed&rdquo; &mdash; it is Radar not being able
+                  to tell you either way, and those are different things.
+                </p>
+              ) : snapshot.days.length === 0 ? (
+                <p className="surface-ring rounded-card bg-surface p-4 type-body text-muted">
+                  Nothing has been read yet. The first scan runs within the week, and what it finds
+                  appears here newest first.
+                </p>
+              ) : (
+                <ChangeFeed
+                  days={snapshot.days}
+                  competitors={snapshot.competitors}
+                  channels={channels}
+                />
+              )}
+            </section>
+          </div>
+
+          {/* The list itself, full width under the two columns. It is what
+              "View all watches" in the summary anchors to, and it renders
+              nothing at all when there is nobody on it. */}
+          <WatchRows competitors={snapshot.competitors} />
         </>
       )}
     </div>

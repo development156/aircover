@@ -80,12 +80,9 @@ export default async function PostsPage({
 
   return (
     <div className="space-y-grid">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <PageTitle>Posts</PageTitle>
-        {/* The empty state owns the only create affordance when there is
-            nothing to list — two "Create post" buttons on one screen is noise. */}
-        {posts.length > 0 ? <CreatePostButton /> : null}
-      </div>
+      {/* The empty state owns the only create affordance when there is
+          nothing to list — two "Create post" buttons on one screen is noise. */}
+      <PageTitle actions={posts.length > 0 ? <CreatePostButton /> : null}>Posts</PageTitle>
 
       <ConnectFirstNote connections={connected} />
 

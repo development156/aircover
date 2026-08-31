@@ -261,12 +261,18 @@ export function signedEffect(entry: Pick<LedgerEntry, 'entry_type' | 'amount'>):
  * as '-3' rather than '+-3'.
  */
 function formatSignedAmount(direction: Direction, amount: number): string {
-  const magnitude = Math.abs(amount)
+  /* GROUPED, since 2026-08-29. The amount column used to print a bare
+     `+5000` while every other credits figure on the wallet — the balance hero,
+     the correction net, and now the per-row `balance_after` beside it — printed
+     `5,000`. Two spellings of the same quantity in one table reads as two
+     different numbers, and the row that made it obvious was a top-up sitting
+     directly left of its own grouped balance. */
+  const magnitude = Math.abs(amount).toLocaleString('en-IN')
 
   if (direction === 'credit') return `+${magnitude}`
   if (direction === 'debit') return `-${magnitude}`
 
-  return `${magnitude}`
+  return magnitude
 }
 
 /**
