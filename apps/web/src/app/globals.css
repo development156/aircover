@@ -4,6 +4,54 @@
 /* If the package-exports import ever fails to resolve under a bundler change,
    fall back to: @import '../../../../../packages/shared/tokens.css'; */
 
+/* ── THE STUDIO'S TYPEFACES, SERVED TO THE BROWSER ──────────────────────────
+   The SAME `.ttf` files the server rasterises with, from the same folder. That
+   is the point of declaring them here by their REAL family names instead of
+   loading them through next/font: next/font emits a hashed family, so the
+   preview's SVG would carry a different `font-family` string from the export's,
+   and `renderSvg` producing one string for both sides is the property the whole
+   studio rests on.
+
+   MEASURED 2026-08-29: the server ignores `@font-face` entirely (a font
+   embedded as a data URI rendered identically to a family that does not exist),
+   so it reads these files from disk through fontconfig instead. This block is
+   the browser's half of the same arrangement, and `lib/studio/fonts.ts` carries
+   the full account.
+
+   Nothing downloads until something asks for these families, and only the
+   studio's preview does, so no other screen pays for them. They are `.ttf`
+   rather than `.woff2` because fontconfig CANNOT READ woff on the server side
+   (it indexes the family and then renders nothing), and one copy serving both
+   halves is worth more than the compression. */
+@font-face {
+  font-family: 'Noto Sans';
+  src: url('/fonts/NotoSans-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Noto Sans';
+  src: url('/fonts/NotoSans-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Noto Sans Devanagari';
+  src: url('/fonts/NotoSansDevanagari-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Noto Sans Devanagari';
+  src: url('/fonts/NotoSansDevanagari-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* Bind the next/font family to the canonical token. next/font emits a HASHED
    family name, so the literal 'Inter' in tokens.css can never match; this
    override is the sanctioned runtime binding.

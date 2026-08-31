@@ -106,6 +106,41 @@ export const DEFAULT_WEEKLY_BUDGET_CREDITS = 150
 /** Matches the column's own ceiling; the largest monthly grant any plan carries. */
 export const MAX_WEEKLY_BUDGET_CREDITS = 5000
 
+/**
+ * THE TWO PROMISES AUTOPILOT MAKES, AND THEIR LIMITS.
+ *
+ * Every number here mirrors a CHECK in `20260828120000_loop_autopilot_l3.sql`.
+ * They are declared once, in the source of truth, so a form and a column cannot
+ * disagree about what is allowed — the disagreement being the case where a
+ * customer reads a constraint violation instead of a sentence somebody wrote.
+ *
+ * The DEFAULTS are the column defaults, not a second opinion. A workspace that
+ * has never touched these is running at three a day and thirty minutes, and the
+ * screen must show those figures rather than an empty field, because an empty
+ * field reads as "no limit".
+ */
+export const DEFAULT_AUTOPILOT_DAILY_CAP = 3
+export const MIN_AUTOPILOT_DAILY_CAP = 0
+export const MAX_AUTOPILOT_DAILY_CAP = 20
+
+export const DEFAULT_AUTOPILOT_CANCEL_MINUTES = 30
+/**
+ * Five, and the reason it is not lower is not the column.
+ *
+ * `AUTOPILOT_CANCEL_FLOOR_MINUTES` clamps to the same number for a different
+ * reason — a zero reaching the decision code would announce and dispatch in the
+ * same instant, autopilot with no cancel wearing the costume of one.
+ *
+ * A window this short is a promise the SCHEDULE cannot keep tightly: the tick
+ * runs every ten minutes, so a five-minute window closes between ticks and the
+ * post goes out on the next one. That is later than promised, never earlier,
+ * which is the safe direction — but copy near this control must not claim a
+ * post goes out the moment the window closes.
+ */
+export const MIN_AUTOPILOT_CANCEL_MINUTES = 5
+/** One day. Beyond this a "cancel window" is just a delay. */
+export const MAX_AUTOPILOT_CANCEL_MINUTES = 1440
+
 export const LoopChannelAutonomySchema = z.object({
   id: z.uuid(),
   workspace_id: z.uuid(),

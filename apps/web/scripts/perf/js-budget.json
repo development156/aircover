@@ -38,7 +38,7 @@
   "/(auth)/layout": 617709,
   "/(auth)/error": 639243,
   "/(auth)/sign-in/[[...sign-in]]": 763883,
-  "/(app)/studio": 608791,
+  "/(app)/studio": 749730,
   "/(auth)/sign-up/[[...sign-up]]": 763883,
   "/(app)/remix": 746152,
   "/(onboarding)/error": 639498,
@@ -79,6 +79,5 @@
   "/(app)/settings/profile": 603637,
   "/(app)/settings": 686187,
   "/(app)/settings/plan": 734347,
-  "/(app)/inbox/comments": 608759,
-  "/(app)/studio/[id]": 730511
+  "/(app)/inbox/comments": 608759
 }

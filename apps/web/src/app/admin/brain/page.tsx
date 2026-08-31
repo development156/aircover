@@ -79,7 +79,7 @@ export default async function MarketingBrainPage() {
                 <span>ws {row.workspace_id.slice(0, 8)}</span>
               </p>
               <p className="type-body mt-1.5 max-w-[70ch] text-ink">{row.claim}</p>
-              <pre className="mt-2 overflow-x-auto rounded-input bg-subtle p-2.5 font-mono type-chip text-muted">
+              <pre className="mt-2 overflow-x-auto rounded-input bg-surface-2 p-2.5 font-mono type-chip text-muted">
                 {JSON.stringify(row.evidence, null, 2)}
               </pre>
             </li>

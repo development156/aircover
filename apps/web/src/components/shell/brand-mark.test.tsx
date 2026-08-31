@@ -143,6 +143,89 @@ describe('the brand mark', () => {
   })
 
   /**
+   * ── A DIALOG WITH NO WAY OUT BUT THE MOUSE ────────────────────────────────
+   * `BrandPanel` renders `role="dialog"` and nothing closed it from the
+   * keyboard. A person who opened it had to tab blindly past every control
+   * inside it to reach the page again. `workspace-switcher.tsx`, in this same
+   * directory, has handled exactly this since it was written.
+   */
+  it('closes on Escape', async () => {
+    render(<BrandMark logoUrl={null} primary={BLUE} hasTheme />)
+    await userEvent.click(screen.getByRole('button', { name: /open brand options/i }))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  /**
+   * And focus goes back to the trigger, or the next Tab restarts at the top of
+   * the document.
+   *
+   * MUTATION FOUND THIS HOLLOW: the first version pressed Escape straight after
+   * clicking the chevron, so focus was already on the chevron and deleting the
+   * refocus left the assertion green. Focus is moved off it first, which is what
+   * actually happens — a person opens the panel and reaches into it.
+   */
+  it('returns focus to the control that opened it', async () => {
+    render(<BrandMark logoUrl={null} primary={BLUE} hasTheme />)
+    const chevron = screen.getByRole('button', { name: /open brand options/i })
+    await userEvent.click(chevron)
+
+    chevron.blur()
+    expect(document.activeElement).not.toBe(chevron)
+
+    await userEvent.keyboard('{Escape}')
+    expect(document.activeElement).toBe(chevron)
+  })
+
+  it('closes when the press lands outside it', async () => {
+    render(<BrandMark logoUrl={null} primary={BLUE} hasTheme />)
+    await userEvent.click(screen.getByRole('button', { name: /open brand options/i }))
+
+    await userEvent.click(document.body)
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('stays open when the press lands inside it', async () => {
+    render(<BrandMark logoUrl={null} primary={BLUE} hasTheme />)
+    await userEvent.click(screen.getByRole('button', { name: /open brand options/i }))
+
+    await userEvent.click(screen.getByRole('dialog'))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  /**
+   * NOT MODAL, and it must not claim to be. There is no scrim, the page behind
+   * stays live, and the panel hangs off its button rather than covering the
+   * viewport. `aria-modal` would tell a screen reader the rest of the page is
+   * inert when it is not, which is a worse lie than the silence it replaces.
+   */
+  it('does not claim to be modal', async () => {
+    render(<BrandMark logoUrl={null} primary={BLUE} hasTheme />)
+    await userEvent.click(screen.getByRole('button', { name: /open brand options/i }))
+
+    expect(screen.getByRole('dialog')).not.toHaveAttribute('aria-modal')
+  })
+
+  /**
+   * ── THE SMALLER HALF OF A SPLIT CONTROL ───────────────────────────────────
+   * WCAG 2.5.8 asks 24x24 CSS pixels for a pointer target. The chevron was
+   * `w-5`, twenty across, and it is the half a thumb misses. jsdom computes no
+   * layout, so this reads the class that decides the width — which is what a
+   * mutation of it would change.
+   */
+  it('gives the chevron a target at least 24px across', async () => {
+    render(<BrandMark logoUrl={null} primary={BLUE} hasTheme />)
+    const chevron = screen.getByRole('button', { name: /open brand options/i })
+
+    const width = /(?:^|\s)w-(\d+)(?:\s|$)/.exec(chevron.className)
+    expect(width, 'the chevron carries no width class to check').not.toBeNull()
+    // Tailwind's scale is 4px per step: w-6 is 24px, w-5 is 20.
+    expect(Number(width![1]) * 4).toBeGreaterThanOrEqual(24)
+  })
+
+  /**
    * NOTHING OF THE PANEL IS ON SCREEN UNTIL IT IS ASKED FOR. Rendering it closed
    * would put its markup in every page for a control most visits never touch,
    * which is the defect that failed the production build.

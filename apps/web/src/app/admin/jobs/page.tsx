@@ -73,7 +73,7 @@ export default async function DeadLettersPage() {
             </thead>
             <tbody>
               {letters.data.map((letter) => (
-                <tr key={letter.id} className="border-t border-hairline align-top">
+                <tr key={letter.id} className="border-t border-line align-top">
                   <td className="py-2 pr-4 tabular-nums whitespace-nowrap">
                     {letter.created_at.slice(0, 16).replace('T', ' ')}
                   </td>
