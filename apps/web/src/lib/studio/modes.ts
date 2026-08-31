@@ -45,15 +45,16 @@ export type ModeRule = {
  * ── THIS IS AN OUTER BOUND, NOT THE ONE A PERSON MEETS ──────────────────────
  * The bound that applies to a given press is the CHOSEN MODEL's, and it is much
  * lower on the everyday one: MEASURED at OpenRouter's capability endpoint,
- * 3 on `gemini-2.5-flash-image` and 14 on Seedream (docs/43 §3). `ruleFor`
- * applies that, and the screen shows it.
+ * 14 on Gemini 3 Pro and Seedream 5.0 Lite, 16 on GPT Image 1 (each fetched
+ * from its own OpenRouter model page, 2026-08-31). `ruleFor` applies that, and
+ * the screen shows it.
  *
  * What this constant is for is the SCHEMA, which validates a request before any
  * model has been resolved and must therefore refuse only what no model could
  * accept. A hand-made request for a hundred references is refused here; one for
  * eight is refused later, by the rule, with a sentence naming the model.
  */
-export const MAX_REFERENCES = 14
+export const MAX_REFERENCES = 16
 
 /**
  * What a mode wants, before the model has its say.
@@ -236,6 +237,9 @@ export function promptHintFor(mode: GenerationMode): string {
     case 'edit':
       return 'Make the background a plain wall'
     case 'series':
+      // A set is described as a set. Prompting for one picture and getting four
+      // is how somebody ends up with four near-identical slides.
+      return 'Three steps of making chai, one per slide'
     case 'on_brand':
       return 'A plate of fresh samosas on a wooden counter, morning light'
   }

@@ -1,9 +1,12 @@
 import { describe, expect, test } from 'vitest'
 
+import { ALLOWED_IMAGE_MODELS } from '@sahoda/mesh'
+
 import {
   STUDIO_MODELS,
   defaultModelId,
   describeModelBlock,
+  describeModelBlockFor,
   modelById,
   routedModels,
   unroutedModels,
@@ -74,9 +77,17 @@ describe('what choosing one unlocks', () => {
     }
   })
 
-  test('a model that unlocks nothing extra says nothing rather than inventing a benefit', () => {
-    const everyday = modelById('google/gemini-2.5-flash-image')
-    expect(everyday?.unlocks).toBeNull()
+  /**
+   * RETARGETED. This pinned a model no longer in the catalogue. The claim it was
+   * making is the one that still matters, now checked over EVERY model: a model
+   * that draws one picture must not say "in one go", because that is a promise
+   * `modes.ts` would refuse to keep.
+   */
+  test('a model that draws one at a time never claims to draw a set', () => {
+    for (const model of STUDIO_MODELS) {
+      if (model.maxPerPress > 1) continue
+      expect(model.unlocks ?? '', model.id).not.toMatch(/in one go|all matching/i)
+    }
   })
 
   /**
@@ -102,12 +113,17 @@ describe('what choosing one unlocks', () => {
 })
 
 describe('refusing a model', () => {
+  /**
+   * RETARGETED, and the FUNCTION was split so this could stay real. Every model
+   * is routed now, so no id reaches this branch. It is not dead code:
+   * `routed: false` is how a model is added before its route exists, which is
+   * the state the field was created for. Exercised over a synthetic model so it
+   * cannot rot between now and then.
+   */
   test('an unreachable model is refused, and says it is not a fault of theirs', () => {
-    const waiting = unroutedModels()[0]
-    expect(waiting, 'no unrouted model to test').toBeTruthy()
-    const said = describeModelBlock(waiting!.id)
+    const said = describeModelBlockFor({ ...STUDIO_MODELS[0]!, label: 'Something', routed: false })
     expect(said).toMatch(/cannot draw/i)
-    expect(said).toContain(waiting!.label)
+    expect(said).toContain('Something')
   })
 
   test('a model that does not exist is refused rather than silently defaulted', () => {
@@ -121,7 +137,7 @@ describe('refusing a model', () => {
   test('every refusal names what to do next', () => {
     const said = [
       describeModelBlock('some/model-nobody-has'),
-      describeModelBlock(unroutedModels()[0]!.id),
+      describeModelBlockFor({ ...STUDIO_MODELS[0]!, routed: false }),
     ]
     for (const one of said) {
       expect(one, String(one)).toMatch(/pick one|waiting/i)
@@ -132,7 +148,7 @@ describe('refusing a model', () => {
     for (const model of STUDIO_MODELS) {
       const read = [model.label, model.goodAt, model.unlocks ?? '', model.costNote].join(' ')
       expect(read, model.id).not.toMatch(/[—–]/)
-      expect(describeModelBlock(model.id) ?? '').not.toMatch(/[—–]/)
+      expect(describeModelBlockFor({ ...model, routed: false }) ?? '').not.toMatch(/[—–]/)
     }
   })
 })
@@ -150,5 +166,67 @@ describe('what this catalogue must NOT claim', () => {
       const read = [model.goodAt, model.unlocks ?? ''].join(' ')
       expect(read, model.id).not.toMatch(/layer|annotat|mask|draw on|markup/i)
     }
+  })
+})
+
+describe('the catalogue and the router agree', () => {
+  /**
+   * THE ONE THAT KEEPS THE TWO HALVES HONEST. The picker decides what somebody
+   * may choose; `ALLOWED_IMAGE_MODELS` decides what the mesh will actually
+   * address. A model in the picker but not the router spends a press on a call
+   * that falls back to something else without saying so. A model in the router
+   * but not the picker is dead weight nobody can reach.
+   */
+  test('every model on offer is one the mesh will address', () => {
+    for (const model of STUDIO_MODELS) {
+      expect(ALLOWED_IMAGE_MODELS, model.id).toContain(model.id)
+    }
+  })
+
+  test('and every model the mesh addresses is one somebody can choose', () => {
+    for (const id of ALLOWED_IMAGE_MODELS) {
+      expect(
+        STUDIO_MODELS.map((model) => model.id),
+        id,
+      ).toContain(id)
+    }
+  })
+
+  test('the two lists are the same size, so neither can grow unnoticed', () => {
+    expect(STUDIO_MODELS).toHaveLength(ALLOWED_IMAGE_MODELS.length)
+  })
+
+  /**
+   * A model that is offered but not routed would be refused by the screen and
+   * silently swapped by the router. With three models all reachable, there is
+   * no such state, and this asserts it rather than assuming it.
+   */
+  test('all three are reachable, so nothing is offered that cannot be drawn', () => {
+    expect(routedModels()).toHaveLength(STUDIO_MODELS.length)
+    expect(unroutedModels()).toHaveLength(0)
+  })
+})
+
+describe('one model for each kind of job', () => {
+  test('there are exactly three, one per family', () => {
+    expect(STUDIO_MODELS).toHaveLength(3)
+    const families = STUDIO_MODELS.map((model) => model.id.split('/')[0])
+    expect(new Set(families).size).toBe(3)
+  })
+
+  test('the families are the three that were asked for', () => {
+    const ids = STUDIO_MODELS.map((model) => model.id).join(' ')
+    expect(ids).toMatch(/openai\//)
+    expect(ids).toMatch(/google\//)
+    expect(ids).toMatch(/seedream/)
+  })
+
+  /**
+   * MEASURED: `openai/gpt-image-1` draws 10 per request and takes 16
+   * references, both of which docs/43 had left blank. If that number ever goes
+   * back to 1 the "matching set" promise on its card becomes false.
+   */
+  test('a matching set is possible on more than one model', () => {
+    expect(STUDIO_MODELS.filter((model) => model.maxPerPress > 1).length).toBeGreaterThan(1)
   })
 })
