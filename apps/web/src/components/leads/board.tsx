@@ -83,7 +83,7 @@ export function Board({ leads }: BoardProps) {
             aria-pressed={filter === value}
             className={[
               'rounded-input px-3 py-2 type-sm transition-colors',
-              filter === value ? 'bg-ink text-bg' : 'bg-subtle text-muted',
+              filter === value ? 'bg-ink text-bg' : 'bg-surface-2 text-muted',
             ].join(' ')}
           >
             {label}

@@ -2,17 +2,20 @@
 
 import Link from 'next/link'
 import type { Route } from 'next'
+import type { ReactNode } from 'react'
 import { useState, useTransition } from 'react'
-import { Play, Pause } from 'lucide-react'
+import { CalendarClock, Timer, Wallet } from 'lucide-react'
 import { MAX_WEEKLY_BUDGET_CREDITS } from '@sahoda/shared'
 
 import { runCycleToPreview } from '@/app/actions/loop-cycle'
 import { setLoopSettings } from '@/app/actions/loop-dial'
 import { Button } from '@/components/ui/button'
+import { creditWord, credits } from '@/lib/credit-words'
 import { CostLabel } from '@/components/ui/cost-label'
 
 /**
- * PAUSE, BUDGET, AND THE BUTTON THAT STARTS A WEEK.
+ * RUNNING THE LOOP — the command centre: what it costs, when it fires, and where
+ * the current week got to.
  *
  * ── THE BUTTON SAYS WHAT IT COSTS AND WHERE IT STOPS ─────────────────────────
  * Two facts, both load-bearing. The price is in the label, per UI_RULES_v3 —
@@ -28,6 +31,25 @@ import { CostLabel } from '@/components/ui/cost-label'
  * screen reader without extra work, and is imprecise about a quantity people
  * think about precisely — nobody wants "about 150 credits". The stepper keeps
  * the dragging affordance for anyone who wants it and lets the rest type.
+ *
+ * ── WHAT THE REDRAW ADDED, AND WHAT IT REFUSED TO ────────────────────────────
+ * The three facts a person actually wants beside the button — budget, schedule,
+ * and how the running week is going — used to be a control row here and a
+ * separate bordered card below. They are one panel now.
+ *
+ * The SCHEDULE line is new information, not new decoration: this page never
+ * said when the weekly plan happens. It comes from `lib/loop/schedule`, which is
+ * pinned to the deployment's own cron by a test.
+ *
+ * REFUSED: a "last run" for a workspace whose cycle row is absent, and a spend
+ * bar when no budget is set. Both would put a figure about the reader's week on
+ * screen that nothing measured.
+ *
+ * ── PAUSE LEFT THIS PANEL ────────────────────────────────────────────────────
+ * It sits beside the page title now, where "is this running" is asked. `paused`
+ * arrives as a prop and is no longer held here: local state in one component and
+ * server state in another is how a screen shows an enabled button above a
+ * sentence saying why it cannot be pressed.
  */
 
 /**
@@ -36,20 +58,22 @@ import { CostLabel } from '@/components/ui/cost-label'
  * One sentence and one link, both from `lib/loop/eligibility` — the same
  * function the Sunday cron reaches its verdict with. `null` when the workspace
  * is eligible.
- *
- * This replaced a ladder written here by hand. That ladder knew two causes of
- * the six — no channels, and paused — and phrased both differently from the
- * cron's words for the same state. A workspace short of credits, or one whose
- * connection had lapsed, got the same disabled button with a sentence that did
- * not describe it: MEASURED against production 2026-08-28, three workspaces
- * would have been told to connect a channel and two that the Loop was paused,
- * and none of those five sentences was on a screen anywhere.
  */
 export interface LoopRefusalNotice {
   /** The sentence, from `explain(verdict)`. Never a code, never a boolean. */
   sentence: string
   /** Somewhere that can actually fix it, from `remedy(verdict)`. */
   remedy: { href: string; label: string } | null
+}
+
+/** What the running week has spent and when it happened. Absent when no cycle. */
+export interface LoopRunFacts {
+  spentCredits: number
+  budgetCredits: number | null
+  /** Formatted by `lib/loop/schedule`, already carrying its zone. */
+  startedAt: string | null
+  /** Only present once a cycle has finished. */
+  duration: string | null
 }
 
 export interface LoopControlsProps {
@@ -60,34 +84,31 @@ export interface LoopControlsProps {
   cycleRunning: boolean
   /** Absent when the Loop will plan this week. */
   refusal?: LoopRefusalNotice | null
+  /** The sentence the schedule states, from `lib/loop/schedule`. */
+  scheduleSentence?: string
+  /** The next fire time, already formatted with its zone. */
+  nextRunAt?: string
+  run?: LoopRunFacts | null
+  /** Where the current week got to, rendered on the server. */
+  children?: ReactNode
 }
 
 export function LoopControls({
-  paused: initialPaused,
+  paused,
   weeklyBudgetCredits,
   cycleCost,
   hasChannels,
   cycleRunning,
   refusal = null,
+  scheduleSentence,
+  nextRunAt,
+  run = null,
+  children,
 }: LoopControlsProps) {
-  const [paused, setPaused] = useState(initialPaused)
   const [budget, setBudget] = useState(weeklyBudgetCredits)
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
-
-  function togglePause() {
-    const next = !paused
-    setPaused(next)
-    setError(null)
-    startTransition(async () => {
-      const result = await setLoopSettings({ paused: next })
-      if (!result.ok) {
-        setPaused(!next)
-        setError(result.message ?? 'Could not save that.')
-      }
-    })
-  }
 
   function saveBudget(value: number) {
     setBudget(value)
@@ -115,88 +136,157 @@ export function LoopControls({
   }
 
   return (
-    <section aria-labelledby="loop-controls" className="surface-ring rounded-card bg-surface p-4">
-      <h2 id="loop-controls" className="type-h3 text-ink">
-        Running the Loop
-      </h2>
+    <section
+      aria-labelledby="loop-running"
+      className="surface-ring rounded-card bg-surface shadow-card"
+    >
+      <div className="grid wide:grid-cols-[minmax(0,1fr)_320px]">
+        {/* The action, and the sentence that qualifies it. */}
+        <div className="flex flex-col gap-4 p-5 max-narrow:p-4">
+          <h2 id="loop-running" className="type-h3 text-ink">
+            Running the Loop
+          </h2>
 
-      <div className="mt-3 flex flex-wrap items-end gap-x-6 gap-y-4">
-        <div className="flex flex-col gap-1.5">
-          <Button
-            onClick={planWeek}
-            loading={pending}
-            disabled={paused || !hasChannels || cycleRunning}
-          >
-            <CostLabel action="Plan my week" cost={cycleCost} />
-          </Button>
-          <span className="type-sm max-w-[42ch] text-muted">
-            {refusal ? (
-              <>
-                {refusal.sentence}
-                {refusal.remedy ? (
-                  <>
-                    {' '}
-                    <Link
-                      href={refusal.remedy.href as Route}
-                      className="font-[550] text-accent underline underline-offset-2"
-                    >
-                      {refusal.remedy.label}
-                    </Link>
-                  </>
-                ) : null}
-              </>
-            ) : (
-              'Stops at a cost preview. Nothing is written until you approve it.'
-            )}
-          </span>
+          <div className="flex flex-col gap-2">
+            <Button
+              onClick={planWeek}
+              loading={pending}
+              disabled={paused || !hasChannels || cycleRunning}
+              className="self-start"
+            >
+              <CostLabel action="Plan my week" cost={cycleCost} />
+            </Button>
+            <span className="type-sm max-w-[52ch] text-muted">
+              {refusal ? (
+                <>
+                  {refusal.sentence}
+                  {refusal.remedy ? (
+                    <>
+                      {' '}
+                      <Link
+                        href={refusal.remedy.href as Route}
+                        className="font-[550] text-accent underline underline-offset-2"
+                      >
+                        {refusal.remedy.label}
+                      </Link>
+                    </>
+                  ) : null}
+                </>
+              ) : (
+                'Stops at a cost preview. Nothing is written until you approve it.'
+              )}
+            </span>
+          </div>
+
+          {children}
+
+          {note ? (
+            <p role="status" className="type-sm text-muted">
+              {note}
+            </p>
+          ) : null}
+          {error ? (
+            <p role="alert" className="type-sm text-danger">
+              {error}
+            </p>
+          ) : null}
         </div>
 
-        <label className="flex flex-col gap-1.5">
-          <span className="type-eyebrow text-muted">Weekly budget</span>
-          <span className="flex items-center gap-2">
-            <input
-              type="number"
-              min={0}
-              max={MAX_WEEKLY_BUDGET_CREDITS}
-              step={10}
-              value={budget}
-              disabled={pending}
-              onChange={(e) => setBudget(Number(e.target.value))}
-              onBlur={(e) => saveBudget(Number(e.target.value))}
-              className="w-24 rounded-input bg-subtle px-3 py-2 type-body tabular-nums text-ink outline-none focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-accent"
-            />
-            <span className="type-sm text-muted">credits</span>
-          </span>
-        </label>
+        {/* Budget, schedule and the run's own figures. Divided by a rule rather
+            than boxed: three cards here would repeat the panel they sit in. */}
+        <dl className="flex flex-col gap-5 p-5 max-narrow:p-4 wide:border-l max-wide:border-t border-line-soft">
+          <Facet icon={<Wallet size={14} strokeWidth={1.9} aria-hidden />} label="Weekly budget">
+            <span className="flex items-center gap-2">
+              <input
+                type="number"
+                min={0}
+                max={MAX_WEEKLY_BUDGET_CREDITS}
+                step={10}
+                value={budget}
+                disabled={pending}
+                aria-label="Weekly budget in credits"
+                onChange={(e) => setBudget(Number(e.target.value))}
+                onBlur={(e) => saveBudget(Number(e.target.value))}
+                className="w-24 rounded-input bg-s2 px-3 py-2 type-body tabular-nums text-ink outline-none focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-accent"
+              />
+              <span className="type-sm text-muted">credits</span>
+            </span>
+            {run && run.budgetCredits !== null ? (
+              <SpendBar spent={run.spentCredits} budget={run.budgetCredits} />
+            ) : run ? (
+              <span className="type-sm num mt-2 block text-muted">
+                Spent this cycle: <span className="text-ink">{run.spentCredits}</span>{' '}
+                {creditWord(run.spentCredits)}
+              </span>
+            ) : null}
+          </Facet>
 
-        <div className="flex flex-col gap-1.5">
-          <span className="type-eyebrow text-muted">Schedule</span>
-          <Button variant="secondary" onClick={togglePause} disabled={pending}>
-            {paused ? (
-              <>
-                <Play size={15} strokeWidth={1.8} aria-hidden />
-                Turn the Loop on
-              </>
-            ) : (
-              <>
-                <Pause size={15} strokeWidth={1.8} aria-hidden />
-                Pause the Loop
-              </>
-            )}
-          </Button>
-        </div>
+          {scheduleSentence ? (
+            <Facet
+              icon={<CalendarClock size={14} strokeWidth={1.9} aria-hidden />}
+              label="Schedule"
+            >
+              <span className="type-body block text-ink">{scheduleSentence}</span>
+              {nextRunAt ? (
+                <span className="type-sm num mt-1 block text-muted">Next run {nextRunAt}</span>
+              ) : null}
+            </Facet>
+          ) : null}
+
+          {run?.startedAt ? (
+            <Facet icon={<Timer size={14} strokeWidth={1.9} aria-hidden />} label="This cycle">
+              <span className="type-body num block text-ink">{run.startedAt}</span>
+              {run.duration ? (
+                <span className="type-sm num mt-1 block text-muted">Took {run.duration}</span>
+              ) : null}
+            </Facet>
+          ) : null}
+        </dl>
       </div>
-
-      {note ? (
-        <p role="status" className="type-sm mt-3 text-muted">
-          {note}
-        </p>
-      ) : null}
-      {error ? (
-        <p role="alert" className="type-sm mt-3 text-danger">
-          {error}
-        </p>
-      ) : null}
     </section>
+  )
+}
+
+function Facet({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
+  return (
+    <div>
+      <dt className="type-eyebrow flex items-center gap-1.5 text-muted">
+        <span className="text-muted">{icon}</span>
+        {label}
+      </dt>
+      <dd className="mt-1.5">{children}</dd>
+    </div>
+  )
+}
+
+/**
+ * How much of the budget this cycle has used.
+ *
+ * Both numbers are stored: `spent_credits` on the cycle row and the budget the
+ * cycle was opened with. Nothing is projected — a bar past 100% is drawn at
+ * 100% and the figures beside it still say what actually happened, because a bar
+ * cannot overflow but a spend can.
+ */
+function SpendBar({ spent, budget }: { spent: number; budget: number }) {
+  const share = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0
+  return (
+    <div className="mt-3">
+      <div
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={budget}
+        aria-valuenow={spent}
+        aria-label="Credits used this cycle"
+        className="h-1.5 w-full overflow-hidden rounded-full bg-s2"
+      >
+        <div
+          className="h-full rounded-full bg-accent transition-panel"
+          style={{ width: `${share}%` }}
+        />
+      </div>
+      <p className="type-sm num mt-1.5 text-muted">
+        Used <span className="text-ink">{spent}</span> of {credits(budget)}
+      </p>
+    </div>
   )
 }

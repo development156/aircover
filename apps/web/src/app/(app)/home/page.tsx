@@ -1,5 +1,3 @@
-import { ArrowRight } from 'lucide-react'
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { creditCost } from '@sahoda/shared'
 
@@ -7,6 +5,7 @@ import { AtAGlance } from '@/components/home/at-a-glance'
 import { FirstRun } from '@/components/home/first-run'
 import { GetStarted } from '@/components/home/get-started'
 import { GreetingBanner } from '@/components/home/greeting-banner'
+import { HomeSection } from '@/components/home/section'
 import { NeedsAttention } from '@/components/home/needs-attention'
 import { BrainCard, ConnectionsCard } from '@/components/home/rail-cards'
 import { countIndexedDocuments } from '@/lib/knowledge/store'
@@ -15,7 +14,6 @@ import { PerformanceStrip } from '@/components/analytics/performance-strip'
 import { SahodaRail } from '@/components/home/sahoda-rail'
 import { SpendCard } from '@/components/home/spend-card'
 import { WeekStrip } from '@/components/home/week-strip'
-import { Card } from '@/components/ui/card'
 import { StaggerItem } from '@/components/motion/stagger'
 import { ActivityFeed } from '@/components/home/activity-feed'
 import { readInstagramAnalytics } from '@/lib/analytics/account-insights'
@@ -79,10 +77,24 @@ async function landingFor(): Promise<LandingDecision> {
  * grid of zero-value cards reads broken; a short page with one clear thing to
  * press reads calm, and it is what a new workspace honestly is.
  *
- * The layout is deliberately ASYMMETRIC: a display-size greeting, the week strip
- * full-bleed as the hero, a 2-column split, then a dense table. The density
- * contrast — a lot of air above, tight rows below — is what stops it reading as
- * a grid of equal cards.
+ * ── THE 2026-08-30 REBUILD ───────────────────────────────────────────────────
+ * The brief was that this read as separate UI blocks rather than one product,
+ * and the measurement agreed: the page rendered its regions in THREE different
+ * card grammars at once — a 46px ruled header on four of them, an unruled 20px
+ * head on the charts, and a small caps label with no heading at all on the
+ * planner block. Counting the four stat cards, thirteen separate ringed boxes
+ * went down one screen. Restyling any one of them could not fix that, because
+ * the defect was that there were three of them.
+ *
+ * So: ONE card language (`home/section.tsx`), and the four numbers became one
+ * divided board rather than four boxes. Then the queue — the question somebody
+ * actually opened the app to ask — came out of the 1fr column and now leads
+ * across the full width, which left the split with a clean division of labour:
+ * the REPORT on the left, the SOURCES on the right.
+ *
+ * NOTHING WAS REMOVED. Every region, sentence, absence state and remedy that
+ * was on the old page is on this one, and every figure still comes from a table
+ * or from a platform that reported it.
  *
  * ── ONE THING LEADS, AND IT IS THE QUEUE (2026-08-20 restructure) ────────────
  * docs/27 §1 found "two competing heroes" and no focal point. Both heroes were
@@ -102,7 +114,8 @@ async function landingFor(): Promise<LandingDecision> {
  * importance. A shop owner checking this between customers is answering "what
  * needs me" — so the queue moved from fourth in the left column, below two
  * charts and a spend card, to directly under the greeting. Everything that was
- * above it is a report, and a report can wait for a scroll.
+ * above it is a report, and a report can wait for a scroll. The 2026-08-30
+ * rebuild took the same argument one step further and gave it the full width.
  *
  * ── ARRIVAL ─────────────────────────────────────────────────────────────────
  * The nine reads stay in ONE `Promise.all`. That is one wait, not nine, and
@@ -247,16 +260,20 @@ export default async function HomePage() {
   )
 
   return (
-    /* ── ONE RHYTHM, AND IT IS 20px ──────────────────────────────────────
-       This page ran at 16 between regions and 16 between the columns, while
-       `Card` ran at 16 inside them — so the gap AROUND a group was the same as
-       the gap BETWEEN things inside it, which docs/37 §4 names as "the most
-       common spacing bug in this product": the reader cannot tell which value
-       belongs to which label. 20 outside, and `Card` is now 20 inside, so the
-       two are at least on the same step; the separation comes from the card's
-       ring rather than from a bigger hole. /analytics runs the same 20 via
-       `space-y-grid`. */
-    <div className="space-y-5">
+    /* ── ONE RHYTHM BETWEEN REGIONS, AND IT IS NOW A STEP ABOVE THE ONE
+       INSIDE THEM ──────────────────────────────────────────────────────────
+       This page ran 20 outside a card and 20 inside it, and the note that set
+       it said so deliberately: the separation was left to the card's ring. With
+       ONE card language across all nine regions (see `home/section.tsx`) that
+       no longer holds — every block now wears the same ring, so the ring can no
+       longer be what tells the reader where a group ends. The gap has to.
+
+       24 outside, 20 inside. Both are on docs/37 §4's ladder, and the step
+       between them is what makes the page read as regions rather than as a run
+       of identical boxes. It drops back to 20 below `narrow`, where 24 is a
+       whole extra scroll across nine blocks and the phone has no columns for
+       the gap to separate anyway. */
+    <div className="space-y-6 max-narrow:space-y-5">
       {/* ── THE FOUR QUESTIONS, IN ORDER (SPECIFICATION.md §1) ──────────────
           what happened · what is happening · what needs me · what next.
 
@@ -269,30 +286,42 @@ export default async function HomePage() {
           read. No band behind it any more — see the component. */}
       <GreetingBanner greeting={greetingFor(now)} state={greetingState(counts, publish)} />
 
-      {/* ── AND THEN FOUR NUMBERS, WHERE THE 190px BAND USED TO BE ────────
-          The reference opens on five stat cards; this page opened on a
-          greeting and then a queue, with its first figure at y≈1190 on a 768px
-          laptop. All four of these are counts of rows this product owns or a
-          ledger balance, so the strip is full on day one with nothing
-          connected — which is the whole reason /home could not have a KPI row
-          before. See the component for why these four and not the platform
-          metrics. */}
+      {/* ── FOUR NUMBERS AS ONE BOARD, NOT FOUR BOXES ─────────────────────
+          All four are counts of rows this product owns or a ledger balance, so
+          the board is full on day one with nothing connected — which is the
+          whole reason /home could not have a KPI row before. It is now a single
+          divided card rather than four ringed ones: see `StatStrip`'s `board`
+          for the argument, which is that thirteen separate boxes down one page
+          is most of what made this screen read as assembled parts. */}
       <StaggerItem i={0}>
         <AtAGlance posts={displayPosts} buckets={buckets} publish={publish} balance={balance} />
       </StaggerItem>
 
-      {/* `split--wide` — 1fr / 380px, not the 280px this page used. The rail
-          holds three cards; at 280px the connection tiles wrapped to one per
-          row and the stack read as a leftovers column. */}
-      <div className="grid grid-cols-[minmax(0,1fr)_380px] items-start gap-5 max-wide:grid-cols-1">
-        <div className="flex min-w-0 flex-col gap-5">
-          {/* WHAT NEEDS ME — the lead. See the header note: this is the question
-              someone actually opened the app to ask, and it used to sit fourth,
-              below two charts and a spend card. */}
-          <StaggerItem i={1}>
-            <NeedsAttention posts={displayPosts} />
-          </StaggerItem>
+      {/* ── WHAT NEEDS ME — FULL WIDTH, AND THAT IS THE RESTRUCTURE ───────
+          This is the question somebody actually opened the app to ask, and it
+          was rendered inside the 1fr column of a 1fr/380 split — so the page's
+          lead had 68% of the page's width, with the Brand Brain card level with
+          it competing for the same eye. It leads across the whole width now,
+          and its own grid opens to three columns when three or more things are
+          waiting, which is the shape a queue should have and could not take at
+          870px. */}
+      <StaggerItem i={1}>
+        <NeedsAttention posts={displayPosts} />
+      </StaggerItem>
 
+      {/* `split--wide` — 1fr / 380px, not the 280px this page used. The rail
+          holds four cards; at 280px the connection tiles wrapped to one per
+          row and the stack read as a leftovers column.
+
+          WHAT IS IN EACH SIDE CHANGED with the queue's promotion. Left is now
+          purely the REPORT — the measured series, in one reading column, so
+          somebody scrolling to ask "how is it going" gets four things in a row
+          that answer that and nothing else. Right is the SOURCES: what
+          happened, what Sahoda knows, what it can post to, and what it drafted.
+          That is the "what next" question, and it belongs beside the report
+          rather than interleaved with it. */}
+      <div className="grid grid-cols-[minmax(0,1fr)_380px] items-start gap-6 max-wide:grid-cols-1 max-narrow:gap-5">
+        <div className="flex min-w-0 flex-col gap-6 max-narrow:gap-5">
           {/* WHAT IS HAPPENING. This page had no metric container at all — not
               an empty one, none. Its four slots stay unmeasured until something
               is connected, which is the honest answer; showing nothing left the
@@ -302,14 +331,14 @@ export default async function HomePage() {
             <PerformanceStrip analytics={instagram} />
           </StaggerItem>
 
-          {/* Instagram's own series sits below the strip: the strip carries the
-              headline numbers, this carries the one real chart. */}
           <StaggerItem i={3}>
-            <InstagramInsights analytics={instagram} />
+            <SpendCard spend={spend} />
           </StaggerItem>
 
+          {/* Instagram's own series: the strip carries the headline numbers,
+              this carries the one real chart a platform reported. */}
           <StaggerItem i={4}>
-            <SpendCard spend={spend} />
+            <InstagramInsights analytics={instagram} />
           </StaggerItem>
 
           <StaggerItem i={5}>
@@ -317,25 +346,22 @@ export default async function HomePage() {
           </StaggerItem>
         </div>
 
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-6 max-narrow:gap-5">
           {/* 1 — WHAT HAPPENED. The reference puts the activity feed at the
                   top of the rail; this app had it as a full-width table at the
                   very bottom, which is the least-read position on the page. */}
-          {/* WHAT HAPPENED. */}
           <StaggerItem i={6}>
-            <section className="surface-ring rounded-card bg-surface">
-              <header className="flex min-h-[46px] items-center gap-3 border-b border-line-soft px-4 py-3">
-                <h2 className="type-h3">Recent activity</h2>
-                <Link
-                  href="/wallet"
-                  className="card-link ml-auto inline-flex items-center gap-1 type-meta font-[550] text-accent transition-micro hover:gap-1.5 max-narrow:min-h-[44px]"
-                >
-                  View all
-                  <ArrowRight aria-hidden className="size-3.5" />
-                </Link>
-              </header>
+            {/* `flush`: the feed's rows run to the card's own edge, so the body
+                may not carry the standard 20px inset. The header still does, so
+                this heading sits on the same line as every other card's. */}
+            <HomeSection
+              id="home-activity"
+              title="Recent activity"
+              action={{ href: '/wallet', label: 'View all' }}
+              flush
+            >
               <ActivityFeed entries={ledger.entries.slice(0, 4)} />
-            </section>
+            </HomeSection>
           </StaggerItem>
 
           {/* ── WHERE `Available credits` USED TO BE ────────────────────────
@@ -356,9 +382,7 @@ export default async function HomePage() {
           </StaggerItem>
 
           <StaggerItem i={9}>
-            <Card>
-              <SahodaRail drafted={draftedThisWeek} planCost={creditCost('loop_cycle')} />
-            </Card>
+            <SahodaRail drafted={draftedThisWeek} planCost={creditCost('loop_cycle')} />
           </StaggerItem>
         </div>
       </div>

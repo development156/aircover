@@ -64,7 +64,7 @@ export function LeadCard({ lead, actions, busy }: LeadCardProps) {
   const name = lead.name?.trim() || 'No name given'
 
   return (
-    <div className="surface-ring rounded-input bg-subtle">
+    <div className="surface-ring rounded-input bg-surface-2">
       <button
         type="button"
         onClick={() => setOpen((was) => !was)}

@@ -53,6 +53,22 @@ export interface StatCardProps {
   chart?: React.ReactNode
   /** Where the number can be acted on. The whole card becomes the target. */
   href?: Route
+  /**
+   * A quiet mark beside the label. Neutral by construction — see the shell.
+   *
+   * It identifies the metric at a glance without the reader parsing four
+   * eyebrows, which is what makes a four-across row scannable rather than a
+   * paragraph of small caps. It is NEVER the only carrier of anything: the
+   * label says the same thing in words directly beside it.
+   */
+  icon?: React.ReactNode
+  /**
+   * `card` is a free-standing object with its own ring. `cell` drops the ring,
+   * the radius and the lift, for a card that is one pane of a larger board —
+   * the board owns the chrome, and the seams between panes are drawn by the
+   * grid's own gap over a line-coloured ground. See `StatStrip`'s `board`.
+   */
+  variant?: 'card' | 'cell'
   className?: string
 }
 
@@ -77,11 +93,26 @@ export function StatCard({
   note,
   chart,
   href,
+  icon,
+  variant = 'card',
   className,
 }: StatCardProps) {
   const body = (
     <>
-      <p className="type-eyebrow text-muted">{label}</p>
+      <div className="flex items-center gap-2">
+        {icon ? (
+          /* `--ink-mute`, never the accent. Four orange glyphs at the top of
+             the page would be four things competing with `Create post`, which
+             `accent-budget.spec.ts` counts and §16 forbids. */
+          <span
+            aria-hidden
+            className="grid size-7 flex-none place-items-center rounded-md bg-surface-2 text-ink-mute"
+          >
+            {icon}
+          </span>
+        ) : null}
+        <p className="type-eyebrow text-muted">{label}</p>
+      </div>
       {/* `items-baseline` so the unit sits ON the figure's baseline rather than
           centred against a 44px line box — the difference between one phrase
           and two stacked things. */}
@@ -94,13 +125,21 @@ export function StatCard({
     </>
   )
 
+  const cell = variant === 'cell'
   const shell = cn(
-    'surface-ring flex flex-col rounded-card bg-surface p-5',
+    'flex flex-col bg-surface p-5',
+    cell ? 'max-narrow:p-4' : 'surface-ring rounded-card',
     // Only an interactive card moves. A hover response is a promise that a
     // click does something — the rule `Card` already states, restated because
     // this primitive does not go through it.
+    //
+    // A CELL MAY NOT LIFT. Translating one pane of a board opens a gap in the
+    // seam beside it and the whole board reads as broken; the pane changes
+    // GROUND instead, which is the same promise without moving the geometry.
     href &&
-      'transition-panel hover:-translate-y-px hover:shadow-[inset_0_0_0_1px_var(--line-firm)]',
+      (cell
+        ? 'transition-micro hover:bg-surface-2'
+        : 'transition-panel hover:-translate-y-px hover:shadow-[inset_0_0_0_1px_var(--line-firm)]'),
     className,
   )
 
@@ -130,8 +169,23 @@ export function StatCard({
 export function StatStrip({
   children,
   cols = 4,
+  board = false,
 }: {
   children: React.ReactNode
+  /**
+   * ── THE BOARD: FOUR PANES OF ONE OBJECT, NOT FOUR OBJECTS ─────────────────
+   *
+   * Four separate ringed cards with 16px between them put four boxes at the top
+   * of Home, each with its own edge, competing with the nine ringed cards
+   * underneath. Counted down the page that is thirteen boxes, which is the
+   * "repetitive cards" the redesign brief names.
+   *
+   * The board draws ONE card and divides it. The seams are the grid's own 1px
+   * gap over a `--line-soft` ground — not `divide-x`, which in a grid that
+   * rewraps puts a rule on the wrong edge of the wrapped row and a top rule on
+   * a pane that starts one. A gap cannot get that wrong at any column count.
+   */
+  board?: boolean
   /**
    * How many cards. Stated rather than counted from `children`, because
    * `Children.count` sees a fragment as one and a conditional card as a `false`
@@ -143,7 +197,10 @@ export function StatStrip({
   return (
     <div
       className={cn(
-        'grid gap-4 max-narrow:gap-3',
+        'grid',
+        board
+          ? 'surface-ring gap-px overflow-hidden rounded-card bg-line-soft shadow-card'
+          : 'gap-4 max-narrow:gap-3',
         /* THREE AND FOUR BREAK DIFFERENTLY, because three FIT in the middle
            band and four do not. MEASURED at 1024, where the rail costs 72px and
            the content column is ~936: four 44px figures need ~230px each and
