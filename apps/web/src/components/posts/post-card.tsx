@@ -92,7 +92,8 @@ export function PostCard({
   now,
   variantStates,
   metrics,
-}: PostCardProps) {
+  zone,
+}: PostCardProps & { zone?: string | null }) {
   const heading = displayTitleOf(post)
   const displayTitle = heading.text
   const hasBody = Boolean(post.body?.trim())
@@ -102,7 +103,7 @@ export function PostCard({
     heading.source === 'derived' ? bodyAfterFirstLine(post.body) : post.body,
   )
   const savedAge = relativeAge(post.updated_at, now)
-  const scheduledAt = formatScheduledAt(post.scheduled_at)
+  const scheduledAt = formatScheduledAt(post.scheduled_at, zone)
   // Distinct already: `post.channels` is a `ChannelSet`, deduplicated once when
   // the row was parsed. `posts.channels` is still a bare `text[]` with no unique
   // constraint, so a repeated value is storable — it just cannot survive the read.

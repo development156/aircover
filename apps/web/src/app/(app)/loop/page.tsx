@@ -16,6 +16,7 @@ import { PendingLearnings } from '@/components/loop/learnings'
 import { LoopControls } from '@/components/loop/controls'
 import { LoopStatus } from '@/components/loop/loop-status'
 import { PageTitle } from '@/components/page-title'
+import { loopCronEnabled } from '@/lib/cron/loop-enabled'
 import { explain, remedy } from '@/lib/loop/eligibility'
 import { readLoop, type LoopSnapshot } from '@/lib/loop/read'
 import { readGoingOut } from '@/lib/loop/autopilot/going-out'
@@ -95,8 +96,18 @@ export default async function LoopPage() {
   // The same `assess()` the Sunday cron uses, so the screen and the schedule
   // cannot disagree. An eligible workspace gets no notice here — the button is
   // enabled and its own line already says where the cycle stops.
+  //
+  // The verdict answers "would the Loop plan for this business". It cannot
+  // answer "is anything going to ask it on Sunday", and for as long as nothing
+  // here consulted the switch, this screen promised a weekly plan to workspaces
+  // in an environment where the Sunday job returns before reading anything. The
+  // switch defaults OFF because that job spends 20 credits per workspace.
+  const autoSchedule = loopCronEnabled() ? ('armed' as const) : ('off' as const)
   const verdict = loopVerdict(snapshot, new Date())
-  const refusal = verdict.eligible ? null : { sentence: explain(verdict), remedy: remedy(verdict) }
+  const refusal =
+    verdict.eligible && autoSchedule === 'armed'
+      ? null
+      : { sentence: explain(verdict, { autoSchedule }), remedy: remedy(verdict) }
 
   return (
     <div className="space-y-grid">
