@@ -77,7 +77,13 @@ export interface WeekTimelineProps {
   today: Date
 }
 
-export function WeekTimeline({ days, posts, variantStates, today }: WeekTimelineProps) {
+export function WeekTimeline({
+  days,
+  posts,
+  variantStates,
+  today,
+  zone,
+}: WeekTimelineProps & { zone?: string | null }) {
   const { from, to } = hourRange(posts)
   const hours = Array.from({ length: to - from + 1 }, (_, i) => from + i)
   const bodyHeight = (to - from + 1) * HOUR_PX
@@ -194,7 +200,7 @@ export function WeekTimeline({ days, posts, variantStates, today }: WeekTimeline
                         </span>
                       </span>
                       <span className="truncate type-eyebrow text-ink-mute">
-                        {formatScheduledTime(post.scheduled_at)}
+                        {formatScheduledTime(post.scheduled_at, zone)}
                         {certainty.label !== null ? ` · ${certainty.label}` : null}
                       </span>
                     </Link>
