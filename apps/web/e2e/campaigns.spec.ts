@@ -91,7 +91,7 @@ async function writePostOnTwoChannels(page: Page, body: string): Promise<string>
   await expect(page.locator('[data-version-card="instagram"]')).toBeVisible()
   await expect(page.locator('[data-version-card="linkedin"]')).toBeVisible()
 
-  await page.getByLabel('Your post').fill(body)
+  await page.getByLabel('Your post', { exact: true }).fill(body)
 
   // Read the id off the PATH. Nothing emits `?post=` any more, and a spec that
   // waits for one waits until its timeout.
