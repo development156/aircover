@@ -31,6 +31,7 @@ import { formatById } from '@/lib/studio/formats'
 import { MAX_TRIES_PER_PRESS, describeModeBlock } from '@/lib/studio/modes'
 import { ReferenceIdsSchema } from '@/lib/studio/reference-ids'
 import { conditionPrompt } from '@/lib/studio/prompt'
+import { stampGeneratedPicture } from '@/lib/studio/stamp-generated'
 import { attachAssetToPost } from '@/app/actions/assets'
 import { createPost } from '@/app/actions/posts'
 import { createServerSupabase } from '@/lib/supabase/server'
@@ -358,14 +359,46 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
           }
 
           charged += ctx.creditsCharged
-          await supabase.from('studio_generation_images').insert({
+
+          // ── THE STAMP RIDES ALONG, AND NEVER COSTS THE GENERATION ─────────
+          // Local compute, so nothing above changes: no second hold, no second
+          // charge, `ctx.creditsCharged` untouched. `stampGeneratedPicture` is
+          // total by contract (it returns null for every failure and throws for
+          // none), which is why there is no try around it here: a throw in this
+          // callback releases the hold and refuses a picture the customer
+          // already has, and one owner of that guarantee is testable where two
+          // are not. See `lib/studio/stamp-generated.ts`.
+          const stamped = await stampGeneratedPicture({
+            workspaceId: workspace.id,
+            userId,
+            picture: bytes,
+            supabase,
+          })
+
+          const imageRow = {
             workspace_id: workspace.id,
             generation_id: generationId,
             idx,
             asset_id: newAssetId,
             width: sniffed.image.width,
             height: sniffed.image.height,
-          })
+          }
+
+          // ── DEPLOY-SAFE, THE SAME WAY `assets.ts` IS ──────────────────────
+          // `stamped_asset_id` arrives with a migration a human applies, and
+          // this code ships before that happens. It goes in the SAME insert
+          // rather than a follow-up update because this table is append-only:
+          // it carries `block_mutations` and has no UPDATE policy, so a second
+          // statement could never land. On `42703` (undefined column) the row
+          // is written again without it, so a missing column costs the LINK and
+          // never the record of a generation somebody paid for.
+          const written = await supabase
+            .from('studio_generation_images')
+            .insert({ ...imageRow, stamped_asset_id: stamped?.assetId ?? null })
+
+          if (written.error?.code === '42703') {
+            await supabase.from('studio_generation_images').insert(imageRow)
+          }
           deliveredThis = true
         },
       )
