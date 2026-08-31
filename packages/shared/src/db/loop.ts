@@ -27,13 +27,20 @@ import { ChannelSetSchema } from './channel-set'
  * the failure surfacing as a raw constraint violation rather than as a refusal
  * anyone wrote.
  *
- * L3 still has to be DESCRIBED — it is on the Loop screen, it is what the ladder
- * is climbing towards, and hiding it would misrepresent the product. So the
- * description lives in `AUTONOMY_LEVELS` below, which includes L3, and the
- * storable type does not. Those are different questions and this file answers
- * them separately.
+ * ── L3 IS STORABLE NOW, AND THE PARAGRAPH ABOVE IS WHY THAT COST WORK ────────
+ * `20260828120000_loop_autopilot_l3.sql` widened the column to 0-3 and put a
+ * trigger in front of it that refuses three NAMED ways:
+ * AUTOPILOT_NEEDS_SUPERVISED_CYCLE, AUTOPILOT_NEEDS_BRAIN and
+ * AUTOPILOT_BRAIN_UNCONFIRMED. Opening this union without translating those
+ * would have produced exactly the defect described above — a customer pressing
+ * Autopilot and reading a Postgres error string. `setChannelAutonomy` names all
+ * three and its tests assert the sentences, so the refusal a person meets is
+ * one somebody wrote.
+ *
+ * The DEFAULT is still L1. Nothing moves to autopilot by upgrade, and the
+ * database still refuses a workspace that has not earned it.
  */
-export const AutonomyLevelSchema = z.union([z.literal(0), z.literal(1), z.literal(2)])
+export const AutonomyLevelSchema = z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)])
 export type AutonomyLevel = z.infer<typeof AutonomyLevelSchema>
 
 /** FSD §0.2: "Default L1" — Sahoda writes, and nothing it writes reaches anyone. */
@@ -77,10 +84,10 @@ export const AUTONOMY_LEVELS = [
     level: 3,
     code: 'L3',
     name: 'Autopilot',
-    storable: false,
-    may: 'Sahoda publishes without asking, inside the limits you set.',
+    storable: true,
+    may: 'Sahoda publishes without asking, inside the limits you set. You get a few minutes to stop each post before it goes.',
     needs:
-      'Not built. Publishing to your accounts with nobody watching is a different risk from everything above it, and Sahoda will not offer it until a person has walked the whole cycle first.',
+      'One week you have already run and reported yourself, and a Brand Brain with your promise, your customer, your voice and your red lines confirmed. Sahoda checks all four before it accepts this setting.',
   },
 ] as const
 
@@ -98,6 +105,41 @@ export type LoopSettings = z.infer<typeof LoopSettingsSchema>
 export const DEFAULT_WEEKLY_BUDGET_CREDITS = 150
 /** Matches the column's own ceiling; the largest monthly grant any plan carries. */
 export const MAX_WEEKLY_BUDGET_CREDITS = 5000
+
+/**
+ * THE TWO PROMISES AUTOPILOT MAKES, AND THEIR LIMITS.
+ *
+ * Every number here mirrors a CHECK in `20260828120000_loop_autopilot_l3.sql`.
+ * They are declared once, in the source of truth, so a form and a column cannot
+ * disagree about what is allowed — the disagreement being the case where a
+ * customer reads a constraint violation instead of a sentence somebody wrote.
+ *
+ * The DEFAULTS are the column defaults, not a second opinion. A workspace that
+ * has never touched these is running at three a day and thirty minutes, and the
+ * screen must show those figures rather than an empty field, because an empty
+ * field reads as "no limit".
+ */
+export const DEFAULT_AUTOPILOT_DAILY_CAP = 3
+export const MIN_AUTOPILOT_DAILY_CAP = 0
+export const MAX_AUTOPILOT_DAILY_CAP = 20
+
+export const DEFAULT_AUTOPILOT_CANCEL_MINUTES = 30
+/**
+ * Five, and the reason it is not lower is not the column.
+ *
+ * `AUTOPILOT_CANCEL_FLOOR_MINUTES` clamps to the same number for a different
+ * reason — a zero reaching the decision code would announce and dispatch in the
+ * same instant, autopilot with no cancel wearing the costume of one.
+ *
+ * A window this short is a promise the SCHEDULE cannot keep tightly: the tick
+ * runs every ten minutes, so a five-minute window closes between ticks and the
+ * post goes out on the next one. That is later than promised, never earlier,
+ * which is the safe direction — but copy near this control must not claim a
+ * post goes out the moment the window closes.
+ */
+export const MIN_AUTOPILOT_CANCEL_MINUTES = 5
+/** One day. Beyond this a "cancel window" is just a delay. */
+export const MAX_AUTOPILOT_CANCEL_MINUTES = 1440
 
 export const LoopChannelAutonomySchema = z.object({
   id: z.uuid(),

@@ -47,6 +47,14 @@ export const readBrandLogo = cache(async function readBrandLogo(
       .eq('workspace_id', workspaceId)
       .eq('kind', 'image')
       .eq('title', LOGO_TITLE)
+      /**
+       * A logo in the TRASH is not the logo. Without this, deleting the logo
+       * left it painting the topbar for ever, and — worse — hid a newer one
+       * behind it, because the trashed row could still be the most recent.
+       * Found by review; `assets` marks deletion with `deleted_at`, not a row
+       * removal, so every read of that table has to say which it wants.
+       */
+      .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
