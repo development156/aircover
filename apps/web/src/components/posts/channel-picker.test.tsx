@@ -46,6 +46,71 @@ function Harness({ initial }: { initial: ChannelSet }) {
   return <ChannelPicker selected={selected} onChange={setSelected} />
 }
 
+/**
+ * WHAT THE PICKER OFFERS, AND WHAT IT REFUSES TO TAKE AWAY.
+ *
+ * Reported from the screen, 2026-08-29: `/connections` had stopped offering
+ * Telegram and the composer went on offering it, so a post could be aimed at an
+ * account nobody can connect. Both screens ask "where should this go?" and only
+ * one had been told the answer changed.
+ *
+ * The pair below is the whole rule and neither half is optional. Hiding it from
+ * the OFFER is the fix; hiding it from a post that already carries it would
+ * silently rewrite somebody's saved choice the moment they opened the post.
+ */
+describe('the channels the composer offers', () => {
+  test('does not offer a channel nobody can connect', () => {
+    render(<Harness initial={toChannelSet(['x'])} />)
+
+    // Asserted through the LABEL a person reads, not the internal id, because
+    // the label is what makes the chip an offer.
+    expect(screen.queryByRole('button', { name: /Telegram/ })).not.toBeInTheDocument()
+    // The rest of the row is untouched — this is a filter, not a deletion.
+    expect(screen.getByRole('button', { name: /LinkedIn/ })).toBeVisible()
+    expect(screen.getByRole('button', { name: /Google Business Profile/ })).toBeVisible()
+  })
+
+  test('keeps a channel the post ALREADY carries, and lets it be unticked', async () => {
+    const user = userEvent.setup()
+    render(<Harness initial={toChannelSet(['telegram'])} />)
+
+    // The load-bearing half. A post saved with Telegram opens with its chip
+    // still there; dropping it would leave the row saying telegram while the
+    // screen said otherwise, and the next save would write a set the person
+    // never chose.
+    const chip = screen.getByRole('button', { name: /Telegram/ })
+    expect(chip).toBeVisible()
+    expect(chip).toHaveAttribute('aria-pressed', 'true')
+
+    // And once it is off, it goes — it was only there because it was chosen.
+    await user.click(chip)
+    expect(screen.queryByRole('button', { name: /Telegram/ })).not.toBeInTheDocument()
+  })
+
+  test('every chip carries its platform\u2019s own mark, never a placeholder', () => {
+    render(<Harness initial={toChannelSet([])} />)
+
+    // ── THE DEFECT ────────────────────────────────────────────────────────────
+    // This row had its own three-entry logo table and fell through to a grey
+    // MAP PIN for everything else, so Google Business Profile and Facebook Pages
+    // rendered anonymously beside real logos. `/connections` has covered all six
+    // for weeks; two components were answering the same question from two
+    // tables. The mark now delegates, so a placeholder here means the shared
+    // table lost an entry — which is a defect on both screens, not just this one.
+    //
+    // `data-placeholder` is the fallback's own marker in `channel-logo.tsx`.
+    // The second assertion is what stops the first passing on a chip with NO
+    // mark at all: a mark is either a shipped image or one drawn to scale, and
+    // an empty chip has neither.
+    const chips = screen.getAllByRole('button')
+    expect(chips.length).toBeGreaterThan(0)
+    for (const chip of chips) {
+      expect(chip.querySelector('[data-placeholder="true"]')).toBeNull()
+      expect(chip.querySelector('img, svg')).not.toBeNull()
+    }
+  })
+})
+
 describe('ChannelPicker selected state', () => {
   test('a selected chip carries a mark that an unselected chip does not', async () => {
     render(<Harness initial={toChannelSet(['x'])} />)
