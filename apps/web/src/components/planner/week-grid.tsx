@@ -39,14 +39,17 @@ function DayChip({
   now,
   autoPublish,
   variants,
+  zone,
 }: {
   post: DisplayPost
   now: Date
   autoPublish: boolean
   /** Required, like the note's own prop: see `AutoPublishNote.variants`. */
   variants: readonly VariantStatusRow[]
+  /** The workspace's timezone, so the cell's time reads in the same clock as every other screen. */
+  zone?: string | null
 }) {
-  const time = formatScheduledTime(post.scheduled_at)
+  const time = formatScheduledTime(post.scheduled_at, zone)
   // The cell's whole signature — solid, hairline, dash or hatch — comes from
   // what the variant rows prove, not from the post row's stale status.
   const certainty = certaintyFor(post.intent, outcomeOf(variants))
@@ -109,7 +112,13 @@ export interface WeekGridProps {
  * fit the window render below it — `bucketWeek` never drops a post, and neither
  * does this component.
  */
-export function WeekGrid({ autoPublish = false, variantStates, buckets, now }: WeekGridProps) {
+export function WeekGrid({
+  autoPublish = false,
+  variantStates,
+  buckets,
+  now,
+  zone,
+}: WeekGridProps & { zone?: string | null }) {
   return (
     <div className="space-y-grid">
       <div className="overflow-x-auto">
@@ -135,6 +144,7 @@ export function WeekGrid({ autoPublish = false, variantStates, buckets, now }: W
                   now={now}
                   autoPublish={autoPublish}
                   variants={variantStates.get(post.id) ?? []}
+                  zone={zone}
                 />
               ))}
             </li>

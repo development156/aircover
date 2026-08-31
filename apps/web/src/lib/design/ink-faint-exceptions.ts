@@ -213,6 +213,29 @@ export const INK_FAINT_EXCEPTIONS: Readonly<Record<string, InkFaintException>> =
    * Adjacent-month days, which ARE selectable, deliberately use `text-muted`
    * instead — the two states are different and are drawn differently.
    */
+  /**
+   * THE REPORT'S ORDINAL, WHICH IS DECORATION AND NOTHING ELSE.
+   *
+   * `01…05` beside each section of the CMO Report. It is `aria-hidden`, it
+   * carries no fact, and the heading beside it says what the section is — a
+   * reader who cannot see the numeral loses nothing at all, because the
+   * document's own order is the sequence and a screen reader gets five named
+   * sections in it.
+   *
+   * `--ink-faint` is exactly right here and `text-muted` would be wrong: at
+   * `--ink-mute` a 44px numeral competes with the heading it sits beside, which
+   * is the opposite of what an ordinal is for. It warms to `--ink-mute` on
+   * hover, so it is legible the moment anyone looks for it.
+   */
+  'src/components/report/module.tsx': {
+    uses: 1,
+    // `legitimate`: an aria-hidden ordinal is decoration by construction, which
+    // is the case this token exists for. Nothing is owed a fix, so no card.
+    kind: 'legitimate',
+    since: '2026-08-30',
+    reason:
+      'The 01-05 ordinal beside each report section. aria-hidden, carries no fact, and the heading beside it names the section. Warms to --ink-mute on hover.',
+  },
   'src/components/posts/schedule-calendar.tsx': {
     uses: 1,
     // `legitimate`, not `debt`: this is correct and permanent. WCAG 1.4.3

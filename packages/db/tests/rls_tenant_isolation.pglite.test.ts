@@ -358,6 +358,10 @@ describe('every append-only table refuses a direct mutation', () => {
    * two at merge, and treat a failure here after a merge as the reminder it is.
    */
   const EXPECTED_GUARDED = [
+    // Written once and never edited afterwards: it is the answer to "why does
+    // this picture look like this", and a provenance record anybody can correct
+    // is one nobody can trust.
+    'studio_generation_images',
     'ai_provider_logs',
     'audience_snapshots',
     'audit_logs',

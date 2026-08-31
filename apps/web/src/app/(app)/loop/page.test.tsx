@@ -33,9 +33,31 @@ vi.mock('@/app/actions/loop-controls', () => ({
 }))
 vi.mock('@/app/actions/autopilot-stop', () => ({ stopAutopilotPost: vi.fn() }))
 
+/**
+ * INTEGRATION, NOT THIS TEST'S OWN CHANGE.
+ *
+ * This file and `loop-status.tsx` were written on different lanes and each was
+ * green alone. `747d9365` gave LoopStatus a `useRouter()`, and this mount
+ * renders it (`page.tsx:118`) — so on the trunk, where both arrived, all nine
+ * tests died on `invariant expected app router to be mounted` before a single
+ * assertion ran. Neither lane could see it; only the merge could.
+ *
+ * Same shape as `home/page.test.tsx`, including a `redirect` that THROWS the
+ * way Next's own does — a silent spy would let the page render on underneath
+ * the assertion.
+ */
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  redirect: vi.fn((to: string) => {
+    throw new Error(`NEXT_REDIRECT:${to}`)
+  }),
+}))
+
 const { default: LoopPage } = await import('./page')
 
 const snapshot = {
+  autopilotDailyCap: 3,
+  autopilotCancelMinutes: 30,
   enabled: true,
   paused: false,
   weeklyBudgetCredits: 150,
@@ -58,6 +80,54 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.clearAllMocks()
+})
+
+describe('the autopilot limits are on the screen', () => {
+  it('shows both figures, so nobody has to guess what autopilot promises', async () => {
+    // Until this landed, `autopilot_daily_cap` and `autopilot_cancel_minutes`
+    // had defaults of 3 and 30 and NOTHING in the product wrote or displayed
+    // them. Every workspace ran at two numbers no screen mentioned.
+    render(await LoopPage())
+
+    expect(screen.getByRole('heading', { name: /autopilot limits/i })).toBeInTheDocument()
+    expect(screen.getByDisplayValue('3')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('30')).toBeInTheDocument()
+  })
+
+  it('reads them from the snapshot rather than hard-coding the defaults', async () => {
+    loop.readLoop.mockResolvedValue({
+      status: 'ok',
+      snapshot: { ...snapshot, autopilotDailyCap: 7, autopilotCancelMinutes: 90 },
+    })
+
+    render(await LoopPage())
+
+    expect(screen.getByDisplayValue('7')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('90')).toBeInTheDocument()
+  })
+
+  it('knows a channel is armed from a level 3 in the dial', async () => {
+    loop.readLoop.mockResolvedValue({
+      status: 'ok',
+      snapshot: { ...snapshot, dial: new Map([['x', 3]]) },
+    })
+
+    render(await LoopPage())
+
+    // The armed copy, not the "nothing is set to" copy.
+    expect(screen.queryByText(/nothing is set to/i)).not.toBeInTheDocument()
+  })
+
+  it('does not call a supervised channel armed', async () => {
+    loop.readLoop.mockResolvedValue({
+      status: 'ok',
+      snapshot: { ...snapshot, dial: new Map([['x', 2]]) },
+    })
+
+    render(await LoopPage())
+
+    expect(screen.getByText(/nothing is set to/i)).toBeInTheDocument()
+  })
 })
 
 describe('the going-out section is mounted, in every state the read can answer', () => {
