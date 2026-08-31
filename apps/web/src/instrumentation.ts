@@ -23,6 +23,15 @@ import * as Sentry from '@sentry/nextjs'
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     await import('./sentry.server.config')
+
+    // The studio's typefaces, and the timing is the whole reason this line is
+    // HERE rather than inside the exporter. MEASURED: fontconfig reads its
+    // configuration once, on first use, so `FONTCONFIG_FILE` set after anything
+    // has rasterised is ignored (243.12936 before and after, same string).
+    // `register()` runs at server start, before any request. `fonts.ts` carries
+    // the full account and never throws.
+    const { registerStudioFonts } = await import('./lib/studio/fonts')
+    registerStudioFonts()
   }
 
   if (process.env.NEXT_RUNTIME === 'edge') {

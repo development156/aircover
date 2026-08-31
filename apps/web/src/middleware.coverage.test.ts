@@ -165,6 +165,12 @@ const EXPECTED_PUBLIC_EXCLUDED = new Set([
   // Authorization header and does not follow redirects, so without the exemption
   // every tick is a 307 to /sign-in that the heartbeat records as a run.
   '/api/cron/brain',
+  // Added 2026-08-30 with the autopilot tick. On the rail for the same reason
+  // as its five siblings, and this guard is one of the three that caught the
+  // schedule arriving without its exemption — the shape where the heartbeat
+  // reports green while every tick is a 307 and a customer who armed a channel
+  // watches nothing happen.
+  '/api/cron/autopilot',
   '/api/webhooks/cashfree',
   '/api/webhooks/clerk',
   // Added 2026-08-23. It arrived on `isPublicRoute` with the wt-webhooks merge and

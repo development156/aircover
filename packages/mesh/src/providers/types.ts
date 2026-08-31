@@ -95,14 +95,37 @@ export interface ImageRequest {
   prompt: string
   width: number
   height: number
+  /**
+   * Pictures to condition on, as data URLs or HTTP(S) URLs.
+   *
+   * The Images API takes these as `input_references`. Optional and absent by
+   * default, because most generations have none and an empty array is a
+   * different request from no field at all.
+   *
+   * Bounded by the MODEL, not by us: the capability endpoint reports a maximum
+   * per model (3 on Gemini 2.5 Flash Image, 14 on Seedream 4.5). A caller that
+   * sends more than a model accepts gets them silently dropped on some
+   * providers, so the caller checks rather than hoping.
+   */
+  references?: readonly string[]
 }
 
 export interface ImageResponse {
-  /** Raw base64, no data-URL prefix — the caller decides what to do with bytes. */
+  /** Raw base64, no data-URL prefix. The caller decides what to do with bytes. */
   base64: string
   /** What the provider CLAIMED. The caller sniffs the bytes and may disagree. */
   mime: string
   usage: ProviderUsage
+  /**
+   * WHAT THE GENERATION ACTUALLY COST, in US dollars, as the provider reports it.
+   *
+   * Absent when the provider did not say. That absence is load-bearing and must
+   * never be rendered as zero: `estimateCostUsd` applies CHAT token rates, which
+   * for a model billed per image produces a number nobody quoted. A margin
+   * figure read from an estimate is fiction, and this field exists so the real
+   * one can be stored instead (`studio_generations.provider_cost_micro_usd`).
+   */
+  costUsd?: number
 }
 
 export interface Provider {

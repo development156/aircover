@@ -83,7 +83,7 @@ export async function startPost(page: Page, channel: string): Promise<string> {
   await expect(page.locator('[data-composer]')).toBeVisible({ timeout: 60_000 })
   await page.locator(`[data-channel-tile="${channel}"]`).click()
   // The tick alone writes nothing now. Typing is what makes it a draft.
-  await page.getByLabel('Your post').fill(SEED_BODY)
+  await page.getByLabel('Your post', { exact: true }).fill(SEED_BODY)
   await page.waitForURL(/\/posts\/[0-9a-f-]{36}$/, { timeout: 60_000 })
 
   const postId = new URL(page.url()).pathname.split('/').pop() as string

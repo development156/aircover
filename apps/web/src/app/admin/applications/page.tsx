@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 
+import { PageTitle } from '@/components/page-title'
 import { ApplicationsView } from '@/components/admin/applications-view'
 import { requireOpsAdmin } from '@/lib/ops/guard'
 import { readApplications } from '@/lib/ops/read'
@@ -14,7 +15,10 @@ export default async function ApplicationsPage() {
   if (applications.status !== 'ok') {
     return (
       <div className="space-y-grid">
-        <h1 className="text-[25px] leading-8 font-extrabold tracking-[-0.01em]">Applications</h1>
+        {/* NO `sub` — the read failed, so there is no inbox to describe, and
+            "approving sends a Clerk invitation" would name a control this
+            branch does not render. */}
+        <PageTitle>Applications</PageTitle>
         <div
           role="alert"
           className="rounded-input border border-danger-bg bg-danger-bg px-3 py-2.5 text-[13px] text-danger"
@@ -31,12 +35,9 @@ export default async function ApplicationsPage() {
 
   return (
     <div className="space-y-grid">
-      <div>
-        <h1 className="text-[25px] leading-8 font-extrabold tracking-[-0.01em]">Applications</h1>
-        <p className="mt-1 text-[14px] text-muted">
-          Approving sends a Clerk invitation. Signing up needs one, so this list is the only way in.
-        </p>
-      </div>
+      <PageTitle sub="Approving sends a Clerk invitation. Signing up needs one, so this list is the only way in.">
+        Applications
+      </PageTitle>
 
       <ApplicationsView applications={applications.data} />
     </div>
