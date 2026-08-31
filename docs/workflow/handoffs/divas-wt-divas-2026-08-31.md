@@ -128,6 +128,26 @@ for the reason above.
    the end-to-end suite.
 2. **Promote `wt-core` → `wt-web`?** 49 commits, autopilot among them, still
    switched off by the flag.
-3. `DEVOPS_INGEST_TOKEN` returns 401, so the changelog dashboard sync is dead.
+3. ~~`DEVOPS_INGEST_TOKEN` returns 401~~ — **resolved, and the earlier claim was
+   wrong by the time it was written.** MEASURED this session: the sync posted,
+   the server acknowledged, and `ops-sync.mjs` drained both pending queues by
+   sent-count. `post()` returns null on any non-2xx and `if (!ack) return`
+   guards the drain, so a drained queue is proof the endpoint accepted the
+   POST. The printed `changelog 0 · qa 0` is `ack[k]`, what the server stored,
+   which is legitimately 0 for an idempotent re-send.
 4. The **Claude GitHub App is not installed** on this repository, so PR webhooks
    never arrive and no session is woken by CI.
+
+## The two pending queues are not one rule
+
+They look alike and are governed oppositely. I got this wrong twice in one
+session, so it is written down.
+
+| File | On a dirty tree | Why |
+| ---- | --------------- | --- |
+| `ops/state/changelog.pending.json` | **commit it** | Doc 13 sec 9.1: committed and reviewable in every PR. `ops-sync.mjs` drains it only after an ack, so a drained queue is proof the server stored those rows. |
+| `ops/state/qa.pending.json` | **revert it, always** | REQUESTS sec 18: the capture hook stamps every gate run with whatever card is open. It has been depositing `pass` and `fail` rows on SL-054, the card recording that production was down for 22h40m. |
+
+A pre-commit hook refuses the second and names the reason. It is the guard that
+caught this, and it worked. `ALLOW_QA_PENDING=1` exists only for a genuine change
+to that file's shape.
