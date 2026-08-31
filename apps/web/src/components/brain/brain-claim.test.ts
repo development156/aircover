@@ -28,6 +28,14 @@ import { describe, it, expect } from 'vitest'
  * nothing in the product makes that true. The companion assertion in
  * `packages/mesh` fails if a fifth task starts reading the brain, which is the
  * day this copy would need widening again.
+ *
+ * ── WHAT IT CANNOT SEE ───────────────────────────────────────────────────────
+ * It reads four NAMED files, so a fifth copy of the promise in a file this list
+ * does not carry passes untouched. It matches on the source text, so a sentence
+ * assembled from a template literal, split across an interpolation, or built by
+ * joining fragments reads as absent. And copy that does not live in source at
+ * all, a string from the database or from a tour definition, is outside it
+ * entirely.
  */
 
 const ROOT = join(__dirname, '../../')
