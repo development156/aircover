@@ -1,4 +1,4 @@
-import { expectPostSaved, leaveOnboarding } from './fixtures/compose'
+import { expectPostSaved, leaveOnboarding, dismissPlanOffer } from './fixtures/compose'
 import { expect, test } from './fixtures/seeded-user'
 
 /**
@@ -129,6 +129,7 @@ test.describe('golden path @smoke', () => {
     await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
     await leaveOnboarding(page)
     await page.goto('/home')
+    await dismissPlanOffer(page)
 
     // `—` is the honest "could not read" state. After a successful bootstrap the
     // balance IS readable, so an em dash here means the read broke.
