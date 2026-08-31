@@ -1,13 +1,4 @@
 {
   "version": 1,
-  "entries": [
-    {
-      "client_id": "cl-mtfrdv99-7b94e88",
-      "title": "Autopilot, ready and switched off",
-      "summary_plain": "Sahoda can now be set to post for you without asking, one channel at a time. It is switched off everywhere until someone turns it on, and it will refuse the setting until you have run one week yourself and confirmed your promise, your customer, your voice and your red lines. When it is on, the Loop screen shows anything about to go out and gives you a few minutes to stop each one.",
-      "kind": "added",
-      "task_codes": [],
-      "happened_at": "2026-08-30T12:01:27.165Z"
-    }
-  ]
+  "entries": []
 }
