@@ -248,6 +248,26 @@ under either name reaches the same repository. That is ruled OUT as a cause.
 reporting green, which is the failure mode that let twenty-six billing tests go
 unexecuted for months.
 
+## Files in the tree that are not mine
+
+At the end of this session the working tree held two modified files, both
+EMPTIED rather than edited:
+
+- `ops/state/changelog.pending.json` — lost its one queued entry, "Autopilot,
+  ready and switched off", which is another lane's work and arrived with the
+  `wt-core` merge.
+- `ops/state/qa.pending.json` — lost 163 queued QA runs (2,122 lines).
+
+MEASURED cause: the SessionStart ops hook reported `ops: synced ... changelog 0 ·
+qa 0`, so it drained both outbound queues to the board. That is its designed
+behaviour, not a defect, and neither file is this lane's work.
+
+**Both were restored to HEAD and NOT committed.** Committing an emptied queue
+would commit the drain of somebody else's changelog entry under a handoff
+message. If the board already took them, the `client_id` on each row is what
+prevents a double publish. `qa.pending.json` is refused by the pre-commit hook
+in any case (REQUESTS §18).
+
 ## Links
 
 - Lane preview: https://sahodalabs-git-wt-divas2-development-4417s-projects.vercel.app/studio
