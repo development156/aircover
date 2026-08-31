@@ -1,6 +1,8 @@
 'use client'
 
 import { useRef, useState, useTransition } from 'react'
+
+import { LOGO_FILE_ACCEPT } from '@/lib/brand/logo-accept'
 import { useRouter } from 'next/navigation'
 
 import { Button } from '@/components/ui/button'
@@ -378,7 +380,7 @@ export function BrandPanel({
            rasterises it and discards the vector. Without this line the dialog
            greys out the founder's own logo, which presents as the button doing
            nothing at all. */
-        accept="image/png,image/jpeg,image/webp,image/svg+xml"
+        accept={LOGO_FILE_ACCEPT}
         className="sr-only"
         onChange={(e) => {
           const file = e.target.files?.[0]
