@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 
-import { isoWeekOf, planningWeekFor, reflectionWindow } from './iso-week'
+import { isoWeekOf, isoWeekStart, planningWeekFor, reflectionWindow } from './iso-week'
 
 const at = (iso: string) => new Date(iso)
 
@@ -75,5 +75,48 @@ describe('reflectionWindow', () => {
     const a = reflectionWindow(at('2026-08-20T00:00:00Z'))
     const b = reflectionWindow(at('2026-08-20T23:59:59Z'))
     expect(a).toEqual(b)
+  })
+})
+
+/**
+ * The inverse, which shipped with no test at all until an audit said so.
+ *
+ * It decides the DATE RANGE printed on every weekly report card, so an off-by-one
+ * here labels a whole screen of real figures with the wrong seven days. Nothing
+ * else in the product would notice.
+ */
+describe('isoWeekStart', () => {
+  it('returns the Monday of the week it names', () => {
+    // ISO week 34 of 2026 starts Monday 17 August. Same week `isoWeekOf` reports
+    // for 20 August in the test at the top of this file.
+    expect(isoWeekStart(2026, 34).toISOString().slice(0, 10)).toBe('2026-08-17')
+  })
+
+  it('round trips against isoWeekOf across thirty-six years', () => {
+    // A property test rather than a handful of dates, because the failures worth
+    // catching all live at year boundaries and there are only a few dozen of
+    // those in a range this size. Every day from 1999 to 2035: the week a day
+    // falls in must start on or before that day, and within seven days of it.
+    let checked = 0
+    for (let ms = Date.UTC(1999, 0, 1); ms <= Date.UTC(2035, 11, 31); ms += 86_400_000) {
+      const day = new Date(ms)
+      const week = isoWeekOf(day)
+      const start = isoWeekStart(week.isoYear, week.isoWeek)
+      const offset = (ms - start.getTime()) / 86_400_000
+      expect(offset).toBeGreaterThanOrEqual(0)
+      expect(offset).toBeLessThanOrEqual(6)
+      // And the Monday it returns must belong to the week it was asked for.
+      expect(isoWeekOf(start)).toEqual(week)
+      checked += 1
+    }
+    expect(checked).toBeGreaterThan(13_000)
+  })
+
+  it('handles a 53-week year, where counting forward from 1 January is wrong', () => {
+    // 2020 has 53 ISO weeks. 1 January 2021 is a Friday and belongs to week 53
+    // OF 2020, which is the case a "day of year over seven" calculation gets
+    // wrong once a year, silently.
+    expect(isoWeekOf(new Date('2021-01-01T12:00:00Z'))).toEqual({ isoYear: 2020, isoWeek: 53 })
+    expect(isoWeekStart(2020, 53).toISOString().slice(0, 10)).toBe('2020-12-28')
   })
 })
