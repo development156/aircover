@@ -108,7 +108,7 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   {
     table: 'asset_logo_facts',
     readability: 'readable',
-    describes: 'what Sahoda measured about your logo file',
+    describes: 'what Sahoda measured about each logo you uploaded',
   },
   {
     table: 'asset_smart_folders',

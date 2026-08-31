@@ -37,8 +37,7 @@ const state = vi.hoisted(() => ({
   pointedRow: null as Record<string, unknown> | null,
   pointedError: null as { code: string } | null,
   signed: [{ id: 'asset-1', url: 'https://signed.test/logo.png' }] as
-    | { id: string; url: string | null }[]
-    | null,
+    { id: string; url: string | null }[] | null,
 }))
 
 vi.mock('@/lib/posts/media-url', () => ({

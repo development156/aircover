@@ -153,3 +153,63 @@ export async function expectPostSaved(page: Page): Promise<void> {
   await expect(page.getByText('Post not saved yet')).toBeVisible({ timeout: 15_000 })
   await expect(page.getByText('Post saved')).toBeVisible({ timeout: 60_000 })
 }
+
+/**
+ * CLOSE THE PLAN OFFER, THE WAY A PERSON DOES.
+ *
+ * ── WHY EVERY SPEC THAT MEASURES /home WITH A WORKSPACE NEEDS THIS ───────────
+ * `/home` opens the plans in a `<dialog>` for any workspace that is not on a
+ * paid plan, and every seeded account IS on Free — nothing writes a
+ * `subscriptions` row. A modal `<dialog>` renders in the browser's TOP LAYER and
+ * makes the rest of the document inert, so a spec that lands on the dashboard
+ * and reaches for a control finds it unclickable, and one that photographs the
+ * screen photographs the dialog. Neither failure names the dialog: the first
+ * reads as a broken selector and the second as a redesign.
+ *
+ * ── AND WHY IT PRESSES THE BUTTON RATHER THAN SEEDING THE FLAG ───────────────
+ * The dismissal is a `localStorage` key scoped to the Clerk session id, which a
+ * test cannot know before signing in — and reaching into storage to pre-set it
+ * would be a test disabling the feature rather than using the product. Pressing
+ * the X is what a customer does, it exercises the real dismissal path, and it
+ * leaves the same state behind. `leaveOnboarding` presses a real button for the
+ * same reason.
+ *
+ * A NO-OP when the offer is not there, so it is safe to call unconditionally:
+ * an account already on a plan, or one that has closed it earlier in the same
+ * test, simply has nothing to close. `e2e/plan-offer.spec.ts` has a test whose
+ * whole job is to prove this helper is not silently a no-op EVERYWHERE, which is
+ * the failure a permissive helper would otherwise hide.
+ */
+const offerDismissed = new WeakSet<Page>()
+
+export async function dismissPlanOffer(page: Page): Promise<void> {
+  /**
+   * ── ONCE PER PAGE, AND THE SECOND CALL IS FREE ───────────────────────────
+   * The dismissal is recorded in `localStorage` against the sign-in, so after
+   * the first close the dialog never opens again in this context — and every
+   * later call then sat through the FULL wait below before giving up.
+   * `shell-widths.spec.ts` calls this once per width per account state, so a
+   * spec that dismisses once was paying roughly 165 seconds to wait for a
+   * dialog that could not appear. A longer spec is a flakier spec, and that is
+   * how a helper meant to steady the suite ends up destabilising it.
+   */
+  if (offerDismissed.has(page)) return
+
+  const offer = page.getByRole('dialog').filter({ hasText: 'Choose the right plan for you' })
+  try {
+    /**
+     * FIFTEEN SECONDS, not five. The dialog cannot open until Clerk's client SDK
+     * has resolved a session id, and on a cold route compile or under the 4x CPU
+     * throttle `ux-j5-phone` applies, five seconds is not a safe budget. This
+     * helper's failure mode is SILENCE — it gives up and reports success — so
+     * the budget has to be one the dialog cannot lose to, or the specs that call
+     * it go green with the offer still on screen.
+     */
+    await offer.waitFor({ state: 'visible', timeout: 15_000 })
+  } catch {
+    return
+  }
+  await offer.getByRole('button', { name: 'Close' }).click()
+  await offer.waitFor({ state: 'hidden', timeout: 10_000 })
+  offerDismissed.add(page)
+}

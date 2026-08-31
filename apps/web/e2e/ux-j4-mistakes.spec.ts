@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 import type { Page } from '@playwright/test'
 
 import { adminClient, expect, signInSecondContext, test } from './fixtures/seeded-user'
-import { leaveOnboarding } from './fixtures/compose'
+import { leaveOnboarding, dismissPlanOffer } from './fixtures/compose'
 import { framesTaken, shot, timedGoto, useTheme, type Theme } from './helpers/ux-shot'
 
 /**
@@ -352,6 +352,7 @@ for (const { width, theme } of COMBOS) {
         await home.click().catch(() => {})
       } else {
         await page.goto('/home')
+        await dismissPlanOffer(page)
       }
       await page.waitForTimeout(2500)
       await shot(page, { journey: JOURNEY, stop: 'E1-left-mid-edit', width, theme })
