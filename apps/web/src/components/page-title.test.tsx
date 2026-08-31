@@ -73,3 +73,84 @@ describe('PageTitle', () => {
     expect(trailed.firstElementChild!.className).toContain('min-w-0')
   })
 })
+
+/**
+ * ── THE ACTIONS SLOT ─────────────────────────────────────────────────────────
+ * Three screens built the title-plus-action row by hand before this prop
+ * existed, and they had already drifted apart: /campaigns aligned it with
+ * `items-start`, /posts with `items-center`, and /assets nested the title inside
+ * a second wrapper so its description was a sibling of the heading rather than
+ * the component's own `sub`. The prop exists so the row is one decision.
+ *
+ * The assertions below are mostly about the case that did NOT change, for the
+ * same reason the `min-w-0` guard above is: forty-two of the forty-five call
+ * sites pass no action, and a wrapper added unconditionally would be a layout
+ * change on every one of them that no test on those screens would see.
+ */
+describe('PageTitle actions', () => {
+  it('puts the action on the title row', () => {
+    render(
+      <PageTitle sub="A sentence." actions={<button type="button">Create post</button>}>
+        Posts
+      </PageTitle>,
+    )
+
+    expect(screen.getByRole('button', { name: 'Create post' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Posts')
+  })
+
+  it('adds no wrapper to the forty-two call sites that pass no action', () => {
+    // ── THIS ASSERTION WAS ONCE A GUARD THAT DID NOT BITE ─────────────────
+    // It read `.className).not.toContain('justify-between')`, and an
+    // adversarial pass showed that a DIFFERENT wrapper —
+    // `<div className="flex flex-col gap-3">{block}</div>` — added to all
+    // forty-two no-action call sites left every test in this file green. The
+    // assertion named the right defect and checked one spelling of it.
+    //
+    // The claim is "the heading block is the OUTERMOST element", so that is
+    // what is asserted now: the `<h1>` must be a DIRECT child of the first
+    // element in the container. Any wrapper of any class fails it.
+    const { container: plain } = render(<PageTitle sub="A sentence.">Wallet</PageTitle>)
+    expect(plain.firstElementChild!.querySelector(':scope > h1')).not.toBeNull()
+    expect(plain.firstElementChild!.className).not.toContain('justify-between')
+
+    const { container: acted } = render(
+      <PageTitle actions={<button type="button">Go</button>}>Wallet</PageTitle>,
+    )
+    expect(acted.firstElementChild!.className).toContain('justify-between')
+    // And in the acted case the h1 is deliberately NOT a direct child — it is
+    // one level down, inside the block. Asserting both directions is what makes
+    // the check above a statement about structure rather than about a class.
+    expect(acted.firstElementChild!.querySelector(':scope > h1')).toBeNull()
+  })
+
+  it('renders no action row when the screen passes null', () => {
+    // Every one of the three call sites passes a CONDITIONAL: the empty state
+    // owns the create affordance when there is nothing to list, so the slot is
+    // handed `null` on exactly the screens where a second primary would be the
+    // bug. `null` must behave as "no action", not as "an empty action row".
+    const { container } = render(<PageTitle actions={null}>Posts</PageTitle>)
+    expect(container.firstElementChild!.className).not.toContain('justify-between')
+  })
+
+  it('lets an action carry its own narrow-width rule', () => {
+    // /assets passes a child with `max-narrow:w-full`, which was a direct flex
+    // child of the row before this slot existed. A `flex-none` box around it
+    // resolves that `w-full` against a content-width box instead of the row.
+    // MEASURED on a 390px fixture: 439px of content in a 390px row, an overflow
+    // of 49px, gone when the box carries the rule itself and stays shrinkable.
+    const { container } = render(
+      <PageTitle actions={<button type="button">Add photos</button>}>Assets</PageTitle>,
+    )
+    const slot = container.firstElementChild!.lastElementChild!
+    expect(slot.className).toContain('max-narrow:w-full')
+    expect(slot.className).not.toContain('flex-none')
+  })
+
+  it('holds the description to a readable measure', () => {
+    // 70ch on a 1320px band. Without it /admin/brain's three-sentence
+    // description sets as one full-width line.
+    render(<PageTitle sub="A sentence.">Wallet</PageTitle>)
+    expect(screen.getByText('A sentence.').className).toContain('max-w-[70ch]')
+  })
+})

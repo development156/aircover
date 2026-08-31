@@ -219,6 +219,16 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { table: 'sites', readability: 'readable', describes: 'your websites' },
   { table: 'studio_designs', readability: 'readable', describes: 'the designs you made in Studio' },
   {
+    table: 'studio_generations',
+    readability: 'readable',
+    describes: 'every picture you asked Studio to make, what you typed, and what it cost',
+  },
+  {
+    table: 'studio_generation_images',
+    readability: 'readable',
+    describes: 'the pictures Studio produced and which file in your library each one became',
+  },
+  {
     table: 'studio_exports',
     readability: 'readable',
     // NOT "your exported pictures". The pictures themselves are rows in
