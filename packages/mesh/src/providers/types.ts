@@ -108,6 +108,15 @@ export interface ImageRequest {
    * providers, so the caller checks rather than hoping.
    */
   references?: readonly string[]
+  /**
+   * The model the CALLER asked for, before the router has vetted it.
+   *
+   * Not necessarily the model that will be used: `planImage` checks it against
+   * `ALLOWED_IMAGE_MODELS` and falls back to the tier's default for anything
+   * else. It rides on the request so the engine can hand it to the router
+   * without a second parameter on every call site.
+   */
+  modelId?: string
 }
 
 export interface ImageResponse {
