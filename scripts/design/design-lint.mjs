@@ -74,6 +74,16 @@ const HEX_EXEMPT_FILES = [
      anything. The app-facing half of this feature, `your-data-panel.tsx`, uses
      tokens and stays enforced. */
   'lib/privacy/readable.ts',
+  /* The logo stamp's PLATE COLOUR. Same class as the colour picker above: the
+     plate is a value the customer chooses for a logo they upload, not styling
+     this product applies. `stamp.ts` carries one hex and it is inside an error
+     message that teaches the format — "must be six hex digits such as #ffffff"
+     — which cannot be written as a token without ceasing to say what it means.
+     `stamp.test.ts` pins a magenta chosen precisely because no fixture could
+     produce it by accident, so the test proves the plate was applied rather
+     than inferred. Nothing in either file paints any part of this interface. */
+  'lib/studio/stamp.ts',
+  'lib/studio/stamp.test.ts',
 ]
 
 /* ── ALLOWLIST 2 · platform brand marks ───────────────────────────────────────
