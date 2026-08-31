@@ -29,11 +29,13 @@ import { describe, it, expect } from 'vitest'
  * where the reconciliation gets decided rather than assumed.
  *
  * ── WHAT IT CANNOT SEE ───────────────────────────────────────────────────────
- * It greps for the column NAMES, which is exactly the defect this repository has
- * shipped before. A `select('*')` names no column and reads all three. So does
- * raw SQL inside a Postgres function, an RPC, and a dynamic access like
- * `row[field]` where the key arrives at runtime. It is blind to every one of
- * those, and to anything outside the paths it greps.
+ * It greps for the three column NAMES under `apps/web/src`, so every way of
+ * reading a column without naming it is invisible to it. `select('*')` returns
+ * `regime` and nothing in the source says so. A Postgres function called through
+ * an RPC reads the column inside SQL this scan never opens. A name built by
+ * interpolation is three characters the pattern does not match. And the search
+ * stops at this app: `apps/jobs` and `packages/*` could read all three today and
+ * this test would stay green.
  */
 
 const WEB = join(__dirname, '../../../')

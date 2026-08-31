@@ -8,6 +8,8 @@ import { cycleCost } from '@/lib/loop/cost'
 // comments too — and would have matched the example.)
 import { credits } from '@/lib/credit-words'
 
+import { LOOP_SCHEDULE_PHRASE } from './schedule'
+
 /**
  * WHY THE LOOP WILL NOT PLAN FOR A WORKSPACE — one named cause, never a boolean.
  *
@@ -356,7 +358,9 @@ function explainArmed(verdict: LoopVerdict): string {
   }
   switch (verdict.reason) {
     case 'never_enabled':
-      return 'Turn the Loop on and Sahoda will plan your week every Sunday.'
+      // The day comes from the deployment's cron, never typed here. Moving the
+      // schedule used to leave this sentence naming the old day for ever.
+      return `Turn the Loop on and Sahoda will plan your week ${LOOP_SCHEDULE_PHRASE}.`
     case 'paused':
       return 'The Loop is paused. Resume it and Sahoda will plan your next week.'
     case 'no_channel':

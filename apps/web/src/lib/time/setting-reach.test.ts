@@ -23,11 +23,13 @@ import { describe, it, expect } from 'vitest'
  * must go on having one.
  *
  * ── WHAT IT CANNOT SEE ───────────────────────────────────────────────────────
- * It reads source, so it proves the sentence and the reader EXIST, never that
- * the reader runs: a zone read behind a branch nothing reaches would satisfy it.
- * A claim built by interpolation, or moved into a component this file does not
- * name, reads as absent. And it cannot tell whether the reach the sentence
- * describes is the reach the code actually has, only that both are non-empty.
+ * It reads ONE file as text — the settings page — so it is blind to the same
+ * two sentences moving anywhere else. Lift them into a child component, a shared
+ * copy constant or a template literal and both assertions go on passing against
+ * a page that no longer contains either half. It also cannot see a SECOND
+ * surface making the same promise, and it cannot see the reach itself: it checks
+ * that the page names Posts and Planner, never that Posts and Planner still read
+ * the column.
  */
 
 const WEB = join(__dirname, '../../')
