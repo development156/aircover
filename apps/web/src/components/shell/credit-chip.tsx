@@ -100,7 +100,7 @@ export function CreditChip({ balance }: { balance: BalanceRead }) {
       aria-live="polite"
       aria-label={content.label}
       className={cn(
-        'flex flex-none items-center gap-[7px] rounded-pill border-[1.5px] border-primary bg-bg px-[13px] py-1.5 font-semibold whitespace-nowrap transition-micro hover:bg-tint-50 active:scale-[.97] max-narrow:min-h-[44px] dark:hover:bg-s2',
+        'flex h-control flex-none items-center gap-[7px] rounded-pill border-[1.5px] border-primary bg-bg px-[13px] font-semibold whitespace-nowrap transition-micro hover:bg-tint-50 active:scale-[.97] max-narrow:h-11 dark:hover:bg-s2',
         hideOnNarrow && 'max-narrow:hidden',
       )}
     >

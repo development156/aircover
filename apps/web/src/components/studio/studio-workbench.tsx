@@ -14,6 +14,7 @@ const DrawModal = dynamic(() =>
   import('@/components/studio/draw-modal').then((mod) => mod.DrawModal),
 )
 
+import { ModelPicker } from '@/components/studio/model-picker'
 import { PictureActions } from '@/components/studio/picture-actions'
 import { PictureViewer } from '@/components/studio/picture-viewer'
 import { ReferenceUpload } from '@/components/studio/reference-upload'
@@ -29,6 +30,7 @@ import {
   readyModes,
   ruleFor,
 } from '@/lib/studio/modes'
+import { defaultModelId, modelById } from '@/lib/studio/models'
 import type { LibraryPicture } from '@/lib/studio/read'
 import { PROMPT_STARTERS } from '@/lib/studio/prompt'
 import { describeInsufficient, describePartial } from '@/lib/studio/refusal-copy'
@@ -72,6 +74,7 @@ export function StudioWorkbench({
   const [formatId, setFormatId] = useState(formats[0]?.id ?? '')
   const [picked, setPicked] = useState<string[]>([])
   const [count, setCount] = useState(1)
+  const [modelId, setModelId] = useState(defaultModelId)
   const [note, setNote] = useState<string | null>(null)
   const [short, setShort] = useState(false)
   const [made, setMade] = useState(false)
@@ -88,10 +91,10 @@ export function StudioWorkbench({
    */
   const active = pictures.find((one) => one.imageId === activeId) ?? pictures[0] ?? null
 
-  const rule = ruleFor(mode)
+  const rule = ruleFor(mode, modelId)
   const chosen = formats.find((f) => f.id === formatId) ?? null
   // Asked, never re-derived. See this file's header.
-  const blocked = describeModeBlock({ mode, references: picked.length })
+  const blocked = describeModeBlock({ mode, references: picked.length, modelId })
   const ready = wanted.trim().length >= 3 && chosen !== null && blocked === null
 
   /**
@@ -126,7 +129,7 @@ export function StudioWorkbench({
     }
 
     if (picked.length >= rule.maxReferences) {
-      setNote(describeModeBlock({ mode, references: picked.length + 1 }))
+      setNote(describeModeBlock({ mode, references: picked.length + 1, modelId }))
       return
     }
     setPicked((current) => [...current, assetId])
@@ -137,7 +140,7 @@ export function StudioWorkbench({
     setMode(next)
     // Explore is unconditioned by definition, so keeping references selected
     // would leave a contradiction on screen that the person did not create.
-    if (ruleFor(next).maxReferences === 0) setPicked([])
+    if (ruleFor(next, modelId).maxReferences === 0) setPicked([])
   }
 
   /**
@@ -156,7 +159,7 @@ export function StudioWorkbench({
     setNote(null)
     setWanted(picture.prompt)
     setMode(picture.mode)
-    setPicked(picture.referenceAssetIds.slice(0, ruleFor(picture.mode).maxReferences))
+    setPicked(picture.referenceAssetIds.slice(0, ruleFor(picture.mode, modelId).maxReferences))
     if (picture.formatId !== null && formats.some((one) => one.id === picture.formatId)) {
       setFormatId(picture.formatId)
     }
@@ -172,6 +175,7 @@ export function StudioWorkbench({
         formatId,
         referenceAssetIds: picked,
         count,
+        modelId,
       })
       if (result.ok) {
         setMade(true)
@@ -250,10 +254,30 @@ export function StudioWorkbench({
           </div>
         ) : null}
 
+        {/* ── ABOVE THE MODES, BECAUSE IT CHANGES WHAT THEY CAN DO ─────────
+            Picking a model that draws a whole set in one call is what makes "a
+            set that matches" appear at all, and it moves the reference limit
+            from three to fourteen. A control that changes the options below it
+            belongs above them. */}
+        <ModelPicker
+          modelId={modelId}
+          onChoose={(next) => {
+            setNote(null)
+            setModelId(next)
+            // Trimmed to what the NEW model will look at. Carrying eight
+            // references onto a model that takes three would send a request the
+            // action refuses, after the person had already chosen them.
+            setPicked((current) => current.slice(0, ruleFor(mode, next).maxReferences))
+            // And off a mode the new model cannot do. Leaving somebody on a
+            // greyed-out Series is a dead end they did not create.
+            if (!ruleFor(mode, next).ready) setMode('on_brand')
+          }}
+        />
+
         <fieldset className="flex flex-col gap-2">
           <legend className="type-sm text-muted">How should Sahoda approach it?</legend>
           <div className="grid gap-2 narrow:grid-cols-3 max-narrow:grid-cols-1">
-            {readyModes().map((option) => (
+            {readyModes(modelId).map((option) => (
               <button
                 key={option.mode}
                 type="button"

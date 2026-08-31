@@ -12,6 +12,8 @@ import {
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
+import { isOfferedForConnect } from '@/lib/connections/offer'
+
 import { ChannelMark } from './channel-mark'
 import { CHANNEL_LABELS } from './channel-label'
 
@@ -76,11 +78,37 @@ export function ChannelPicker({
     onChange(toChannelSet(next))
   }
 
+  /**
+   * The channels this picker OFFERS, which is not every channel the product
+   * supports.
+   *
+   * ── REPORTED FROM THE SCREEN, AND IT IS THE SECOND HALF OF AN OLD FIX ──────
+   * `/connections` stopped offering Telegram, TikTok and Slack. This picker
+   * kept mapping over the whole `ChannelSchema`, so the composer went on
+   * offering Telegram as somewhere a post could go — for an account nobody can
+   * connect. Both screens ask "where should this go?" and only one of them had
+   * been told the answer had changed.
+   *
+   * ── AND IT WITHHOLDS FROM THE OFFER ONLY, NEVER FROM A CHOICE ALREADY MADE ─
+   * A post that already carries Telegram keeps its chip and can still be
+   * unticked. Dropping it would silently rewrite somebody's saved post the
+   * moment they opened it: the chip would vanish while the row still said
+   * telegram, and the next save would write a set the person never chose. That
+   * is the same rule `/connections` follows for a channel a workspace already
+   * linked, stated in `offer.ts` — govern the offer, not what exists.
+   *
+   * So take an id out of `HIDDEN_FROM_OFFER` and its chip comes straight back
+   * here too, with no change to this file.
+   */
+  const offered = ChannelSchema.options.filter(
+    (channel) => isOfferedForConnect(channel) || selected.includes(channel),
+  )
+
   return (
     <div className="space-y-2" data-guide="post-channels">
       {hideLabel ? null : <Label>Channels</Label>}
       <div className="flex flex-wrap gap-1.5">
-        {ChannelSchema.options.map((channel) => {
+        {offered.map((channel) => {
           const isOn = selected.includes(channel)
           return (
             <button

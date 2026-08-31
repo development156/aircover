@@ -112,7 +112,10 @@ export interface MeshRunnerDeps {
    * is not configured, and `runImage` then fails honestly rather than reaching for
    * a text model that would return a paragraph describing a picture.
    */
-  planImage?: (tier: ModelTier) => { provider: Provider; model: string } | undefined
+  planImage?: (
+    tier: ModelTier,
+    requested?: string,
+  ) => { provider: Provider; model: string } | undefined
 }
 
 export type MeshResult<O> = (
@@ -499,7 +502,7 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
     req: Omit<ImageRequest, 'model'>,
     ctx: MeshContext,
   ): Promise<MeshResult<{ base64: string; mime: string; providerCostUsd?: number }>> {
-    const planned = deps.planImage?.(def.tier)
+    const planned = deps.planImage?.(def.tier, req.modelId)
     if (!planned?.provider.image) {
       await writeLog(toLogRow(def, ctx, undefined, 'error', 'NO_IMAGE_PROVIDER', false))
       return {

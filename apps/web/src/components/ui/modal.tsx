@@ -29,6 +29,7 @@ export function Modal({
   children,
   footer,
   className,
+  busy = false,
 }: {
   open: boolean
   onClose: () => void
@@ -38,6 +39,25 @@ export function Modal({
   children: React.ReactNode
   footer?: React.ReactNode
   className?: string
+  /**
+   * Work is in flight and this dialog must not be dismissed.
+   *
+   * ── WHY THIS HAD TO LIVE HERE ────────────────────────────────────────────
+   * A call site can disable its own Cancel button, and the delete dialog did.
+   * It cannot disable the two doors this component owns: the X above and the
+   * native Escape key. An audit walked through both — press Escape after
+   * confirming a delete and the dialog vanished while the request kept running,
+   * then a "Deleted the post." toast arrived over a page that had already moved
+   * on. A dialog that decides a person may not back out mid-flight has to close
+   * every exit, not the one it renders itself.
+   *
+   * Escape is refused through the `cancel` event rather than by swallowing a
+   * keydown: `cancel` is the platform's own "the user asked to dismiss this"
+   * signal, and `preventDefault` on it is the platform's own way to say no.
+   *
+   * Defaults false, so all fifteen existing call sites are unchanged.
+   */
+  busy?: boolean
 }) {
   const ref = useRef<HTMLDialogElement>(null)
   /**
@@ -70,6 +90,19 @@ export function Modal({
     return () => el.removeEventListener('close', handle)
   }, [onClose])
 
+  // Escape, refused while busy. Without this the ELEMENT closes and the parent's
+  // `open` stays true, which is worse than either: an invisible dialog that the
+  // effect above will not reopen, because `open` never changed.
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const handle = (event: Event) => {
+      if (busy) event.preventDefault()
+    }
+    el.addEventListener('cancel', handle)
+    return () => el.removeEventListener('cancel', handle)
+  }, [busy])
+
   return (
     <dialog
       ref={ref}
@@ -77,6 +110,7 @@ export function Modal({
       // A click that lands on the DIALOG itself is a click on the backdrop:
       // the panel below stops propagation, so this cannot fire from inside.
       onClick={(e) => {
+        if (busy) return
         if (e.target === ref.current) onClose()
       }}
       className={cn(
@@ -134,8 +168,9 @@ export function Modal({
           <button
             type="button"
             onClick={onClose}
+            disabled={busy}
             aria-label="Close"
-            className="grid size-8 flex-none place-items-center rounded-sm text-muted transition-micro hover:bg-s2 hover:text-ink max-narrow:size-11"
+            className="grid size-8 flex-none place-items-center rounded-sm text-muted transition-micro hover:bg-s2 hover:text-ink disabled:pointer-events-none disabled:opacity-50 max-narrow:size-11"
           >
             <X size={16} aria-hidden />
           </button>
