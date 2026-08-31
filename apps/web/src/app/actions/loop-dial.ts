@@ -6,11 +6,16 @@ import {
   AutonomyLevelSchema,
   ChannelSchema,
   DEFAULT_WEEKLY_BUDGET_CREDITS,
+  MAX_AUTOPILOT_CANCEL_MINUTES,
+  MAX_AUTOPILOT_DAILY_CAP,
   MAX_WEEKLY_BUDGET_CREDITS,
+  MIN_AUTOPILOT_CANCEL_MINUTES,
+  MIN_AUTOPILOT_DAILY_CAP,
 } from '@sahoda/shared'
 
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
+import { autopilotRefusalMessage } from '@/lib/loop/autopilot-refusal-copy'
 import { workspaceForWrite } from '@/lib/workspaces'
 import { credits } from '@/lib/credit-words'
 
@@ -24,13 +29,23 @@ import { credits } from '@/lib/credit-words'
  * them through an owner connection would make a settings form one of the few
  * places in this app that bypasses the security model.
  *
- * ── L3 IS REFUSED THREE TIMES OVER ───────────────────────────────────────────
- * `AutonomyLevelSchema` accepts 0, 1 and 2 — a 3 fails here, before a request is
- * made. The column's check constraint refuses it if it somehow arrives. And the
- * screen renders L3 as text rather than as a control. Three refusals because
- * they fail in different places: this one gives a readable message, the
- * constraint catches anything that skips this function entirely, and the screen
- * stops anyone trying.
+ * ── L3 IS ACCEPTED HERE AND ADJUDICATED BY THE DATABASE ──────────────────────
+ * `AutonomyLevelSchema` now admits 3, and the trigger in
+ * `20260828120000_loop_autopilot_l3.sql` is what decides whether this workspace
+ * may have it. That split is deliberate: the preconditions are facts about rows
+ * (a supervised cycle that reached 'reported', a Brand Brain with four fields
+ * confirmed) and re-deriving them in TypeScript would be a second opinion that
+ * can disagree with the one that actually governs the write.
+ *
+ * ── SO THE THREE REFUSALS MUST BECOME SENTENCES SOMEBODY WROTE ───────────────
+ * The trigger raises AUTOPILOT_NEEDS_SUPERVISED_CYCLE, AUTOPILOT_NEEDS_BRAIN
+ * and AUTOPILOT_BRAIN_UNCONFIRMED. `AutonomyLevelSchema`'s own header warns
+ * that letting a value reach the database and surface as a raw constraint
+ * violation is the defect to avoid, and opening the union is exactly what would
+ * have caused it. `autopilotRefusalMessage` below is the other half of that
+ * change: every named refusal gets a sentence that says what is missing and
+ * what to do, and an unrecognised one falls back to a sentence that does not
+ * pretend to know which.
  */
 
 export interface DialState {
@@ -53,15 +68,7 @@ export async function setChannelAutonomy(channel: unknown, level: unknown): Prom
 
     const parsedLevel = AutonomyLevelSchema.safeParse(level)
     if (!parsedLevel.success) {
-      // The specific copy matters: someone who tried to select autopilot should
-      // be told it is not built, not that their input was malformed.
-      return {
-        ok: false,
-        message:
-          level === 3
-            ? 'Autopilot is not built yet. Sahoda will not publish without asking.'
-            : 'Pick a level between suggest and approve-to-publish.',
-      }
+      return { ok: false, message: 'Pick a level between suggest and autopilot.' }
     }
 
     const supabase = createServerSupabase()
@@ -74,7 +81,14 @@ export async function setChannelAutonomy(channel: unknown, level: unknown): Prom
       },
       { onConflict: 'workspace_id,channel' },
     )
-    if (error) return { ok: false, message: 'Could not save that. Try again.' }
+    if (error) {
+      // A named refusal is an answer, not a fault. It must reach the person
+      // ahead of the generic sentence, which would otherwise tell somebody to
+      // "try again" at a write the database will refuse every time.
+      const named = autopilotRefusalMessage(`${error.message} ${error.details ?? ''}`)
+      if (named) return { ok: false, message: named }
+      return { ok: false, message: 'Could not save that. Try again.' }
+    }
 
     revalidatePath('/loop')
     return { ok: true }
@@ -87,6 +101,8 @@ export async function setChannelAutonomy(channel: unknown, level: unknown): Prom
 export async function setLoopSettings(input: {
   paused?: unknown
   weeklyBudgetCredits?: unknown
+  autopilotDailyCap?: unknown
+  autopilotCancelMinutes?: unknown
 }): Promise<DialState> {
   let workspaceId: string | undefined
   try {
@@ -112,6 +128,40 @@ export async function setLoopSettings(input: {
         }
       }
       patch.weekly_budget_credits = n
+    }
+
+    // ── THE TWO AUTOPILOT PROMISES ──────────────────────────────────────────
+    // Bounded here as well as in their columns, for the same reason as the
+    // budget above: a value past the end must read as a sentence rather than as
+    // a constraint violation. The bounds come from @sahoda/shared, so the form,
+    // this check and the column cannot drift apart.
+    //
+    // A cap of 0 is a real choice, not an empty field — it means autopilot may
+    // announce nothing today — so `Number()` and an integer check are used
+    // rather than any truthiness test.
+    if (input.autopilotDailyCap !== undefined) {
+      const n = Number(input.autopilotDailyCap)
+      if (!Number.isInteger(n) || n < MIN_AUTOPILOT_DAILY_CAP || n > MAX_AUTOPILOT_DAILY_CAP) {
+        return {
+          ok: false,
+          message: `Pick how many posts a day, between ${MIN_AUTOPILOT_DAILY_CAP} and ${MAX_AUTOPILOT_DAILY_CAP}.`,
+        }
+      }
+      patch.autopilot_daily_cap = n
+    }
+    if (input.autopilotCancelMinutes !== undefined) {
+      const n = Number(input.autopilotCancelMinutes)
+      if (
+        !Number.isInteger(n) ||
+        n < MIN_AUTOPILOT_CANCEL_MINUTES ||
+        n > MAX_AUTOPILOT_CANCEL_MINUTES
+      ) {
+        return {
+          ok: false,
+          message: `Pick how long you get to stop a post, between ${MIN_AUTOPILOT_CANCEL_MINUTES} minutes and ${MAX_AUTOPILOT_CANCEL_MINUTES / 60} hours.`,
+        }
+      }
+      patch.autopilot_cancel_minutes = n
     }
 
     const supabase = createServerSupabase()

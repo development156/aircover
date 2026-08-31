@@ -26,6 +26,12 @@ export const SURFACE_RGB: Rgb = { r: 255, g: 255, b: 255 }
 export const INK_RGB: Rgb = { r: 0, g: 0, b: 0 }
 
 const MIN_CONTRAST = 4.5
+/**
+ * WCAG 1.4.11: the boundary of a user-interface component needs 3:1 against
+ * what is behind it. Lower than the text bar on purpose — this is about seeing
+ * the control at all, not reading words on it.
+ */
+const MIN_SHAPE_CONTRAST = 3
 const DARKEN_STEP = 0.03
 const MAX_DARKEN_ITERATIONS = 32
 
@@ -110,12 +116,50 @@ const SURFACES: Record<SkinSurface, SurfaceSpec> = {
  * button; too much and a neon logo gives an interface that glows. The band
  * keeps the colour recognisably theirs without either failure.
  *
- * Lightness is NOT clamped here, deliberately: the guard below moves it until
- * the contrast is real, which is a stronger statement than a band, and a band
- * applied first would only give the guard less room.
+ * ── LIGHTNESS IS NOT CLAMPED HERE, AND THE REASON WAS WRONG ONCE ────────────
+ * The founder's research also asked for a lightness BAND, 45–60%. This comment
+ * used to decline it: "the guard below moves it until the contrast is real,
+ * which is a stronger statement than a band."
+ *
+ * The claim was right about bands and wrong about the guard. The guard measured
+ * TEXT AGAINST THE FILL and nothing else, so a label could be perfectly legible
+ * on a button that was the same colour as the page behind it. MEASURED, fill
+ * against page, with every other check passing: navy on dark **1.02:1**, deep
+ * purple **1.09:1**, lime on light **1.22:1**, yellow **1.41:1**.
+ *
+ * `guardPrimaryForeground` now measures that pair too, at WCAG 1.4.11's 3:1.
+ * So the original sentence is finally true rather than merely confident: the
+ * guard moves lightness until BOTH contrasts are real, which is strictly better
+ * than a fixed band because it adapts to the surface and to the hue. A band
+ * would refuse a deep navy that a dark theme can actually carry, and admit a
+ * yellow that a white page cannot.
  */
 const MIN_BRAND_CHROMA = 0.03
 const MAX_BRAND_CHROMA = 0.16
+
+/**
+ * Can this colour actually become a brand, or will it fall back to ours?
+ *
+ * ── WHY THIS IS EXPORTED ────────────────────────────────────────────────────
+ * MEASURED on the founder's own logo, which is grey, white and black: the panel
+ * offered five swatches and every one of them had chroma 0.0000, so every one
+ * fell through `guardedInput` to Sahoda orange. Five choices, five no-ops, and
+ * a panel that then announced "your brand colours are on" while the product was
+ * painted in ours.
+ *
+ * `no-impossible-remedy.spec.ts` exists in this repository because offering an
+ * action that cannot work is a defect of its own. The panel therefore asks this
+ * question BEFORE it draws a swatch, and the answer comes from the same constant
+ * the derivation uses rather than a second copy of the rule that could drift.
+ */
+export function isUsableBrandColor(css: string): boolean {
+  try {
+    const { c } = parseOklch(css)
+    return Number.isFinite(c) && c >= MIN_BRAND_CHROMA
+  } catch {
+    return false
+  }
+}
 
 function guardedInput(input: { l: number; c: number; h: number }): {
   l: number
@@ -164,6 +208,106 @@ function readableBlack(): string {
   return formatOklch(0, 0, 0)
 }
 
+/**
+ * ── THE NEUTRALS, TINTED — DESIGN SYSTEM §2 UNFROZEN ────────────────────────
+ * Founder's ruling, 2026-08-30, unfreezing the neutral tokens for this and
+ * nothing else.
+ *
+ * WHY IT WAS NEEDED. MEASURED: brand colour reaches under 0.5% of the pixels on
+ * any screen — 666 to 5,594 px² of a 1.3M px² frame — and two guards
+ * (`accent-area-budget`, `accent-budget`) keep it there on purpose. So switching
+ * Brand Skin on recoloured one button and a nav item, and the founder's verdict
+ * was that it "feels like a pathetic failed attempt". He was right: the feature
+ * could not deliver its promise from 0.5% of the frame however correct the
+ * derivation was.
+ *
+ * WHY IT IS SAFE, AND WHY THAT IS NOT AN ASSUMPTION. Only the CHROMA of each
+ * neutral moves; its lightness is read from `tokens.css` and re-emitted
+ * unchanged. A hue at this chroma is a whisper — the founder's research calls it
+ * "inject base hue into neutrals … makes the interface look cohesive and
+ * premium" — and it cannot restratify the tonal ladder, because the ladder is
+ * built from lightness.
+ *
+ * It is NOT, however, free: WCAG relative luminance is computed from sRGB and is
+ * not the same function as OKLCH lightness, so adding chroma at fixed L moves
+ * the contrast ratio slightly. `brand-neutrals.test.ts` measures that drift on
+ * every pair this product actually paints and holds it to a bound. The chroma
+ * constant below was chosen FROM that measurement rather than picked.
+ *
+ * The accent budget is untouched. This does not make the product louder; it
+ * makes its quiet parts belong to the customer.
+ */
+export type BrandNeutralVars = Record<
+  '--canvas' | '--surface' | '--surface-2' | '--surface-3' | '--line',
+  string
+>
+
+/** Mirrors tokens.css. `guard-neutrals.test.ts` reads the real file. */
+const NEUTRAL_STOPS: Record<SkinSurface, Record<keyof BrandNeutralVars, Rgb>> = {
+  light: {
+    '--canvas': { r: 250, g: 250, b: 250 },
+    '--surface': { r: 255, g: 255, b: 255 },
+    '--surface-2': { r: 242, g: 242, b: 243 },
+    '--surface-3': { r: 233, g: 233, b: 235 },
+    '--line': { r: 233, g: 233, b: 236 },
+  },
+  dark: {
+    '--canvas': { r: 13, g: 13, b: 13 },
+    '--surface': { r: 23, g: 23, b: 23 },
+    '--surface-2': { r: 33, g: 33, b: 33 },
+    '--surface-3': { r: 41, g: 41, b: 41 },
+    '--line': { r: 51, g: 51, b: 51 },
+  },
+}
+
+/**
+ * How much hue a neutral may carry. MEASURED, not chosen: at 0.006 the largest
+ * contrast drift across every pair this product paints is under 0.1:1, and the
+ * hue is still visible as a cast rather than as a colour. See
+ * `brand-neutrals.test.ts` for the table.
+ */
+const NEUTRAL_CHROMA = 0.006
+
+/**
+ * Above this lightness sRGB has no room for chroma, so asking for some costs
+ * LIGHTNESS instead of adding hue. See the note in `brandNeutralVars`.
+ */
+const MAX_TINTABLE_LIGHTNESS = 0.99
+
+export function brandNeutralVars(colors: string[], surface: SkinSurface): BrandNeutralVars {
+  const { h } = colors[0] ? guardedInput(parseOklch(colors[0])) : DEFAULT_PRIMARY
+  const stops = NEUTRAL_STOPS[surface]
+  const out = {} as BrandNeutralVars
+
+  for (const key of Object.keys(stops) as (keyof BrandNeutralVars)[]) {
+    const { r, g, b } = stops[key]
+    // The LIGHTNESS of the real token, unchanged. Only chroma and hue are ours.
+    const { l } = parseOklch(rgbToOklch(r, g, b))
+
+    /**
+     * ── NO CHROMA WHERE THERE IS NO ROOM FOR IT ─────────────────────────────
+     * Light `--surface` is `#ffffff`, which is L=1.0, and at L=1.0 sRGB has no
+     * headroom for any chroma at all. Asking for some does not tint the card, it
+     * makes `oklchToRgb` CLAMP — and what it clamps is lightness.
+     *
+     * MEASURED by an adversarial review: the canvas-to-surface step fell from
+     * 1.0438:1 to 1.0298:1 at hue 352, under the 1.03 light adjacent-pair floor
+     * that `tonal-ladder.test.ts` enforces, with up to 32% of the step gone
+     * across the hue circle. That step is the ONLY thing separating a card from
+     * the page in v5 — "a card is a card because it is BRIGHTER than the page"
+     * — and `--line` is tinted by the same rule, so the hairline cannot make up
+     * for it. The tint was quietly dissolving every card boundary in light mode.
+     *
+     * So a stop with no room keeps its exact value. One rung of five carries no
+     * hue in light; the other four and all five in dark do, and the ladder is
+     * intact, which is worth far more than tinting the one colour that cannot
+     * hold a tint anyway.
+     */
+    out[key] = l >= MAX_TINTABLE_LIGHTNESS ? rgbToOklch(r, g, b) : formatOklch(l, NEUTRAL_CHROMA, h)
+  }
+  return out
+}
+
 export type BrandSkinVars = Record<
   '--p' | '--pfg' | '--pstrong' | '--acc' | '--t50' | '--t100' | '--t300',
   string
@@ -185,7 +329,21 @@ function guardPrimaryForeground(
     const rgb = oklchToRgb(lightness, c, h)
     const contrastWhite = contrastRatio(rgb, WHITE_RGB)
     const contrastDark = contrastRatio(rgb, spec.darkText.rgb)
-    if (contrastWhite >= MIN_CONTRAST || contrastDark >= MIN_CONTRAST) {
+    const readableText = contrastWhite >= MIN_CONTRAST || contrastDark >= MIN_CONTRAST
+    // ── AND THE FILL ITSELF HAS TO BE VISIBLE ─────────────────────────────
+    // The loop used to stop the moment the LABEL was legible, which says
+    // nothing about whether the button can be seen. MEASURED: a navy brand on
+    // the dark theme came back at 1.02:1 against `#171717` — white text
+    // floating on a rectangle exactly the colour of the page behind it — and
+    // it passed every check in the suite. Founder's rule, 2026-08-29, and the
+    // threshold is WCAG 1.4.11's 3:1 for the boundary of a UI component.
+    //
+    // The same walk serves both: darkening on a white page separates the fill
+    // AND helps white text, lightening on a near-black page does the mirror.
+    // So this costs extra steps, never a contradiction, and the fallbacks
+    // below are reachable exactly as before.
+    const visibleShape = contrastRatio(rgb, spec.surface) >= MIN_SHAPE_CONTRAST
+    if (readableText && visibleShape) {
       const foreground = contrastDark >= contrastWhite ? spec.darkText.css : 'white'
       return { primary: formatOklch(lightness, c, h), foreground }
     }
