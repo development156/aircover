@@ -27,6 +27,13 @@ import { describe, it, expect } from 'vitest'
  * this change's to make. What this change can do is make the next reader
  * conscious: start reading them for behaviour and this test fails, which is
  * where the reconciliation gets decided rather than assumed.
+ *
+ * ── WHAT IT CANNOT SEE ───────────────────────────────────────────────────────
+ * It greps for the column NAMES, which is exactly the defect this repository has
+ * shipped before. A `select('*')` names no column and reads all three. So does
+ * raw SQL inside a Postgres function, an RPC, and a dynamic access like
+ * `row[field]` where the key arrives at runtime. It is blind to every one of
+ * those, and to anything outside the paths it greps.
  */
 
 const WEB = join(__dirname, '../../../')

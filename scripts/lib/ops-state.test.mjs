@@ -20,6 +20,15 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest'
  *
  * `OPS_REPO_ROOT` is set before the import because ops-env resolves the root at
  * module load, so a static import would already have pinned the real repo.
+ *
+ * ── WHAT IT CANNOT SEE ──────────────────────────────────────────────────────
+ * The `readFileSync` below reads the TEMPORARY tree this file created, never
+ * the repository. So "the drain did not touch the tracked bytes" is proven
+ * about a fixture, and this file cannot see a write to the real
+ * `ops/state/*.json` made through any path that does not go through
+ * `ops-state.mjs`: a script writing the file directly, a shell redirect in a
+ * hook, or the sync process itself. The pre-commit hook is what catches those,
+ * and it is tested separately in `pre-commit-hook.test.mjs`.
  */
 const root = mkdtempSync(resolve(tmpdir(), 'sahoda-state-'))
 process.env.OPS_REPO_ROOT = root

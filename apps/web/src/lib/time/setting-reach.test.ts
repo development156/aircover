@@ -21,6 +21,13 @@ import { describe, it, expect } from 'vitest'
  * So the guard is two-sided, and it pins the CLAIM rather than the wording:
  * rewrite the sentence freely, but it must go on naming a reach, and the code
  * must go on having one.
+ *
+ * ── WHAT IT CANNOT SEE ───────────────────────────────────────────────────────
+ * It reads source, so it proves the sentence and the reader EXIST, never that
+ * the reader runs: a zone read behind a branch nothing reaches would satisfy it.
+ * A claim built by interpolation, or moved into a component this file does not
+ * name, reads as absent. And it cannot tell whether the reach the sentence
+ * describes is the reach the code actually has, only that both are non-empty.
  */
 
 const WEB = join(__dirname, '../../')
