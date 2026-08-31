@@ -6,6 +6,7 @@ import type { DisplayPost } from '@/lib/posts/display-post'
 import { outcomeOf } from '@/lib/posts/publish-evidence'
 import type { VariantStatusRow } from '@/lib/posts/variant-status'
 import type { WeekBuckets } from '@/lib/planner/week'
+import { HomeSection } from '@/components/home/section'
 import { cn } from '@/lib/utils'
 
 /**
@@ -110,7 +111,22 @@ export function WeekStrip({ buckets, variantStates }: WeekStripProps) {
   const total = buckets.days.reduce((sum, day) => sum + day.posts.length, 0)
 
   return (
-    <section aria-label="This week" data-guide="home.week">
+    /* ── IT IS IN THE PAGE'S CARD LANGUAGE NOW ────────────────────────────────
+       This rendered seven bordered day tiles on the bare page ground, with an
+       `aria-label` and no heading — so the one region of Home that answers
+       "what is scheduled" had no title on screen and none in the document
+       outline either, and it was the only block on the page not sitting in a
+       card. Seven boxes floating below two carded regions is what made the
+       bottom of the page read as loose parts.
+
+       The days keep their own borders: inside the card they are a calendar's
+       cells, which is a grid of seven things and genuinely wants its edges. */
+    <HomeSection
+      id="home-week"
+      title="This week"
+      guide="home.week"
+      action={{ href: '/planner', label: 'Open Planner' }}
+    >
       <ol className="grid grid-cols-7 gap-2.5 max-narrow:grid-cols-1 max-narrow:gap-0">
         {buckets.days.map((day, index) => (
           <li
@@ -162,6 +178,6 @@ export function WeekStrip({ buckets, variantStates }: WeekStripProps) {
           Nothing scheduled this week yet. Anything you approve or schedule shows up here.
         </p>
       ) : null}
-    </section>
+    </HomeSection>
   )
 }
