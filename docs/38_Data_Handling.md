@@ -51,9 +51,12 @@ not a description somebody wrote down — it is a fact about how the database is
 holding a customer's data carries a `workspace_id` column, and the boundary between two customers is
 enforced by the database itself (PostgreSQL row-level security), not by the application.
 
-**MEASURED 2026-08-29: 58 tables.** They are listed in full in §3, and
+**MEASURED 2026-08-31: 59 tables.** They are listed in full in §3, and
 `packages/db/tests/data_handling_doc.pglite.test.ts` fails the build if that number or that list
-stops matching the database. (It read 52 on 2026-08-26, the figure this sentence carried until now.
+stops matching the database. (It read 58 on 2026-08-29, the figure this sentence carried until now;
+the new table is `asset_logo_facts`, which records what was measured about a logo file so a picture
+can be stamped with it. The guard caught the omission on the same day, which is what it is for.
+It read 52 on 2026-08-26 before that.
 FOUR arrived on 2026-08-28 from three different lanes, which is why no lane's own figure — 53, 54
 and 53 again — was right: each counted only its own. Studio's `studio_designs` and
 `studio_exports`, which arrived when Studio stopped being a roadmap screen and started saving a
@@ -115,6 +118,7 @@ the table belongs to one identified workspace.
 | `asset_derivatives` | the per-channel crops made from your pictures | `created_by` | removed |
 | `asset_folder_items` | which folders you filed each picture in | `added_by` | removed |
 | `asset_folders` | the folders you made, and their names | `name` `created_by` | removed |
+| `asset_logo_facts` | what Sahoda measured about your logo file: whether its background is see-through, where the mark sits inside it, and whether its ink is light or dark | no direct identifiers | removed |
 | `asset_smart_folders` | the saved searches you named, and their rules | `name` `query` `created_by` | removed |
 | `asset_usages` | where each picture is used | no direct identifiers | removed |
 | `assets` | your picture library, including anything in its trash | `title` `created_by` | removed |
