@@ -9,12 +9,11 @@ import type { MediaPreview } from '@/lib/posts/media-url'
 import { toAttachment, unverifiableRows, validateAttachments } from '@/lib/posts/to-attachment'
 
 import { ChannelObjections } from './channel-objections'
-import { GenerateImage } from './generate-image'
+import { StudioOrigin } from './studio-origin'
 import { InlineNote } from './inline-error'
 import { LibraryPicker } from './library-picker'
 import { MediaAttach } from './media-attach'
 import { MediaRemoveButton } from './media-remove-button'
-import { StudioLink } from './studio-link'
 
 export interface MediaPaneProps {
   media: PostMedia[]
@@ -215,18 +214,10 @@ export function MediaPane({
 
       <LibraryPicker postId={postId} channels={channels} />
 
-      {/* ── WHERE PICTURES ARE MEANT TO COME FROM ────────────────────────────
-          Above the generator, because it is the answer: image work belongs in
-          Studio, not in a prompt box on a writing screen. `studio-link.tsx`
-          carries the full reasoning, including why the generator below it is
-          still here rather than deleted. */}
-      <StudioLink />
-
-      {/* Below all three on purpose: bringing your own photo is the ordinary path
-          and costs nothing, Studio is where the work belongs, and generating from
-          a sentence is the paid fallback that happens to be the only one of the
-          three that can produce a file today. */}
-      <GenerateImage postId={postId} />
+      {/* Below the two ways of bringing a picture IN, because those cost
+          nothing and are the ordinary path. Making one is where the Studio
+          lives now, and `studio-origin.tsx` carries the reasoning. */}
+      <StudioOrigin />
 
       {/* ── BOTH OF THESE ARE ABOUT A PHOTO, SO THEY WAIT FOR ONE ─────────────
           MEASURED on this lane's baseline frame at 1440: with no media attached

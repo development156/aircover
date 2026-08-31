@@ -11,6 +11,14 @@ const nextConfig: NextConfig = {
   // traced into Vercel's serverless output instead of inferred from whichever
   // lockfile Next finds first.
   outputFileTracingRoot: path.resolve(import.meta.dirname, '../..'),
+  // The studio's bundled typefaces. NOTHING IMPORTS THESE FILES — they are read
+  // by fontconfig at runtime from `process.cwd()/fonts`, so tracing cannot find
+  // them on its own and without this line the folder is simply absent in
+  // production while every check passes locally. `lib/studio/fonts.ts` carries
+  // the measurements behind the whole arrangement.
+  outputFileTracingIncludes: {
+    '**': ['./public/fonts/**'],
+  },
   // @sahoda/shared ships raw TS via package exports — webpack `next build`
   // needs it transpiled (Turbopack dev handles workspace packages natively).
   // Grow this list only when web actually imports another @sahoda package.
