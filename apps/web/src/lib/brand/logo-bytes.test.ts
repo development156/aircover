@@ -126,7 +126,9 @@ async function transparentLogoPng(): Promise<Uint8Array> {
       raw[offset + 3] = 255
     }
   }
-  const png = await sharp(raw, { raw: { width, height, channels: 4 } }).png().toBuffer()
+  const png = await sharp(raw, { raw: { width, height, channels: 4 } })
+    .png()
+    .toBuffer()
   return new Uint8Array(png)
 }
 

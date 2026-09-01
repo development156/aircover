@@ -132,13 +132,17 @@ const LIGHT_INK_MAX_BACKDROP = (1 + CONTRAST_OFFSET) / TARGET_CONTRAST - CONTRAS
 
 function assertPositiveIntegerCanvas(width: number, height: number): void {
   if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) {
-    throw new RangeError(`placeLogo: canvas width and height must be positive integers, got ${width}x${height}`)
+    throw new RangeError(
+      `placeLogo: canvas width and height must be positive integers, got ${width}x${height}`,
+    )
   }
 }
 
 function assertUsableAspect(logoAspect: number): void {
   if (!Number.isFinite(logoAspect) || logoAspect <= 0) {
-    throw new RangeError(`placeLogo: logoAspect must be a positive finite number, got ${logoAspect}`)
+    throw new RangeError(
+      `placeLogo: logoAspect must be a positive finite number, got ${logoAspect}`,
+    )
   }
 }
 

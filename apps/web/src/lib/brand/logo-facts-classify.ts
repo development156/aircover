@@ -74,7 +74,11 @@ export function isLightLuma(luma: number): boolean {
  * commits to nothing, and `dark` or `light` would each tell a caller to place
  * the mark on the opposite surface, a claim about ink that is not there.
  */
-export function polarityOf(inkPixels: number, darkPixels: number, lightPixels: number): InkPolarity {
+export function polarityOf(
+  inkPixels: number,
+  darkPixels: number,
+  lightPixels: number,
+): InkPolarity {
   if (inkPixels === 0) return 'mixed'
   if (darkPixels / inkPixels >= DOMINANT_INK_SHARE) return 'dark'
   if (lightPixels / inkPixels >= DOMINANT_INK_SHARE) return 'light'

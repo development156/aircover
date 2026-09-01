@@ -55,7 +55,12 @@ function assertIsIntegerRect(rect: Rect, label: string): void {
 }
 
 /** The four margins between `mark` and the `clear` rect that must contain it. */
-function clearMargins(placement: Placement): { left: number; top: number; right: number; bottom: number } {
+function clearMargins(placement: Placement): {
+  left: number
+  top: number
+  right: number
+  bottom: number
+} {
   const { mark, clear } = placement
   return {
     left: mark.x - clear.x,
@@ -81,8 +86,16 @@ describe('size: bound by the shorter edge of the canvas', () => {
   })
 
   it('scaling the shorter edge up scales the mark up, for a canvas the same shape', () => {
-    const base = placeLogo({ canvas: { width: 800, height: 400 }, logoAspect: 2, anchor: 'bottom-right' })
-    const doubled = placeLogo({ canvas: { width: 1600, height: 800 }, logoAspect: 2, anchor: 'bottom-right' })
+    const base = placeLogo({
+      canvas: { width: 800, height: 400 },
+      logoAspect: 2,
+      anchor: 'bottom-right',
+    })
+    const doubled = placeLogo({
+      canvas: { width: 1600, height: 800 },
+      logoAspect: 2,
+      anchor: 'bottom-right',
+    })
     expect(doubled.mark.height).toBeGreaterThan(base.mark.height)
     expect(doubled.mark.width).toBeGreaterThan(base.mark.width)
   })
@@ -102,15 +115,23 @@ describe('size: capped on the long axis so a very wide lockup cannot run across 
   })
 
   it('a very wide lockup still leaves its clear space fully inside the canvas', () => {
-    const placement = placeLogo({ canvas: { width: 1000, height: 1000 }, logoAspect: 200, anchor: 'bottom-right' })
+    const placement = placeLogo({
+      canvas: { width: 1000, height: 1000 },
+      logoAspect: 200,
+      anchor: 'bottom-right',
+    })
     expect(placement.clear.x).toBeGreaterThanOrEqual(0)
     expect(placement.clear.x + placement.clear.width).toBeLessThanOrEqual(1000)
   })
 })
 
-describe('clear: a fraction of the mark\'s own height, symmetric on all four sides, and scales with the mark', () => {
+describe("clear: a fraction of the mark's own height, symmetric on all four sides, and scales with the mark", () => {
   it('the four margins between mark and clear are all equal, for a square mark', () => {
-    const placement = placeLogo({ canvas: { width: 900, height: 900 }, logoAspect: 1, anchor: 'bottom-right' })
+    const placement = placeLogo({
+      canvas: { width: 900, height: 900 },
+      logoAspect: 1,
+      anchor: 'bottom-right',
+    })
     const margins = clearMargins(placement)
     expect(margins.left).toBe(margins.top)
     expect(margins.left).toBe(margins.right)
@@ -118,7 +139,11 @@ describe('clear: a fraction of the mark\'s own height, symmetric on all four sid
   })
 
   it('the four margins between mark and clear are all equal, for a wide mark', () => {
-    const placement = placeLogo({ canvas: { width: 1400, height: 700 }, logoAspect: 3, anchor: 'top-left' })
+    const placement = placeLogo({
+      canvas: { width: 1400, height: 700 },
+      logoAspect: 3,
+      anchor: 'top-left',
+    })
     const margins = clearMargins(placement)
     expect(margins.left).toBe(margins.top)
     expect(margins.left).toBe(margins.right)
@@ -126,8 +151,16 @@ describe('clear: a fraction of the mark\'s own height, symmetric on all four sid
   })
 
   it('doubling the mark doubles the clear-space margin', () => {
-    const small = placeLogo({ canvas: { width: 800, height: 400 }, logoAspect: 2, anchor: 'bottom-right' })
-    const big = placeLogo({ canvas: { width: 1600, height: 800 }, logoAspect: 2, anchor: 'bottom-right' })
+    const small = placeLogo({
+      canvas: { width: 800, height: 400 },
+      logoAspect: 2,
+      anchor: 'bottom-right',
+    })
+    const big = placeLogo({
+      canvas: { width: 1600, height: 800 },
+      logoAspect: 2,
+      anchor: 'bottom-right',
+    })
     expect(big.mark.height).toBe(small.mark.height * 2)
     const smallMargin = clearMargins(small).left
     const bigMargin = clearMargins(big).left
@@ -135,7 +168,11 @@ describe('clear: a fraction of the mark\'s own height, symmetric on all four sid
   })
 
   it('clear contains mark: the mark never sits outside its own clear rectangle', () => {
-    const placement = placeLogo({ canvas: { width: 1200, height: 628 }, logoAspect: 1.5, anchor: 'top-right' })
+    const placement = placeLogo({
+      canvas: { width: 1200, height: 628 },
+      logoAspect: 1.5,
+      anchor: 'top-right',
+    })
     const { mark, clear } = placement
     expect(clear.x).toBeLessThanOrEqual(mark.x)
     expect(clear.y).toBeLessThanOrEqual(mark.y)
@@ -147,37 +184,43 @@ describe('clear: a fraction of the mark\'s own height, symmetric on all four sid
 describe('inset: the mark sits one clear-space in from its anchor corner, for every anchor', () => {
   const canvas = { width: 1200, height: 628 }
 
-  it.each(ANCHORS)('anchor %s puts the clear rectangle flush against the correct edges', (anchor) => {
-    const placement = placeLogo({ canvas, logoAspect: 2, anchor })
-    const { clear } = placement
-    const touchesRight = clear.x + clear.width === canvas.width
-    const touchesLeft = clear.x === 0
-    const touchesBottom = clear.y + clear.height === canvas.height
-    const touchesTop = clear.y === 0
+  it.each(ANCHORS)(
+    'anchor %s puts the clear rectangle flush against the correct edges',
+    (anchor) => {
+      const placement = placeLogo({ canvas, logoAspect: 2, anchor })
+      const { clear } = placement
+      const touchesRight = clear.x + clear.width === canvas.width
+      const touchesLeft = clear.x === 0
+      const touchesBottom = clear.y + clear.height === canvas.height
+      const touchesTop = clear.y === 0
 
-    if (anchor === 'bottom-right') {
-      expect(touchesRight).toBe(true)
-      expect(touchesBottom).toBe(true)
-    } else if (anchor === 'bottom-left') {
-      expect(touchesLeft).toBe(true)
-      expect(touchesBottom).toBe(true)
-    } else if (anchor === 'top-right') {
-      expect(touchesRight).toBe(true)
-      expect(touchesTop).toBe(true)
-    } else {
-      expect(touchesLeft).toBe(true)
-      expect(touchesTop).toBe(true)
-    }
-  })
+      if (anchor === 'bottom-right') {
+        expect(touchesRight).toBe(true)
+        expect(touchesBottom).toBe(true)
+      } else if (anchor === 'bottom-left') {
+        expect(touchesLeft).toBe(true)
+        expect(touchesBottom).toBe(true)
+      } else if (anchor === 'top-right') {
+        expect(touchesRight).toBe(true)
+        expect(touchesTop).toBe(true)
+      } else {
+        expect(touchesLeft).toBe(true)
+        expect(touchesTop).toBe(true)
+      }
+    },
+  )
 
-  it.each(ANCHORS)('anchor %s keeps clear fully inside the canvas, never past an edge', (anchor) => {
-    const placement = placeLogo({ canvas, logoAspect: 2, anchor })
-    const { clear } = placement
-    expect(clear.x).toBeGreaterThanOrEqual(0)
-    expect(clear.y).toBeGreaterThanOrEqual(0)
-    expect(clear.x + clear.width).toBeLessThanOrEqual(canvas.width)
-    expect(clear.y + clear.height).toBeLessThanOrEqual(canvas.height)
-  })
+  it.each(ANCHORS)(
+    'anchor %s keeps clear fully inside the canvas, never past an edge',
+    (anchor) => {
+      const placement = placeLogo({ canvas, logoAspect: 2, anchor })
+      const { clear } = placement
+      expect(clear.x).toBeGreaterThanOrEqual(0)
+      expect(clear.y).toBeGreaterThanOrEqual(0)
+      expect(clear.x + clear.width).toBeLessThanOrEqual(canvas.width)
+      expect(clear.y + clear.height).toBeLessThanOrEqual(canvas.height)
+    },
+  )
 
   it('bottom-right and top-left place the mark in visibly different, opposite corners', () => {
     const bottomRight = placeLogo({ canvas, logoAspect: 2, anchor: 'bottom-right' })
@@ -189,7 +232,11 @@ describe('inset: the mark sits one clear-space in from its anchor corner, for ev
 
 describe('integers: every number in both rects, even on a canvas that does not divide evenly', () => {
   it('mark and clear are all-integer rects for a 733x511 canvas', () => {
-    const placement = placeLogo({ canvas: { width: 733, height: 511 }, logoAspect: 1.7, anchor: 'bottom-right' })
+    const placement = placeLogo({
+      canvas: { width: 733, height: 511 },
+      logoAspect: 1.7,
+      anchor: 'bottom-right',
+    })
     assertIsIntegerRect(placement.mark, 'mark')
     assertIsIntegerRect(placement.clear, 'clear')
   })
@@ -209,7 +256,11 @@ describe('aspect: mark.width / mark.height matches logoAspect, within a pixel of
     ['square', 1],
     ['wide', 4],
   ] as const)('holds for a %s logo (aspect %s)', (_label, aspect) => {
-    const placement = placeLogo({ canvas: { width: 1200, height: 628 }, logoAspect: aspect, anchor: 'bottom-right' })
+    const placement = placeLogo({
+      canvas: { width: 1200, height: 628 },
+      logoAspect: aspect,
+      anchor: 'bottom-right',
+    })
     const { width, height } = placement.mark
     // width and height are each independently rounded to an integer, so the
     // achievable error is at most one pixel of width against the exact aspect.
@@ -219,12 +270,12 @@ describe('aspect: mark.width / mark.height matches logoAspect, within a pixel of
 
 describe('degenerate inputs: refused, never guessed', () => {
   it('throws on a zero canvas dimension', () => {
-    expect(() => placeLogo({ canvas: { width: 0, height: 400 }, logoAspect: 1, anchor: 'bottom-right' })).toThrow(
-      RangeError,
-    )
-    expect(() => placeLogo({ canvas: { width: 400, height: 0 }, logoAspect: 1, anchor: 'bottom-right' })).toThrow(
-      RangeError,
-    )
+    expect(() =>
+      placeLogo({ canvas: { width: 0, height: 400 }, logoAspect: 1, anchor: 'bottom-right' }),
+    ).toThrow(RangeError)
+    expect(() =>
+      placeLogo({ canvas: { width: 400, height: 0 }, logoAspect: 1, anchor: 'bottom-right' }),
+    ).toThrow(RangeError)
   })
 
   it('throws on a negative canvas dimension', () => {
@@ -240,9 +291,9 @@ describe('degenerate inputs: refused, never guessed', () => {
   })
 
   it('throws on a zero or negative logoAspect', () => {
-    expect(() => placeLogo({ canvas: { width: 400, height: 400 }, logoAspect: 0, anchor: 'bottom-right' })).toThrow(
-      RangeError,
-    )
+    expect(() =>
+      placeLogo({ canvas: { width: 400, height: 400 }, logoAspect: 0, anchor: 'bottom-right' }),
+    ).toThrow(RangeError)
     expect(() =>
       placeLogo({ canvas: { width: 400, height: 400 }, logoAspect: -2, anchor: 'bottom-right' }),
     ).toThrow(RangeError)
@@ -250,10 +301,18 @@ describe('degenerate inputs: refused, never guessed', () => {
 
   it('throws on a NaN or infinite logoAspect', () => {
     expect(() =>
-      placeLogo({ canvas: { width: 400, height: 400 }, logoAspect: Number.NaN, anchor: 'bottom-right' }),
+      placeLogo({
+        canvas: { width: 400, height: 400 },
+        logoAspect: Number.NaN,
+        anchor: 'bottom-right',
+      }),
     ).toThrow(RangeError)
     expect(() =>
-      placeLogo({ canvas: { width: 400, height: 400 }, logoAspect: Number.POSITIVE_INFINITY, anchor: 'bottom-right' }),
+      placeLogo({
+        canvas: { width: 400, height: 400 },
+        logoAspect: Number.POSITIVE_INFINITY,
+        anchor: 'bottom-right',
+      }),
     ).toThrow(RangeError)
   })
 
@@ -261,7 +320,11 @@ describe('degenerate inputs: refused, never guessed', () => {
     // 4x4 is the smallest canvas with a meaningful shorter edge (see file
     // header): the mark scales down with the canvas rather than the canvas
     // being too small to hold it, so this is not one of the refused inputs.
-    const placement = placeLogo({ canvas: { width: 4, height: 4 }, logoAspect: 1, anchor: 'bottom-right' })
+    const placement = placeLogo({
+      canvas: { width: 4, height: 4 },
+      logoAspect: 1,
+      anchor: 'bottom-right',
+    })
     assertIsIntegerRect(placement.mark, 'mark')
     assertIsIntegerRect(placement.clear, 'clear')
     expect(placement.clear.x).toBeGreaterThanOrEqual(0)
