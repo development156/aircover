@@ -70,7 +70,7 @@ export function AddCard() {
         <button
           type="submit"
           disabled={pending || title.trim() === ''}
-          className="rounded-pill bg-primary px-3 py-1 text-[12px] font-semibold text-primary-foreground transition-micro hover:bg-primary-strong hover:text-white disabled:pointer-events-none disabled:opacity-45"
+          className="rounded-pill bg-primary px-3 py-1 text-[12px] font-semibold text-primary-foreground transition-micro hover:bg-primary-strong hover:text-primary-strong-foreground disabled:pointer-events-none disabled:opacity-45"
         >
           {pending ? 'Adding…' : 'Add card'}
         </button>

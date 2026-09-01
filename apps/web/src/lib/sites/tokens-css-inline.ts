@@ -88,6 +88,18 @@ export const TOKENS_CSS = `/* ==================================================
   --pstrong: #000000; /* primary hovers to BLACK: orange is the resting state,
                          black is the commitment. */
 
+  /* THE HOVER'S OWN FOREGROUND, WHICH USED TO BE HARDCODED IN NINE COMPONENTS.
+     \`--pfg\` is #000000 and stays #000000 in every theme, so it cannot label the
+     hover fill on LIGHT: black on black. Every call site solved that the same
+     way, by writing \`hover:text-white\` beside \`hover:bg-primary-strong\` — nine
+     of them, in eight files, all correct and all light-only.
+     That is docs/37 §19's warning exactly ("guards that grade TOKENS cannot see
+     what COMPONENTS write"), and it is what made the dark fix below more than a
+     one-line change: lightening \`--pstrong\` in dark while nine components still
+     force white would have put white on #ff893e at 2.57:1. Now the pair moves
+     together, per theme, and no component decides a colour. */
+  --pstrong-fg: #ffffff; /* 21.0:1 on the black light-theme hover fill */
+
   /* Accent TEXT — links, and any orange word on a light surface.
 
      ── FOUNDER'S RULING, 2026-08-26: BRAND BRIGHTNESS OVER THE AA FLOOR ──────
@@ -592,6 +604,43 @@ export const TOKENS_CSS = `/* ==================================================
      --acc returns to the brand value. It is NOT re-pointed at a tint: a
      24%-alpha focus ring is invisible. */
   --acc: #ff6600;
+
+  /* ── AND NEITHER DOES THE PRIMARY. ITS HOVER DID, AND POINTED AT THE PAGE ──
+     \`--p\` and \`--pfg\` are deliberately absent from this block: orange is the
+     fixed point above, and ink on it is 7.15:1 in both themes. \`--pstrong\` was
+     absent too, and that was not the same decision — it was an omission. It
+     inherited \`:root\`'s #000000, which on this theme's own \`--surface\` #171717
+     measures 1.23:1, so every primary button in dark mode became a hole in its
+     card at the moment somebody reached for it.
+
+     \`brand-theme.ts\` states the rule beside the line implementing it: "The
+     hover step moves AWAY from the page, in whichever direction that is.
+     Darkening a dark-theme button on hover moved it towards its own background,
+     so the loudest control in the product got quieter when you reached for it."
+     Every CUSTOMER theme has followed it since the 2026-08-30 rail ruling. This
+     one did not, which is the own-medicine defect in the theme most people use.
+
+     SOLVED, NOT PICKED — \`brandSkinVars([], 'dark')['--pstrong']\`, the product's
+     own solver asked about Sahoda orange on a dark ground:
+     \`oklch(0.8008 0.2043 43.5)\`, which is L + (0.03 x 3.5) from \`--p\`.
+
+       fill on --surface #171717   7.60:1   (was 1.23:1)
+       fill on --canvas  #0d0d0d   8.24:1
+       resting --p on #171717      6.11:1 -> 7.60:1 on hover
+
+     The foreground flips WITH it. White cannot label this fill (2.57:1), and no
+     fill white can label is brighter than the resting orange — which would make
+     the button quieter on hover and reintroduce the defect from the other side.
+     So dark's hover keeps INK, at 8.90:1, better than the resting 7.15:1.
+
+     \`--brand-deep\` is NOT re-declared here, and that asymmetry with
+     \`[data-surface='inverse']\` is the point: this selector matches <html>, the
+     same element \`:root\` declares the alias on, so the var() substitution picks
+     up the value below. Only a scope on a DESCENDANT needs the alias repeated.
+     See the six-alias paragraph in that scope. */
+  --pstrong: #ff893e;
+  --pstrong-fg: #000000; /* 8.90:1 on the fill above */
+
   --channel-x: #ffffff; /* the X glyph is invisible on dark otherwise */
 
   --ok: #ffffff;
@@ -710,6 +759,7 @@ export const TOKENS_CSS = `/* ==================================================
      radius, and it changes shipping pixels for real users. Reported, not
      silently fixed here. */
   --pstrong: #ff893e;
+  --pstrong-fg: #000000; /* 8.90:1 on the fill above, the same pair dark uses */
 
   --ok: #ffffff;
   --info: #979797;

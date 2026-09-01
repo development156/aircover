@@ -208,7 +208,7 @@ function Feedback() {
           <div>
             <button
               type="button"
-              className="type-chip rounded-full bg-primary px-4 py-2 text-primary-foreground transition-micro hover:bg-primary-strong hover:text-white max-narrow:min-h-[44px]"
+              className="type-chip rounded-full bg-primary px-4 py-2 text-primary-foreground transition-micro hover:bg-primary-strong hover:text-primary-strong-foreground max-narrow:min-h-[44px]"
             >
               Write a post
             </button>
