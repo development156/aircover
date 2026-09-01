@@ -2,6 +2,8 @@ import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
+import type { BrandSignal } from '@sahoda/shared'
+
 import { queueGeneration, startPostFromPicture } from '@/app/actions/studio'
 import { StudioWorkbench } from '@/components/studio/studio-workbench'
 import { generatableFormats } from '@/lib/studio/formats'
@@ -80,15 +82,37 @@ const MADE = [
   },
 ]
 
-const open = (library = LIBRARY, pictures: typeof MADE = []) =>
+const open = (library = LIBRARY, pictures: typeof MADE = [], signals: BrandSignal[] | null = []) =>
   render(
     <StudioWorkbench
       formats={generatableFormats()}
       cost={6}
       library={library}
       pictures={pictures}
+      signals={signals}
     />,
   )
+
+/**
+ * The MODE control, not "any button on the screen whose name contains this".
+ *
+ * ── WHY THESE QUERIES WERE NARROWED ─────────────────────────────────────────
+ * They read `modeButton(/on brand/i)` and passed for
+ * as long as exactly one button carried that word. The composer's chip row now
+ * SUMMARISES the chosen mode, so two do, and `getByRole` refused with "found
+ * multiple elements" — correctly. The old query was ambiguous before the chip
+ * existed; nothing had made the ambiguity visible.
+ *
+ * Scoped to the fieldset rather than made more specific by string, because the
+ * thing these tests are about is the mode CONTROL. A query pinned to the exact
+ * label would go green again and break the next time the copy moved.
+ */
+function modeButton(name: RegExp): HTMLElement {
+  return within(screen.getByRole('group', { name: /how should sahoda approach it/i })).getByRole(
+    'button',
+    { name },
+  )
+}
 
 describe('choosing which model draws it', () => {
   test('the reachable models are offered by what they are good at, never by id', () => {
@@ -153,16 +177,13 @@ describe('the modes on offer', () => {
   test('offers every mode the default model can actually do', () => {
     open()
     for (const rule of readyModes()) {
-      expect(screen.getByRole('button', { name: new RegExp(rule.label, 'i') })).toBeTruthy()
+      expect(modeButton(new RegExp(rule.label, 'i'))).toBeTruthy()
     }
   })
 
   test('on brand is chosen to begin with, because it is the one that uses the brand', () => {
     open()
-    expect(screen.getByRole('button', { name: /on brand/i })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
+    expect(modeButton(/on brand/i)).toHaveAttribute('aria-pressed', 'true')
   })
 })
 
@@ -302,7 +323,7 @@ describe('matching a picture', () => {
   test('matching asks for a picture before it will run', async () => {
     const user = userEvent.setup()
     open()
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
     expect(screen.getByRole('status').textContent).toMatch(/pick one picture/i)
     expect(screen.getByRole('button', { name: /make this picture/i })).toBeDisabled()
   })
@@ -310,7 +331,7 @@ describe('matching a picture', () => {
   test('picking one clears the block', async () => {
     const user = userEvent.setup()
     open()
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
     await user.type(screen.getByLabelText(/what should the picture show/i), 'a cup of chai')
     await user.click(screen.getAllByRole('button', { pressed: false })[3]!)
     expect(screen.queryByText(/pick one picture/i)).toBeNull()
@@ -324,7 +345,7 @@ describe('matching a picture', () => {
   test('the selection cannot grow past what the model will look at', async () => {
     const user = userEvent.setup()
     const { container } = open()
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
 
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     const thumbs = within(picker).getAllByRole('button')
@@ -342,12 +363,12 @@ describe('matching a picture', () => {
   test('switching to a mode that ignores references clears them, rather than leaving a contradiction', async () => {
     const user = userEvent.setup()
     const { container } = open()
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     await user.click(within(picker).getAllByRole('button')[0]!)
 
     await user.click(screen.getByRole('button', { name: /explore/i }))
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
     expect(screen.getByRole('status').textContent).toMatch(/pick one picture/i)
   })
 
@@ -358,7 +379,7 @@ describe('matching a picture', () => {
   test('a picture with no preview is still offered, not hidden', async () => {
     const user = userEvent.setup()
     const { container } = open()
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     expect(within(picker).getAllByRole('button')).toHaveLength(LIBRARY.length)
     expect(within(picker).getByText(/no preview/i)).toBeTruthy()
@@ -367,7 +388,7 @@ describe('matching a picture', () => {
   test('an empty library says how to fill it rather than showing nothing', async () => {
     const user = userEvent.setup()
     open([])
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
     expect(screen.getByText(/you have no pictures yet/i)).toBeTruthy()
   })
 })
@@ -383,7 +404,7 @@ describe('a press that changes nothing must say why', () => {
   test('a pick beyond the limit is explained rather than ignored', async () => {
     const user = userEvent.setup()
     const { container } = open()
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
 
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     const thumbs = within(picker).getAllByRole('button')
@@ -428,7 +449,7 @@ describe('adding a picture from this device', () => {
   test('the way in is a real file control, reachable by name', async () => {
     const user = userEvent.setup()
     open()
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
     expect(screen.getByLabelText(/add a picture from this device/i)).toBeTruthy()
   })
 
@@ -440,7 +461,7 @@ describe('adding a picture from this device', () => {
   test('it is an input, not a drop target pretending to be one', async () => {
     const user = userEvent.setup()
     open()
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
     const control = screen.getByLabelText(/add a picture from this device/i)
     expect(control.tagName).toBe('INPUT')
     expect(control.getAttribute('type')).toBe('file')
@@ -449,7 +470,7 @@ describe('adding a picture from this device', () => {
   test('what it offers is the proven list, so it cannot drift from the server', async () => {
     const user = userEvent.setup()
     open()
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
     const control = screen.getByLabelText(/add a picture from this device/i)
     expect(control.getAttribute('accept')).toBe(uploadAccept())
   })
@@ -457,7 +478,7 @@ describe('adding a picture from this device', () => {
   test('the empty library points at this device rather than at a library trip', async () => {
     const user = userEvent.setup()
     open([])
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
     expect(screen.getByText(/add one from this device/i)).toBeTruthy()
   })
 })
@@ -512,10 +533,7 @@ describe('asking for the same thing again', () => {
     expect(
       (screen.getByLabelText(/what should the picture show/i) as HTMLTextAreaElement).value,
     ).toBe(MADE[0]!.prompt)
-    expect(screen.getByRole('button', { name: /on brand/i })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
+    expect(modeButton(/on brand/i)).toHaveAttribute('aria-pressed', 'true')
   })
 
   /**
@@ -537,10 +555,7 @@ describe('asking for the same thing again', () => {
     await user.click(within(strip).getAllByRole('button')[1]!)
     await user.click(screen.getByRole('button', { name: /use these words again/i }))
 
-    expect(screen.getByRole('button', { name: /match a picture/i })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
+    expect(modeButton(/match a picture/i)).toHaveAttribute('aria-pressed', 'true')
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     expect(within(picker).getByRole('button', { name: /picked 1 of 1/i })).toBeTruthy()
   })
@@ -595,10 +610,7 @@ describe('picking a picture in a mode that ignores one', () => {
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     await user.click(within(picker).getAllByRole('button')[0]!)
 
-    expect(screen.getByRole('button', { name: /match a picture/i })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
+    expect(modeButton(/match a picture/i)).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('alert').textContent).toMatch(/moved you to match a picture/i)
   })
 
@@ -622,7 +634,7 @@ describe('which picture is which', () => {
   test('a picked reference shows its position, not just that it is picked', async () => {
     const user = userEvent.setup()
     const { container } = open()
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     const thumbs = within(picker).getAllByRole('button')
 
@@ -636,7 +648,7 @@ describe('which picture is which', () => {
   test('the position is announced, not only drawn', async () => {
     const user = userEvent.setup()
     const { container } = open()
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     await user.click(within(picker).getAllByRole('button')[0]!)
 
@@ -726,5 +738,109 @@ describe('before any spend', () => {
     expect(button).toBeDisabled()
     await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
     expect(button).toBeEnabled()
+  })
+})
+
+describe('the composer', () => {
+  /**
+   * ── THE SCOPE IS THE DESIGN, NOT A COLOUR ─────────────────────────────────
+   * The composer is a dark panel on a light page, and `data-surface="inverse"`
+   * is the only correct way to paint one here. A hand-written dark fill would
+   * look identical in a screenshot and be wrong in every token inside it:
+   * `--ink` is #000000 on light, so `text-ink` would be black on near-black,
+   * and `--pstrong` would be black on black at 1.23:1 the moment somebody
+   * hovered the button they came to press. tokens.css's INVERSE SURFACE header
+   * carries the measurements.
+   *
+   * This is asserted rather than left to review because the failure is
+   * invisible in the theme most people develop in.
+   */
+  test('the composer paints itself with the inverse scope, not a hand-written fill', () => {
+    const { container } = open()
+    const prompt = screen.getByPlaceholderText(promptHintFor('on_brand'))
+    expect(prompt.closest('[data-surface="inverse"]')).not.toBeNull()
+    // And the settings sit on the same object, which is a second scope: a CSS
+    // scope does not cross a sibling boundary, so the tray needs its own.
+    expect(container.querySelectorAll('[data-surface="inverse"]').length).toBeGreaterThanOrEqual(2)
+  })
+
+  /**
+   * The chip row is a SUMMARY of what the press will do. It reads its labels
+   * from `models.ts` and `modes.ts`, the same modules the rules come from, so a
+   * chip cannot name a model the picker no longer offers.
+   */
+  test('says which model, look, size and count this press will use', async () => {
+    const user = userEvent.setup()
+    const { container } = open()
+    const chips = () => container.querySelector('[data-guide="studio-chips"]')!.textContent ?? ''
+
+    // Read from `models.ts` and `modes.ts`, the modules the RULES come from, so
+    // a chip cannot name a model the picker no longer offers.
+    expect(chips()).toContain(routedModels()[0]!.label)
+    expect(chips()).toContain(ruleFor('on_brand').label)
+
+    // And it tracks the control rather than the first render.
+    await user.click(modeButton(/explore/i))
+    expect(chips()).toContain(ruleFor('explore').label)
+    expect(chips()).not.toContain(ruleFor('on_brand').label)
+  })
+
+  test('the settings can be put away, and the composer stays', async () => {
+    const user = userEvent.setup()
+    open()
+    expect(screen.getByRole('group', { name: /how should sahoda approach it/i })).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: /hide settings/i }))
+
+    expect(screen.queryByRole('group', { name: /how should sahoda approach it/i })).toBeNull()
+    // The thing a person came to do is still there. A composer that folded the
+    // prompt away with the settings would be a screen with nothing on it.
+    //
+    // BY ROLE, not by placeholder: `getByPlaceholderText` finds an element that
+    // is `hidden`, so the placeholder query passed against a prompt nobody
+    // could see. MEASURED — adding `hidden={!settingsOpen}` to the Textarea
+    // left this test green until the query moved. `getByRole` excludes what is
+    // hidden from the accessibility tree, which is the thing being claimed.
+    expect(screen.getByRole('textbox')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /make this picture/i })).toBeTruthy()
+  })
+})
+
+describe('what Sahoda will send, shown before the spend', () => {
+  const SIGNALS: BrandSignal[] = [
+    { field: 'voice', certainty: 'confirmed', value: 'Warm, plain-spoken, never salesy' },
+    { field: 'palette', certainty: 'guessed', value: 'Warm cream, deep brown, one orange' },
+  ]
+
+  test('names each signal, and marks which ones were guessed', () => {
+    open(LIBRARY, [], SIGNALS)
+
+    expect(screen.getByText('Warm, plain-spoken, never salesy')).toBeTruthy()
+    expect(screen.getByText('Warm cream, deep brown, one orange')).toBeTruthy()
+    // The certainty is carried for a screen reader too, not by a dot alone.
+    expect(screen.getByText(/which Sahoda guessed/i)).toBeTruthy()
+    expect(screen.getByText(/which you confirmed/i)).toBeTruthy()
+  })
+
+  /**
+   * ── THREE STATES, NEVER TWO ───────────────────────────────────────────────
+   * `BrandSignalsSchema`'s own header forbids collapsing these: an empty array
+   * means the Brand Brain had nothing to add, which a person can act on; null
+   * means the read failed, which they cannot. A screen that said "no brand
+   * signals" for both would tell somebody their brain was empty when it was
+   * unreadable.
+   */
+  test('an empty Brand Brain and an unreadable one are different sentences', () => {
+    open(LIBRARY, [], [])
+    const empty = screen.getByText(/nothing from your brand brain/i).textContent ?? ''
+    expect(empty).toMatch(/fill it in/i)
+    cleanup()
+
+    open(LIBRARY, [], null)
+    const unread = screen.getByText(/could not read your brand brain/i).textContent ?? ''
+    // It must not claim the brain is empty, and it must not offer filling it in
+    // as the remedy for a read that failed.
+    expect(unread).not.toMatch(/nothing from your brand brain/i)
+    expect(screen.queryByText(/fill it in/i)).toBeNull()
   })
 })

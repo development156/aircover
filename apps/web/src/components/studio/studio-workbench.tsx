@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { Sparkles } from 'lucide-react'
-import type { GenerationMode } from '@sahoda/shared'
+import type { BrandSignal, GenerationMode } from '@sahoda/shared'
 
 import { queueGeneration } from '@/app/actions/studio'
 // Lazy: a canvas editor is a large chunk that most visits never open, and the
@@ -30,7 +30,7 @@ import {
   readyModes,
   ruleFor,
 } from '@/lib/studio/modes'
-import { defaultModelId } from '@/lib/studio/models'
+import { defaultModelId, modelById } from '@/lib/studio/models'
 import type { LibraryPicture } from '@/lib/studio/read'
 import { PROMPT_STARTERS } from '@/lib/studio/prompt'
 import { describeInsufficient, describePartial } from '@/lib/studio/refusal-copy'
@@ -59,6 +59,7 @@ export function StudioWorkbench({
   cost,
   library,
   pictures,
+  signals,
 }: {
   formats: StudioFormat[]
   cost: number
@@ -66,6 +67,15 @@ export function StudioWorkbench({
   library: LibraryPicture[]
   /** What this workspace has already made, newest first, for the canvas. */
   pictures: CanvasPicture[]
+  /**
+   * What the Brand Brain will add to this request, shown BEFORE the press.
+   *
+   * The same array `queueGeneration` builds and stores on the row, from the same
+   * `brandSignalsFor`. Null means the read failed, which is a different sentence
+   * from an empty array — that one means Explore, where adding nothing is
+   * correct. `BrandSignalsSchema`'s own header forbids collapsing the two.
+   */
+  signals: BrandSignal[] | null
 }) {
   const router = useRouter()
   const [wanted, setWanted] = useState('')
@@ -81,6 +91,15 @@ export function StudioWorkbench({
   const [viewing, setViewing] = useState<CanvasPicture | null>(null)
   const [drawing, setDrawing] = useState<CanvasPicture | null>(null)
   const [busy, start] = useTransition()
+  /**
+   * Open by default, and that is a decision rather than a default.
+   *
+   * This screen's job IS these controls; a composer that hides all of them
+   * behind a chevron makes a person hunt for the model on their first visit.
+   * The composer stays the thing you look at first because it is the one dark
+   * object on a light page, not because everything else is hidden.
+   */
+  const [settingsOpen, setSettingsOpen] = useState(true)
 
   /**
    * Position zero unless somebody has clicked back through the strip. The reader
@@ -91,6 +110,10 @@ export function StudioWorkbench({
   const active = pictures.find((one) => one.imageId === activeId) ?? pictures[0] ?? null
 
   const rule = ruleFor(mode, modelId)
+  // Asked of the same modules the RULES come from, never re-typed here. A chip
+  // that names a model the picker no longer offers is a screen disagreeing with
+  // itself about what is about to be spent.
+  const modelLabel = modelById(modelId)?.label ?? 'None'
   const chosen = formats.find((f) => f.id === formatId) ?? null
   // Asked, never re-derived. See this file's header.
   const blocked = describeModeBlock({ mode, references: picked.length, modelId })
@@ -206,266 +229,438 @@ export function StudioWorkbench({
       data-guide="studio-workbench"
     >
       <section aria-labelledby="studio-make" className="flex flex-col gap-3">
-        <div>
-          <h2 id="studio-make" className="type-h2">
-            Make a picture
-          </h2>
-          <p className="type-body mt-1 max-w-[54ch] text-muted">
-            Say what you want to see. Sahoda adds your colours and the way your business sounds, so
-            you do not have to describe them every time.
-          </p>
-        </div>
+        <h2 id="studio-make" className="type-h2">
+          Make a picture
+        </h2>
 
-        <label className="flex flex-col gap-1">
-          <span className="type-sm text-muted">What should the picture show?</span>
-          <Textarea
-            value={wanted}
-            autoGrow
-            rows={3}
-            maxLength={1000}
-            placeholder={promptHintFor(mode)}
-            onChange={(event) => setWanted(event.target.value)}
-            data-guide="studio-prompt"
-          />
-        </label>
+        {/* ── THE COMPOSER: ONE DARK OBJECT ON A LIGHT PAGE ───────────────────
+            `data-surface="inverse"` rather than a hand-written dark fill, so
+            every token inside it re-resolves — `bg-surface` is #171717 here,
+            `text-muted` is #979797 rather than the light theme's #57575a, and
+            the primary's hover is the lifted orange rather than a hole in the
+            panel. That scope is the ONLY correct way to paint a dark panel in
+            this product; a bespoke fill leaves `text-ink` black on near-black.
 
-        {/* ── SOMETHING TO TRY ────────────────────────────────────────────────
-            A box nobody knows what to put in stays empty. These FILL the box
-            rather than generating, so nothing is spent by trying one and the
-            words can be edited first. Hidden once there is something to edit,
-            because then they are only in the way. */}
-        {wanted.trim() === '' ? (
-          <div className="flex flex-col gap-1" data-guide="studio-starters">
-            <span className="type-sm text-muted">Not sure what to write? Try one of these.</span>
-            <ul className="flex flex-wrap gap-2">
+            WHY THE SCREEN IS SHAPED THIS WAY. The controls did not change and
+            neither did any rule they ask about. What changed is that the
+            request now reads as one thing you compose and press, instead of six
+            labelled fieldsets scrolling down a column — Sahoda already had more
+            genuine control here than the tools it is compared to, and none of
+            it was legible at a glance. */}
+        <div
+          data-surface="inverse"
+          className="flex flex-col gap-4 rounded-xl bg-surface p-4 shadow-lg"
+        >
+          <label className="flex flex-col gap-1">
+            <span className="sr-only">What should the picture show?</span>
+            <Textarea
+              value={wanted}
+              autoGrow
+              rows={2}
+              maxLength={1000}
+              placeholder={promptHintFor(mode)}
+              onChange={(event) => setWanted(event.target.value)}
+              data-guide="studio-prompt"
+              // The prompt is the loudest thing in the composer and does not
+              // need a box drawn round it: it already sits on a surface nothing
+              // else on the page shares. `bg-transparent` keeps the panel's own
+              // fill rather than stacking a second one at the same value.
+              className="border-0 bg-transparent px-0 py-0 type-h3 font-[400] shadow-none focus-visible:outline-none"
+            />
+          </label>
+
+          {/* ── SOMETHING TO TRY ──────────────────────────────────────────────
+              A box nobody knows what to put in stays empty. These FILL the box
+              rather than generating, so nothing is spent by trying one and the
+              words can be edited first. Hidden once there is something to edit,
+              because then they are only in the way. */}
+          {wanted.trim() === '' ? (
+            <ul className="flex flex-wrap gap-2" data-guide="studio-starters">
               {PROMPT_STARTERS.map((starter) => (
                 <li key={starter}>
                   <button
                     type="button"
                     onClick={() => setWanted(starter)}
-                    className="surface-ring rounded-card bg-s2 px-2 py-1 text-left type-sm text-muted transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    className="surface-ring rounded-pill bg-s2 px-3 py-1 text-left type-sm text-muted transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                   >
                     {starter}
                   </button>
                 </li>
               ))}
             </ul>
-          </div>
-        ) : null}
+          ) : null}
 
-        {/* ── ABOVE THE MODES, BECAUSE IT CHANGES WHAT THEY CAN DO ─────────
-            Picking a model that draws a whole set in one call is what makes "a
-            set that matches" appear at all, and it moves the reference limit
-            from three to fourteen. A control that changes the options below it
-            belongs above them. */}
-        <ModelPicker
-          modelId={modelId}
-          onChoose={(next) => {
-            setNote(null)
-            setModelId(next)
-            // Trimmed to what the NEW model will look at. Carrying eight
-            // references onto a model that takes three would send a request the
-            // action refuses, after the person had already chosen them.
-            setPicked((current) => current.slice(0, ruleFor(mode, next).maxReferences))
-            // And off a mode the new model cannot do. Leaving somebody on a
-            // greyed-out Series is a dead end they did not create.
-            if (!ruleFor(mode, next).ready) setMode('on_brand')
-          }}
-        />
-
-        <fieldset className="flex flex-col gap-2">
-          <legend className="type-sm text-muted">How should Sahoda approach it?</legend>
-          <div className="grid gap-2 narrow:grid-cols-3 max-narrow:grid-cols-1">
-            {readyModes(modelId).map((option) => (
-              <button
-                key={option.mode}
-                type="button"
-                onClick={() => chooseMode(option.mode)}
-                aria-pressed={mode === option.mode}
-                className={`surface-ring rounded-card px-3 py-2 text-left transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-                  mode === option.mode ? 'bg-primary text-primary-foreground' : 'bg-s2 text-muted'
-                }`}
-              >
-                <span className="block type-sm font-[550]">{option.label}</span>
-                <span className="block type-sm">{option.what}</span>
-              </button>
-            ))}
-          </div>
-        </fieldset>
-
-        {/* ── WHAT TO MATCH ──────────────────────────────────────────────────
-            Shown in EVERY mode, including the one that ignores references.
-            This used to be hidden for Explore, on the reasoning that offering a
-            picker would invite a choice the mode then ignores. That reasoning
-            stopped being true the moment picking one MOVED you to the mode that
-            uses it: the choice is now honoured rather than ignored, and hiding
-            the control only hides the shortest route to what a person meant. */}
-        <fieldset className="flex flex-col gap-2" data-guide="studio-references">
-          <legend className="type-sm text-muted">
-            {rule.maxReferences === 0
-              ? 'Picking a picture here moves you to Match a picture.'
-              : rule.minReferences > 0
-                ? 'Which picture should Sahoda match?'
-                : 'Anything Sahoda should match? (optional)'}
-          </legend>
-
-          {/* ── THE UPLOAD FOLLOWS THE SAME RULE THE TILES DO ─────────────────
-              `disabled={picked.length >= rule.maxReferences}` read `0 >= 0` in
-              Explore, so adding from the device was dead the moment the mode
-              opened — while the legend directly above promised "Picking a
-              picture here moves you to Match a picture" and `toggleReference`
-              did exactly that for every tile below. The one route that did not
-              get the mode switch was the one a person with a new photograph
-              would take, and nothing on the screen said why. */}
-          <ReferenceUpload
-            disabled={rule.maxReferences > 0 && picked.length >= rule.maxReferences}
-            onAdded={(assetId) => {
-              setNote(null)
-              // Explore uses no reference by definition, so adding one means the
-              // other mode. Same move, same sentence, as picking a tile.
-              if (rule.maxReferences === 0) {
-                setMode('match')
-                setPicked([assetId])
-                setNote('Explore ignores a picture, so Sahoda moved you to Match a picture.')
-                router.refresh()
-                return
-              }
-              // Selected at once. Somebody who adds a picture to match wants
-              // to match it, and it appears in the grid below on the refresh
-              // already chosen.
-              setPicked((current) =>
-                current.includes(assetId) || current.length >= rule.maxReferences
-                  ? current
-                  : [...current, assetId],
-              )
-              router.refresh()
-            }}
-          />
-
-          {library.length === 0 ? (
-            <p className="surface-ring rounded-card bg-s2 px-3 py-2 type-sm text-muted">
-              You have no pictures yet. Add one from this device, or make one below, and it appears
-              here to match.
-            </p>
-          ) : (
-            <ul className="grid grid-cols-4 gap-2">
-              {library.map((picture) => {
-                // The POSITION, not a yes. `signReferences` sends them in pick
-                // order and the first weighs most, so an order-free tick hides
-                // something the model acts on.
-                const at = picked.indexOf(picture.assetId)
-                const on = at !== -1
+          {/* ── WHAT IT IS MATCHING, IN THE ORDER IT WILL BE SENT ─────────────
+              The numeral is the POSITION and not a tick, for the same reason
+              the grid below carries one: `signReferences` sends them in pick
+              order and the first weighs most. A count alone ("3 refs") states
+              a fact nobody can check; the tiles show the claim. */}
+          {picked.length === 0 ? null : (
+            <ul className="flex flex-wrap items-center gap-2" data-guide="studio-picked">
+              {picked.map((assetId, at) => {
+                const picture = library.find((one) => one.assetId === assetId) ?? null
                 return (
-                  <li key={picture.assetId}>
+                  <li key={assetId}>
                     <button
                       type="button"
-                      onClick={() => toggleReference(picture.assetId)}
-                      aria-pressed={on}
-                      aria-label={
-                        on
-                          ? `${picture.title ?? 'A picture in your library'}, picked ${at + 1} of ${picked.length}`
-                          : (picture.title ?? 'A picture in your library')
-                      }
-                      className={`surface-ring relative block w-full overflow-hidden rounded-card transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-                        on ? 'ring-2 ring-accent' : ''
-                      }`}
+                      onClick={() => toggleReference(assetId)}
+                      aria-label={`Stop matching ${picture?.title ?? 'this picture'}, picked ${at + 1} of ${picked.length}`}
+                      className="surface-ring relative block size-[44px] overflow-hidden rounded-sm transition-micro hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                     >
-                      {picture.url === null ? (
-                        <span className="flex aspect-square items-center justify-center bg-s2 type-sm text-muted">
-                          no preview
-                        </span>
+                      {picture?.url == null ? (
+                        <span className="flex size-full items-center justify-center bg-s2" />
                       ) : (
                         // eslint-disable-next-line @next/next/no-img-element -- a
                         // short-lived signed URL from a private bucket cannot be
                         // optimised without proxying the credential.
                         <img
                           src={picture.url}
-                          alt={picture.title ?? 'A picture in your library'}
-                          className="aspect-square w-full object-cover object-top"
+                          alt=""
+                          className="size-full object-cover object-top"
                         />
                       )}
-                      {on ? (
-                        <span className="absolute right-1 top-1 flex size-[18px] items-center justify-center rounded-full bg-primary type-sm text-primary-foreground">
-                          <span className="num">{at + 1}</span>
-                        </span>
-                      ) : null}
+                      <span className="absolute bottom-0 left-0 flex size-[16px] items-center justify-center rounded-full bg-primary type-sm text-primary-foreground">
+                        <span className="num">{at + 1}</span>
+                      </span>
                     </button>
                   </li>
                 )
               })}
+              <li className="type-sm text-muted">
+                <span className="num">{picked.length}</span> to match, in order
+              </li>
             </ul>
           )}
-        </fieldset>
 
-        {/* ── HOW MANY TRIES ──────────────────────────────────────────────────
-            Four separate calls, not a matching set: the routed model draws one
-            picture per call, so these will differ from each other. That is what
-            "show me some options" means and is why the label says options. */}
-        <fieldset className="flex flex-col gap-2">
-          <legend className="type-sm text-muted">How many options?</legend>
-          <div className="flex flex-wrap gap-2" data-guide="studio-count">
-            {Array.from({ length: MAX_TRIES_PER_PRESS }, (_unused, i) => i + 1).map((n) => (
+          {/* ── THE CHIP ROW: WHAT THIS PRESS WILL DO, IN ONE LINE ────────────
+              Each chip is a SUMMARY and an entry point, not a cycling control.
+              A chip that steps through three models would be quick to build and
+              wrong to use: the pickers below carry the reasons a person needs
+              to choose between them, and one of them lists the models we cannot
+              reach yet, which is a door rather than a wall. So a chip opens the
+              settings and the real control keeps its label, its legend and its
+              keyboard behaviour. */}
+          <div className="flex flex-wrap items-center gap-2" data-guide="studio-chips">
+            {[
+              { label: 'Model', value: modelLabel },
+              { label: 'Look', value: rule.label },
+              { label: 'Size', value: chosen?.label ?? 'None' },
+              { label: 'How many', value: String(count) },
+            ].map((chip) => (
               <button
-                key={n}
+                key={chip.label}
                 type="button"
-                onClick={() => setCount(n)}
-                aria-pressed={count === n}
-                className={`surface-ring rounded-card px-3 py-1 type-sm transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-                  count === n ? 'bg-primary text-primary-foreground' : 'bg-s2 text-muted'
-                }`}
+                onClick={() => setSettingsOpen(true)}
+                aria-expanded={settingsOpen}
+                aria-controls="studio-settings"
+                className="surface-ring flex items-center gap-2 rounded-pill bg-s2 px-3 py-1.5 type-sm transition-micro hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               >
-                <span className="num">{n}</span>
+                <span className="text-muted">{chip.label}</span>
+                <span className="font-[550] text-ink">{chip.value}</span>
               </button>
             ))}
+
+            <div className="grow" />
+
+            <button
+              type="button"
+              onClick={() => setSettingsOpen((open) => !open)}
+              aria-expanded={settingsOpen}
+              aria-controls="studio-settings"
+              className="rounded-pill px-2 py-1.5 type-sm text-muted transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              {settingsOpen ? 'Hide settings' : 'Settings'}
+            </button>
+
+            {/* The TOTAL, not the unit price. Somebody who chose four and was
+                shown the price of one has not been told what this press costs. */}
+            <CostLabel
+              action={count === 1 ? 'Make a picture' : `Make ${count} pictures`}
+              cost={cost * count}
+            />
+
+            <Button
+              onClick={generate}
+              loading={busy}
+              disabled={!ready}
+              data-guide="studio-generate"
+            >
+              Make this picture
+            </Button>
           </div>
-          {count === 1 ? null : (
-            <span className="type-sm text-muted">
-              <span className="num">{count}</span> different pictures from the same description, so
-              you can pick. They will not match each other.
-            </span>
+
+          {/* Inside the composer, because it is about THIS press. */}
+          {blocked === null ? null : (
+            <p
+              role="status"
+              className="surface-ring rounded-card bg-s2 px-3 py-2 type-sm text-muted"
+            >
+              {blocked}
+            </p>
           )}
-        </fieldset>
-
-        <label className="flex flex-col gap-1">
-          <span className="type-sm text-muted">What size?</span>
-          <select
-            value={formatId}
-            onChange={(event) => setFormatId(event.target.value)}
-            className="surface-ring h-input w-fit rounded-sm bg-surface px-2 type-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            data-guide="studio-format"
-          >
-            {formats.map((format) => (
-              <option key={format.id} value={format.id}>
-                {format.label}
-              </option>
-            ))}
-          </select>
-          {chosen === null ? null : (
-            <span className="type-sm text-muted">
-              <span className="num">{chosen.width}</span> by{' '}
-              <span className="num">{chosen.height}</span> pixels, for{' '}
-              <span className="num">{chosen.channels.length}</span> of your channels.
-            </span>
-          )}
-        </label>
-
-        {blocked === null ? null : (
-          <p role="status" className="surface-ring rounded-card bg-s2 px-3 py-2 type-sm text-muted">
-            {blocked}
-          </p>
-        )}
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={generate} loading={busy} disabled={!ready} data-guide="studio-generate">
-            Make this picture
-          </Button>
-          {/* The TOTAL, not the unit price. Somebody who chose four and was
-              shown the price of one has not been told what this press costs. */}
-          <CostLabel
-            action={count === 1 ? 'Make a picture' : `Make ${count} pictures`}
-            cost={cost * count}
-          />
         </div>
+
+        {/* ── THE SETTINGS, ON THE SAME OBJECT ────────────────────────────────
+            Its own `data-surface="inverse"`, because the scope does not cross a
+            sibling boundary. `bg-canvas` rather than `bg-surface`, so the two
+            halves read as two zones of one block: in this scope those are
+            #0d0d0d and #171717, a real step rather than the same value twice. */}
+        {settingsOpen ? (
+          <div
+            id="studio-settings"
+            data-surface="inverse"
+            className="flex flex-col gap-4 rounded-xl bg-canvas p-4 shadow-lg"
+          >
+            {/* ── WHAT SAHODA WILL ADD, BEFORE ANYTHING IS SPENT ────────────
+                The same array the action stores on the row, so the screen and
+                the record cannot disagree. Three states and never two: a read
+                that failed is not a workspace with nothing to add, and Explore
+                deliberately sends nothing at all. */}
+            <div className="flex flex-col gap-2" data-guide="studio-signals">
+              <span className="type-eyebrow text-muted">Will send</span>
+              {signals === null ? (
+                <p className="type-sm text-muted">
+                  Sahoda could not read your Brand Brain just now, so it cannot show what it would
+                  add. The picture can still be drawn.
+                </p>
+              ) : signals.length === 0 ? (
+                <p className="type-sm text-muted">
+                  Nothing from your Brand Brain. Fill it in and pictures start looking like your
+                  business rather than generic.
+                </p>
+              ) : (
+                <>
+                  <ul className="flex flex-wrap gap-2">
+                    {signals.map((signal) => (
+                      <li
+                        key={signal.field}
+                        className="flex items-center gap-2 rounded-pill bg-s2 px-3 py-1 type-sm text-ink"
+                      >
+                        <span
+                          aria-hidden
+                          className={`size-[6px] shrink-0 rounded-full ${
+                            signal.certainty === 'confirmed' ? 'bg-primary' : 'surface-ring-firm'
+                          }`}
+                        />
+                        {signal.value}
+                        <span className="sr-only">
+                          {signal.certainty === 'confirmed'
+                            ? ', which you confirmed'
+                            : ', which Sahoda guessed'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="type-sm text-muted">
+                    A hollow dot is one Sahoda worked out for you. Confirm it in the Brand Brain and
+                    the picture stops drifting between one attempt and the next.
+                  </p>
+                </>
+              )}
+            </div>
+
+            <div className="h-px bg-line" />
+
+            {/* ── ABOVE THE MODES, BECAUSE IT CHANGES WHAT THEY CAN DO ───────
+                Picking a model that draws a whole set in one call is what makes
+                "a set that matches" appear at all, and it moves the reference
+                limit from three to fourteen. A control that changes the options
+                below it belongs above them. */}
+            <ModelPicker
+              modelId={modelId}
+              onChoose={(next) => {
+                setNote(null)
+                setModelId(next)
+                // Trimmed to what the NEW model will look at. Carrying eight
+                // references onto a model that takes three would send a request
+                // the action refuses, after the person had already chosen them.
+                setPicked((current) => current.slice(0, ruleFor(mode, next).maxReferences))
+                // And off a mode the new model cannot do. Leaving somebody on a
+                // greyed-out Series is a dead end they did not create.
+                if (!ruleFor(mode, next).ready) setMode('on_brand')
+              }}
+            />
+
+            <fieldset className="flex flex-col gap-2">
+              <legend className="type-sm text-muted">How should Sahoda approach it?</legend>
+              <div className="grid gap-2 narrow:grid-cols-3 max-narrow:grid-cols-1">
+                {readyModes(modelId).map((option) => (
+                  <button
+                    key={option.mode}
+                    type="button"
+                    onClick={() => chooseMode(option.mode)}
+                    aria-pressed={mode === option.mode}
+                    className={`surface-ring rounded-card px-3 py-2 text-left transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                      mode === option.mode
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-s2 text-muted'
+                    }`}
+                  >
+                    <span className="block type-sm font-[550]">{option.label}</span>
+                    <span className="block type-sm">{option.what}</span>
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            {/* ── WHAT TO MATCH ────────────────────────────────────────────────
+                Shown in EVERY mode, including the one that ignores references.
+                This used to be hidden for Explore, on the reasoning that
+                offering a picker would invite a choice the mode then ignores.
+                That reasoning stopped being true the moment picking one MOVED
+                you to the mode that uses it: the choice is now honoured rather
+                than ignored, and hiding the control only hides the shortest
+                route to what a person meant. */}
+            <fieldset className="flex flex-col gap-2" data-guide="studio-references">
+              <legend className="type-sm text-muted">
+                {rule.maxReferences === 0
+                  ? 'Picking a picture here moves you to Match a picture.'
+                  : rule.minReferences > 0
+                    ? 'Which picture should Sahoda match?'
+                    : 'Anything Sahoda should match? (optional)'}
+              </legend>
+
+              {/* ── THE UPLOAD FOLLOWS THE SAME RULE THE TILES DO ───────────────
+                  `disabled={picked.length >= rule.maxReferences}` read `0 >= 0`
+                  in Explore, so adding from the device was dead the moment the
+                  mode opened — while the legend directly above promised
+                  "Picking a picture here moves you to Match a picture" and
+                  `toggleReference` did exactly that for every tile below. The
+                  one route that did not get the mode switch was the one a
+                  person with a new photograph would take, and nothing on the
+                  screen said why. */}
+              <ReferenceUpload
+                disabled={rule.maxReferences > 0 && picked.length >= rule.maxReferences}
+                onAdded={(assetId) => {
+                  setNote(null)
+                  // Explore uses no reference by definition, so adding one means
+                  // the other mode. Same move, same sentence, as picking a tile.
+                  if (rule.maxReferences === 0) {
+                    setMode('match')
+                    setPicked([assetId])
+                    setNote('Explore ignores a picture, so Sahoda moved you to Match a picture.')
+                    router.refresh()
+                    return
+                  }
+                  // Selected at once. Somebody who adds a picture to match wants
+                  // to match it, and it appears in the grid below on the refresh
+                  // already chosen.
+                  setPicked((current) =>
+                    current.includes(assetId) || current.length >= rule.maxReferences
+                      ? current
+                      : [...current, assetId],
+                  )
+                  router.refresh()
+                }}
+              />
+
+              {library.length === 0 ? (
+                <p className="surface-ring rounded-card bg-s2 px-3 py-2 type-sm text-muted">
+                  You have no pictures yet. Add one from this device, or make one below, and it
+                  appears here to match.
+                </p>
+              ) : (
+                <ul className="grid grid-cols-4 gap-2">
+                  {library.map((picture) => {
+                    // The POSITION, not a yes. `signReferences` sends them in
+                    // pick order and the first weighs most, so an order-free
+                    // tick hides something the model acts on.
+                    const at = picked.indexOf(picture.assetId)
+                    const on = at !== -1
+                    return (
+                      <li key={picture.assetId}>
+                        <button
+                          type="button"
+                          onClick={() => toggleReference(picture.assetId)}
+                          aria-pressed={on}
+                          aria-label={
+                            on
+                              ? `${picture.title ?? 'A picture in your library'}, picked ${at + 1} of ${picked.length}`
+                              : (picture.title ?? 'A picture in your library')
+                          }
+                          className={`surface-ring relative block w-full overflow-hidden rounded-card transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                            on ? 'ring-2 ring-accent' : ''
+                          }`}
+                        >
+                          {picture.url === null ? (
+                            <span className="flex aspect-square items-center justify-center bg-s2 type-sm text-muted">
+                              no preview
+                            </span>
+                          ) : (
+                            // eslint-disable-next-line @next/next/no-img-element -- as above.
+                            <img
+                              src={picture.url}
+                              alt={picture.title ?? 'A picture in your library'}
+                              className="aspect-square w-full object-cover object-top"
+                            />
+                          )}
+                          {on ? (
+                            <span className="absolute right-1 top-1 flex size-[18px] items-center justify-center rounded-full bg-primary type-sm text-primary-foreground">
+                              <span className="num">{at + 1}</span>
+                            </span>
+                          ) : null}
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </fieldset>
+
+            {/* ── HOW MANY TRIES ──────────────────────────────────────────────
+                Four separate calls, not a matching set: the routed model draws
+                one picture per call, so these will differ from each other. That
+                is what "show me some options" means and is why the label says
+                options. */}
+            <fieldset className="flex flex-col gap-2">
+              <legend className="type-sm text-muted">How many options?</legend>
+              <div className="flex flex-wrap gap-2" data-guide="studio-count">
+                {Array.from({ length: MAX_TRIES_PER_PRESS }, (_unused, i) => i + 1).map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setCount(n)}
+                    aria-pressed={count === n}
+                    className={`surface-ring rounded-card px-3 py-1 type-sm transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                      count === n ? 'bg-primary text-primary-foreground' : 'bg-s2 text-muted'
+                    }`}
+                  >
+                    <span className="num">{n}</span>
+                  </button>
+                ))}
+              </div>
+              {count === 1 ? null : (
+                <span className="type-sm text-muted">
+                  <span className="num">{count}</span> different pictures from the same description,
+                  so you can pick. They will not match each other.
+                </span>
+              )}
+            </fieldset>
+
+            <label className="flex flex-col gap-1">
+              <span className="type-sm text-muted">What size?</span>
+              <select
+                value={formatId}
+                onChange={(event) => setFormatId(event.target.value)}
+                className="surface-ring h-input w-fit rounded-sm bg-s2 px-2 type-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                data-guide="studio-format"
+              >
+                {formats.map((format) => (
+                  <option key={format.id} value={format.id}>
+                    {format.label}
+                  </option>
+                ))}
+              </select>
+              {chosen === null ? null : (
+                <span className="type-sm text-muted">
+                  <span className="num">{chosen.width}</span> by{' '}
+                  <span className="num">{chosen.height}</span> pixels, for{' '}
+                  <span className="num">{chosen.channels.length}</span> of your channels.
+                </span>
+              )}
+            </label>
+          </div>
+        ) : null}
 
         {note === null ? null : (
           <p role="alert" className="type-sm text-ink">
