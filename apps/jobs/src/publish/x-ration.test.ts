@@ -31,7 +31,32 @@ import {
 
 const ctx: PublishJobContext = { attempt: 1, jobRunId: 'run_ration' }
 
-/** The monthly ration's window is the only one that starts on the 1st at midnight. */
+/**
+ * THE CLOCK IS PINNED, AND THAT IS THE WHOLE POINT OF THIS CONSTANT.
+ *
+ * `isMonthWindow` below tells the two reads apart by asking whether the window
+ * starts on the 1st at midnight. That is true of the monthly window always, and
+ * of the DAILY window on the first of every month, when the two coincide
+ * exactly. On that one day the discriminator answers `true` for both, the daily
+ * read throws as well, and the per-day guard refuses first: the unreadable case
+ * below then sees `PER_DAY_CAP_UNREADABLE` where it expects
+ * `X_MONTHLY_RATION_UNREADABLE`.
+ *
+ * MEASURED 2026-09-01: that is exactly what happened. This file passed in CI on
+ * 2026-08-31 (9 tests, 28ms) and failed one test locally the next morning with
+ * no code change between the two. A test whose result depends on the calendar
+ * is not a guard; it is a guard for 30 days out of 31.
+ *
+ * `runPublishPost` already takes `now` (`PublishPostDeps.now`, defaulting to
+ * `new Date()`), so pinning it costs nothing and both windows are derived from
+ * it. Any instant that is not the 1st works; this one is arbitrary and fixed.
+ */
+const NOW = new Date('2026-08-17T09:30:00.000Z')
+
+/**
+ * The monthly ration's window is the only one that starts on the 1st at
+ * midnight, GIVEN a `now` that is not itself the 1st. See `NOW` above.
+ */
 const isMonthWindow = (since: Date): boolean =>
   since.getUTCDate() === 1 && since.getUTCHours() === 0
 
@@ -106,6 +131,7 @@ function harness(
 
   const deps: PublishPostDeps = {
     mode: 'fixture',
+    now: () => NOW,
     gate,
     countLiveSends: async (args) => {
       spend.countedFor.push(args)
