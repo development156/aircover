@@ -1,6 +1,7 @@
 # Handoff — divas — wt-divas2 — 2026-09-01
 
-**Branch** `wt-divas2` at `2fbefd01`, which is this handoff and the two mesh
+**Branch** `wt-divas2` at `40c232e1`, which is `lane-sync`'s merge of `wt-core`
+(the lane was **138 behind**) on top of `03499609`, this handoff and the two mesh
 guards it describes writing. The Studio work it reports ends at `bb117725`.
 Lane `wt-divas2`. Pushed: yes.
 
@@ -38,8 +39,13 @@ above. 106 files changed against `origin/wt-core`, 10978 insertions.
   untested and I am not claiming it.** Someone with the Actions tab open should
   dispatch `gate.yml` → `smoke` with `ack_target=rloztdhzfliyvpvxsgjl`.
 - **`wt-core` push not done.** `lane-sync push` prints the gate to run before it;
-  the gate is not fully green (see below) and my brief forbids pushing to another
-  branch without explicit permission. Asked once, not granted, not worked around.
+  the gate is **not green** on two legs, neither of them this lane's, and my brief
+  forbids pushing to another branch without explicit permission. Asked once, not
+  granted, not worked around.
+- **`packages/db/tests/live-guard.test.ts` left RED and untouched.** It is a
+  guard written after a production write incident, `packages/db` is `wt-db`'s by
+  the CLAUDE.md rule, and making it green is a judgement about the secrets that
+  were just added rather than a test fix. Written up in full under Gate.
 - **`ops/state/changelog.pending.json` and `ops/state/qa.pending.json` restored,
   not committed.** They are scratch queues drained by the sync and gate hooks;
   the pre-commit hook refuses `qa.pending.json` by name, and the changelog entry
@@ -141,8 +147,10 @@ nobody can call is a boundary nobody can prove.
    Repository secrets now exist; dispatch `gate.yml` → `smoke` by hand with
    `ack_target=rloztdhzfliyvpvxsgjl` and read the result. Do not un-skip a spec
    that skipped for want of a key.
-2. **Fix or hand back the `@sahoda/jobs` failure** — it is `wt-core`'s, and
-   `wt-core` cannot take this lane until it is green.
+2. **Two red legs block `wt-core` taking this lane**, and neither is this
+   lane's to fix: `@sahoda/jobs` is trunk's, and `@sahoda/db`'s live-guard is a
+   `wt-db` decision about the newly-added ambient secrets. Both are written up
+   under Gate below. Do not narrow either guard to get green.
 3. **Make generation asynchronous.** The server action still waits on the model
    inside the request. A slow model is a timeout today.
 4. **`image_tier` and `seed`** are null on every row. The column exists because
@@ -151,24 +159,33 @@ nobody can call is a boundary nobody can prove.
 
 ## Gate
 
-MEASURED 2026-09-01 on `wt-divas2` at `bb117725`, `--force` on every leg so
-nothing is a cache replay.
+MEASURED 2026-09-01 on `wt-divas2` at `40c232e1`, **after** `lane-sync` took the
+138 commits of `wt-core` this lane was behind. `--force` on every leg, so nothing
+is a cache replay, and nothing was piped.
 
 | Leg | Result |
 | --- | --- |
-| `turbo run typecheck lint test --force` | **24 of 27 tasks passed**; `@sahoda/jobs#test` FAILED |
-| `@sahoda/web` alone | **PASS** — 531 files passed / 3 skipped, 7022 tests passed / 13 skipped |
-| `@sahoda/shared` | PASS — 465 passed |
+| `turbo run typecheck lint test --force` | **24 of 27 tasks passed**; `@sahoda/jobs#test` FAILED, and two more were killed with it |
+| `@sahoda/web` alone | **PASS** — 576 files passed / 3 skipped, 7592 tests passed / 13 skipped |
 | `@sahoda/mesh` | PASS — 219 passed (27 files) |
-| `@sahoda/publishing` | PASS — 473 passed |
-| `@sahoda/sites` | PASS — 1566 passed |
-| `@sahoda/billing` | PASS — 401 passed / 13 skipped |
-| `@sahoda/research` | PASS — 195 passed |
-| `@sahoda/jobs` | **FAIL** — 1 failed / 395 passed (396) |
+| `@sahoda/shared` | PASS |
+| `@sahoda/publishing` | PASS |
+| `@sahoda/sites` | PASS |
+| `@sahoda/billing` | PASS |
+| `@sahoda/research` | PASS |
+| `@sahoda/jobs` | **FAIL** — 1 failed / 408 passed (409) |
+| `@sahoda/db` alone | **FAIL** — 1 failed / 836 passed / 207 skipped (1044) |
 | `prettier --check .` | PASS |
 | Playwright `@smoke` | **UNRUN** |
 
-The one failure, reproducing deterministically in isolation:
+**Note on reading the log.** Turbo reported `@sahoda/db` and `@sahoda/web` with
+an `[ELIFECYCLE] Test failed` line when jobs died, and both were re-run alone for
+a number worth quoting. Web is green; db is red for its own separate reason. A
+grouped turbo log is not a per-package result.
+
+### The two failures, and whose they are
+
+**1 — `@sahoda/jobs`, and it is `wt-core`'s.**
 
 ```
 FAIL src/publish/x-ration.test.ts > the X monthly ration, on the publish path
@@ -180,10 +197,50 @@ AssertionError: expected { Object (code, classification, ...) } to match object
   src/publish/x-ration.test.ts:279:34
 ```
 
-Note on reading the log: turbo **truncated the `@sahoda/web` output** when jobs
-failed, attaching `[ELIFECYCLE] Test failed` to the web prefix. That is why web
-was re-run alone for a number worth quoting. A grouped log is not a per-package
-result.
+MEASURED: my commits touch **0** files under `apps/jobs`. MEASURED: it still
+fails identically after taking the 138 newest `wt-core` commits, so it is not
+something an older checkout of trunk had already fixed. INFERRED: it arrived
+through `4525a3ab feat(publishing): [contract] keywords replace hashtags`, which
+`git merge-base --is-ancestor` confirms is already in `origin/wt-core`.
+
+**2 — `@sahoda/db`, and it is NEW TODAY because the secrets were added.**
+
+```
+FAIL tests/live-guard.test.ts > live-test guard
+  > does not read the repo-root .env while the flag is absent
+AssertionError: expected 'postgresql://postgres:…' to be ''
+  tests/live-guard.test.ts:31:23
+```
+
+**The dangerous property is INTACT and this is not a live run.** MEASURED:
+`SAHODA_ALLOW_LIVE_TESTS` is absent, so `LIVE` is false, so `loadEnv` never ran
+and `hasLedgerEnv` and `hasRlsEnv` are both false. No suite touched production.
+
+What actually changed is narrower than the test's name suggests. The guard was
+written to assert that **no credential enters the process at all** while the flag
+is off, and it checked that by reading `process.env.SUPABASE_DB_URL`. That was a
+sound check while the only route in was the repo-root `.env`, which `loadEnv`
+gates. It is no longer sound: `SUPABASE_DB_URL` and `SUPABASE_SERVICE_ROLE_KEY`
+are now **exported into the process ambiently** by the cloud environment, from
+the secrets added this week. MEASURED: both are set in this shell; a repo-root
+`.env` also exists.
+
+So the assertion is false for a reason the code cannot control, and the guard is
+doing exactly what a guard should — it went red the moment the ground moved.
+
+**I did not change it.** It was written after a run that wrote to production on
+2026-07-27 (`docs/audit/2026-07-27/04-risks-and-unknowns.md` R-01), and narrowing
+it to keep a suite green is the precise move that incident was about. It belongs
+to whoever owns `packages/db`, and the decision is theirs: either the ambient
+export is itself the thing to remove, or the guard's second assertion narrows to
+the claim it can still make (the FLAG closes the gate) while the "no credential
+in the process" claim is retired as no longer true. **`packages/db` is also not
+this lane's to edit** — the CLAUDE.md rule is that only `wt-db` touches it.
+
+**One thing to fix regardless of which way that goes:** the failure output prints
+the production database connection string, password included, into the test log.
+Anywhere that suite runs red with the secret set, the credential lands in a CI
+log. That is worth a `toBe('')` that reports a length rather than a value.
 
 **Look at it:** the Studio is at
 `https://sahodalabs-git-wt-divas2-development-4417s-projects.vercel.app/studio`.
