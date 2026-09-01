@@ -211,8 +211,30 @@ export function placeLogo(input: {
   // at half a pixel, where rounding the two independently would let it grow with
   // the aspect. A sub-pixel mark still gets one pixel: it is a silly output, but
   // an empty rect would be a silently invisible logo.
-  const markHeight = Math.max(1, Math.round(height))
-  const markWidth = Math.max(1, Math.round(markHeight * logoAspect))
+  let markHeight = Math.max(1, Math.round(height))
+  let markWidth = Math.max(1, Math.round(markHeight * logoAspect))
+
+  // ── AND THEN THE WIDTH CAP IS RE-CHECKED, BECAUSE THAT DERIVATION LEAVES IT ─
+  // The line above multiplies the ROUNDED height by the UNCAPPED aspect, which
+  // walks straight back past the `maxWidth` the scaling established. Two things
+  // compound: `Math.max(1, …)` re-inflates a height the caps had taken below a
+  // pixel, and the aspect is then applied to that.
+  //
+  // MEASURED on a real 1080x1080 canvas, cap 346px: an aspect-10 wordmark
+  // shipped 350, aspect 16 shipped 352. At the extreme it stops being a rounding
+  // question — canvas 200x200 with aspect 200 produced a clear box 202px wide,
+  // placed at x = -2, off the canvas the file's header calls structurally
+  // impossible. `assertUsableAspect` admits any positive finite aspect, so that
+  // input is reachable rather than theoretical.
+  //
+  // Held to the cap by width, with the height re-derived from it. At an aspect
+  // this extreme the half-pixel aspect promise cannot also be kept, and a mark
+  // inside its own canvas is the one that matters.
+  const widthCeiling = Math.max(1, Math.floor(maxWidth))
+  if (markWidth > widthCeiling) {
+    markWidth = widthCeiling
+    markHeight = Math.max(1, Math.round(markWidth / logoAspect))
+  }
 
   const margin = Math.max(1, Math.round(markHeight * CLEAR_SPACE_SHARE))
   const clearWidth = markWidth + margin * 2
