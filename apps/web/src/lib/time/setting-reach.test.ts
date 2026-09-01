@@ -58,9 +58,16 @@ describe('the time zone setting’s reach', () => {
     expect(upcoming).toMatch(/resolveDisplayZone/)
 
     // And the week grid's caption must read in the zone it is DRAWN in, or the
-    // card contradicts itself.
+    // card contradicts itself. The CLAIM is "same zone as the placement", not a
+    // particular function: the chips now print the clock alone and the grid
+    // states its zone once on the rail, because repeating the suffix truncated
+    // the certainty word out of a 100px column.
     const timeline = read('components/planner/week-timeline.tsx')
-    expect(timeline).toMatch(/formatScheduledTime\(post\.scheduled_at, PLANNER_GRID_ZONE\)/)
+    expect(timeline).toMatch(/format\w+\(post\.scheduled_at, PLANNER_GRID_ZONE\)/)
+    // The zone is still SAID, once, rather than quietly dropped.
+    expect(timeline).toMatch(/zoneLabel\(PLANNER_GRID_ZONE/)
+    // And never in the workspace's zone, which is the contradiction itself.
+    expect(timeline).not.toMatch(/format\w+\(post\.scheduled_at, zone\)/)
   })
 
   it('is not described as doing nothing, now that it does something', () => {

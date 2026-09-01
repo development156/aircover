@@ -285,10 +285,27 @@ export function StudioWorkbench({
                 : 'Anything Sahoda should match? (optional)'}
           </legend>
 
+          {/* ── THE UPLOAD FOLLOWS THE SAME RULE THE TILES DO ─────────────────
+              `disabled={picked.length >= rule.maxReferences}` read `0 >= 0` in
+              Explore, so adding from the device was dead the moment the mode
+              opened — while the legend directly above promised "Picking a
+              picture here moves you to Match a picture" and `toggleReference`
+              did exactly that for every tile below. The one route that did not
+              get the mode switch was the one a person with a new photograph
+              would take, and nothing on the screen said why. */}
           <ReferenceUpload
-            disabled={picked.length >= rule.maxReferences}
+            disabled={rule.maxReferences > 0 && picked.length >= rule.maxReferences}
             onAdded={(assetId) => {
               setNote(null)
+              // Explore uses no reference by definition, so adding one means the
+              // other mode. Same move, same sentence, as picking a tile.
+              if (rule.maxReferences === 0) {
+                setMode('match')
+                setPicked([assetId])
+                setNote('Explore ignores a picture, so Sahoda moved you to Match a picture.')
+                router.refresh()
+                return
+              }
               // Selected at once. Somebody who adds a picture to match wants
               // to match it, and it appears in the grid below on the refresh
               // already chosen.

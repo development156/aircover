@@ -106,6 +106,14 @@ export function PictureActions({
               router.push(`/posts/${result.postId}`)
               return
             }
+            // A draft that exists is still somewhere to go. The attach is the
+            // half that failed, so the sentence travels WITH them rather than
+            // stranding them here beside a post they cannot see.
+            if (result.postId !== undefined) {
+              setNote(result.message)
+              router.push(`/posts/${result.postId}`)
+              return
+            }
             setNote(result.message)
           }}
           Icon={PenLine}

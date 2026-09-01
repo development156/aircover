@@ -5,8 +5,9 @@ import { certaintyFor } from '@/lib/posts/certainty'
 import type { DisplayPost } from '@/lib/posts/display-post'
 import { outcomeOf } from '@/lib/posts/publish-evidence'
 import type { VariantStatusRow } from '@/lib/posts/variant-status'
-import { formatScheduledTime } from '@/lib/posts/schedule-format'
+import { formatScheduledClock } from '@/lib/posts/schedule-format'
 import { PLANNER_GRID_ZONE, hourRange, istDayKey, placeDay } from '@/lib/planner/week-window'
+import { zoneLabel } from '@/lib/time/zone'
 import { cn } from '@/lib/utils'
 
 import { NowLine } from './now-line'
@@ -99,7 +100,14 @@ export function WeekTimeline({ days, posts, variantStates, today }: WeekTimeline
       <div className="min-w-[760px]">
         {/* HEADER */}
         <div className="grid grid-cols-[56px_repeat(7,1fr)] border-b border-line-soft">
-          <div />
+          {/* The zone every time in this grid is read in, said once. The cards
+              carry the clock alone so the certainty word beside it survives a
+              100px column. */}
+          <div className="flex items-end justify-end px-2 py-2.5">
+            <span className="type-eyebrow text-ink-mute">
+              {zoneLabel(PLANNER_GRID_ZONE, today)}
+            </span>
+          </div>
           {days.map((day) => {
             const isToday = istDayKey(day) === todayKey
             return (
@@ -194,12 +202,12 @@ export function WeekTimeline({ days, posts, variantStates, today }: WeekTimeline
                         </span>
                       </span>
                       <span className="truncate type-eyebrow text-ink-mute">
-                        {/* THE GRID'S ZONE, not the workspace's. This card's
-                            column and row are computed in `PLANNER_GRID_ZONE`,
-                            so a caption in any other zone contradicts the place
-                            the card is drawn. The planner moves zone as a whole
-                            or not at all. */}
-                        {formatScheduledTime(post.scheduled_at, PLANNER_GRID_ZONE)}
+                        {/* The clock alone. The zone is stated ONCE, on the
+                            hour rail's header, because every card here is placed
+                            by PLANNER_GRID_ZONE — so it is a fact about the grid
+                            and not about each card. Repeating it truncated the
+                            certainty word out of a 100px column. */}
+                        {formatScheduledClock(post.scheduled_at, PLANNER_GRID_ZONE)}
                         {certainty.label !== null ? ` · ${certainty.label}` : null}
                       </span>
                     </Link>
