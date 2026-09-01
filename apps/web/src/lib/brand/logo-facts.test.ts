@@ -83,7 +83,12 @@ async function build(
       channels,
       background:
         channels === 4
-          ? { r: background.r, g: background.g, b: background.b, alpha: (background.alpha ?? 255) / 255 }
+          ? {
+              r: background.r,
+              g: background.g,
+              b: background.b,
+              alpha: (background.alpha ?? 255) / 255,
+            }
           : { r: background.r, g: background.g, b: background.b },
     },
   })
