@@ -78,7 +78,25 @@ import { credits as creditsPhrase } from '@/lib/credit-words'
 /** The bucket `assets` already uses, and whose tenant policies already cover us. */
 const BUCKET = 'media'
 
-export type { KnowledgeActionState } from '@/lib/knowledge/ingest'
+/**
+ * ── THE TYPE IS IMPORTED, NEVER RE-EXPORTED ──────────────────────────────────
+ * This line was `export type { KnowledgeActionState } from '@/lib/knowledge/ingest'`
+ * and it made the DEV SERVER return 500 on /onboarding: Next allows a
+ * `'use server'` module to export async functions and nothing else, and it
+ * counts a type re-export as an export. MEASURED, `next dev`:
+ * "Only async functions are allowed to be exported in a 'use server' file",
+ * traced through `onboarding-stage.tsx`, so every browser test that bootstraps a
+ * workspace was blocked.
+ *
+ * `tsc` and `next build` both pass on it, which is why it reached the lane: the
+ * type is erased before either of them looks, and only the dev compiler enforces
+ * the rule.
+ *
+ * Nothing replaces it here — line 18 already imports the same type for this
+ * file's own use — and the one consumer that read it through this module,
+ * `components/knowledge/add-document.tsx`, now imports it from the module that
+ * declares it.
+ */
 
 const SIGNED_OUT: KnowledgeActionState = { ok: false, message: 'Sign in to add to your library.' }
 

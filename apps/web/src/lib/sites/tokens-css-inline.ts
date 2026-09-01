@@ -175,6 +175,20 @@ export const TOKENS_CSS = `/* ==================================================
   --canvas: #fafafa; /* the page ground — NO LONGER white */
   --surface: #ffffff; /* cards, panels, sheets */
   --surface-2: #f2f2f3; /* a well INSIDE a card — inputs, code, table heads */
+
+  /* ── INK DRAWN ON A CUSTOMER'S PHOTOGRAPH ──────────────────────────────────
+     Not app chrome. These are the marks somebody draws ON their own picture in
+     the Studio, and they are DELIBERATELY THEME-INDEPENDENT: a photograph does
+     not follow our light and dark modes, so ink that flipped with the interface
+     would vanish on half of everybody's pictures. A brand accent is worse still,
+     since an orange arrow on a photograph of a sunset is invisible.
+
+     Two of them, always drawn as a pair: the light stroke carries the edge
+     behind it, so the mark reads on a night sky and on a white wall alike. They
+     live here rather than as literals in the renderer because a colour anywhere
+     in this product is a token, including one that lands on a canvas. */
+  --photo-ink: #ffffff;
+  --photo-ink-edge: #111111;
   --surface-3: #e9e9eb; /* hover / pressed */
   /* Hairlines. Softer than v4's #dcdcdc because they are no longer doing the
      structural work — the fill is. A line at v4's weight over the new fill

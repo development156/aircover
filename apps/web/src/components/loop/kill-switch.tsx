@@ -51,14 +51,33 @@ export function KillSwitch() {
   }
 
   return (
-    <section aria-labelledby="loop-kill" className="surface-ring rounded-card bg-surface p-4">
-      <h2 id="loop-kill" className="type-h3 text-ink">
-        Stop everything
-      </h2>
-      <p className="type-body mt-1 max-w-[68ch] text-muted">
-        Takes every post the Loop scheduled off the calendar and pauses it. Your drafts stay in the
-        Planner. Nothing is deleted.
-      </p>
+    <section
+      aria-labelledby="loop-kill"
+      className="surface-ring rounded-card bg-danger-bg p-5 max-narrow:p-4"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+        <div className="flex items-start gap-3">
+          <OctagonX
+            size={18}
+            strokeWidth={1.8}
+            aria-hidden
+            className="mt-icon-nudge shrink-0 text-danger"
+          />
+          <div className="min-w-0">
+            <h2 id="loop-kill" className="type-h3 text-ink">
+              Stop everything
+            </h2>
+            <p className="type-body mt-1 max-w-[68ch] text-muted">
+              Takes every post the Loop scheduled off the calendar and pauses it. Your drafts stay
+              in the Planner. Nothing is deleted.
+            </p>
+          </div>
+        </div>
+        <Button variant="secondary" onClick={() => setOpen(true)} className="shrink-0">
+          <OctagonX size={15} strokeWidth={1.8} aria-hidden />
+          Stop the Loop
+        </Button>
+      </div>
 
       {result ? (
         <p role="status" className="type-sm mt-3 text-ink">
@@ -70,13 +89,6 @@ export function KillSwitch() {
           {error}
         </p>
       ) : null}
-
-      <div className="mt-3">
-        <Button variant="secondary" onClick={() => setOpen(true)}>
-          <OctagonX size={15} strokeWidth={1.8} aria-hidden />
-          Stop the Loop
-        </Button>
-      </div>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Stop the Loop?">
         <p className="type-body text-muted">

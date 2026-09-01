@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures/seeded-user'
-import { bootstrapWorkspace, leaveOnboarding } from './fixtures/compose'
+import { bootstrapWorkspace, leaveOnboarding, dismissPlanOffer } from './fixtures/compose'
 import { decodePng, luminanceAt } from './helpers/png'
 
 /**
@@ -86,6 +86,7 @@ for (const theme of ['light', 'dark'] as const) {
     await bootstrapWorkspace(page)
     await leaveOnboarding(page)
     await page.goto('/home')
+    await dismissPlanOffer(page)
 
     const viewport = page.viewportSize()!
     // A fixed point well away from where the panel will open, so the only thing

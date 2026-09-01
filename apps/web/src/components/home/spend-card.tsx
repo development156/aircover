@@ -1,7 +1,7 @@
 import { Info, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 
-import { Bars, type BarPoint } from '@/components/charts/bars'
+import { SpendTrend, type SpendPoint } from '@/components/charts/spend-trend'
 import { ChartSparse, Panel, PanelHead } from '@/components/charts/panel'
 import { CountUp } from '@/components/motion/count-up'
 import { Unreadable } from '@/components/design-system/absence-row'
@@ -56,12 +56,22 @@ import { SpendBars } from './spend-bars'
  * baseline — which is a designed apology and still an apology. It now shows the
  * one day that was spent on.
  *
- * ── BARS, NOT AN AREA ────────────────────────────────────────────────────────
+ * ── A CONNECTED LINE, AND WHAT MADE THAT SAFE ────────────────────────────────
+ * This said "BARS, NOT AN AREA" until 2026-08-29, on an argument that was
+ * correct and is worth keeping in view: a line INTERPOLATES, so a run of
+ * measured zeroes renders identically to a stretch nobody looked at, and that
+ * is the one distinction this chart exists to make.
+ *
+ * What the argument turns on is the SECOND half of its own first sentence.
  * Every one of the thirty days is MEASURED: the ledger was read for the whole
- * window, and a day with no rows genuinely had no spend. That is the one series
- * on either screen where a zero is knowledge rather than an absence, and `Bars`
- * is the chart that can say so — a measured zero draws a stub at the baseline,
- * where a line chart would draw the same flat run as a gap in the data.
+ * window, and a day with no rows genuinely had no spend. So on this series
+ * there is no gap to interpolate across, and a segment between two adjacent
+ * measured days invents nothing. `SpendTrend` still breaks its path at a
+ * `null`, so the guarantee survives for any caller that does have gaps.
+ *
+ * The founder asked for the reference's thin line, subtle fill, average rule
+ * and hover value on 2026-08-29. `Bars` is left in the tree with its
+ * measurements intact and is no longer rendered anywhere.
  *
  * ── THE TOTAL: A REAL ZERO IS KNOWLEDGE, AN UNREADABLE ONE IS NOT ────────────
  * `spend.total` is 0 in BOTH the `empty` and the `unreadable` states, and this
@@ -99,7 +109,7 @@ export function SpendCard({ spend }: { spend: SpendRead }) {
     ? dayLabel(spend.days[spend.days.length - 1]!.date)
     : undefined
 
-  const points: BarPoint[] = spend.days.map((day) => ({
+  const points: SpendPoint[] = spend.days.map((day) => ({
     label: dayLabel(day.date),
     // Never null: every day in this window was read, so every day is measured
     // and a 0 is a real reading of "nothing was charged".
@@ -141,7 +151,7 @@ export function SpendCard({ spend }: { spend: SpendRead }) {
 
       {hasChart ? (
         <>
-          <Bars points={points} unit="credits" />
+          <SpendTrend points={points} unit="credits" />
           {/* THE FLOOR'S REAL JOB, IN WORDS. One tall bar in thirty is honest
               and it is not a trend, so the caption says how many days had
               activity rather than the chart withholding itself. Above three the
