@@ -6,6 +6,8 @@ import { redirect } from 'next/navigation'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { z } from 'zod'
 
+import { describeZoneRefusal, isKnownZone } from '@/lib/time/zone'
+
 import { slugify } from '@/lib/slug'
 import { createServerSupabase } from '@/lib/supabase/server'
 import {
@@ -141,25 +143,30 @@ export async function setActiveWorkspace(formData: FormData): Promise<void> {
  * stays out: it IS a pointer, and this is not.
  */
 /**
- * A zone name this runtime can actually resolve.
+ * A zone name this runtime can actually resolve — THE SAME TEST THE READERS USE.
  *
- * `Intl.DateTimeFormat` throws `RangeError` on a zone it does not know, which
- * makes it the real test rather than a shape test. `Asia/Kolkatta` is one
- * keystroke from the real zone, would pass any regex, and would then quietly
- * shift every hour this product ever reports for that customer.
+ * ── THE WRITE GATE WAS WIDER THAN THE READ GATE ──────────────────────────────
+ * This used to be a local `isRealTimezone`: a bare `new Intl.DateTimeFormat`
+ * try/catch. `lib/time/zone.ts`'s `isKnownZone`, which every screen consults
+ * before rendering a time, additionally refuses a leading `+`/`-` and anything
+ * without a `/` (except `UTC`). So the two disagreed, and the save side was the
+ * generous one.
  *
- * The database trigger `workspaces_timezone_is_real` refuses the same value, so
- * this is the first of two independent checks rather than the only one. It is
- * here so the customer gets a sentence instead of a failed write.
+ * MEASURED on this Node: `IST`, `Japan`, `Singapore`, `Egypt`, `EST5EDT` and
+ * `+05:30` were all ACCEPTED and stored, and `isKnownZone` rejects every one.
+ * The customer saved, the field read the value back to them as saved, and every
+ * screen went on rendering IST with nothing anywhere saying the setting had been
+ * ignored. A setting that silently changes nothing is the defect this file's own
+ * comment names two paragraphs down.
+ *
+ * Importing the reader's predicate rather than restating it is the point: two
+ * copies of a rule are two rules, and these two had already drifted.
+ *
+ * The database trigger `workspaces_timezone_is_real` is a second, INDEPENDENT
+ * check and is deliberately not described as equivalent: it refuses
+ * `Asia/Kolkatta` and accepts `IST`, so it is wider than this. Narrowing it
+ * needs a migration, which is wt-db's to write.
  */
-function isRealTimezone(zone: string): boolean {
-  try {
-    new Intl.DateTimeFormat('en', { timeZone: zone })
-    return true
-  } catch {
-    return false
-  }
-}
 
 /**
  * Record where this business is, or withdraw the answer.
@@ -169,11 +176,17 @@ function isRealTimezone(zone: string): boolean {
  * that exist. Somebody who set the wrong zone has to be able to take it back to
  * "unknown" rather than being forced to leave a wrong answer standing.
  *
- * ── WHAT THIS DOES NOT DO ────────────────────────────────────────────────────
- * Nothing in the product reads this column yet. Every time on every screen is
- * still rendered in IST, from 38 hardcoded sites. The field says so, because a
- * setting that silently changes nothing is the same defect as a figure no query
- * produced.
+ * ── WHAT THIS DOES, AND WHAT IT STILL DOES NOT ───────────────────────────────
+ * This block used to read "Nothing in the product reads this column yet", and
+ * that stopped being true when `lib/time/zone.ts` landed and Posts began
+ * resolving times through it. The copy on the settings screen was rewritten in
+ * the same change; this comment was not, so the stale claim sat directly above
+ * the action the change had just made meaningful.
+ *
+ * What is still true: the Planner is NOT fully on it. `PlannerUpcoming` has its
+ * own hardcoded `Asia/Kolkata` formatter, and the week timeline places cards by
+ * IST while labelling them in the workspace zone. Those are tracked separately;
+ * the settings copy no longer promises them.
  */
 export async function setWorkspaceTimezone(
   workspaceId: string,
@@ -188,8 +201,10 @@ export async function setWorkspaceTimezone(
 
     const trimmed = timezone === null ? null : timezone.trim()
     const next = trimmed === null || trimmed.length === 0 ? null : trimmed
-    if (next !== null && !isRealTimezone(next)) {
-      return { ok: false, message: `Sahoda does not recognise the time zone ${next}.` }
+    if (next !== null && !isKnownZone(next)) {
+      // Which of the three refusals it was. "Sahoda does not recognise IST" is
+      // false — it is recognised and ambiguous, and those need different words.
+      return { ok: false, message: describeZoneRefusal(next) }
     }
 
     const supabase = createServerSupabase()
