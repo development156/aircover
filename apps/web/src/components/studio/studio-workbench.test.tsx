@@ -6,6 +6,8 @@ import type { BrandSignal } from '@sahoda/shared'
 
 import { queueGeneration, startPostFromPicture } from '@/app/actions/studio'
 import { StudioWorkbench } from '@/components/studio/studio-workbench'
+import type { CanvasPicture } from '@/lib/studio/canvas'
+import { stampNote } from '@/lib/studio/stamp-copy'
 import { generatableFormats } from '@/lib/studio/formats'
 import { routedModels, unroutedModels } from '@/lib/studio/models'
 import { uploadAccept } from '@/lib/studio/upload'
@@ -67,6 +69,8 @@ const MADE = [
     mime: 'image/png',
     mode: 'on_brand' as const,
     referenceAssetIds: [],
+    stampedUrl: null,
+    stampOutcome: null,
   },
   {
     imageId: 'p2',
@@ -79,10 +83,19 @@ const MADE = [
     mime: 'image/webp',
     mode: 'match' as const,
     referenceAssetIds: ['a2'],
+    stampedUrl: null,
+    stampOutcome: null,
   },
 ]
 
-const open = (library = LIBRARY, pictures: typeof MADE = [], signals: BrandSignal[] | null = []) =>
+const open = (
+  library = LIBRARY,
+  // `CanvasPicture[]`, not `typeof MADE`: the literal's inferred type pinned
+  // `stampedUrl` and `stampOutcome` to null, so a stamped fixture — the whole
+  // point of the result-screen tests below — could not be passed in.
+  pictures: CanvasPicture[] = [],
+  signals: BrandSignal[] | null = [],
+) =>
   render(
     <StudioWorkbench
       formats={generatableFormats()}
@@ -842,5 +855,83 @@ describe('what Sahoda will send, shown before the spend', () => {
     // as the remedy for a read that failed.
     expect(unread).not.toMatch(/nothing from your brand brain/i)
     expect(screen.queryByText(/fill it in/i)).toBeNull()
+  })
+})
+
+describe('the result screen: which version, and why there is only one', () => {
+  const stamped = {
+    imageId: 'p9',
+    assetId: 'asset-9',
+    url: 'https://example.test/original.png',
+    width: 1080,
+    height: 1080,
+    prompt: 'a plate of samosas',
+    formatId: 'square',
+    mime: 'image/png',
+    mode: 'on_brand' as const,
+    referenceAssetIds: [],
+    stampedUrl: 'https://example.test/stamped.png',
+    stampOutcome: 'stamped' as const,
+  }
+
+  test('shows the stamped version first, because that is the one they will post', () => {
+    open(LIBRARY, [stamped])
+    expect(screen.getByAltText(/with your logo/i)).toHaveAttribute('src', stamped.stampedUrl)
+  })
+
+  test('the original is one press away, and nothing is deleted to get to it', async () => {
+    const user = userEvent.setup()
+    open(LIBRARY, [stamped])
+
+    await user.click(screen.getByRole('button', { name: /without it/i }))
+
+    expect(screen.getByAltText(stamped.prompt)).toHaveAttribute('src', stamped.url)
+    expect(screen.getByText(/does not delete the other/i)).toBeTruthy()
+  })
+
+  /**
+   * ── A TOGGLE OVER ONE PICTURE IS A CONTROL THAT DOES NOTHING ──────────────
+   * Same defect class as a remedy that leads nowhere. Every answer but
+   * `stamped` has exactly one picture, so the control is absent rather than
+   * present-and-inert.
+   */
+  test.each([['no_logo'], ['logo_unreadable'], ['failed']] as const)(
+    'offers no choice when the outcome is %s',
+    (outcome) => {
+      open(LIBRARY, [{ ...stamped, stampedUrl: null, stampOutcome: outcome }])
+      expect(screen.queryByRole('button', { name: /without it/i })).toBeNull()
+    },
+  )
+
+  test('offers no choice when a stamped copy exists but its link would not sign', () => {
+    // The outcome says stamped and there is no URL to show. Offering the toggle
+    // would put a control on screen with nothing behind half of it.
+    open(LIBRARY, [{ ...stamped, stampedUrl: null }])
+    expect(screen.queryByRole('button', { name: /without it/i })).toBeNull()
+  })
+
+  test('asks stamp-copy for the sentence rather than writing its own', () => {
+    for (const outcome of [null, 'no_logo', 'logo_unreadable', 'failed', 'stamped'] as const) {
+      cleanup()
+      open(LIBRARY, [{ ...stamped, stampOutcome: outcome }])
+      const note = stampNote(outcome)
+      expect(screen.getByText(note.title), String(outcome)).toBeTruthy()
+      expect(screen.getByText(note.body), String(outcome)).toBeTruthy()
+    }
+  })
+
+  test('a picture made before stamping is not reported as a failure', () => {
+    open(LIBRARY, [{ ...stamped, stampedUrl: null, stampOutcome: null }])
+    expect(screen.getByText(/nothing went wrong/i)).toBeTruthy()
+    expect(screen.queryByRole('link', { name: /add your logo/i })).toBeNull()
+  })
+
+  test('the one remedy that exists is offered, and only where it works', () => {
+    open(LIBRARY, [{ ...stamped, stampedUrl: null, stampOutcome: 'no_logo' }])
+    expect(screen.getByRole('link', { name: /add your logo/i })).toBeTruthy()
+    cleanup()
+
+    open(LIBRARY, [{ ...stamped, stampedUrl: null, stampOutcome: 'failed' }])
+    expect(screen.queryByRole('link', { name: /add your logo|replace your logo/i })).toBeNull()
   })
 })
