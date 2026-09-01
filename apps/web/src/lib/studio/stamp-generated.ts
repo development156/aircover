@@ -1,8 +1,11 @@
 import 'server-only'
 
+import type { StampOutcome } from '@sahoda/shared'
+
 import { randomUUID } from 'node:crypto'
 
 import { kindForProvenMime } from '@/lib/assets/kind'
+import { readBrandLogo } from '@/lib/brand/logo'
 import { readBrandLogoBytes } from '@/lib/brand/logo-bytes'
 import type { InkPolarity } from '@/lib/brand/logo-facts'
 import type { Anchor } from '@/lib/brand/logo-placement'
@@ -62,7 +65,13 @@ import { stampLogo } from './stamp'
  * with everything on it.
  */
 
-/** What the caller records. Null from this module means no stamped copy exists. */
+/**
+ * What the caller records when a stamped copy EXISTS.
+ *
+ * Reached only through `StampResult` below — this module no longer answers with
+ * null, because null was one word for four situations and the screen that reads
+ * it has to tell them apart.
+ */
 export interface StampedPicture {
   assetId: string
   /** Whether a plate was drawn behind the mark, for a screen that wants to say so. */
@@ -162,20 +171,43 @@ export interface StampGeneratedInput {
 }
 
 /**
+ * The answer, which is never null and never a throw.
+ *
+ * ── WHY THIS STOPPED BEING `StampedPicture | null` ──────────────────────────
+ * It returned null for every failure, which was right about the caller's
+ * obligation (keep the picture, charge once) and useless to the screen. The
+ * migration's own step 5 forbids collapsing the reasons, and a function that
+ * hands back one null cannot help anyone honour that. So the reason travels
+ * with the answer and is written in the same insert that records the pointer.
+ *
+ * The value IS `StampOutcome` from `@sahoda/shared` — not a local copy — so the
+ * database check constraint, the row schema and this module cannot drift apart.
+ */
+export type StampResult =
+  ({ outcome: 'stamped' } & StampedPicture) | { outcome: Exclude<StampOutcome, 'stamped'> }
+
+/**
  * Stamp the workspace's logo onto one generated picture and store the result.
  *
- * Null when nothing was stamped, for ANY reason. Never throws, for any input.
+ * Always answers, never throws, for any input. A non-`stamped` outcome means the
+ * caller keeps the model's original picture and charges once, exactly as before.
  */
-export async function stampGeneratedPicture(
-  input: StampGeneratedInput,
-): Promise<StampedPicture | null> {
+export async function stampGeneratedPicture(input: StampGeneratedInput): Promise<StampResult> {
   const { supabase, workspaceId } = input
   let objectPath: string | null = null
 
   try {
     const logo = await readBrandLogoBytes(workspaceId)
-    // The ordinary case, and not a failure: most workspaces have no logo yet.
-    if (logo === null) return null
+    if (logo === null) {
+      // ── TWO SITUATIONS, AND THE REMEDIES ARE OPPOSITE ────────────────────
+      // `readBrandLogoBytes` answers null both for a workspace with no logo and
+      // for one whose logo file it could not decode. Telling somebody to add a
+      // logo they already added is the impossible remedy this product forbids,
+      // so the pointer is asked directly. This second read happens ONLY on a
+      // path that already failed, and `readBrandLogo` is a single indexed row.
+      const pointer = await readBrandLogo(workspaceId).catch(() => null)
+      return { outcome: pointer === null ? 'no_logo' : 'logo_unreadable' }
+    }
 
     const stamped = await stampLogo({
       picture: input.picture,
@@ -184,19 +216,19 @@ export async function stampGeneratedPicture(
       anchor: STAMP_ANCHOR,
       plate: await plateColour(workspaceId, logo.facts.inkPolarity),
     })
-    if (!stamped.ok) return null
+    if (!stamped.ok) return { outcome: 'failed' }
 
     if (stamped.png.byteLength === 0 || stamped.png.byteLength > MEDIA_UPLOAD_CAP_BYTES) {
-      return null
+      return { outcome: 'failed' }
     }
 
     // Facts from the bytes, through the same gate an upload passes. The stamped
     // file is a PNG by construction, and this is where that stops being an
     // assumption: the row records what the object actually is.
     const sniffed = sniffImage(stamped.png)
-    if (!sniffed.ok) return null
+    if (!sniffed.ok) return { outcome: 'failed' }
     const kind = kindForProvenMime(sniffed.image.mime)
-    if (kind === null) return null
+    if (kind === null) return { outcome: 'failed' }
 
     const assetId = randomUUID()
     objectPath = assetObjectPath({ workspaceId, assetId, mime: sniffed.image.mime })
@@ -205,7 +237,7 @@ export async function stampGeneratedPicture(
       contentType: sniffed.image.mime,
       upsert: false,
     })
-    if (upload.error) return null
+    if (upload.error) return { outcome: 'failed' }
 
     const row = await supabase.from('assets').insert({
       id: assetId,
@@ -223,16 +255,16 @@ export async function stampGeneratedPicture(
       // leaving bytes nobody can reach or delete, exactly as the generation's own
       // asset write does one step earlier.
       await removeObject(supabase, objectPath)
-      return null
+      return { outcome: 'failed' }
     }
 
-    return { assetId, plated: stamped.plated, objectPath }
+    return { outcome: 'stamped', assetId, plated: stamped.plated, objectPath }
   } catch {
     // A thrown transport failure, a `MediaPathError`, anything at all. If the
     // object made it to storage before the throw, it is removed on the way out:
     // an orphan is the one outcome worse than losing the stamp.
     if (objectPath !== null) await removeObject(supabase, objectPath)
-    return null
+    return { outcome: 'failed' }
   }
 }
 

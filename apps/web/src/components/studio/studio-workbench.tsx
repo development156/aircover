@@ -33,6 +33,7 @@ import {
 import { defaultModelId, modelById } from '@/lib/studio/models'
 import type { LibraryPicture } from '@/lib/studio/read'
 import { PROMPT_STARTERS } from '@/lib/studio/prompt'
+import { stampNote } from '@/lib/studio/stamp-copy'
 import { describeInsufficient, describePartial } from '@/lib/studio/refusal-copy'
 
 /**
@@ -100,6 +101,15 @@ export function StudioWorkbench({
    * object on a light page, not because everything else is hidden.
    */
   const [settingsOpen, setSettingsOpen] = useState(true)
+  /**
+   * Which version of the ACTIVE picture is on screen.
+   *
+   * Not per-picture: clicking through the strip lands on a picture that may not
+   * have a stamped copy at all, so the choice is re-derived below rather than
+   * remembered per id. Defaults to the stamped one — that is the picture the
+   * person will post, and the original is one press away.
+   */
+  const [showing, setShowing] = useState<'stamped' | 'original'>('stamped')
 
   /**
    * Position zero unless somebody has clicked back through the strip. The reader
@@ -108,6 +118,19 @@ export function StudioWorkbench({
    * effect, no id to track, and no chance of showing yesterday's.
    */
   const active = pictures.find((one) => one.imageId === activeId) ?? pictures[0] ?? null
+
+  /**
+   * ── WHAT THIS PICTURE'S LOGO STORY IS, ASKED NEVER DERIVED ────────────────
+   * `stamp-copy.ts` owns the five answers and refuses to share a sentence
+   * between them. This screen only asks. A null outcome is "never attempted",
+   * which is why it is passed through rather than defaulted to anything.
+   */
+  const note_ = active === null ? null : stampNote(active.stampOutcome)
+  // Both versions exist only when one was actually stamped AND its link signed.
+  // A stamped copy whose preview would not sign is a picture we cannot show, so
+  // offering the choice would be a control with nothing behind half of it.
+  const bothVersions = note_ !== null && note_.hasBothVersions && active?.stampedUrl != null
+  const shown = bothVersions && showing === 'stamped' ? active!.stampedUrl! : (active?.url ?? null)
 
   const rule = ruleFor(mode, modelId)
   // Asked of the same modules the RULES come from, never re-typed here. A chip
@@ -717,8 +740,12 @@ export function StudioWorkbench({
                   short-lived signed URL from a private bucket cannot be
                   optimised by next/image without proxying the credential. */}
               <img
-                src={active.url}
-                alt={active.prompt}
+                src={shown ?? active.url}
+                alt={
+                  bothVersions && showing === 'stamped'
+                    ? `${active.prompt}, with your logo`
+                    : active.prompt
+                }
                 width={active.width ?? undefined}
                 height={active.height ?? undefined}
                 className={`size-full object-contain transition-micro ${busy ? 'opacity-40' : ''}`}
@@ -742,6 +769,73 @@ export function StudioWorkbench({
             </p>
           ) : null}
         </div>
+
+        {/* ── WHICH ONE DO YOU WANT, AND WHY THERE IS ONLY ONE ────────────────
+            The same dark object the composer uses, and the same reason: this is
+            the bar you act from once the picture exists. `data-surface="inverse"`
+            re-resolves every token inside it, so nothing here paints a colour of
+            its own.
+
+            The TOGGLE only exists when there are genuinely two pictures. Every
+            other case gets the sentence for ITS answer and no control, because a
+            toggle over one picture is a control that does nothing — and the
+            sentence is asked of `stamp-copy.ts` rather than written here, so the
+            five answers cannot quietly collapse into "no logo". */}
+        {active === null || note_ === null ? null : (
+          <div
+            data-surface="inverse"
+            data-guide="studio-logo-bar"
+            className="flex flex-wrap items-center gap-3 rounded-xl bg-surface p-3 pl-4 shadow-lg"
+          >
+            {bothVersions ? (
+              <div
+                role="group"
+                aria-label="Which version of this picture to show"
+                className="surface-ring flex gap-1 rounded-pill bg-canvas p-1"
+              >
+                {(['stamped', 'original'] as const).map((which) => (
+                  <button
+                    key={which}
+                    type="button"
+                    onClick={() => setShowing(which)}
+                    aria-pressed={showing === which}
+                    className={`rounded-pill px-3 py-1 type-sm font-[550] transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                      showing === which ? 'bg-surface-3 text-ink' : 'text-muted hover:text-ink'
+                    }`}
+                  >
+                    {which === 'stamped' ? 'With your logo' : 'Without it'}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            <div className="flex min-w-[24ch] flex-1 flex-col gap-0.5">
+              <span className="type-sm font-[550] text-ink">{note_.title}</span>
+              <span className="type-sm text-muted">{note_.body}</span>
+            </div>
+
+            {/* A remedy is offered ONLY when one exists. `remedy: null` is the
+                assertion that no action of theirs would change this, not a gap
+                somebody forgot to fill — see `no-impossible-remedy.spec.ts`. */}
+            {note_.remedy === null ? null : (
+              <Link
+                href={note_.remedy.href}
+                className="surface-ring rounded-pill px-3 py-1.5 type-sm font-[550] text-ink transition-micro hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
+                {note_.remedy.label}
+              </Link>
+            )}
+          </div>
+        )}
+
+        {/* Both are kept, always. Said once, here, rather than inside the
+            toggle: it is true of every stamped picture whether or not anybody
+            touches the control. */}
+        {bothVersions ? (
+          <p className="type-sm text-muted">
+            Both versions are saved. Picking one here does not delete the other.
+          </p>
+        ) : null}
 
         {/* ── THE STRIP ───────────────────────────────────────────────────────
             Every picture this workspace has made that can actually be drawn,

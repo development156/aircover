@@ -44,6 +44,8 @@ const PICTURE: CanvasPicture = {
   mime: 'image/png',
   mode: 'on_brand',
   referenceAssetIds: [],
+  stampedUrl: null,
+  stampOutcome: null,
 }
 
 const open = (picture: CanvasPicture | null = PICTURE) =>

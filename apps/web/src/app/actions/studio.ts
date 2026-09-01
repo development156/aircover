@@ -479,9 +479,14 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
           // statement could never land. On `42703` (undefined column) the row
           // is written again without it, so a missing column costs the LINK and
           // never the record of a generation somebody paid for.
-          let image = await supabase
-            .from('studio_generation_images')
-            .insert({ ...imageRow, stamped_asset_id: stamped?.assetId ?? null })
+          let image = await supabase.from('studio_generation_images').insert({
+            ...imageRow,
+            stamped_asset_id: stamped.outcome === 'stamped' ? stamped.assetId : null,
+            // WHY, beside the pointer and in the SAME insert. The pointer's null
+            // is one fact standing in for several situations and the screen has
+            // to tell them apart; the migration's step 5 carries the reasoning.
+            stamp_outcome: stamped.outcome,
+          })
 
           if (image.error?.code === '42703') {
             image = await supabase.from('studio_generation_images').insert(imageRow)
@@ -510,7 +515,7 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
           // stamped copy must not stop the generation's own from being removed
           // — so they are separate statements rather than one chain.
           if (image.error) {
-            if (stamped !== null) {
+            if (stamped.outcome === 'stamped') {
               await supabase.from('assets').delete().eq('id', stamped.assetId)
               await supabase.storage.from(MEDIA_BUCKET).remove([stamped.objectPath])
             }

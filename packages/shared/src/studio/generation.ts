@@ -158,3 +158,49 @@ export function countCertainty(signals: readonly BrandSignal[]): {
  * images' worth of credits.
  */
 export const MAX_IMAGES_PER_GENERATION = 20
+
+/**
+ * WHY A GENERATED PICTURE DOES OR DOES NOT CARRY THE WORKSPACE'S LOGO.
+ *
+ * ── THE COLUMN ALONE CANNOT ANSWER THIS, AND THE MIGRATION SAYS SO ──────────
+ * `studio_generation_images.stamped_asset_id` is a pointer, so its NULL is a
+ * single fact — no stamped copy exists — standing in for several different
+ * situations. That migration's own step 4 spells them out and forbids the copy
+ * from conflating them, and then leaves the screen no way to tell them apart.
+ * This is that way: the reason is recorded WHEN THE STAMPING RAN, beside the
+ * pointer, in the same append-only insert.
+ *
+ * ── WHY IT IS NOT DERIVED AT READ TIME ──────────────────────────────────────
+ * Every alternative asks a question about the past by looking at the present.
+ * "The workspace has no logo" is true NOW; it says nothing about what was true
+ * when a picture was drawn last week, and a shop that uploaded a logo yesterday
+ * would have every older picture re-explained as though the logo had been there
+ * all along. Same shape as `BrandSignalSchema` above: the record stores what was
+ * actually done, because the source can change afterwards.
+ *
+ * ── FOUR VALUES, AND A FIFTH STATE THAT IS THE ABSENCE OF ONE ───────────────
+ * NULL is not in this enum and is not an error: it means stamping was never
+ * attempted, which is true of every row written before this shipped and of any
+ * deploy where the column is not yet applied. A screen that rendered that as a
+ * failure would tell somebody something went wrong with a picture that predates
+ * the feature.
+ *
+ * `failed` deliberately covers more than one internal cause — a mark that would
+ * not fit, bytes that would not encode, an upload that did not land. They are
+ * one value because they are one SENTENCE to a reader: nothing they can do
+ * changes any of them, and splitting a code a person cannot act on invents a
+ * distinction no screen can honour. `no_logo` and `logo_unreadable` are separate
+ * for the opposite reason: their remedies differ, and offering the wrong one is
+ * the impossible remedy this product forbids.
+ */
+export const StampOutcomeSchema = z.enum([
+  /** A stamped copy exists. `stamped_asset_id` names it. */
+  'stamped',
+  /** The workspace had no logo to stamp. Remedy: add one. */
+  'no_logo',
+  /** A logo file exists and Sahoda could not read it. Remedy: replace it. */
+  'logo_unreadable',
+  /** Stamping ran and did not produce a stored copy. No remedy the reader owns. */
+  'failed',
+])
+export type StampOutcome = z.infer<typeof StampOutcomeSchema>

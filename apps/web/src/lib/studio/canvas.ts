@@ -1,4 +1,4 @@
-import type { GenerationMode } from '@sahoda/shared'
+import type { GenerationMode, StampOutcome } from '@sahoda/shared'
 
 import type { GenerationCard, GenerationPicture } from './read'
 
@@ -47,6 +47,20 @@ export type CanvasPicture = {
    */
   mode: GenerationMode
   referenceAssetIds: string[]
+  /**
+   * The logo-stamped copy's link, when one exists and signed. The picture keeps
+   * BOTH versions: `url` is always the model's own output, untouched, and this
+   * is the additional one. Nothing here ever replaces `url` — a screen that
+   * swapped them would make the unstamped picture unreachable, which is the
+   * thing `stamped_asset_id` exists to prevent.
+   */
+  stampedUrl: string | null
+  /**
+   * WHY this picture does or does not carry the logo. Null means stamping was
+   * never attempted; `lib/studio/stamp-copy.ts` turns each answer into the one
+   * sentence that is true for it, and refuses to share sentences between them.
+   */
+  stampOutcome: StampOutcome | null
 }
 
 /**
@@ -78,6 +92,8 @@ export function canvasPictures(cards: readonly GenerationCard[]): CanvasPicture[
         mime: picture.mime,
         mode: card.generation.mode,
         referenceAssetIds: [...card.generation.reference_asset_ids],
+        stampedUrl: picture.stampedUrl,
+        stampOutcome: picture.stampOutcome,
       })
     }
   }
