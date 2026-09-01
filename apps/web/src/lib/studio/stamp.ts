@@ -246,7 +246,9 @@ export async function stampLogo(input: StampInput): Promise<StampResult> {
   if (input.plate !== undefined) {
     plateColour = parsePlate(input.plate)
     if (plateColour === null) {
-      return refuse(`The plate colour must be six hex digits such as #ffffff. Got ${input.plate}.`)
+      return refuse(
+        `The plate colour must be a hash followed by six hex digits. Got ${input.plate}.`,
+      )
     }
   }
 

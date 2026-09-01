@@ -33,6 +33,7 @@ import { MAX_REFERENCES, MAX_TRIES_PER_PRESS, describeModeBlock } from '@/lib/st
 import { defaultModelId, describeModelBlock } from '@/lib/studio/models'
 import { ReferenceIdsSchema } from '@/lib/studio/reference-ids'
 import { conditionPrompt } from '@/lib/studio/prompt'
+import { stampGeneratedPicture } from '@/lib/studio/stamp-generated'
 import { attachAssetToPost } from '@/app/actions/assets'
 import { createPost } from '@/app/actions/posts'
 import { createServerSupabase } from '@/lib/supabase/server'
@@ -446,6 +447,46 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
             throw new Error('ASSET_ROW_FAILED')
           }
 
+          // ── THE STAMP RIDES ALONG, AND NEVER COSTS THE GENERATION ─────────
+          // Local compute, so nothing above changes: no second hold, no second
+          // charge, `ctx.creditsCharged` untouched. `stampGeneratedPicture` is
+          // total by contract (it returns null for every failure and throws for
+          // none), which is why there is no try around it here: a throw in this
+          // callback releases the hold and refuses a picture the customer
+          // already has, and one owner of that guarantee is testable where two
+          // are not. See `lib/studio/stamp-generated.ts`.
+          const stamped = await stampGeneratedPicture({
+            workspaceId: workspace.id,
+            userId,
+            picture: bytes,
+            supabase,
+          })
+
+          const imageRow = {
+            workspace_id: workspace.id,
+            generation_id: generationId,
+            idx,
+            asset_id: newAssetId,
+            width: sniffed.image.width,
+            height: sniffed.image.height,
+          }
+
+          // ── DEPLOY-SAFE, THE SAME WAY `assets.ts` IS ──────────────────────
+          // `stamped_asset_id` arrives with a migration a human applies, and
+          // this code ships before that happens. It goes in the SAME insert
+          // rather than a follow-up update because this table is append-only:
+          // it carries `block_mutations` and has no UPDATE policy, so a second
+          // statement could never land. On `42703` (undefined column) the row
+          // is written again without it, so a missing column costs the LINK and
+          // never the record of a generation somebody paid for.
+          let image = await supabase
+            .from('studio_generation_images')
+            .insert({ ...imageRow, stamped_asset_id: stamped?.assetId ?? null })
+
+          if (image.error?.code === '42703') {
+            image = await supabase.from('studio_generation_images').insert(imageRow)
+          }
+
           // ── THE PROVENANCE ROW, CHECKED LIKE EVERY OTHER WRITE ABOVE ───────
           //
           // This insert used to be awaited with its `.error` never read, while
@@ -460,15 +501,19 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
           // failure costs a released hold rather than a false claim about
           // money. The migration's §6 states this contract: an image row is
           // written once, "create it, or do nothing".
-          const image = await supabase.from('studio_generation_images').insert({
-            workspace_id: workspace.id,
-            generation_id: generationId,
-            idx,
-            asset_id: newAssetId,
-            width: sniffed.image.width,
-            height: sniffed.image.height,
-          })
+          //
+          // THE STAMPED COPY IS ROLLED BACK TOO, and it is listed first
+          // because it is the one a person would SEE. Both asset rows are in
+          // the library by now; undoing only the generation's own would leave a
+          // stamped picture sitting there for a generation that was refused and
+          // refunded. Each undo is independent — a failure to remove the
+          // stamped copy must not stop the generation's own from being removed
+          // — so they are separate statements rather than one chain.
           if (image.error) {
+            if (stamped !== null) {
+              await supabase.from('assets').delete().eq('id', stamped.assetId)
+              await supabase.storage.from(MEDIA_BUCKET).remove([stamped.objectPath])
+            }
             await supabase.from('assets').delete().eq('id', newAssetId)
             await supabase.storage.from(MEDIA_BUCKET).remove([objectPath])
             failure = FAILURE_REASON.IMAGE_NOT_STORED
