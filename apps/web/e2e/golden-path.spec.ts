@@ -22,6 +22,8 @@ test.describe('golden path @smoke', () => {
     page,
     signedIn,
   }) => {
+    // Destructured to activate the fixture; `void` because the value itself is unused.
+    void signedIn
     // ── 1. Signed in, but no workspace yet — the state a wiped database leaves.
     await page.goto('/home')
     // Scoped to the PAGE, not the shell. A workspace-less account is offered the
@@ -120,6 +122,8 @@ test.describe('golden path @smoke', () => {
     page,
     signedIn,
   }) => {
+    // Destructured to activate the fixture; `void` because the value itself is unused.
+    void signedIn
     await page.goto('/home')
     // Scoped for the same reason as above — the offer appears in the shell too.
     await page

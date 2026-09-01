@@ -67,6 +67,18 @@ export interface StampedPicture {
   assetId: string
   /** Whether a plate was drawn behind the mark, for a screen that wants to say so. */
   plated: boolean
+  /**
+   * Where the bytes landed, so the CALLER can undo this write.
+   *
+   * Returned as of the 2026-09-01 merge with `wt-core`, which gave the
+   * `studio_generation_images` insert an error check that rolls the generation
+   * back. Rolling back the generation's own asset while leaving the stamped one
+   * standing would put a picture in somebody's library for a generation they
+   * were refunded for — an orphan with a thumbnail, which is worse than an
+   * orphan nobody can see. This module cannot do that undo itself: it returns
+   * before the caller's row is attempted and has no way to learn the outcome.
+   */
+  objectPath: string
 }
 
 /**
@@ -214,7 +226,7 @@ export async function stampGeneratedPicture(
       return null
     }
 
-    return { assetId, plated: stamped.plated }
+    return { assetId, plated: stamped.plated, objectPath }
   } catch {
     // A thrown transport failure, a `MediaPathError`, anything at all. If the
     // object made it to storage before the throw, it is removed on the way out:

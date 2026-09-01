@@ -105,6 +105,8 @@ export function DrawCanvas({
       live !== null && live.id === selectedId
         ? live
         : (state.objects.find((one) => one.id === selectedId) ?? null)
+    // `redraw` skips whichever object `live` is a moving copy of — see its
+    // header. Handing it the full list is correct.
     redraw(ctx, size, state.objects, colours, live, picked === null ? null : boundsOf(picked))
   }, [state.objects, live, size, colours, selectedId])
 

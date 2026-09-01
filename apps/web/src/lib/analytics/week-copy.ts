@@ -82,7 +82,14 @@ export interface Verdict {
  * too small to mention. Collapsing them into "not enough data" would tell four
  * of those six customers something false about why.
  */
-export function verdictCopy(verdict: WeekReport['verdict'], channels: readonly Channel[]): Verdict {
+export function verdictCopy(
+  verdict: WeekReport['verdict'],
+  // Passed by every caller and pinned by the tests, and this function does not
+  // read it: the sentence is built from the comparison alone. Kept in the
+  // signature rather than removed, because a caller that stops passing its
+  // channels is a caller that has stopped knowing them.
+  _channels: readonly Channel[],
+): Verdict {
   const { basis, comparison } = verdict
 
   if (comparison.kind === 'lift') {

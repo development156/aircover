@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { Download, Maximize2, Pencil, Sparkles } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import type { GenerationMode } from '@sahoda/shared'
 
 import { queueGeneration } from '@/app/actions/studio'
@@ -30,11 +30,10 @@ import {
   readyModes,
   ruleFor,
 } from '@/lib/studio/modes'
-import { defaultModelId, modelById } from '@/lib/studio/models'
+import { defaultModelId } from '@/lib/studio/models'
 import type { LibraryPicture } from '@/lib/studio/read'
 import { PROMPT_STARTERS } from '@/lib/studio/prompt'
 import { describeInsufficient, describePartial } from '@/lib/studio/refusal-copy'
-import { savePicture } from '@/lib/studio/save-picture'
 
 /**
  * THE WORKBENCH: CONTROLS ON THE LEFT, THE PICTURE ON THE RIGHT.
@@ -310,10 +309,27 @@ export function StudioWorkbench({
                 : 'Anything Sahoda should match? (optional)'}
           </legend>
 
+          {/* ── THE UPLOAD FOLLOWS THE SAME RULE THE TILES DO ─────────────────
+              `disabled={picked.length >= rule.maxReferences}` read `0 >= 0` in
+              Explore, so adding from the device was dead the moment the mode
+              opened — while the legend directly above promised "Picking a
+              picture here moves you to Match a picture" and `toggleReference`
+              did exactly that for every tile below. The one route that did not
+              get the mode switch was the one a person with a new photograph
+              would take, and nothing on the screen said why. */}
           <ReferenceUpload
-            disabled={picked.length >= rule.maxReferences}
+            disabled={rule.maxReferences > 0 && picked.length >= rule.maxReferences}
             onAdded={(assetId) => {
               setNote(null)
+              // Explore uses no reference by definition, so adding one means the
+              // other mode. Same move, same sentence, as picking a tile.
+              if (rule.maxReferences === 0) {
+                setMode('match')
+                setPicked([assetId])
+                setNote('Explore ignores a picture, so Sahoda moved you to Match a picture.')
+                router.refresh()
+                return
+              }
               // Selected at once. Somebody who adds a picture to match wants
               // to match it, and it appears in the grid below on the refresh
               // already chosen.
@@ -388,7 +404,7 @@ export function StudioWorkbench({
         <fieldset className="flex flex-col gap-2">
           <legend className="type-sm text-muted">How many options?</legend>
           <div className="flex flex-wrap gap-2" data-guide="studio-count">
-            {Array.from({ length: MAX_TRIES_PER_PRESS }, (unused, i) => i + 1).map((n) => (
+            {Array.from({ length: MAX_TRIES_PER_PRESS }, (_unused, i) => i + 1).map((n) => (
               <button
                 key={n}
                 type="button"

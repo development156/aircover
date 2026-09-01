@@ -114,7 +114,7 @@ function dayIn(iso: string, timeZone: string): string | null {
  * before it, and enough behind that to date the first publish, and the filtering
  * happens here where the reason for each cut can be written down.
  */
-export async function readWindow(view: AnalyticsView, now: Date = new Date()): Promise<WindowRead> {
+export async function readWindow(view: AnalyticsView): Promise<WindowRead> {
   try {
     const workspace = await activeWorkspaceRead()
     if (workspace.status === 'none') return { kind: 'no-workspace' }

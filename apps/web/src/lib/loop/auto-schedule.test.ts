@@ -45,6 +45,61 @@ const ELIGIBLE: LoopVerdict = {
   advisory: { suggestOnly: false, brainUnconfirmed: false },
 } as unknown as LoopVerdict
 
+/**
+ * ── THE FIVE THIS SUITE NEVER ASKED ─────────────────────────────────────────
+ * The regex below matched `insufficient_credits` all along. It was never handed
+ * one: the loops ran over never_enabled, paused and eligible, and
+ * `withoutSundayPromise` sent everything else to a `default:` that returned the
+ * ARMED sentence. So a workspace short on credits was told "Top up and Sahoda
+ * will plan your next week. Sahoda is not planning weeks automatically at the
+ * moment." A guard that is never pointed at the case that breaks it is not a
+ * guard, which is the whole reason these five exist.
+ */
+const INSUFFICIENT: LoopVerdict = {
+  ...NEVER_ENABLED,
+  reason: 'insufficient_credits',
+  required: 20,
+  available: 2,
+} as unknown as LoopVerdict
+
+const LAPSED: LoopVerdict = {
+  ...NEVER_ENABLED,
+  reason: 'channel_lapsed',
+  lapsed: ['instagram'],
+} as unknown as LoopVerdict
+
+const NO_CHANNEL: LoopVerdict = { ...NEVER_ENABLED, reason: 'no_channel' } as unknown as LoopVerdict
+
+const ALREADY: LoopVerdict = {
+  ...NEVER_ENABLED,
+  reason: 'already_planned',
+  isoWeek: 35,
+  isoYear: 2026,
+} as unknown as LoopVerdict
+
+const NO_BRAIN: LoopVerdict = {
+  ...NEVER_ENABLED,
+  reason: 'brain_not_resolved',
+} as unknown as LoopVerdict
+
+/** Every verdict `explain` can be handed. Nothing may be left out of the loops. */
+const EVERY_VERDICT: readonly LoopVerdict[] = [
+  NEVER_ENABLED,
+  PAUSED,
+  ELIGIBLE,
+  INSUFFICIENT,
+  LAPSED,
+  NO_CHANNEL,
+  ALREADY,
+  NO_BRAIN,
+]
+
+/**
+ * The two whose plan button `controls.tsx:154` disables. Offering them "plan
+ * yours here whenever you want one" points at a greyed-out control.
+ */
+const CANNOT_PLAN_BY_HAND: readonly LoopVerdict[] = [PAUSED, NO_CHANNEL]
+
 /** Everything the automatic schedule promises, in the words a reader would search for. */
 const promisesSunday = (sentence: string): boolean =>
   /\bevery sunday\b/i.test(sentence) || /\bwill plan your (week|next week)\b/i.test(sentence)
@@ -67,7 +122,7 @@ describe('when the Sunday schedule is armed', () => {
 
 describe('when the Sunday schedule is switched off', () => {
   it('promises no automatic plan, on every sentence that used to', () => {
-    for (const v of [NEVER_ENABLED, PAUSED, ELIGIBLE]) {
+    for (const v of EVERY_VERDICT) {
       expect(promisesSunday(explain(v, { autoSchedule: 'off' }))).toBe(false)
     }
   })
@@ -75,7 +130,7 @@ describe('when the Sunday schedule is switched off', () => {
   it('says the automatic weekly planning is off, rather than going quiet', () => {
     // Silence would be a smaller lie and still a lie: the customer is left
     // expecting a Sunday that never comes. The sentence has to name the state.
-    for (const v of [NEVER_ENABLED, PAUSED, ELIGIBLE]) {
+    for (const v of EVERY_VERDICT) {
       expect(explain(v, { autoSchedule: 'off' })).toMatch(/not planning weeks automatically/i)
     }
   })
@@ -84,11 +139,29 @@ describe('when the Sunday schedule is switched off', () => {
     // Never leave a person with a problem and no next step. "Plan my week" is on
     // the same screen and does not consult the switch, so it works while the
     // schedule is off — that is the one true thing to point at.
-    for (const v of [NEVER_ENABLED, PAUSED, ELIGIBLE]) {
+    for (const v of EVERY_VERDICT.filter((one) => !CANNOT_PLAN_BY_HAND.includes(one))) {
       // The claim, not a phrasing: the sentence must point at planning a week
       // from this screen, which is the thing that still works.
-      expect(explain(v, { autoSchedule: 'off' })).toMatch(/plan (yours|it|a week|your week)/i)
+      expect(explain(v, { autoSchedule: 'off' })).toMatch(/plan (yours|it|a week|your week|one)/i)
     }
+  })
+
+  it('does not offer a button this screen has disabled', () => {
+    // ── THE OTHER HALF, AND THIS SUITE USED TO PIN THE DEFECT ────────────────
+    // The test above asserted `/plan (yours|it|a week|your week)/` for PAUSED
+    // specifically, so a new guard was endorsing a remedy the same screen greys
+    // out. `controls.tsx:154` is `disabled={paused || !hasChannels ||
+    // cycleRunning}`, so for these two the offer cannot be taken.
+    for (const v of CANNOT_PLAN_BY_HAND) {
+      expect(explain(v, { autoSchedule: 'off' })).not.toMatch(/plan yours here whenever/i)
+    }
+  })
+
+  it('still names the step that comes first for those two', () => {
+    // Removing the impossible offer must not leave them with nothing. Their own
+    // reason carries the action that IS available: resume, or connect.
+    expect(explain(PAUSED, { autoSchedule: 'off' })).toMatch(/resume/i)
+    expect(explain(NO_CHANNEL, { autoSchedule: 'off' })).toMatch(/connect a channel/i)
   })
 
   it('keeps whatever else was wrong with the workspace', () => {

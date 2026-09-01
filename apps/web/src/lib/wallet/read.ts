@@ -115,12 +115,6 @@ export async function readBalance(): Promise<BalanceRead> {
  */
 
 /**
- * Ledger history, newest first. Sorted by `seq` (the int8 identity) rather than
- * `created_at`, which can invert for entries written inside one transaction.
- * Rows are parsed individually: `model_tier` has no DB CHECK backing it, so a
- * single junk row must not take down the page.
- */
-/**
  * How many ledger entries this workspace has, in total.
  *
  * ── WHY A SECOND READ RATHER THAN COUNTING WHAT WE LOADED ───────────────────
@@ -158,6 +152,12 @@ export async function countLedger(): Promise<number | null> {
   }
 }
 
+/**
+ * Ledger history, newest first. Sorted by `seq` (the int8 identity) rather than
+ * `created_at`, which can invert for entries written inside one transaction.
+ * Rows are parsed individually: `model_tier` has no DB CHECK backing it, so a
+ * single junk row must not take down the page.
+ */
 export async function readLedger(limit = HISTORY_LIMIT): Promise<ParsedLedger> {
   try {
     const workspaceId = await activeWorkspaceId()

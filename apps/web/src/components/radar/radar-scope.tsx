@@ -62,7 +62,27 @@ const MARKS: { angle: number; radius: number; size: number }[] = [
 ]
 
 /** Seconds for one full turn. The brief asks for four to six. */
-const SWEEP_SECONDS = 5
+export const SWEEP_SECONDS = 5
+
+/**
+ * WHEN A MARK'S BRIGHT FRAME MUST LAND, as a negative CSS animation delay.
+ *
+ * ── THE ARITHMETIC THAT WAS BACKWARDS ────────────────────────────────────────
+ * `radar-ping`'s 0% IS the bright frame, and a negative delay of `d` starts the
+ * animation `d` into its cycle — so the NEXT 0% happens at `SWEEP - d`, not at
+ * `d`. The delay was `-(angle / 360) * SWEEP`, which puts the flash at
+ * `SWEEP - angle/72` while the beam reaches that angle at `angle/72`. Those
+ * agree only where the two are the same instant.
+ *
+ * MEASURED over the ten fixed marks: EIGHT were wrong, each brightening when the
+ * beam was at `360 - angle` — its mirror image. Only 0 (the wrap point) and 180
+ * (the fixed point) happened to be right, which is why it read as plausible.
+ *
+ * Solving `SWEEP - d = angle / 72` for `d` gives `SWEEP * (1 - angle / 360)`.
+ */
+export function markDelaySeconds(angle: number, sweepSeconds = SWEEP_SECONDS): number {
+  return -sweepSeconds * (1 - angle / 360)
+}
 
 const C = 200
 const R = 168
@@ -172,9 +192,9 @@ export function RadarScope({
               fill="var(--brand)"
               className="radar-mark-glow"
               /* NEGATIVE delay, so it starts mid-cycle rather than waiting a
-                 turn to catch up: the mark's own angle as a fraction of the
-                 sweep is exactly when the beam is over it. */
-              style={{ animationDelay: `${-(mark.angle / 360) * SWEEP_SECONDS}s` }}
+                 turn to catch up. See `markDelaySeconds` for why the obvious
+                 expression put eight of the ten marks on the mirrored angle. */
+              style={{ animationDelay: `${markDelaySeconds(mark.angle)}s` }}
             />
             <circle
               cx={x}
@@ -182,7 +202,7 @@ export function RadarScope({
               r={mark.size}
               fill="var(--brand)"
               className="radar-mark"
-              style={{ animationDelay: `${-(mark.angle / 360) * SWEEP_SECONDS}s` }}
+              style={{ animationDelay: `${markDelaySeconds(mark.angle)}s` }}
             />
           </g>
         )

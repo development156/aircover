@@ -130,9 +130,28 @@ export async function readActiveWorkspace(): Promise<ActiveWorkspaceRead> {
   return workspace === null ? { status: 'none' } : { status: 'ok', workspace }
 }
 
-/** The active workspace for the current request (RLS-scoped list + cookie pointer). */
+/**
+ * The active workspace for the current request (RLS-scoped list + cookie pointer).
+ *
+ * ── THROUGH THE MEMOISED READ, LIKE EVERYTHING ELSE ─────────────────────────
+ * This called `readActiveWorkspace` DIRECTLY, so every caller issued its own
+ * `workspaces` SELECT and its own cookie read on top of whatever the page's
+ * other readers had already done — `/posts` and `/planner` both do, beside
+ * `posts/read.ts`, `analytics/post-metrics.ts` and `loop/read.ts`, which all go
+ * through the memo.
+ *
+ * The cost is the smaller half. The reason `activeWorkspaceRead` exists at all
+ * is stated below: a private read per module is how two panels on one screen end
+ * up disagreeing about whether a workspace exists, and a page that resolved a
+ * DIFFERENT workspace from the reads whose rows it is labelling is the version
+ * of that with somebody's data in it.
+ *
+ * The `| null` collapse stays, and stays wrong for the reason the block above
+ * gives — `none` and `unreadable` are not the same answer. That is a separate
+ * change with its own callers to move; this one is about which read runs.
+ */
 export async function getActiveWorkspace(): Promise<WorkspaceOption | null> {
-  const read = await readActiveWorkspace()
+  const read = await activeWorkspaceRead()
   return read.status === 'ok' ? read.workspace : null
 }
 

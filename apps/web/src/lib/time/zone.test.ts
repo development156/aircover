@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest'
 
-import { instantAtWallClock, isKnownZone, partsInZone, resolveDisplayZone, zoneLabel } from './zone'
+import {
+  describeZoneRefusal,
+  instantAtWallClock,
+  isKnownZone,
+  partsInZone,
+  resolveDisplayZone,
+  zoneLabel,
+} from './zone'
 
 /**
  * The zone arithmetic the scheduler needs, tested before it existed.
@@ -275,5 +282,47 @@ describe('instantAtWallClock', () => {
     // 03:30 PDT — the same distance past the jump, which is what every calendar
     // application does and what a reader would recognise.
     expect(partsInZone('America/Los_Angeles', taken)).toMatchObject({ hour: 3, minute: 30 })
+  })
+})
+
+describe('the write gate and the read gate are the same gate', () => {
+  /**
+   * ── WHAT WAS MEASURED ───────────────────────────────────────────────────────
+   * `actions/workspace.ts` used a local `isRealTimezone` — a bare
+   * `new Intl.DateTimeFormat` try/catch — while every screen consults
+   * `isKnownZone`, which also refuses an offset and anything without a `/`.
+   * Six values passed the save and failed the render, so a customer set a zone,
+   * saw it echoed back as saved, and every screen went on showing IST with
+   * nothing saying the setting had been dropped.
+   *
+   * These are the six. The action now calls `isKnownZone` itself, so this file
+   * is the one place the rule lives.
+   */
+  const STORED_THEN_IGNORED = ['IST', 'Japan', 'Singapore', 'Egypt', 'EST5EDT', '+05:30']
+
+  it('refuses everything Intl would have let through', () => {
+    for (const zone of STORED_THEN_IGNORED) {
+      // Intl really does accept these — that is the whole trap.
+      expect(() => new Intl.DateTimeFormat('en', { timeZone: zone })).not.toThrow()
+      expect(isKnownZone(zone)).toBe(false)
+    }
+  })
+
+  it('still accepts the zones a customer would actually pick', () => {
+    // Without this, `isKnownZone` returning false for everything passes the above.
+    for (const zone of ['Asia/Kolkata', 'UTC', 'America/New_York', 'Europe/London']) {
+      expect(isKnownZone(zone)).toBe(true)
+    }
+  })
+
+  it('says WHY, and never calls an ambiguous name an unrecognised one', () => {
+    // "Sahoda does not recognise IST" is false. It is recognised and ambiguous,
+    // and a person told it is unknown goes looking for a typo that is not there.
+    expect(describeZoneRefusal('IST')).toMatch(/abbreviation/i)
+    expect(describeZoneRefusal('IST')).not.toMatch(/does not recognise/i)
+    expect(describeZoneRefusal('+05:30')).toMatch(/offset/i)
+    // And each one names something the reader can do next.
+    expect(describeZoneRefusal('IST')).toMatch(/Asia\/Kolkata/)
+    expect(describeZoneRefusal('+05:30')).toMatch(/Asia\/Kolkata/)
   })
 })
