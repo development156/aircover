@@ -175,7 +175,7 @@ is a cache replay, and nothing was piped.
 | `@sahoda/billing` | PASS |
 | `@sahoda/research` | PASS |
 | `@sahoda/jobs` | **FAIL** — 1 failed / 408 passed (409) |
-| `@sahoda/db` alone | **FAIL** — 1 failed / 836 passed / 207 skipped (1044) |
+| `@sahoda/db` alone | **FAIL** — 1 failed / 836 passed / 207 skipped (1044). Passes on CI, see below |
 | `prettier --check .` | PASS |
 | Playwright `@smoke` | **UNRUN** — dispatched, refused at the guard in under a second |
 
@@ -204,6 +204,20 @@ something an older checkout of trunk had already fixed. INFERRED: it arrived
 through `4525a3ab feat(publishing): [contract] keywords replace hashtags`, which
 `git merge-base --is-ancestor` confirms is already in `origin/wt-core`.
 
+**CONFIRMED ON A CLEAN RUNNER, which settles the attribution.** The gate ran on
+CI for three states of this lane:
+
+| Run | SHA | State of the lane | Result |
+| --- | --- | --- | --- |
+| 1170 | `bb117725` | all the Studio work, **before** taking `wt-core` | **success** |
+| 1191 | `40c232e1` | the same work **after** `lane-sync` merged `wt-core` | failure |
+| 1195 | `19ad847f` | this handoff on top | failure |
+
+Same assertion, same file, same counts on the runner as in this sandbox: `1
+failed | 408 passed (409)`, `Failed: @sahoda/jobs#test`, `24 successful, 27
+total`. **This lane was green until it took trunk in, and the merge is the only
+thing that changed.** MEASURED, not inferred.
+
 **2 — `@sahoda/db`, and it is NEW TODAY because the secrets were added.**
 
 ```
@@ -227,7 +241,14 @@ the secrets added this week. MEASURED: both are set in this shell; a repo-root
 `.env` also exists.
 
 So the assertion is false for a reason the code cannot control, and the guard is
-doing exactly what a guard should — it went red the moment the ground moved.
+doing exactly what a guard should. It went red the moment the ground moved.
+
+**CONFIRMED by the same CI runs, which is the cleanest possible check on this
+diagnosis.** `@sahoda/db` **passes on CI** — runs 1191 and 1195 name
+`@sahoda/jobs#test` as the only failure out of 27 tasks. The runner has no
+ambient `SUPABASE_DB_URL`, so the credential the guard objects to is not there
+and the assertion holds. It fails here and passes there because of the
+environment, exactly as diagnosed, and NOT because of anything in the diff.
 
 **I did not change it.** It was written after a run that wrote to production on
 2026-07-27 (`docs/audit/2026-07-27/04-risks-and-unknowns.md` R-01), and narrowing
