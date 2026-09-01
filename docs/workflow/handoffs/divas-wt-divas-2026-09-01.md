@@ -196,12 +196,80 @@ qualifies.
 3. **REQUESTS §18** — the QA capture hook's attribution defect. It writes `pass` and
    `fail` rows onto a stranger's incident card. A run with no identifiable card
    belongs against a null `task_code`, or nowhere.
-4. Autopilot itself is finished and switched off. It needs a decision, not code.
+4. **`scanner-registry.mjs` matches comments** (the section above). Until it is
+   fixed, `wt-core` cannot take this lane, and nobody can write prose naming those
+   five functions without being flagged for it.
+5. Autopilot itself is finished and switched off. It needs a decision, not code.
+
+## After the merge: two things `wt-core` is red on, neither of them mine
+
+`node scripts/lane-sync.mjs push` took `wt-core` first, as it is meant to. That
+brought **188 commits** in and the merge commit is `28ccd4bd`. Re-gating the merged
+tree found two failures. **Both were measured to predate this lane, and neither is
+fixed here** — fixing another lane's tooling inside a handoff commit is the widening
+the rules warn against.
+
+### 1 · A prose comment trips the scanner it is explaining
+
+**MEASURED.** `pnpm exec vitest run` fails 2 of 231 in
+`scripts/lib/scanner-registry.test.mjs`:
+
+- `no NEW scanner arrives without declaring its blind spot` — flags
+  `apps/web/src/lib/brand/logo-facts.test.ts`
+- `the baseline can only shrink` — `expected 63 to be less than or equal to 62`
+
+That file arrived in `6c3ab328`, which is an ancestor of `origin/wt-core`, so this
+is `wt-core`'s failure and not this lane's.
+
+The cause is exact. `scripts/lib/scanner-registry.mjs:39` detects a scanner with a
+plain regex over the whole file:
+
+```js
+const READS_SOURCE = /readFileSync|readdirSync|globSync|execFileSync|execSync/
+```
+
+`logo-facts.test.ts` calls **none** of them. Its only occurrence is line 16, inside
+the doc comment that explains why it is not a scanner: *"`scanner-registry.mjs` only
+flags a test file that calls `readFileSync`, `readdirSync`, `globSync`,
+`execFileSync` or `execSync` — this one calls none of them"*. The author reasoned
+correctly and was flagged for writing the reasoning down.
+
+**Proposed patch, for whoever owns that file:** strip comments before testing
+`READS_SOURCE` (and `enumeratesDynamically` on line 91, which has the same regex and
+the same flaw). The regex over-matches, never under-matches, so nothing that really
+calls those functions escapes — the baseline will SHRINK, which the second test
+already permits, and it then wants
+`node scripts/lib/scanner-registry.test.mjs --update-baseline` to lock the gain in.
+
+Not applied here: it changes shared tooling every lane depends on, and a
+comment-stripping regex is its own trap. It belongs in a change that can be reviewed
+as one.
+
+### 2 · A stale `.next/types` blocks `@sahoda/web#typecheck` in this sandbox only
+
+**MEASURED.** After the merge, `turbo typecheck` fails with three errors, all the
+same shape:
+
+```
+.next/types/validator.ts(431,39): error TS2307: Cannot find module
+  '../../src/app/(app)/studio/[id]/page.js'
+```
+
+`f61de776` ("replace the design canvas with the generative image Studio") moved that
+route. `.next/` is gitignored build output left over in this working copy; CI checks
+out fresh and never sees it. **This is an environment artefact, not a defect** — and
+it is unverified rather than dismissed: I could not clear it, because deleting the
+directory was refused by this session's permissions. `@sahoda/web`'s **lint and test
+pass on the merged tree** (576 files, 3 skipped) when run without the typecheck
+task, which is the evidence that the merge itself is sound.
 
 ## Gate
 
 MEASURED on this working tree, 2026-09-01. Nothing piped; `--force` on turbo so no
 leg is a cache replay.
+
+**Before the merge**, on `86caabb8` — this lane's own work, and the figures that
+matter for judging it:
 
 | Leg | Command | Result |
 | --- | ------- | ------ |
@@ -210,10 +278,24 @@ leg is a cache replay.
 | prettier | `npx prettier --check .` | **PASS** — "All matched files use Prettier code style!" |
 | Playwright @smoke | `turbo test:smoke` | **UNRUN.** Chromium here cannot complete an outbound HTTPS request and every @smoke spec signs in through Clerk. Not passed. |
 
+**After the merge**, on `28ccd4bd`, with the 188 commits `lane-sync` brought in:
+
+| Leg | Result |
+| --- | ------ |
+| turbo typecheck | **FAIL**, 3 errors, all the stale `.next/types` artefact above. Environment, not a defect, and unverified because I could not clear the directory. |
+| turbo lint + test (`--filter=@sahoda/web`) | **PASS** — `Tasks: 10 successful, 10 total`, 576 test files, 3 skipped |
+| root vitest | **FAIL** — 2 of 231, `scanner-registry.test.mjs`, measured to predate this lane |
+| prettier | **PASS** |
+| Playwright @smoke | **UNRUN** |
+
+**So `wt-core` was NOT pushed.** `lane-sync` prints that push as the human's step on
+purpose, and a green gate is its precondition. It is not green, for two reasons that
+are `wt-core`'s own. Do not push this to `wt-core` until item 1 above is fixed.
+
 Per-package test files: research 13 · shared 32 · publishing 27 · mesh 26 · sites 53 ·
 billing 30 (+1 skipped) · jobs 34 · db 41 (+12 skipped) · web 516 (+3 skipped).
 
 **The first run of this gate was RED** — `@sahoda/jobs` 1 failed of 396 — which is
 how the calendar bomb was found. Grouped by error message it was one message in one
-file, so a diff and not an environment. It is fixed above and the figures here are
-from the run after the fix.
+file, so a diff and not an environment. It is fixed above and the pre-merge figures
+are from the run after the fix.
