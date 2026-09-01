@@ -183,3 +183,14 @@ apps/web/perf-results/
 # apps/web/.gitignore covers its own copy; nothing covered this one, and a
 # stray test-results/.last-run.json turned `prettier --check .` red 2026-08-27.
 test-results/
+
+# The pending-queue overlay (scripts/lib/ops-state.mjs). Per-CHECKOUT scratch:
+# how much of the tracked outbox this working copy has already published, plus
+# the QA runs this session recorded. It exists so the sync stops rewriting
+# ops/state/qa.pending.json, which is TRACKED and which .githooks/pre-commit
+# refuses by name — two rules that between them left the working tree
+# permanently modified with a change nobody was allowed to commit.
+#
+# Anchored, and nothing broader may follow it. Verify with
+# `git check-ignore -v --no-index ops/state/.pending.local.json`.
+/ops/state/.pending.local.json

@@ -30,6 +30,7 @@ import { sniffImage } from '@/lib/posts/sniff-image'
 import { brandSignalsFor } from '@/lib/studio/brand-signals'
 import { formatById } from '@/lib/studio/formats'
 import { MAX_REFERENCES, MAX_TRIES_PER_PRESS, describeModeBlock } from '@/lib/studio/modes'
+import { defaultModelId, describeModelBlock } from '@/lib/studio/models'
 import { ReferenceIdsSchema } from '@/lib/studio/reference-ids'
 import { conditionPrompt } from '@/lib/studio/prompt'
 import { attachAssetToPost } from '@/app/actions/assets'
@@ -103,6 +104,11 @@ const GenerateInputSchema = z.object({
    * a hundred.
    */
   count: z.number().int().min(1).max(MAX_TRIES_PER_PRESS).default(1),
+  /**
+   * Which model draws it. Defaulted rather than required, so a caller that
+   * predates the picker still works and gets the everyday model.
+   */
+  modelId: z.string().min(1).default(defaultModelId()),
 })
 
 export type QueueGenerationState =
@@ -185,11 +191,22 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
       return { ok: false, insufficient: false, message: REFUSALS.unknownFormat }
     }
 
+    // ── THE MODEL, BEFORE THE MODE ──────────────────────────────────────────
+    // Checked first because every rule below depends on it: what a mode may do
+    // and how many references it takes are the CHOSEN MODEL's answer. A model
+    // the router cannot reach is refused here rather than spending a hold on a
+    // call that cannot be made.
+    const modelBlocked = describeModelBlock(parsed.data.modelId)
+    if (modelBlocked !== null) {
+      return { ok: false, insufficient: false, message: modelBlocked }
+    }
+
     // The mode's own rule, asked through the SAME function the screen asks, so
     // a request that skipped the screen cannot reach a mode the screen refused.
     const blocked = describeModeBlock({
       mode: parsed.data.mode,
       references: parsed.data.referenceAssetIds.length,
+      modelId: parsed.data.modelId,
     })
     if (blocked !== null) return { ok: false, insufficient: false, message: blocked }
 
@@ -237,7 +254,16 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
     // rule that can drift from the first. A smaller count can only trip the
     // `minReferences` branch, never the `maxReferences` one, so a non-null here
     // can ONLY mean signing took it below the floor.
-    if (describeModeBlock({ mode: parsed.data.mode, references: referenceUrls.length }) !== null) {
+    if (
+      describeModeBlock({
+        mode: parsed.data.mode,
+        references: referenceUrls.length,
+        // The SAME model the first check used. `ruleFor(mode, modelId)` reads the
+        // chosen model's own reference bounds, so asking without it would check a
+        // different model's floor than the one this request will run on.
+        modelId: parsed.data.modelId,
+      }) !== null
+    ) {
       return { ok: false, insufficient: false, message: REFUSALS.referencesUnreadable }
     }
 
@@ -254,6 +280,10 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
         width: format.width,
         height: format.height,
         requested_count: parsed.data.count,
+        // Recorded at REQUEST time, not after the call. A row that only learns
+        // its model on success cannot say what a failure was trying to use,
+        // which is the case where somebody most wants to know.
+        model_id: parsed.data.modelId,
         reference_asset_ids: parsed.data.referenceAssetIds,
         // Explore legitimately used nothing, and `[]` says that. A null here
         // would mean conditioning never ran, which is a different claim.
@@ -328,6 +358,16 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
               // entirely for an empty list, because a field carrying [] and a
               // field that is not there are different requests.
               references: referenceUrls,
+              // ── THE CHOICE HAD TO TRAVEL, AND DID NOT ────────────────────
+              // The field existed at BOTH ends and nothing carried it across:
+              // `ImageGenerateInputSchema` declares `modelId`, `engine.ts`
+              // reads `req.modelId` and hands it to `planImage`, and this call
+              // omitted it. So a person picked a model, `describeModelBlock`
+              // vetted it, `model_id` was written on the row, and the mesh
+              // routed to the TIER DEFAULT — the row recorded a model that had
+              // not drawn the picture. Same shape as the `keywordBrackets`
+              // defect on the publish path.
+              modelId: parsed.data.modelId,
             },
             {
               workspaceId: workspace.id,

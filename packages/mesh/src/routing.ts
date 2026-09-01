@@ -106,6 +106,38 @@ export const IMAGE_ROUTES: Partial<Record<ModelTier, string>> = {
   premium: 'openai/gpt-image-1',
 }
 
+/**
+ * EVERY IMAGE MODEL THIS PRODUCT WILL ADDRESS.
+ *
+ * ── WHY AN ALLOW-LIST AND NOT JUST A DEFAULT ────────────────────────────────
+ * The Studio lets a person choose which model draws their picture, so a model id
+ * now arrives from a REQUEST. Passing that string through to the provider would
+ * let anybody bill this account against any model on OpenRouter, including ones
+ * far dearer than anything we price, and would put an unpriced id in the
+ * `model_id` column as though we had chosen it.
+ *
+ * So the id is checked against this list and a stranger is refused. The list is
+ * the contract: adding a model here is the deliberate act, and everything else
+ * (the picker, the price, the rules) reads from it.
+ *
+ * MEASURED on OpenRouter's own model pages, 2026-08-31, each id fetched and its
+ * figures compared against docs/43 §3:
+ *
+ *   google/gemini-3-pro-image      $2/M in, $120/M image out, 14 references
+ *   openai/gpt-image-1             $5/M text in, $40/M image out, 10 per request, 16 references
+ *   bytedance-seed/seedream-5-0-lite  $0.035 flat per image, 4 per request, 14 references
+ */
+export const ALLOWED_IMAGE_MODELS: readonly string[] = [
+  'google/gemini-3-pro-image',
+  'openai/gpt-image-1',
+  'bytedance-seed/seedream-5-0-lite',
+]
+
+/** True only for an id this product has deliberately priced and listed. */
+export function isAllowedImageModel(id: string): boolean {
+  return ALLOWED_IMAGE_MODELS.includes(id)
+}
+
 export function imageModelForTier(tier: ModelTier): string | undefined {
   return IMAGE_ROUTES[tier]
 }

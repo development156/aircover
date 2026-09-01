@@ -77,6 +77,38 @@ async function demoteOtherLogos(
   }
 }
 
+/**
+ * Point the workspace at the asset that is now its logo.
+ *
+ * ── BEST EFFORT, IN THE SAME SENSE AS `demoteOtherLogos` ─────────────────────
+ * `workspaces.logo_asset_id` arrives with a migration a human applies, and this
+ * code ships before that happens. Setting the logo must not start failing
+ * because that migration is not applied yet, and `42703` (undefined column) is
+ * exactly what an unapplied migration answers with.
+ *
+ * So every failure is ignored, including that one. Note HOW: supabase-js
+ * RETURNS `{ error }` rather than throwing, so it is discarding the result that
+ * swallows the error, not the `catch`. The `catch` is here for a thrown
+ * transport failure, which is the only thing that reaches it.
+ *
+ * Ignoring it is safe because the title write above is what makes the logo
+ * findable today, on every deploy, and the pointer is a refinement of that
+ * answer rather than a replacement for it. A workspace whose pointer write
+ * failed still reads its logo correctly, by title, until the next successful
+ * write repairs it.
+ */
+async function pointWorkspaceAtLogo(
+  supabase: ReturnType<typeof createServerSupabase>,
+  workspaceId: string,
+  assetId: string,
+): Promise<void> {
+  try {
+    await supabase.from('workspaces').update({ logo_asset_id: assetId }).eq('id', workspaceId)
+  } catch {
+    // Best effort, deliberately. See above.
+  }
+}
+
 /** `brand.svg` -> `brand`. The stored file is a PNG and its name should say so. */
 function baseName(name: string): string {
   const trimmed = typeof name === 'string' ? name.trim() : ''
@@ -189,6 +221,8 @@ export async function setBrandLogo(formData: FormData): Promise<SetBrandLogoStat
 
       if (claimed) return { ok: false, message: 'Could not set that as your logo. Try again.' }
 
+      await pointWorkspaceAtLogo(supabase, workspaceId, existing.id)
+
       revalidatePath('/assets')
       return { ok: true, adopted: true, converted }
     }
@@ -198,10 +232,18 @@ export async function setBrandLogo(formData: FormData): Promise<SetBrandLogoStat
     // asset is titled Logo" true, which is what makes the read unambiguous.
     await demoteOtherLogos(supabase, workspaceId, null)
 
-    // Not here yet, so it is an ordinary upload — with every check that carries,
+    // Not here yet, so it is an ordinary upload, with every check that carries,
     // including the sniffing that proves the bytes are an image at all.
+    //
+    // `uploadAsset` already answers the row it inserted on its success arm
+    // (`{ ok: true; asset: Asset }`), so the new id is `stored.asset.id`. That
+    // is preferred over re-reading the row by content hash: it is one fewer
+    // database round trip, and the row `uploadAsset` just inserted is not in
+    // any doubt the way a second read of it would be.
     const stored = await uploadAsset(payload)
     if (!stored.ok) return { ok: false, message: stored.message }
+
+    await pointWorkspaceAtLogo(supabase, workspaceId, stored.asset.id)
 
     return { ok: true, adopted: false, converted }
   } catch (error) {

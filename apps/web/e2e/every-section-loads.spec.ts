@@ -146,6 +146,7 @@ test.describe('every section loads @smoke', () => {
     test.setTimeout(120_000)
 
     await page.goto('/home')
+
     await page
       .locator('#main')
       .getByRole('button', { name: /create workspace/i })

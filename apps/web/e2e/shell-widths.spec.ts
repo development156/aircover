@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures/seeded-user'
-import { leaveOnboarding } from './fixtures/compose'
+import { leaveOnboarding, dismissPlanOffer } from './fixtures/compose'
 import { mkdirSync } from 'node:fs'
 import type { Page } from '@playwright/test'
 
@@ -91,6 +91,7 @@ test.describe('shell across widths @smoke', () => {
       for (const width of WIDTHS) {
         await p.setViewportSize({ width, height: 900 })
         await p.goto('/home', { waitUntil: 'domcontentloaded' })
+        await dismissPlanOffer(p)
         await p.waitForTimeout(1200)
 
         const dir = `shell-proof/${theme}`

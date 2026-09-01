@@ -236,6 +236,7 @@ test.describe('connections is honest about every channel @smoke', () => {
     })
 
     await page.goto('/home')
+
     await page
       .locator('#main')
       .getByRole('button', { name: /create workspace/i })
@@ -277,6 +278,7 @@ test.describe('connections is honest about every channel @smoke', () => {
     void signedIn
 
     await page.goto('/home')
+
     await page
       .locator('#main')
       .getByRole('button', { name: /create workspace/i })
