@@ -70,7 +70,14 @@ export type GenerationsRead =
  * reads make a failure a failure.
  */
 export async function readGenerations(limit = 24): Promise<GenerationsRead> {
+  // ── TWO ANSWERS, NOT ONE ────────────────────────────────────────────────
+  // `status !== 'ok'` collapsed `unreadable` into `no-workspace`, and this
+  // union carries both on purpose. `RecentGenerations` renders NOTHING for
+  // `no-workspace`, so a member whose workspace read failed lost the entire
+  // "What you have made" section with no picture, no error and no explanation.
+  // `read-brain.ts:117` fixed exactly this for the Brand Brain and states why.
   const workspace = await activeWorkspaceRead()
+  if (workspace.status === 'unreadable') return { status: 'unreadable' }
   if (workspace.status !== 'ok') return { status: 'no-workspace' }
   const workspaceId = workspace.workspace.id
 
