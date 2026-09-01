@@ -6,7 +6,7 @@ import { ThemeTokensSchema } from '@sahoda/shared'
 
 import { themeTokensFrom } from '@/lib/brand/brand-theme'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
+import { workspaceForWrite } from '@/lib/workspaces'
 
 export type SaveThemeState = { ok: true } | { ok: false; message: string }
 

@@ -1,5 +1,6 @@
 import { adminClient, expect, test } from './fixtures/seeded-user'
 import { leaveOnboarding } from './fixtures/compose'
+import { RADAR_H1 } from './helpers/headings'
 
 /**
  * ONE OBSERVATION → A DRAFT A PERSON APPROVES, END TO END.
@@ -59,7 +60,7 @@ test.describe('a Radar change becomes a draft', () => {
     if (connError) throw new Error(`staging the connection failed: ${connError.message}`)
 
     await page.goto('/radar')
-    await expect(page.getByRole('heading', { name: 'Radar', level: 1 })).toBeVisible({
+    await expect(page.getByRole('heading', { name: RADAR_H1, level: 1 })).toBeVisible({
       timeout: 60_000,
     })
 

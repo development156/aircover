@@ -7,6 +7,7 @@ import { createMesh, type Mesh } from '@sahoda/mesh'
 import {
   GenerationModeSchema,
   MESH_TASK_ACTION,
+  StudioGenerationRowSchema,
   StudioGenerationSchema,
   type BrandSignal,
   type WithCreditsFn,
@@ -28,8 +29,8 @@ import { signMediaPreviews } from '@/lib/posts/media-url'
 import { sniffImage } from '@/lib/posts/sniff-image'
 import { brandSignalsFor } from '@/lib/studio/brand-signals'
 import { formatById } from '@/lib/studio/formats'
-import { MAX_TRIES_PER_PRESS, describeModeBlock } from '@/lib/studio/modes'
-import { defaultModelId, describeModelBlock, modelById } from '@/lib/studio/models'
+import { MAX_REFERENCES, MAX_TRIES_PER_PRESS, describeModeBlock } from '@/lib/studio/modes'
+import { defaultModelId, describeModelBlock } from '@/lib/studio/models'
 import { ReferenceIdsSchema } from '@/lib/studio/reference-ids'
 import { conditionPrompt } from '@/lib/studio/prompt'
 import { stampGeneratedPicture } from '@/lib/studio/stamp-generated'
@@ -129,9 +130,24 @@ const REFUSALS = {
   malformed: 'Describe the picture you want, in a few words at least.',
   unknownFormat: 'That size is not one Sahoda can make, so nothing was charged.',
   failed: 'Sahoda could not make this image. Nothing was charged.',
-  unusable:
-    'The model returned something Sahoda could not read as a picture. Nothing was charged, and you can try again.',
-  stored: 'The image was made but could not be saved to your library. Nothing was charged.',
+  /**
+   * Every picture the person picked was unreadable by the time we went to use it.
+   *
+   * Its own sentence rather than the mode block's, because the two say different
+   * things. "Pick the picture you want changed" is wrong here: they DID pick one,
+   * and telling them to do the thing they just did is a remedy that cannot work.
+   */
+  referencesUnreadable:
+    'Sahoda could not open the pictures you picked, so nothing was made and nothing was charged. Try picking them again.',
+  /**
+   * The request named more pictures than any mode accepts.
+   *
+   * Its own sentence because `malformed` is about the PROMPT. A hand-made
+   * request carrying four references was told "Describe the picture you want, in
+   * a few words at least", which describes a different field entirely: the parse
+   * failed on `referenceAssetIds` and every failure mapped to one line.
+   */
+  tooManyReferences: `Pick at most ${MAX_REFERENCES} pictures for Sahoda to match.`,
 } as const
 
 /**
@@ -155,7 +171,19 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
     workspaceId = workspace.id
 
     const parsed = GenerateInputSchema.safeParse(input)
-    if (!parsed.success) return { ok: false, insufficient: false, message: REFUSALS.malformed }
+    if (!parsed.success) {
+      // WHICH field failed, not one sentence for all of them. `safeParse` runs
+      // before `describeModeBlock`, so the reference bound is met here first and
+      // was reported as a complaint about the prompt.
+      const onReferences = parsed.error.issues.some(
+        (issue) => issue.path[0] === 'referenceAssetIds',
+      )
+      return {
+        ok: false,
+        insufficient: false,
+        message: onReferences ? REFUSALS.tooManyReferences : REFUSALS.malformed,
+      }
+    }
 
     // Through the SAME function the picker uses, so a hand-made request cannot
     // reach a size the screen refused to offer.
@@ -212,6 +240,33 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
       workspace.id,
       parsed.data.referenceAssetIds,
     )
+
+    // ── ASK THE MODE'S RULE AGAIN, AGAINST WHAT SURVIVED SIGNING ─────────────
+    //
+    // The block above ran against the count the person PICKED. Signing drops
+    // anything it cannot resolve and returns `[]` outright on a query error, so
+    // a mode with a floor of one could reach the model with zero references —
+    // `edit` would send a bare prompt, get back a fresh unrelated picture
+    // instead of the edit, and charge in full for it. Dropping SOME references
+    // is the documented, deliberate behaviour; dropping ALL of them for a mode
+    // that structurally requires one is not the same event.
+    //
+    // Re-asking the same function is what makes this exact rather than a second
+    // rule that can drift from the first. A smaller count can only trip the
+    // `minReferences` branch, never the `maxReferences` one, so a non-null here
+    // can ONLY mean signing took it below the floor.
+    if (
+      describeModeBlock({
+        mode: parsed.data.mode,
+        references: referenceUrls.length,
+        // The SAME model the first check used. `ruleFor(mode, modelId)` reads the
+        // chosen model's own reference bounds, so asking without it would check a
+        // different model's floor than the one this request will run on.
+        modelId: parsed.data.modelId,
+      }) !== null
+    ) {
+      return { ok: false, insufficient: false, message: REFUSALS.referencesUnreadable }
+    }
 
     // ── THE ROW, BEFORE THE MODEL ────────────────────────────────────────────
     const queued = await supabase
@@ -278,6 +333,9 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
       // know whether the callback reached its end, and the error alone cannot say.
       let failure: string | null = null
       let deliveredThis = false
+      // What THIS press reserved, carried out of the callback so it can be added
+      // to `charged` only after the debit is known to have committed.
+      let chargedThis = 0
 
       const credits = await getWithCredits()(
         { workspaceId: workspace.id, action, objectRef: objectRefFor(idx) },
@@ -301,6 +359,16 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
               // entirely for an empty list, because a field carrying [] and a
               // field that is not there are different requests.
               references: referenceUrls,
+              // ── THE CHOICE HAD TO TRAVEL, AND DID NOT ────────────────────
+              // The field existed at BOTH ends and nothing carried it across:
+              // `ImageGenerateInputSchema` declares `modelId`, `engine.ts`
+              // reads `req.modelId` and hands it to `planImage`, and this call
+              // omitted it. So a person picked a model, `describeModelBlock`
+              // vetted it, `model_id` was written on the row, and the mesh
+              // routed to the TIER DEFAULT — the row recorded a model that had
+              // not drawn the picture. Same shape as the `keywordBrackets`
+              // defect on the publish path.
+              modelId: parsed.data.modelId,
             },
             {
               workspaceId: workspace.id,
@@ -329,19 +397,19 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
 
           const bytes = Uint8Array.from(Buffer.from(result.data.base64, 'base64'))
           if (bytes.byteLength === 0 || bytes.byteLength > MEDIA_UPLOAD_CAP_BYTES) {
-            failure = REFUSALS.unusable
+            failure = FAILURE_REASON.IMAGE_UNREADABLE
             throw new Error('IMAGE_UNUSABLE')
           }
 
           // Facts, not the model's claim. `result.data.mime` is deliberately unused.
           const sniffed = sniffImage(bytes)
           if (!sniffed.ok) {
-            failure = REFUSALS.unusable
+            failure = FAILURE_REASON.IMAGE_UNREADABLE
             throw new Error('IMAGE_UNREADABLE')
           }
           const kind = kindForProvenMime(sniffed.image.mime)
           if (kind === null) {
-            failure = REFUSALS.unusable
+            failure = FAILURE_REASON.IMAGE_UNREADABLE
             throw new Error('IMAGE_UNSUPPORTED')
           }
 
@@ -356,7 +424,7 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
             upsert: false,
           })
           if (upload.error) {
-            failure = REFUSALS.stored
+            failure = FAILURE_REASON.IMAGE_NOT_STORED
             throw new Error('STORAGE_FAILED')
           }
 
@@ -375,11 +443,9 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
             // The object is already in storage and nothing points at it. Remove it
             // rather than leaving bytes nobody can reach or delete.
             await supabase.storage.from(MEDIA_BUCKET).remove([objectPath])
-            failure = REFUSALS.stored
+            failure = FAILURE_REASON.IMAGE_NOT_STORED
             throw new Error('ASSET_ROW_FAILED')
           }
-
-          charged += ctx.creditsCharged
 
           // ── THE STAMP RIDES ALONG, AND NEVER COSTS THE GENERATION ─────────
           // Local compute, so nothing above changes: no second hold, no second
@@ -413,19 +479,61 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
           // statement could never land. On `42703` (undefined column) the row
           // is written again without it, so a missing column costs the LINK and
           // never the record of a generation somebody paid for.
-          const written = await supabase
+          let image = await supabase
             .from('studio_generation_images')
             .insert({ ...imageRow, stamped_asset_id: stamped?.assetId ?? null })
 
-          if (written.error?.code === '42703') {
-            await supabase.from('studio_generation_images').insert(imageRow)
+          if (image.error?.code === '42703') {
+            image = await supabase.from('studio_generation_images').insert(imageRow)
           }
+
+          // ── THE PROVENANCE ROW, CHECKED LIKE EVERY OTHER WRITE ABOVE ───────
+          //
+          // This insert used to be awaited with its `.error` never read, while
+          // the storage upload and the `assets` insert directly above it both
+          // checked and threw. A lost row meant the person was charged, the
+          // picture reached their library, and NOTHING recorded which
+          // generation made it — after which `describeCount` would tell them
+          // "3 of the 4 options you asked for arrived. You were charged for
+          // those and for nothing else" about four they had paid for.
+          //
+          // Rolled back the same way the asset row above rolls back, so the
+          // failure costs a released hold rather than a false claim about
+          // money. The migration's §6 states this contract: an image row is
+          // written once, "create it, or do nothing".
+          //
+          // THE STAMPED COPY IS ROLLED BACK TOO, and it is listed first
+          // because it is the one a person would SEE. Both asset rows are in
+          // the library by now; undoing only the generation's own would leave a
+          // stamped picture sitting there for a generation that was refused and
+          // refunded. Each undo is independent — a failure to remove the
+          // stamped copy must not stop the generation's own from being removed
+          // — so they are separate statements rather than one chain.
+          if (image.error) {
+            if (stamped !== null) {
+              await supabase.from('assets').delete().eq('id', stamped.assetId)
+              await supabase.storage.from(MEDIA_BUCKET).remove([stamped.objectPath])
+            }
+            await supabase.from('assets').delete().eq('id', newAssetId)
+            await supabase.storage.from(MEDIA_BUCKET).remove([objectPath])
+            failure = FAILURE_REASON.IMAGE_NOT_STORED
+            throw new Error('IMAGE_ROW_FAILED')
+          }
+
+          chargedThis = ctx.creditsCharged
           deliveredThis = true
         },
       )
 
       if (credits.ok) {
         delivered += 1
+        // ── COUNTED ONLY ONCE THE DEBIT ACTUALLY COMMITTED ─────────────────
+        // `withCredits` reaches its DEBIT after the callback returns, so a
+        // failure there releases the hold and charges nothing. Incrementing
+        // inside the callback counted a credit that never left the wallet, and
+        // when an earlier picture had succeeded the row was still written
+        // `ready` with `cost_credits` claiming it.
+        charged += chargedThis
         balanceAfter = credits.data.balanceAfter
         continue
       }
@@ -514,7 +622,8 @@ export async function readGeneration(
   if (error) return { ok: false, message: 'Sahoda could not read that image request just now.' }
   if (!data) return { ok: false, message: 'That image request does not exist.' }
 
-  const row = StudioGenerationSchema.safeParse(data)
+  // The refined schema, for the reason `read.ts` gives at its own call site.
+  const row = StudioGenerationRowSchema.safeParse(data)
   if (!row.success) {
     reportServerError(new Error('studio: generation row did not parse'), {
       action: 'readGeneration',
@@ -562,7 +671,23 @@ async function signReferences(
     .filter((url): url is string => typeof url === 'string')
 }
 
-export type StartPostState = { ok: true; postId: string } | { ok: false; message: string }
+export type StartPostState =
+  | { ok: true; postId: string }
+  | {
+      ok: false
+      message: string
+      /**
+       * The draft that DOES exist, when the picture is the half that failed.
+       *
+       * The header below promises the person is "sent to it with a sentence
+       * about the picture", and the failure arm returned no id, so nothing could
+       * send them anywhere: `picture-actions.tsx` only set a note, the draft was
+       * created and unreachable from that screen, and pressing the button again
+       * made another empty one. Present here exactly when there is somewhere to
+       * go, so a caller cannot navigate to a post that was never created.
+       */
+      postId?: string
+    }
 
 /**
  * TURN A PICTURE INTO A POST, WITHOUT A TRIP THROUGH THE LIBRARY.
@@ -625,8 +750,9 @@ export async function startPostFromPicture(assetId: unknown): Promise<StartPostS
     const attached = await attachAssetToPost(post.postId, parsed.data)
     if (!attached.ok) {
       // The draft exists. Sending them to it with the picture missing beats
-      // losing the half that worked.
-      return { ok: false, message: attached.message }
+      // losing the half that worked — and that needs the id, which this arm did
+      // not carry.
+      return { ok: false, message: attached.message, postId: post.postId }
     }
 
     revalidatePath('/posts')

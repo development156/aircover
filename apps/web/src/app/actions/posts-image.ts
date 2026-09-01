@@ -21,7 +21,7 @@ import { newImageGenerateRef } from '@/lib/posts/object-ref'
 import { getPost, listMedia, readVariantFormats } from '@/lib/posts/read'
 import { sniffImage } from '@/lib/posts/sniff-image'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
+import { workspaceForWrite } from '@/lib/workspaces'
 
 // 'use server' modules may export only async functions — these singletons stay
 // module-private. Built lazily so a missing key surfaces as a typed error inside

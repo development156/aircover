@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs'
 import { expect, test } from './fixtures/seeded-user'
 import { leaveOnboarding } from './fixtures/compose'
+import { RADAR_H1 } from './helpers/headings'
 
 /**
  * SOLID AND HATCHED STAY APART WITH THE COLOUR REMOVED.
@@ -57,7 +58,7 @@ test.describe('Radar certainty survives greyscale', () => {
       }
 
       await page.goto('/radar')
-      await expect(page.getByRole('heading', { name: 'Radar', level: 1 })).toBeVisible({
+      await expect(page.getByRole('heading', { name: RADAR_H1, level: 1 })).toBeVisible({
         timeout: 60_000,
       })
 

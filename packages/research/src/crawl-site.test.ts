@@ -34,15 +34,6 @@ function client(opts: {
   }
 }
 
-const PROSE =
-  'A two-room bookshop off a Buxi Bazaar side street where Odia poetry sits at eye level. ' +
-  'The reading room upstairs is never rushed and a seat costs nothing. Our readers are ' +
-  'Ravenshaw students and school teachers who grew up on Odia poetry and now mostly buy ' +
-  'English fiction, because Odia titles are hard to find in the city and the online sellers ' +
-  'do not stock them at all. Book club meets Saturday at five upstairs; bring your copy or ' +
-  'borrow ours. Pakhala from May, same seat, cooler lunch. We only recommend what we have ' +
-  'read, and Odia writing gets the front shelf every single week of the year here.'
-
 describe('countWords', () => {
   it('counts prose and ignores markdown syntax, links and images', () => {
     expect(countWords('# Title\n\n![alt](a.png)\n\n[Chai](/x) and **books**')).toBe(4)

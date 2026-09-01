@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Check, Coins, CreditCard, Info, Sparkles } from 'lucide-react'
+import { Check, Coins, CreditCard, Sparkles } from 'lucide-react'
 import {
   PLAN_CATALOG,
   describePlanPrice,

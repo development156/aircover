@@ -74,6 +74,8 @@ for (const theme of ['light', 'dark'] as const) {
     page,
     signedIn,
   }) => {
+    // Destructured to activate the fixture; `void` because the value itself is unused.
+    void signedIn
     await page.addInitScript((t) => {
       try {
         window.localStorage.setItem('sahoda-theme', t as string)

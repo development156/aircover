@@ -16,7 +16,6 @@ vi.mock('@/lib/cron/loop-enabled', () => ({ loopCronEnabled: vi.fn(() => true) }
 
 import { loopCronEnabled } from '@/lib/cron/loop-enabled'
 import * as store from './store'
-import { AUTOPILOT_REFUSALS } from '@/lib/loop/autopilot-refusals'
 import { runWorkspaceAutopilotTick } from './tick'
 
 /**

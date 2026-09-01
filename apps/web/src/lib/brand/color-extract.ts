@@ -3,8 +3,6 @@ import { rgbToOklch } from './oklch'
 // Client-side dominant-color extraction for the Theme step (docs/superpowers
 // spec, "4. Theme") — canvas pixel math only, no color-quantization library.
 
-/** How many buckets per channel (256 / BUCKET_SIZE ≈ 8 buckets/channel). */
-const BUCKET_SIZE = 32
 /** Pixels below this alpha (0–255) are transparent padding — skip them. */
 const MIN_ALPHA = 200
 /** Pixels brighter than this on every channel are near-white background. */

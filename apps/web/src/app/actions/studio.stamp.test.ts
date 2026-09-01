@@ -37,6 +37,26 @@ const state = vi.hoisted(() => ({
   inserted: [] as Inserted[],
   /** Per table, so one table can be made to fail without touching the others. */
   insertErrors: {} as Record<string, { code?: string; message: string } | null>,
+  /**
+   * Which inserts an error applies to, per table. Defaults to every one.
+   *
+   * ── WHY THIS EXISTS, AND WHAT IT WAS BEFORE ────────────────────────────────
+   * `insertErrors` used to fail EVERY insert into a table, and the `42703` test
+   * below set it and passed. It passed because the retry's `.error` was never
+   * read: this fake was describing a table where the second write fails too,
+   * the code was quietly ignoring that, and the assertion could not tell the
+   * difference. `wt-core` gave that insert an error check on 2026-09-01 and the
+   * fixture went red at once — correctly, because a retry that also fails must
+   * roll the generation back rather than charge for a lost record.
+   *
+   * A missing column fails the write that NAMES it and nothing else, which is
+   * what this models. A fake that is wrong in the direction of the code being
+   * tested is not a fixture, it is an alibi.
+   */
+  insertErrorWhen: {} as Record<string, (row: Record<string, unknown>) => boolean>,
+  /** Rows deleted, as `table:id`, and objects removed from storage. */
+  deleted: [] as string[],
+  removed: [] as string[],
   updates: [] as Record<string, unknown>[],
   uploads: [] as string[],
   withCreditsCalls: 0,
@@ -104,12 +124,20 @@ vi.mock('@/lib/supabase/server', () => {
       from: (table: string) => ({
         insert: (row: Record<string, unknown>) => {
           state.inserted.push({ table, row })
-          return thenable({ error: state.insertErrors[table] ?? null })
+          const when = state.insertErrorWhen[table]
+          const applies = when === undefined || when(row)
+          return thenable({ error: (applies ? state.insertErrors[table] : null) ?? null })
         },
         update: (row: Record<string, unknown>) => {
           state.updates.push(row)
           return thenable({ error: null })
         },
+        delete: () => ({
+          eq(_column: string, value: string) {
+            state.deleted.push(`${table}:${value}`)
+            return thenable({ error: null })
+          },
+        }),
         select: () => thenable({ data: [], error: null }),
       }),
       storage: {
@@ -118,7 +146,10 @@ vi.mock('@/lib/supabase/server', () => {
             state.uploads.push(path)
             return Promise.resolve({ error: null })
           },
-          remove: () => Promise.resolve({ error: null }),
+          remove: (paths: string[]) => {
+            state.removed.push(...paths)
+            return Promise.resolve({ error: null })
+          },
         }),
       },
     }),
@@ -183,6 +214,9 @@ beforeEach(async () => {
   state.logoThrows = false
   state.inserted = []
   state.insertErrors = {}
+  state.insertErrorWhen = {}
+  state.deleted = []
+  state.removed = []
   state.updates = []
   state.uploads = []
   state.withCreditsCalls = 0
@@ -261,6 +295,8 @@ describe('the stamped_asset_id column before its migration is applied', () => {
     // `42703` is "undefined column": the migration has not been applied on this
     // deploy. The picture is still stamped and stored; only the link is lost.
     state.insertErrors.studio_generation_images = { code: '42703', message: 'no such column' }
+    // Postgres refuses the write that NAMES the absent column, not every write.
+    state.insertErrorWhen.studio_generation_images = (row) => 'stamped_asset_id' in row
 
     const result = await queueGeneration(REQUEST)
 
@@ -271,5 +307,67 @@ describe('the stamped_asset_id column before its migration is applied', () => {
     // The retry carries the record and nothing that cannot be written.
     expect(attempts[1]!.row).not.toHaveProperty('stamped_asset_id')
     expect(attempts[1]!.row.asset_id).toBe(assetRows()[0]!.row.id)
+  })
+
+  /**
+   * ── AND WHEN THE RETRY FAILS TOO ──────────────────────────────────────────
+   * Added because a mutation proved the case uncovered: dropping the retry's
+   * error check left this file green. That is the same blind spot the old
+   * fixture had — it modelled a table where every insert fails and passed
+   * anyway — so the fixture and the assertion were wrong together, which is
+   * how a fixture becomes an alibi.
+   *
+   * A retry that fails is not "the column is missing". It is a lost provenance
+   * row for a generation somebody paid for, and it must cost a released hold
+   * rather than a silent charge.
+   */
+  it('rolls the generation back when the retry fails as well', async () => {
+    state.insertErrors.studio_generation_images = { code: '42703', message: 'no such column' }
+    // No `insertErrorWhen`, so BOTH writes are refused.
+
+    const result = await queueGeneration(REQUEST)
+
+    const attempts = state.inserted.filter((one) => one.table === 'studio_generation_images')
+    expect(attempts).toHaveLength(2)
+    expect(result).toMatchObject({ ok: false })
+    expect(state.deleted).toContain(`assets:${assetRows()[0]!.row.id as string}`)
+  })
+})
+
+describe('a generation rolled back after its picture was already stamped', () => {
+  /**
+   * ── THE CASE THIS MERGE CREATED, AND WHY IT IS NOT A LOOSE END ─────────────
+   * Two changes met on 2026-09-01. `wt-core` gave the `studio_generation_images`
+   * insert an error check that DELETES the generation's asset and removes its
+   * object, so a lost provenance row costs a released hold rather than a false
+   * claim about money. This branch had, one statement earlier, written a SECOND
+   * asset: the stamped copy.
+   *
+   * Neither change is wrong and their combination has a failure neither had.
+   * Undoing only the generation's own asset leaves the stamped picture sitting
+   * in the customer's library, attached to a generation that was refused and
+   * refunded. That is an orphan WITH A THUMBNAIL — strictly worse than an
+   * orphan nobody can see, which is the outcome every rollback in this file
+   * already exists to prevent.
+   */
+  it('removes the stamped copy too, not just the original', async () => {
+    state.insertErrors.studio_generation_images = { message: 'row rejected' }
+
+    const result = await queueGeneration(REQUEST)
+
+    // Both assets reached the library before the row failed.
+    expect(assetRows()).toHaveLength(2)
+    const original = assetRows()[0]!.row.id as string
+    const stampedId = assetRows()[1]!.row.id as string
+    expect(stampedId).not.toBe(original)
+
+    // Both are undone. The stamped one is the one a person would have SEEN.
+    expect(state.deleted).toContain(`assets:${stampedId}`)
+    expect(state.deleted).toContain(`assets:${original}`)
+    expect(state.removed).toHaveLength(2)
+    expect(state.uploads.every((path) => state.removed.includes(path))).toBe(true)
+
+    // And nothing is claimed to have been delivered.
+    expect(result).toMatchObject({ ok: false })
   })
 })

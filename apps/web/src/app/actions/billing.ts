@@ -9,7 +9,7 @@ import {
   createCashfreeProvider,
   loadCashfreeEnv,
 } from '@sahoda/billing'
-import { PlanIdSchema, parseGstin, type PlanId } from '@sahoda/shared'
+import { PlanIdSchema, parseGstin } from '@sahoda/shared'
 
 import { env } from '@/lib/env'
 import { reportServerError } from '@/lib/observability/report'

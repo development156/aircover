@@ -50,8 +50,6 @@ export type AttachDecision =
   | { ok: true; warnings: ChannelRejection[] }
   | { ok: false; rejections: ChannelRejection[]; message: string }
 
-const ACCEPTED = 'Attached this file.'
-const ACCEPTED_WITH_WARNINGS = 'Attached this file. Some channels will not use it.'
 const REJECTED = 'Check this file. No channel on this post can use it.'
 
 /**
