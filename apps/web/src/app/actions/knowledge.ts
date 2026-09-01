@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { auth } from '@clerk/nextjs/server'
 import { revalidatePath } from 'next/cache'
 import { createPgLedgerPort, createWithCredits, loadBillingEnv } from '@sahoda/billing'
-import { creditCost, MESH_TASK_ACTION } from '@sahoda/shared'
+import { MESH_TASK_ACTION } from '@sahoda/shared'
 import {
   DEPLOYMENT_CONFIG_MESSAGE,
   isDeploymentConfigCause,
@@ -12,18 +12,16 @@ import {
 } from '@/lib/actions/paid-failure'
 import { revalidateBalance } from '@/lib/actions/revalidate-balance'
 import { chargeFailureState, FAILURE_REASON } from '@/lib/posts/charge-failure'
-import { buildEvidenceSet, chunkForIngestion, MAX_CHUNKS_PER_DOCUMENT } from '@sahoda/research'
 
 import { describeImpact } from '@/lib/knowledge/delete-impact'
 import { createThenIndex, indexFromSource, type KnowledgeActionState } from '@/lib/knowledge/ingest'
-import { knowledgeFailure, type KnowledgeFailureCode } from '@/lib/knowledge/failure-copy'
+import { knowledgeFailure } from '@/lib/knowledge/failure-copy'
 import {
   MAX_UPLOAD_BYTES,
   readPdfSource,
   readTypedSource,
   readUrlSource,
 } from '@/lib/knowledge/read-source'
-import type { SourceRead } from '@/lib/knowledge/read-source'
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { proposeFromLibrary } from '@/lib/knowledge/propose'
@@ -486,7 +484,7 @@ export async function resolveFromLibrary(): Promise<LibraryResolveState> {
 
     const credits = await getWithCredits()(
       { workspaceId: ws.workspace.id, action, objectRef: newLibraryResolveRef(ws.workspace.id) },
-      async (ctx) => {
+      async (_ctx) => {
         const outcome = await proposeFromLibrary({
           passages: passages.passages,
           workspaceId: ws.workspace.id,

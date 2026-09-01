@@ -20,7 +20,7 @@ import { casSaveVariant } from '@/lib/posts/cas-save'
 import { parseExtras } from '@/lib/posts/variant-extras'
 import type { DeleteState, FormatState, SaveState } from '@/lib/posts/state'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
+import { workspaceForWrite } from '@/lib/workspaces'
 
 /**
  * Post CRUD. `posts` / `post_variants` carry full member CRUD policies, so these

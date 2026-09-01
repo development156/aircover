@@ -15,7 +15,7 @@ import { getPost, readMedia, readVariantFormatsStrict } from '@/lib/posts/read'
 import { sniffImage } from '@/lib/posts/sniff-image'
 import type { AttachMediaState, DetachMediaState } from '@/lib/posts/media-state'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
+import { workspaceForWrite } from '@/lib/workspaces'
 
 /**
  * Attach a file to a post.

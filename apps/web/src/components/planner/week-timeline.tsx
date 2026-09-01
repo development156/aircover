@@ -77,13 +77,7 @@ export interface WeekTimelineProps {
   today: Date
 }
 
-export function WeekTimeline({
-  days,
-  posts,
-  variantStates,
-  today,
-  zone,
-}: WeekTimelineProps & { zone?: string | null }) {
+export function WeekTimeline({ days, posts, variantStates, today }: WeekTimelineProps) {
   const { from, to } = hourRange(posts)
   const hours = Array.from({ length: to - from + 1 }, (_, i) => from + i)
   const bodyHeight = (to - from + 1) * HOUR_PX
@@ -163,7 +157,7 @@ export function WeekTimeline({
 
                 {isToday ? <NowLine fromHour={from} toHour={to} hourPx={HOUR_PX} /> : null}
 
-                {placed.map(({ post, minutes, lane, lanes }) => {
+                {placed.map(({ post, minutes, lane }) => {
                   const certainty = certaintyFor(
                     post.intent,
                     outcomeOf(variantStates.get(post.id) ?? []),
