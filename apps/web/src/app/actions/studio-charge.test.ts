@@ -270,6 +270,31 @@ describe('a mode that needs a reference will not run without one', () => {
   })
 })
 
+describe('a refusal names the field that actually failed', () => {
+  /**
+   * MUTATION: map every `!parsed.success` back to `REFUSALS.malformed` and this
+   * goes green while a request with too many pictures is told to write a longer
+   * prompt.
+   */
+  it('says the pictures are too many, not that the prompt is too short', async () => {
+    const tooMany = Array.from({ length: 9 }, (_x, i) => `3333333${i}-3333-4333-8333-333333333333`)
+
+    const out = await ask({ mode: 'match', referenceAssetIds: tooMany })
+
+    if (out.ok || out.insufficient) throw new Error('expected a refusal with a sentence')
+    expect(out.message).toMatch(/pictures/i)
+    expect(out.message).not.toMatch(/in a few words at least/i)
+  })
+
+  it('still complains about the prompt when the prompt is what failed', async () => {
+    // Without this, pointing every refusal at the references would pass above.
+    const out = await ask({ wanted: 'x' })
+
+    if (out.ok || out.insufficient) throw new Error('expected a refusal with a sentence')
+    expect(out.message).toMatch(/in a few words at least/i)
+  })
+})
+
 describe('the specific refusal sentences actually reach a reader', () => {
   /**
    * MUTATION: point the throw sites back at a reason that is not in

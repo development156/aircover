@@ -159,7 +159,17 @@ export function redraw(
   selected: { x: number; y: number; w: number; h: number } | null = null,
 ): void {
   ctx.clearRect(0, 0, size.width, size.height)
-  for (const object of objects) drawOne(ctx, object, ink)
+  // ── AN OBJECT `inProgress` IS A MOVING COPY OF IS DRAWN ONCE ──────────────
+  // During a MOVE drag, `inProgress` is the same mark translated, and the
+  // original is still in `objects` at its resting place. Painting both showed
+  // the person a duplicate of their own mark that vanished on release. A mark
+  // being DRAWN for the first time is not in `objects` at all, so this is a
+  // no-op for the pen and the shapes — the id is what tells the two apart, and
+  // it lives here rather than at the call site so every caller gets it.
+  for (const object of objects) {
+    if (inProgress !== null && object.id === inProgress.id) continue
+    drawOne(ctx, object, ink)
+  }
   if (inProgress !== null) drawOne(ctx, inProgress, ink)
   // Last, so it sits OVER the mark it describes rather than under it.
   if (selected !== null) drawSelection(ctx, selected, ink)

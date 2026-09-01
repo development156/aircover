@@ -7,6 +7,7 @@ import { createMesh, type Mesh } from '@sahoda/mesh'
 import {
   GenerationModeSchema,
   MESH_TASK_ACTION,
+  StudioGenerationRowSchema,
   StudioGenerationSchema,
   type BrandSignal,
   type WithCreditsFn,
@@ -28,7 +29,7 @@ import { signMediaPreviews } from '@/lib/posts/media-url'
 import { sniffImage } from '@/lib/posts/sniff-image'
 import { brandSignalsFor } from '@/lib/studio/brand-signals'
 import { formatById } from '@/lib/studio/formats'
-import { MAX_TRIES_PER_PRESS, describeModeBlock } from '@/lib/studio/modes'
+import { MAX_REFERENCES, MAX_TRIES_PER_PRESS, describeModeBlock } from '@/lib/studio/modes'
 import { ReferenceIdsSchema } from '@/lib/studio/reference-ids'
 import { conditionPrompt } from '@/lib/studio/prompt'
 import { attachAssetToPost } from '@/app/actions/assets'
@@ -131,6 +132,15 @@ const REFUSALS = {
    */
   referencesUnreadable:
     'Sahoda could not open the pictures you picked, so nothing was made and nothing was charged. Try picking them again.',
+  /**
+   * The request named more pictures than any mode accepts.
+   *
+   * Its own sentence because `malformed` is about the PROMPT. A hand-made
+   * request carrying four references was told "Describe the picture you want, in
+   * a few words at least", which describes a different field entirely: the parse
+   * failed on `referenceAssetIds` and every failure mapped to one line.
+   */
+  tooManyReferences: `Pick at most ${MAX_REFERENCES} pictures for Sahoda to match.`,
 } as const
 
 /**
@@ -154,7 +164,19 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
     workspaceId = workspace.id
 
     const parsed = GenerateInputSchema.safeParse(input)
-    if (!parsed.success) return { ok: false, insufficient: false, message: REFUSALS.malformed }
+    if (!parsed.success) {
+      // WHICH field failed, not one sentence for all of them. `safeParse` runs
+      // before `describeModeBlock`, so the reference bound is met here first and
+      // was reported as a complaint about the prompt.
+      const onReferences = parsed.error.issues.some(
+        (issue) => issue.path[0] === 'referenceAssetIds',
+      )
+      return {
+        ok: false,
+        insufficient: false,
+        message: onReferences ? REFUSALS.tooManyReferences : REFUSALS.malformed,
+      }
+    }
 
     // Through the SAME function the picker uses, so a hand-made request cannot
     // reach a size the screen refused to offer.
@@ -515,7 +537,8 @@ export async function readGeneration(
   if (error) return { ok: false, message: 'Sahoda could not read that image request just now.' }
   if (!data) return { ok: false, message: 'That image request does not exist.' }
 
-  const row = StudioGenerationSchema.safeParse(data)
+  // The refined schema, for the reason `read.ts` gives at its own call site.
+  const row = StudioGenerationRowSchema.safeParse(data)
   if (!row.success) {
     reportServerError(new Error('studio: generation row did not parse'), {
       action: 'readGeneration',
@@ -563,7 +586,23 @@ async function signReferences(
     .filter((url): url is string => typeof url === 'string')
 }
 
-export type StartPostState = { ok: true; postId: string } | { ok: false; message: string }
+export type StartPostState =
+  | { ok: true; postId: string }
+  | {
+      ok: false
+      message: string
+      /**
+       * The draft that DOES exist, when the picture is the half that failed.
+       *
+       * The header below promises the person is "sent to it with a sentence
+       * about the picture", and the failure arm returned no id, so nothing could
+       * send them anywhere: `picture-actions.tsx` only set a note, the draft was
+       * created and unreachable from that screen, and pressing the button again
+       * made another empty one. Present here exactly when there is somewhere to
+       * go, so a caller cannot navigate to a post that was never created.
+       */
+      postId?: string
+    }
 
 /**
  * TURN A PICTURE INTO A POST, WITHOUT A TRIP THROUGH THE LIBRARY.
@@ -626,8 +665,9 @@ export async function startPostFromPicture(assetId: unknown): Promise<StartPostS
     const attached = await attachAssetToPost(post.postId, parsed.data)
     if (!attached.ok) {
       // The draft exists. Sending them to it with the picture missing beats
-      // losing the half that worked.
-      return { ok: false, message: attached.message }
+      // losing the half that worked — and that needs the id, which this arm did
+      // not carry.
+      return { ok: false, message: attached.message, postId: post.postId }
     }
 
     revalidatePath('/posts')
