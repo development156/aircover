@@ -296,3 +296,53 @@ describe('needsPlate: whether the mark needs a plate behind it on a given backdr
     expect(needsPlate(1, 'mixed')).toBe(true)
   })
 })
+
+describe('the width cap holds for a wide wordmark, and the mark stays on the canvas', () => {
+  /**
+   * ── THE INVARIANT THE ROUNDING STEP WAS BREAKING ───────────────────────────
+   * `markWidth` was re-derived as `round(markHeight) * logoAspect` AFTER the
+   * caps had scaled the rect, using the uncapped aspect — so it walked back past
+   * `MAX_MARK_WIDTH_SHARE`. The existing cap test passes only because it picked
+   * 1000x1000 with a modest aspect, one of the canvases where it still held.
+   *
+   * MEASURED before the fix, cap 346px on a 1080 canvas: aspect 6 shipped 348,
+   * aspect 10 shipped 350, aspect 16 shipped 352. Ordinary wide wordmarks.
+   */
+  const CAP_SHARE = 0.32
+
+  it('never exceeds the width cap, at any aspect a caller may pass', () => {
+    for (const aspect of [2, 6, 8, 10, 12, 16, 20, 200]) {
+      for (const canvas of [
+        { width: 1080, height: 1080 },
+        { width: 1200, height: 628 },
+        { width: 400, height: 400 },
+        { width: 200, height: 200 },
+      ]) {
+        const p = placeLogo({ canvas, logoAspect: aspect, anchor: 'bottom-right' })
+        expect(
+          p.mark.width,
+          `aspect ${aspect} on ${canvas.width}x${canvas.height}`,
+        ).toBeLessThanOrEqual(Math.floor(CAP_SHARE * canvas.width))
+      }
+    }
+  })
+
+  it('keeps the clear box inside the canvas, which is the header\u2019s own promise', () => {
+    // The file says no positive canvas is structurally impossible. At 200x200
+    // with an aspect-200 lockup the clear box was 202 wide at x = -2.
+    for (const aspect of [2, 10, 200]) {
+      for (const canvas of [
+        { width: 1080, height: 1080 },
+        { width: 400, height: 400 },
+        { width: 200, height: 200 },
+      ]) {
+        const p = placeLogo({ canvas, logoAspect: aspect, anchor: 'bottom-right' })
+        const where = `aspect ${aspect} on ${canvas.width}x${canvas.height}`
+        expect(p.clear.x, where).toBeGreaterThanOrEqual(0)
+        expect(p.clear.y, where).toBeGreaterThanOrEqual(0)
+        expect(p.clear.x + p.clear.width, where).toBeLessThanOrEqual(canvas.width)
+        expect(p.clear.y + p.clear.height, where).toBeLessThanOrEqual(canvas.height)
+      }
+    }
+  })
+})
