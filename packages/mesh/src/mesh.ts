@@ -24,7 +24,7 @@ import {
   type MeshTaskSpec,
   type RepairEvent,
 } from './engine'
-import { TIER_ROUTES, imageModelForTier, isAllowedImageModel } from './routing'
+import { TIER_ROUTES, chooseImageModel } from './routing'
 import { brandGuidelinesTask } from './tasks/brand-guidelines'
 import { brandExtractTask } from './tasks/brand-extract'
 import { captionRewriteTask } from './tasks/caption-rewrite'
@@ -103,10 +103,7 @@ export function createMesh(opts: CreateMeshOptions = {}): Mesh {
     // refused here, because the screen has already refused it with a sentence
     // and this layer's job is to make the wrong thing impossible, not to
     // explain it twice.
-    const chosen =
-      requested !== undefined && isAllowedImageModel(requested)
-        ? requested
-        : imageModelForTier(tier)
+    const chosen = chooseImageModel(tier, requested)
     return chosen === undefined ? undefined : { provider: openRouterByClass.image, model: chosen }
   }
 
