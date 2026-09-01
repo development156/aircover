@@ -6,7 +6,7 @@ import type { DisplayPost } from '@/lib/posts/display-post'
 import { outcomeOf } from '@/lib/posts/publish-evidence'
 import type { VariantStatusRow } from '@/lib/posts/variant-status'
 import { formatScheduledTime } from '@/lib/posts/schedule-format'
-import { hourRange, istDayKey, placeDay } from '@/lib/planner/week-window'
+import { PLANNER_GRID_ZONE, hourRange, istDayKey, placeDay } from '@/lib/planner/week-window'
 import { cn } from '@/lib/utils'
 
 import { NowLine } from './now-line'
@@ -200,7 +200,12 @@ export function WeekTimeline({
                         </span>
                       </span>
                       <span className="truncate type-eyebrow text-ink-mute">
-                        {formatScheduledTime(post.scheduled_at, zone)}
+                        {/* THE GRID'S ZONE, not the workspace's. This card's
+                            column and row are computed in `PLANNER_GRID_ZONE`,
+                            so a caption in any other zone contradicts the place
+                            the card is drawn. The planner moves zone as a whole
+                            or not at all. */}
+                        {formatScheduledTime(post.scheduled_at, PLANNER_GRID_ZONE)}
                         {certainty.label !== null ? ` · ${certainty.label}` : null}
                       </span>
                     </Link>

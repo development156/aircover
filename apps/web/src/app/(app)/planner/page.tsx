@@ -432,7 +432,7 @@ export default async function PlannerPage({
                 query={filter.query}
                 week={weekParam}
               />
-              {next.length > 0 ? <PlannerUpcoming posts={next} /> : null}
+              {next.length > 0 ? <PlannerUpcoming posts={next} zone={zone} /> : null}
             </aside>
           ) : null}
         </div>
