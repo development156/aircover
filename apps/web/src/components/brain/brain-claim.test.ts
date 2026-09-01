@@ -28,6 +28,15 @@ import { describe, it, expect } from 'vitest'
  * nothing in the product makes that true. The companion assertion in
  * `packages/mesh` fails if a fifth task starts reading the brain, which is the
  * day this copy would need widening again.
+ *
+ * ── WHAT IT CANNOT SEE ───────────────────────────────────────────────────────
+ * It reads three NAMED files as text, so it is blind to a fourth surface: a new
+ * screen that repeats the promise is simply not in `SURFACES` and passes by not
+ * being looked at. It is equally blind to a claim that is not present as a
+ * literal — a sentence assembled in a template literal, interpolated from a
+ * variable, imported from a shared copy constant, or stored in the database and
+ * rendered at runtime. A scan of source can only refuse the sentences somebody
+ * typed into the files it was pointed at.
  */
 
 const ROOT = join(__dirname, '../../')

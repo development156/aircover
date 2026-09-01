@@ -21,6 +21,15 @@ import { describe, it, expect } from 'vitest'
  * So the guard is two-sided, and it pins the CLAIM rather than the wording:
  * rewrite the sentence freely, but it must go on naming a reach, and the code
  * must go on having one.
+ *
+ * ── WHAT IT CANNOT SEE ───────────────────────────────────────────────────────
+ * It reads ONE file as text — the settings page — so it is blind to the same
+ * two sentences moving anywhere else. Lift them into a child component, a shared
+ * copy constant or a template literal and both assertions go on passing against
+ * a page that no longer contains either half. It also cannot see a SECOND
+ * surface making the same promise, and it cannot see the reach itself: it checks
+ * that the page names Posts and Planner, never that Posts and Planner still read
+ * the column.
  */
 
 const WEB = join(__dirname, '../../')
