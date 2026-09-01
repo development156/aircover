@@ -72,6 +72,16 @@ const INVERSE_BLOCK = (() => {
   return TOKENS.slice(from, close)
 })()
 
+/** The `[data-theme='dark'], .dark` block, sliced the same way. */
+const DARK_BLOCK = (() => {
+  const open = TOKENS.match(/^\[data-theme='dark'\],\n\.dark\s*\{$/m)
+  if (!open || open.index === undefined) throw new Error('tokens.css has no dark block')
+  const from = open.index + open[0].length
+  const close = TOKENS.indexOf('\n}', from)
+  if (close === -1) throw new Error('tokens.css dark block is unterminated')
+  return TOKENS.slice(from, close)
+})()
+
 /** Pull a `--name: value;` out of a block, or null when the block never sets it. */
 function tokenIn(block: string, name: string): string | null {
   const match = block.match(new RegExp(`^\\s*${name}:\\s*([^;]+);`, 'm'))
@@ -175,62 +185,95 @@ describe('the default theme passes the guard it applies to customers', () => {
   })
 
   /**
-   * ── THE PRIMARY'S HOVER ON THE INVERSE SURFACE ─────────────────────────────
+   * ── THE PRIMARY'S HOVER ON EVERY DARK GROUND ───────────────────────────────
    * `:root` sets `--pstrong: #000000`, which is right on a white page and
-   * points AT THE GROUND on `[data-surface='inverse']`. `brand-theme.ts`
-   * already states the rule beside the line implementing it — the hover step
-   * moves away from the page, in whichever direction that is — and
-   * `skin-css.ts` has given every CUSTOMER theme a lightened `--pstrong` in
-   * this exact scope since the 2026-08-30 rail ruling. Sahoda's own default,
-   * having no Brand Skin, fell through to `:root` and got the black.
+   * points AT THE GROUND anywhere the page is dark. `brand-theme.ts` states the
+   * rule beside the line implementing it — the hover step moves away from the
+   * page, in whichever direction that is — and `skin-css.ts` has given every
+   * CUSTOMER theme a lightened `--pstrong` since the 2026-08-30 rail ruling.
+   * Sahoda's own default, having no Brand Skin, fell through to `:root` and got
+   * the black, in BOTH dark scopes.
    *
-   * So this is the same own-medicine defect the tests above exist for, in the
-   * one scope none of them read.
+   * Graded as a PAIR, because the fill and its label cannot be judged apart:
+   * no fill that white can label is brighter than the resting orange, so
+   * "lighten the fill" and "keep white text" cannot both be true.
    */
-  it('the inverse scope lifts the primary on hover instead of sinking it', () => {
-    const pstrong = tokenIn(INVERSE_BLOCK, '--pstrong')
-    expect(
-      pstrong,
-      "[data-surface='inverse'] does not declare --pstrong, so it inherits " +
-        ":root's #000000 — a primary button that vanishes into the panel on hover.",
-    ).not.toBeNull()
-    expect(pstrong!.startsWith('#'), '--pstrong is expected to be a hex literal').toBe(true)
-
-    const fill = hexToRgb(pstrong!)
-
-    // It must SEPARATE from both grounds it can land on, as a non-text fill.
-    for (const [name, ground] of [
-      ['--surface #171717', INVERSE_SURFACE],
-      ['--canvas #0d0d0d', INVERSE_CANVAS],
-    ] as const) {
-      const ratio = contrastRatio(fill, ground)
+  describe.each([
+    ["[data-surface='inverse']", INVERSE_BLOCK],
+    ["[data-theme='dark']", DARK_BLOCK],
+  ])('%s', (scope, block) => {
+    it('lifts the primary on hover instead of sinking it, and labels it', () => {
+      const pstrong = tokenIn(block, '--pstrong')
       expect(
-        ratio,
-        `inverse --pstrong ${pstrong} measures ${ratio.toFixed(2)}:1 on ${name}, ` +
-          `below the ${AA_NON_TEXT}:1 WCAG 1.4.11 floor for a non-text fill.`,
-      ).toBeGreaterThanOrEqual(AA_NON_TEXT)
-    }
+        pstrong,
+        `${scope} does not declare --pstrong, so it inherits :root's #000000 — ` +
+          'a primary button that vanishes into its own card on hover.',
+      ).not.toBeNull()
+      expect(pstrong!.startsWith('#'), '--pstrong is expected to be a hex literal').toBe(true)
 
-    // And it must move AWAY from the ground, not merely differ from it. A
-    // DARKER hover can still clear 3:1 while breaking the rule this encodes.
-    const rest = hexToRgb(token('--p'))
-    const lift = contrastRatio(fill, INVERSE_SURFACE)
-    const resting = contrastRatio(rest, INVERSE_SURFACE)
+      const fill = hexToRgb(pstrong!)
+
+      // It must SEPARATE from both grounds it can land on, as a non-text fill.
+      for (const [name, ground] of [
+        ['--surface #171717', INVERSE_SURFACE],
+        ['--canvas #0d0d0d', INVERSE_CANVAS],
+      ] as const) {
+        const ratio = contrastRatio(fill, ground)
+        expect(
+          ratio,
+          `${scope} --pstrong ${pstrong} measures ${ratio.toFixed(2)}:1 on ${name}, ` +
+            `below the ${AA_NON_TEXT}:1 WCAG 1.4.11 floor for a non-text fill.`,
+        ).toBeGreaterThanOrEqual(AA_NON_TEXT)
+      }
+
+      // And it must move AWAY from the ground, not merely differ from it. A
+      // DARKER hover can still clear 3:1 while breaking the rule this encodes.
+      const rest = hexToRgb(token('--p'))
+      const lift = contrastRatio(fill, INVERSE_SURFACE)
+      const resting = contrastRatio(rest, INVERSE_SURFACE)
+      expect(
+        lift,
+        `${scope} --pstrong ${pstrong} reads ${lift.toFixed(2)}:1 on #171717 while the ` +
+          `resting --p reads ${resting.toFixed(2)}:1. The control must get LOUDER when ` +
+          'somebody reaches for it, never quieter.',
+      ).toBeGreaterThan(resting)
+
+      // ── THE LABEL, WHICH IS THE HALF THAT MAKES THIS MORE THAN ONE LINE ────
+      // This assertion CAN fail here, unlike the version deleted from an
+      // earlier draft: `--pstrong-fg` is a free variable, so a scope that
+      // lightens the fill and leaves the light theme's white behind goes red.
+      const fg = tokenIn(block, '--pstrong-fg')
+      expect(
+        fg,
+        `${scope} declares --pstrong but not --pstrong-fg, so it keeps the LIGHT ` +
+          "theme's white on a bright fill.",
+      ).not.toBeNull()
+      const label = contrastRatio(hexToRgb(fg!), fill)
+      expect(
+        label,
+        `${scope} labels its hover fill ${pstrong} with ${fg} at ${label.toFixed(2)}:1, below AA.`,
+      ).toBeGreaterThanOrEqual(AA_BODY)
+    })
+  })
+
+  it('the light theme labels its own hover fill too', () => {
+    const label = contrastRatio(hexToRgb(token('--pstrong-fg')), hexToRgb(token('--pstrong')))
+    expect(label).toBeGreaterThanOrEqual(AA_BODY)
+  })
+
+  /**
+   * The measurement that made this a two-token change rather than a one-line
+   * one, asserted so it cannot rot into a claim nobody rechecked.
+   */
+  it('white could not have labelled the dark hover fill', () => {
+    const fill = hexToRgb(tokenIn(DARK_BLOCK, '--pstrong')!)
+    const white = contrastRatio(WHITE_RGB, fill)
     expect(
-      lift,
-      `inverse --pstrong ${pstrong} reads ${lift.toFixed(2)}:1 on #171717 while the ` +
-        `resting --p reads ${resting.toFixed(2)}:1. The control must get LOUDER when ` +
-        `somebody reaches for it, never quieter.`,
-    ).toBeGreaterThan(resting)
-
-    // ── ONE ASSERTION IS DELIBERATELY ABSENT ────────────────────────────────
-    // A fourth line checking that --pfg ink still clears AA on the hovered fill
-    // was written here and REMOVED, because no value can fail it while the
-    // lift assertion above passes, and a line that cannot go red is decoration.
-    // The arithmetic: #171717 has relative luminance 0.0086, so lift > 6.11
-    // forces L_fill > 6.11 x 0.0586 - 0.05 = 0.308, and ink on such a fill
-    // measures (0.308 + 0.05) / 0.05 = 7.2:1 at worst. Recorded rather than
-    // asserted so the guarantee survives without pretending to be a guard.
+      white,
+      `White on ${tokenIn(DARK_BLOCK, '--pstrong')} measures ${white.toFixed(2)}:1. Nine ` +
+        'components hardcoded `hover:text-white` beside `hover:bg-primary-strong`; ' +
+        'leaving them would have shipped exactly this.',
+    ).toBeLessThan(AA_BODY)
   })
 
   /**
@@ -241,7 +284,11 @@ describe('the default theme passes the guard it applies to customers', () => {
    * the documented reason the inverse scope re-declares its aliases at all, and
    * it cost the rail its label contrast for months before anyone measured it.
    */
-  it('the inverse scope re-declares --brand-deep, not just its source', () => {
+  it('the inverse scope re-declares --brand-deep, and dark does not need to', () => {
+    // The asymmetry is the point. `[data-theme='dark']` matches <html>, the same
+    // element `:root` declares the alias on, so the substitution picks up dark's
+    // value. Only a scope on a DESCENDANT is affected.
+    expect(tokenIn(DARK_BLOCK, '--brand-deep')).toBeNull()
     expect(
       tokenIn(INVERSE_BLOCK, '--brand-deep'),
       '--brand-deep resolves through --pstrong and is declared on :root, so it ' +
