@@ -1,5 +1,9 @@
 # Handoff — divas — wt-divas — 2026-08-31
 
+> **Superseded by [`divas-wt-divas-2026-09-01.md`](./divas-wt-divas-2026-09-01.md).**
+> Same session, filed before it crossed midnight UTC. That file carries the
+> sections `/handoff` requires and one retraction this one does not. Read it instead.
+
 **Branch** `wt-divas` at `da2d0b84`, fully contained in `wt-core` at `a953a2e2`.
 Lane `wt-divas`. Pushed: **yes**. **PR #28 and PR #35 are both merged.** Nothing
 of this lane is open.
