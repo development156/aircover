@@ -24,7 +24,7 @@ import {
   type MeshTaskSpec,
   type RepairEvent,
 } from './engine'
-import { TIER_ROUTES, imageModelForTier } from './routing'
+import { TIER_ROUTES, imageModelForTier, isAllowedImageModel } from './routing'
 import { brandGuidelinesTask } from './tasks/brand-guidelines'
 import { brandExtractTask } from './tasks/brand-extract'
 import { captionRewriteTask } from './tasks/caption-rewrite'
@@ -91,9 +91,23 @@ export function createMesh(opts: CreateMeshOptions = {}): Mesh {
    * Undefined when the tier has no image model, which is how `runImage` learns to
    * refuse rather than guess.
    */
-  const planImage = (tier: ModelTier): { provider: Provider; model: string } | undefined => {
-    const model = imageModelForTier(tier)
-    return model === undefined ? undefined : { provider: openRouterByClass.image, model }
+  const planImage = (
+    tier: ModelTier,
+    requested?: string,
+  ): { provider: Provider; model: string } | undefined => {
+    // ── THE REQUESTED MODEL IS CHECKED, NEVER PASSED THROUGH ────────────────
+    // A model id now arrives from a request, because the Studio lets somebody
+    // choose. Handing that string to the provider would let any caller bill this
+    // account against any model on OpenRouter, including ones far dearer than
+    // anything we price. An id that is not on the list is IGNORED rather than
+    // refused here, because the screen has already refused it with a sentence
+    // and this layer's job is to make the wrong thing impossible, not to
+    // explain it twice.
+    const chosen =
+      requested !== undefined && isAllowedImageModel(requested)
+        ? requested
+        : imageModelForTier(tier)
+    return chosen === undefined ? undefined : { provider: openRouterByClass.image, model: chosen }
   }
 
   const planAttempts = (tier: ModelTier): Attempt[] => {
@@ -188,7 +202,11 @@ export function createMesh(opts: CreateMeshOptions = {}): Mesh {
         error: appError('VALIDATION_ERROR', 'invalid image prompt', ctx.traceId),
       }
     }
-    const size = IMAGE_SIZES[parsed.data.size]
+    // `dims` wins when the caller gave one. A named size is a convenience for
+    // callers that do not care; a caller that DOES care about the shape has
+    // already worked out the exact canvas and must not have it rounded to one
+    // of three ratios.
+    const size = parsed.data.dims ?? IMAGE_SIZES[parsed.data.size]
     return runner.runImage(
       imageGenerateDef,
       // The size rides in the prompt as well as the structured field: not every
@@ -199,6 +217,8 @@ export function createMesh(opts: CreateMeshOptions = {}): Mesh {
         prompt: `${parsed.data.prompt}\n\nRender at ${size.width}x${size.height} pixels.`,
         width: size.width,
         height: size.height,
+        references: parsed.data.references,
+        modelId: parsed.data.modelId,
       },
       ctx,
     )

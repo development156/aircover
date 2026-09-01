@@ -68,20 +68,22 @@ export default async function CampaignsPage({
 
   return (
     <div className="space-y-grid">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <PageTitle sub="Group posts under one push, and read them together.">Campaigns</PageTitle>
-        {/* THE one primary action on this view — and only ever one of it.
-            Rendered here when there IS a list to add to. On the empty screen the
-            empty state's own button is the primary, and showing both would put
-            two identical primaries on one view, which means neither is the main
-            action. Playwright caught exactly that: a by-name lookup matched two
-            elements on the empty screen.
+      {/* THE one primary action on this view — and only ever one of it.
+          Rendered here when there IS a list to add to. On the empty screen the
+          empty state's own button is the primary, and showing both would put
+          two identical primaries on one view, which means neither is the main
+          action. Playwright caught exactly that: a by-name lookup matched two
+          elements on the empty screen.
 
-            It is also absent for the other two reads: with no workspace there is
-            nothing to create a campaign in, and after a failed read the list may
-            already hold the name you are about to collide with. */}
-        {read.status === 'ok' && read.rollups.length > 0 ? <CampaignForm /> : null}
-      </div>
+          It is also absent for the other two reads: with no workspace there is
+          nothing to create a campaign in, and after a failed read the list may
+          already hold the name you are about to collide with. */}
+      <PageTitle
+        sub="Group posts under one push, and read them together."
+        actions={read.status === 'ok' && read.rollups.length > 0 ? <CampaignForm /> : null}
+      >
+        Campaigns
+      </PageTitle>
 
       {read.status === 'no-workspace' ? (
         <EmptyState

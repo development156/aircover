@@ -141,7 +141,7 @@ export function CostPreview({ cycleId, briefs, budgetCredits }: CostPreviewProps
                 className={[
                   'flex cursor-pointer items-start gap-3 rounded-input p-3 transition-colors',
                   'focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent',
-                  on ? 'bg-subtle' : 'bg-transparent opacity-60',
+                  on ? 'bg-s2' : 'bg-transparent opacity-60',
                 ].join(' ')}
               >
                 <input
@@ -193,7 +193,7 @@ export function CostPreview({ cycleId, briefs, budgetCredits }: CostPreviewProps
       {preview.overBudget ? (
         <p
           role="status"
-          className="mt-3 flex items-start gap-2 rounded-input bg-warn-subtle p-3 type-sm text-ink"
+          className="mt-3 flex items-start gap-2 rounded-input bg-warn-bg p-3 type-sm text-ink"
         >
           <AlertTriangle size={15} strokeWidth={1.8} aria-hidden className="mt-[2px] shrink-0" />
           <span>

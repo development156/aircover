@@ -1,12 +1,17 @@
-import { ArrowRight } from 'lucide-react'
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { auth } from '@clerk/nextjs/server'
 import { creditCost } from '@sahoda/shared'
+
+import { PlanOfferMount } from '@/components/billing/plan-offer-mount'
+import { planOfferDecision } from '@/lib/billing/plan-offer'
+import { planOfferRows } from '@/lib/billing/plan-offer-rows'
+import { readSubscription } from '@/lib/billing/read'
 
 import { AtAGlance } from '@/components/home/at-a-glance'
 import { FirstRun } from '@/components/home/first-run'
 import { GetStarted } from '@/components/home/get-started'
 import { GreetingBanner } from '@/components/home/greeting-banner'
+import { HomeSection } from '@/components/home/section'
 import { NeedsAttention } from '@/components/home/needs-attention'
 import { BrainCard, ConnectionsCard } from '@/components/home/rail-cards'
 import { countIndexedDocuments } from '@/lib/knowledge/store'
@@ -15,7 +20,6 @@ import { PerformanceStrip } from '@/components/analytics/performance-strip'
 import { SahodaRail } from '@/components/home/sahoda-rail'
 import { SpendCard } from '@/components/home/spend-card'
 import { WeekStrip } from '@/components/home/week-strip'
-import { Card } from '@/components/ui/card'
 import { StaggerItem } from '@/components/motion/stagger'
 import { ActivityFeed } from '@/components/home/activity-feed'
 import { readInstagramAnalytics } from '@/lib/analytics/account-insights'
@@ -79,10 +83,24 @@ async function landingFor(): Promise<LandingDecision> {
  * grid of zero-value cards reads broken; a short page with one clear thing to
  * press reads calm, and it is what a new workspace honestly is.
  *
- * The layout is deliberately ASYMMETRIC: a display-size greeting, the week strip
- * full-bleed as the hero, a 2-column split, then a dense table. The density
- * contrast — a lot of air above, tight rows below — is what stops it reading as
- * a grid of equal cards.
+ * ── THE 2026-08-30 REBUILD ───────────────────────────────────────────────────
+ * The brief was that this read as separate UI blocks rather than one product,
+ * and the measurement agreed: the page rendered its regions in THREE different
+ * card grammars at once — a 46px ruled header on four of them, an unruled 20px
+ * head on the charts, and a small caps label with no heading at all on the
+ * planner block. Counting the four stat cards, thirteen separate ringed boxes
+ * went down one screen. Restyling any one of them could not fix that, because
+ * the defect was that there were three of them.
+ *
+ * So: ONE card language (`home/section.tsx`), and the four numbers became one
+ * divided board rather than four boxes. Then the queue — the question somebody
+ * actually opened the app to ask — came out of the 1fr column and now leads
+ * across the full width, which left the split with a clean division of labour:
+ * the REPORT on the left, the SOURCES on the right.
+ *
+ * NOTHING WAS REMOVED. Every region, sentence, absence state and remedy that
+ * was on the old page is on this one, and every figure still comes from a table
+ * or from a platform that reported it.
  *
  * ── ONE THING LEADS, AND IT IS THE QUEUE (2026-08-20 restructure) ────────────
  * docs/27 §1 found "two competing heroes" and no focal point. Both heroes were
@@ -102,7 +120,8 @@ async function landingFor(): Promise<LandingDecision> {
  * importance. A shop owner checking this between customers is answering "what
  * needs me" — so the queue moved from fourth in the left column, below two
  * charts and a spend card, to directly under the greeting. Everything that was
- * above it is a report, and a report can wait for a scroll.
+ * above it is a report, and a report can wait for a scroll. The 2026-08-30
+ * rebuild took the same argument one step further and gave it the full width.
  *
  * ── ARRIVAL ─────────────────────────────────────────────────────────────────
  * The nine reads stay in ONE `Promise.all`. That is one wait, not nine, and
@@ -143,6 +162,8 @@ export default async function HomePage() {
     brain,
     connections,
     knowledgeDocuments,
+    subscription,
+    session,
   ] = await Promise.all([
     /**
      * IN THE BATCH, NOT IN FRONT OF IT.
@@ -183,6 +204,21 @@ export default async function HomePage() {
      * rather than a zero: a failed read is not an empty library.
      */
     countIndexedDocuments(),
+    /**
+     * The plan offer's read. In the batch rather than on its own line below —
+     * see the offer's own note for the guard that decided that. It short-circuits
+     * on a null workspace without touching the database, like the rest of them.
+     */
+    readSubscription(),
+    /**
+     * The Clerk session, for the plan offer's dismissal key. In the batch for
+     * the same reason `readSubscription` is: `lib/perf/read-waterfall.test.ts`
+     * counts a bare `await` below this block as a sequential read and refuses
+     * it, and it was right both times — a round trip in front of the dashboard
+     * costs every returning customer, where being in the batch costs only the
+     * accounts on their way into onboarding one throwaway call.
+     */
+    auth(),
   ])
 
   // THE RULING, ACTED ON. Everything above was read in parallel with the
@@ -195,6 +231,54 @@ export default async function HomePage() {
   // workspace WITHOUT touching the database, so this branch costs nothing and the
   // dashboard is replaced rather than rendered empty. See FirstRun for why.
   if (balance.status === 'no-workspace') return <FirstRun now={now} />
+
+  /**
+   * ── THE PLANS, OFFERED ONCE TO A WORKSPACE THAT IS NOT ON ONE ──────────────
+   *
+   * /home is where a session lands (see the landing rule above), so it is where
+   * "on arriving at the dashboard" happens. Mounting this in the `(app)` layout
+   * was the other candidate and was refused for the same reason the landing rule
+   * is not there: the layout runs for every route in the group, so the offer
+   * would appear over /posts, over a typed URL and over every refresh. That is a
+   * wall, not an offer.
+   *
+   * ── AND ITS READ IS IN THE BATCH ABOVE, BECAUSE A GUARD INSISTED ──────────
+   * It was written as its own `await` on this line, with a comment arguing that
+   * only accounts which actually reach the dashboard should pay for it.
+   * `lib/perf/read-waterfall.test.ts` refused: "/(app)/home: 7 to 8 sequential
+   * reads (new: readSubscription)". The guard is right and the argument was
+   * wrong. A sequential read is a whole extra round trip in front of EVERY
+   * returning customer's dashboard, and what it was buying was one saved query
+   * for an account on its way into onboarding. That is the same trade the batch
+   * already makes for its other nine reads, and its own comment says so.
+   *
+   * ── THE SESSION ID IS READ ON THE CLIENT, NOT HERE ────────────────────────
+   * The dismissal is scoped to the Clerk session so that closing it lasts for
+   * one sign-in and no longer. The obvious way to get that id is `auth()` on
+   * this server component, and it was written that way first. It broke four
+   * tests in this page's own suite: `auth()` pulls in `server-only`, which
+   * throws under the component test environment, and every existing assertion
+   * about the landing rule went red naming a Realtime auth token.
+   *
+   * That was the test telling the truth about a real cost — a whole Clerk
+   * server module dragged into the dashboard's render for one string the
+   * browser already has. `useAuth()` in the modal reads it where it is used, and
+   * this page keeps exactly one new read.
+   *
+   * ── AND IT SHOWS RUPEES, WITH NO LOCAL APPROXIMATION ──────────────────────
+   * /wallet converts its prices for the reader's country, which costs two more
+   * reads: the billing profile for a declared country and today's FX rates. Both
+   * on the hottest route in the product, for an approximation, when the rupee
+   * figure IS the charge — `plans.ts` is explicit that every plan is billed in
+   * rupees and anything else is an approximation of one. So the dialog states
+   * the charge and says it is in rupees, and /wallet stays the screen that
+   * converts. The component keeps the props for a caller that wants to pay for
+   * them.
+   */
+  const offer =
+    session.sessionId !== null && planOfferDecision(subscription).kind === 'offer' ? (
+      <PlanOfferMount sessionKey={session.sessionId} plans={planOfferRows()} />
+    ) : null
 
   /**
    * ── AND A WORKSPACE THAT EXISTS AND HOLDS NOTHING GETS ITS OWN SCREEN TOO ──
@@ -223,7 +307,21 @@ export default async function HomePage() {
     accountReported: instagram.kind === 'ready' && instagram.insights.length > 0,
   }
   if (!workspaceHasStarted(signals)) {
-    return <GetStarted now={now} steps={startSteps()} />
+    /* The offer rides BOTH dashboard states. A workspace with nothing in it yet
+       is still a workspace on Free, and it is the account most likely to be
+       weighing a plan — leaving it out here would mean the offer only ever
+       reached people who had already committed to the product. The one state it
+       does not ride is the branch above: an account with NO workspace cannot
+       check out at all, because `startCheckout` resolves a workspace to charge
+       for, and an offer that cannot be taken up is the "impossible remedy" this
+       codebase has a whole guard about. `planOfferDecision` returns `silent` for
+       it, so that exclusion is in the decision rather than in this JSX. */
+    return (
+      <>
+        <GetStarted now={now} steps={startSteps()} />
+        {offer}
+      </>
+    )
   }
 
   // The evidence behind `.is-real` on the strip. This page read publish-log
@@ -247,16 +345,20 @@ export default async function HomePage() {
   )
 
   return (
-    /* ── ONE RHYTHM, AND IT IS 20px ──────────────────────────────────────
-       This page ran at 16 between regions and 16 between the columns, while
-       `Card` ran at 16 inside them — so the gap AROUND a group was the same as
-       the gap BETWEEN things inside it, which docs/37 §4 names as "the most
-       common spacing bug in this product": the reader cannot tell which value
-       belongs to which label. 20 outside, and `Card` is now 20 inside, so the
-       two are at least on the same step; the separation comes from the card's
-       ring rather than from a bigger hole. /analytics runs the same 20 via
-       `space-y-grid`. */
-    <div className="space-y-5">
+    /* ── ONE RHYTHM BETWEEN REGIONS, AND IT IS NOW A STEP ABOVE THE ONE
+       INSIDE THEM ──────────────────────────────────────────────────────────
+       This page ran 20 outside a card and 20 inside it, and the note that set
+       it said so deliberately: the separation was left to the card's ring. With
+       ONE card language across all nine regions (see `home/section.tsx`) that
+       no longer holds — every block now wears the same ring, so the ring can no
+       longer be what tells the reader where a group ends. The gap has to.
+
+       24 outside, 20 inside. Both are on docs/37 §4's ladder, and the step
+       between them is what makes the page read as regions rather than as a run
+       of identical boxes. It drops back to 20 below `narrow`, where 24 is a
+       whole extra scroll across nine blocks and the phone has no columns for
+       the gap to separate anyway. */
+    <div className="space-y-6 max-narrow:space-y-5">
       {/* ── THE FOUR QUESTIONS, IN ORDER (SPECIFICATION.md §1) ──────────────
           what happened · what is happening · what needs me · what next.
 
@@ -269,30 +371,42 @@ export default async function HomePage() {
           read. No band behind it any more — see the component. */}
       <GreetingBanner greeting={greetingFor(now)} state={greetingState(counts, publish)} />
 
-      {/* ── AND THEN FOUR NUMBERS, WHERE THE 190px BAND USED TO BE ────────
-          The reference opens on five stat cards; this page opened on a
-          greeting and then a queue, with its first figure at y≈1190 on a 768px
-          laptop. All four of these are counts of rows this product owns or a
-          ledger balance, so the strip is full on day one with nothing
-          connected — which is the whole reason /home could not have a KPI row
-          before. See the component for why these four and not the platform
-          metrics. */}
+      {/* ── FOUR NUMBERS AS ONE BOARD, NOT FOUR BOXES ─────────────────────
+          All four are counts of rows this product owns or a ledger balance, so
+          the board is full on day one with nothing connected — which is the
+          whole reason /home could not have a KPI row before. It is now a single
+          divided card rather than four ringed ones: see `StatStrip`'s `board`
+          for the argument, which is that thirteen separate boxes down one page
+          is most of what made this screen read as assembled parts. */}
       <StaggerItem i={0}>
         <AtAGlance posts={displayPosts} buckets={buckets} publish={publish} balance={balance} />
       </StaggerItem>
 
-      {/* `split--wide` — 1fr / 380px, not the 280px this page used. The rail
-          holds three cards; at 280px the connection tiles wrapped to one per
-          row and the stack read as a leftovers column. */}
-      <div className="grid grid-cols-[minmax(0,1fr)_380px] items-start gap-5 max-wide:grid-cols-1">
-        <div className="flex min-w-0 flex-col gap-5">
-          {/* WHAT NEEDS ME — the lead. See the header note: this is the question
-              someone actually opened the app to ask, and it used to sit fourth,
-              below two charts and a spend card. */}
-          <StaggerItem i={1}>
-            <NeedsAttention posts={displayPosts} />
-          </StaggerItem>
+      {/* ── WHAT NEEDS ME — FULL WIDTH, AND THAT IS THE RESTRUCTURE ───────
+          This is the question somebody actually opened the app to ask, and it
+          was rendered inside the 1fr column of a 1fr/380 split — so the page's
+          lead had 68% of the page's width, with the Brand Brain card level with
+          it competing for the same eye. It leads across the whole width now,
+          and its own grid opens to three columns when three or more things are
+          waiting, which is the shape a queue should have and could not take at
+          870px. */}
+      <StaggerItem i={1}>
+        <NeedsAttention posts={displayPosts} />
+      </StaggerItem>
 
+      {/* `split--wide` — 1fr / 380px, not the 280px this page used. The rail
+          holds four cards; at 280px the connection tiles wrapped to one per
+          row and the stack read as a leftovers column.
+
+          WHAT IS IN EACH SIDE CHANGED with the queue's promotion. Left is now
+          purely the REPORT — the measured series, in one reading column, so
+          somebody scrolling to ask "how is it going" gets four things in a row
+          that answer that and nothing else. Right is the SOURCES: what
+          happened, what Sahoda knows, what it can post to, and what it drafted.
+          That is the "what next" question, and it belongs beside the report
+          rather than interleaved with it. */}
+      <div className="grid grid-cols-[minmax(0,1fr)_380px] items-start gap-6 max-wide:grid-cols-1 max-narrow:gap-5">
+        <div className="flex min-w-0 flex-col gap-6 max-narrow:gap-5">
           {/* WHAT IS HAPPENING. This page had no metric container at all — not
               an empty one, none. Its four slots stay unmeasured until something
               is connected, which is the honest answer; showing nothing left the
@@ -302,14 +416,14 @@ export default async function HomePage() {
             <PerformanceStrip analytics={instagram} />
           </StaggerItem>
 
-          {/* Instagram's own series sits below the strip: the strip carries the
-              headline numbers, this carries the one real chart. */}
           <StaggerItem i={3}>
-            <InstagramInsights analytics={instagram} />
+            <SpendCard spend={spend} />
           </StaggerItem>
 
+          {/* Instagram's own series: the strip carries the headline numbers,
+              this carries the one real chart a platform reported. */}
           <StaggerItem i={4}>
-            <SpendCard spend={spend} />
+            <InstagramInsights analytics={instagram} />
           </StaggerItem>
 
           <StaggerItem i={5}>
@@ -317,25 +431,22 @@ export default async function HomePage() {
           </StaggerItem>
         </div>
 
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-6 max-narrow:gap-5">
           {/* 1 — WHAT HAPPENED. The reference puts the activity feed at the
                   top of the rail; this app had it as a full-width table at the
                   very bottom, which is the least-read position on the page. */}
-          {/* WHAT HAPPENED. */}
           <StaggerItem i={6}>
-            <section className="surface-ring rounded-card bg-surface">
-              <header className="flex min-h-[46px] items-center gap-3 border-b border-line-soft px-4 py-3">
-                <h2 className="type-h3">Recent activity</h2>
-                <Link
-                  href="/wallet"
-                  className="card-link ml-auto inline-flex items-center gap-1 type-meta font-[550] text-accent transition-micro hover:gap-1.5 max-narrow:min-h-[44px]"
-                >
-                  View all
-                  <ArrowRight aria-hidden className="size-3.5" />
-                </Link>
-              </header>
+            {/* `flush`: the feed's rows run to the card's own edge, so the body
+                may not carry the standard 20px inset. The header still does, so
+                this heading sits on the same line as every other card's. */}
+            <HomeSection
+              id="home-activity"
+              title="Recent activity"
+              action={{ href: '/wallet', label: 'View all' }}
+              flush
+            >
               <ActivityFeed entries={ledger.entries.slice(0, 4)} />
-            </section>
+            </HomeSection>
           </StaggerItem>
 
           {/* ── WHERE `Available credits` USED TO BE ────────────────────────
@@ -356,12 +467,15 @@ export default async function HomePage() {
           </StaggerItem>
 
           <StaggerItem i={9}>
-            <Card>
-              <SahodaRail drafted={draftedThisWeek} planCost={creditCost('loop_cycle')} />
-            </Card>
+            <SahodaRail drafted={draftedThisWeek} planCost={creditCost('loop_cycle')} />
           </StaggerItem>
         </div>
       </div>
+
+      {/* Last child, and a closed `<dialog>` is `display: none`, so the
+          `space-y-5` above it costs nothing while it is shut. Open, it is in the
+          browser's top layer and no ancestor's spacing reaches it at all. */}
+      {offer}
     </div>
   )
 }

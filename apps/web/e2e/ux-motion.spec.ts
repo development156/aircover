@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 
 import { expect, test } from './fixtures/seeded-user'
-import { leaveOnboarding } from './fixtures/compose'
+import { leaveOnboarding, dismissPlanOffer } from './fixtures/compose'
 import { DETECTORS } from './helpers/ux-detect'
 import { framesTaken, shot, useReducedMotion, useTheme } from './helpers/ux-shot'
 
@@ -163,11 +163,14 @@ test.describe('ux motion', () => {
     await bootstrap(page)
 
     await page.goto('/home')
+
+    await dismissPlanOffer(page)
     await page.waitForTimeout(1200)
     const normal = await page.evaluate(DELAY_PROBE)
 
     await useReducedMotion(page, true)
     await page.goto('/home')
+    await dismissPlanOffer(page)
     await page.waitForTimeout(1200)
     const reduced = await page.evaluate(DELAY_PROBE)
     const motion = await page.evaluate(DETECTORS.motion)
