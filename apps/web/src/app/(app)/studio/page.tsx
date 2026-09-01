@@ -3,9 +3,11 @@ import { MESH_TASK_ACTION, creditCost } from '@sahoda/shared'
 import { PageTitle } from '@/components/page-title'
 import { StudioWorkbench } from '@/components/studio/studio-workbench'
 import { RecentGenerations } from '@/components/studio/recent-generations'
+import { brandSignalsFor } from '@/lib/studio/brand-signals'
 import { canvasPictures } from '@/lib/studio/canvas'
 import { generatableFormats } from '@/lib/studio/formats'
 import { readGenerations, readLibraryPictures } from '@/lib/studio/read'
+import { activeWorkspaceRead } from '@/lib/workspaces'
 
 export const metadata = { title: 'Studio' }
 
@@ -26,7 +28,30 @@ export const metadata = { title: 'Studio' }
 export default async function StudioPage() {
   // In parallel, deliberately. Sequentially the picker would wait on the
   // gallery and the screen would take twice as long to draw for no reason.
-  const [recent, library] = await Promise.all([readGenerations(), readLibraryPictures()])
+  /**
+   * ── ALL THREE IN PARALLEL, INCLUDING THE ONE THAT NEEDS A WORKSPACE ───────
+   * The signals read DEPENDS on the workspace, so the obvious shape is to await
+   * the workspace and then await the signals — and that is a second round trip
+   * this screen waits on before it paints anything. `read-waterfall.test.ts`
+   * refused exactly that, correctly: the Studio's first paint is where a person
+   * decides whether to spend, which is why the canvas editor is already lazy.
+   *
+   * The dependency lives INSIDE the parallel arm instead, so the signals query
+   * races the other two rather than following them. `activeWorkspaceRead` is
+   * `cache()`d, so the workspace itself is read once for the whole request no
+   * matter how many readers ask.
+   */
+  const [recent, library, signals] = await Promise.all([
+    readGenerations(),
+    readLibraryPictures(),
+    // NULL is "could not read", which the composer states as its own sentence.
+    // An EMPTY array means the Brand Brain has nothing to add, which is a
+    // different thing and one a person can act on. `BrandSignalsSchema`'s own
+    // header forbids collapsing the two, so the catch returns null and never [].
+    activeWorkspaceRead().then((active) =>
+      active.status === 'ok' ? brandSignalsFor(active.workspace.id).catch(() => null) : null,
+    ),
+  ])
 
   const formats = generatableFormats()
   const cost = creditCost(MESH_TASK_ACTION.image_generate)
@@ -42,7 +67,13 @@ export default async function StudioPage() {
         Studio
       </PageTitle>
 
-      <StudioWorkbench formats={formats} cost={cost} library={library} pictures={pictures} />
+      <StudioWorkbench
+        formats={formats}
+        cost={cost}
+        library={library}
+        pictures={pictures}
+        signals={signals}
+      />
 
       <RecentGenerations read={recent} />
     </div>
