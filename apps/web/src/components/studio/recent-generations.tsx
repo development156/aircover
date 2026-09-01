@@ -115,7 +115,15 @@ export function RecentGenerations({ read }: { read: GenerationsRead }) {
 
                 <span className="type-sm text-muted">
                   {describeStatus(generation.status)}
-                  {generation.format_id === null ? null : ` · ${generation.format_id}`}
+                  {/* `describeFormat`, not the raw column. This printed the
+                      INTERNAL key — a customer read "link-card" and
+                      "business-update" on their own screen. The helper was
+                      imported for exactly this and never called; it also returns
+                      null for a preset that has since been retired, which the
+                      raw key cannot do. */}
+                  {describeFormat(generation.format_id) === null
+                    ? null
+                    : ` · ${describeFormat(generation.format_id)}`}
                 </span>
 
                 <span className="type-sm text-muted">
@@ -124,14 +132,31 @@ export function RecentGenerations({ read }: { read: GenerationsRead }) {
 
                 {howMany === null ? null : <span className="type-sm text-muted">{howMany}</span>}
 
-                {generation.status !== 'ready' ? null : (
-                  <Link
-                    href="/assets"
-                    className="type-sm text-muted underline transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                  >
-                    Open your library
-                  </Link>
-                )}
+                {/* ── COMPUTED AND DISCARDED ────────────────────────────────
+                    `stranded` was assigned and never rendered, so a row whose
+                    process died went on claiming "Being drawn now" for ever with
+                    no route to the wallet. It is the ONLY mitigation for a row
+                    written before the model call, which is the design. */}
+                {stranded === null ? null : <span className="type-sm text-warn">{stranded}</span>}
+
+                <span className="flex flex-wrap items-center gap-3">
+                  {generation.status !== 'ready' ? null : (
+                    <Link
+                      href="/assets"
+                      className="type-sm text-muted underline transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    >
+                      Open your library
+                    </Link>
+                  )}
+                  {/* The control this list shipped without. `discardGeneration`,
+                      its confirmation modal and this import all existed and
+                      nothing rendered it, so the list was append-only from the
+                      reader's side and grew with no way to tidy it. */}
+                  <DiscardGeneration
+                    generationId={generation.id}
+                    prompt={generation.prompt_given}
+                  />
+                </span>
               </li>
             )
           })}

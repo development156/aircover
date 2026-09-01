@@ -6,7 +6,7 @@ import { PlanIdSchema } from '@sahoda/shared'
 
 import { env } from '@/lib/env'
 import { reportServerError } from '@/lib/observability/report'
-import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
+import { workspaceForWrite } from '@/lib/workspaces'
 import type { CheckoutState } from '@/lib/wallet/checkout-state'
 import { currentBillingPeriod } from '@/lib/wallet/checkout-state'
 

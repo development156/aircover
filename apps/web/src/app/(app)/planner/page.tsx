@@ -357,8 +357,11 @@ export default async function PlannerPage({
                         ...(filter.dateKey === null ? {} : { date: filter.dateKey }),
                       }}
                     />
+                    {/* No `zone`: the grid places every card by
+                        PLANNER_GRID_ZONE, and its caption reads the same zone.
+                        Passing the workspace's would only let the two drift
+                        apart again. */}
                     <WeekTimeline
-                      zone={zone}
                       days={view === 'day' ? window.days.filter(isToday) : window.days}
                       posts={visible}
                       variantStates={variantStates}

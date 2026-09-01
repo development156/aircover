@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { Download, Maximize2, Pencil, Sparkles } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import type { GenerationMode } from '@sahoda/shared'
 
 import { queueGeneration } from '@/app/actions/studio'
@@ -32,7 +32,6 @@ import {
 import type { LibraryPicture } from '@/lib/studio/read'
 import { PROMPT_STARTERS } from '@/lib/studio/prompt'
 import { describeInsufficient, describePartial } from '@/lib/studio/refusal-copy'
-import { savePicture } from '@/lib/studio/save-picture'
 
 /**
  * THE WORKBENCH: CONTROLS ON THE LEFT, THE PICTURE ON THE RIGHT.
@@ -364,7 +363,7 @@ export function StudioWorkbench({
         <fieldset className="flex flex-col gap-2">
           <legend className="type-sm text-muted">How many options?</legend>
           <div className="flex flex-wrap gap-2" data-guide="studio-count">
-            {Array.from({ length: MAX_TRIES_PER_PRESS }, (unused, i) => i + 1).map((n) => (
+            {Array.from({ length: MAX_TRIES_PER_PRESS }, (_unused, i) => i + 1).map((n) => (
               <button
                 key={n}
                 type="button"
