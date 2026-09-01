@@ -31,6 +31,7 @@ import { captionRewriteTask } from './tasks/caption-rewrite'
 import { contentVariantsTask } from './tasks/content-variants'
 import { planWeekTask } from './tasks/plan-week'
 import { siteGenerateTask } from './tasks/site-generate'
+import { gateClassifyTask } from './tasks/gate-classify'
 
 /** Rough $/1M-token estimate for ai_provider_logs margin telemetry (not billing). */
 function estimateCostUsd(u: ProviderUsage): number {
@@ -172,6 +173,25 @@ export function createMesh(opts: CreateMeshOptions = {}): Mesh {
   register(contentVariantsTask)
   register(planWeekTask)
   register(siteGenerateTask)
+  // ── THE ONE THAT WAS EXPORTED, CALLED, AND NEVER REGISTERED ────────────────
+  // `gateClassifyTask` is exported from index.ts and invoked by
+  // `apps/jobs/src/gate/classifier.ts:113` through this very `runTask`. It was
+  // missing from this map, so that call returned
+  // `VALIDATION_ERROR: unknown mesh task: gate_classify` — PROVEN by probe.
+  //
+  // The consequence was not a logged error. `classifier.ts:141` maps
+  // VALIDATION_ERROR to the state `unparseable`; `verdict.ts:146` turns that
+  // into `decision: 'hold'`; and `gateHoldIsTransient` (verdict.ts:219) is true
+  // only for `unavailable` and `timeout`, so the hold was TERMINAL and never
+  // retried. Every post that passed the literal word checks was held for ever,
+  // and the customer was shown "The wording check answered in a form we could
+  // not read" for a call that was never made.
+  //
+  // `mesh.test.ts` stayed green because it only ever proved that an UNKNOWN
+  // name errors, and every publish test in apps/jobs mocks the gate rather than
+  // wiring the real mesh. `registered-tasks.test.ts` is the guard that closes
+  // the class: it asserts EVERY exported task spec is reachable here.
+  register(gateClassifyTask)
 
   async function runTask<I, O>(
     def: MeshTaskDef<I, O>,
