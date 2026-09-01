@@ -650,12 +650,53 @@
   --ink-mute: #979797;
   --ink-faint: #6f6f6f;
   --acc: #ff6600;
+
+  /* ── THE PRIMARY'S HOVER, WHICH POINTED AT THE GROUND ─────────────────────
+     `:root` sets `--pstrong: #000000` and says why: "orange is the resting
+     state, black is the commitment." That is right on a white page and exactly
+     backwards here. Black on this scope's `#171717` measures **1.23:1** — the
+     loudest control in the product becomes a hole in the panel at the moment
+     somebody reaches for it. `--p` and `--pfg` are unaffected: orange is the
+     one fixed point in the palette and `--pfg` is already ink.
+
+     THE RULE IS NOT NEW AND NOT MINE. `brand-theme.ts` states it beside the
+     line that implements it: "The hover step moves AWAY from the page, in
+     whichever direction that is. Darkening a dark-theme button on hover moved
+     it towards its own background, so the loudest control in the product got
+     quieter when you reached for it." Every CUSTOMER theme has had this since
+     the 2026-08-30 rail ruling — `skin-css.ts` builds this very scope from
+     `brandSkinVars(colors, 'dark')`, which carries a lightened `--pstrong`.
+     A workspace with no Brand Skin fell through to `:root` and got the black.
+     So the app applied the rule to every tenant and not to itself, which is
+     the defect `own-medicine.test.ts` exists for, in a scope it did not read.
+
+     SOLVED, NOT PICKED. This is `brandSkinVars([], 'dark')['--pstrong']` — the
+     product's own solver, asked about Sahoda orange on a dark ground:
+     `oklch(0.8008 0.2043 43.5)`, which is L + (0.03 x 3.5) from `--p`.
+     Flattened to hex like `--ink-faint`, because the Readability Guard mirrors
+     these as decimal RGB and parses 6-digit hex only.
+
+       fill on --surface #171717   7.60:1   (was 1.23:1)
+       fill on --canvas  #0d0d0d   8.24:1
+       --pfg #000000 on the fill   8.90:1   (resting orange is 7.15:1)
+       resting --p on #171717      6.11:1 → 7.60:1 on hover
+
+     The control gets LOUDER when reached for, and its own label gets more
+     readable, not less. Graded by `own-medicine.test.ts`.
+
+     STILL OPEN, deliberately out of this change: `[data-theme='dark']`
+     declares none of `--p`, `--pfg` or `--pstrong`, so full dark mode inherits
+     the same `#000000` on its own `#171717` cards. Same defect, wider blast
+     radius, and it changes shipping pixels for real users. Reported, not
+     silently fixed here. */
+  --pstrong: #ff893e;
+
   --ok: #ffffff;
   --info: #979797;
   --hatch: rgba(255, 255, 255, 0.2);
   --channel-x: #ffffff;
 
-  /* ── THE FIVE ALIASES, RE-DECLARED — AND THIS IS NOT TIDINESS ──────────────
+  /* ── THE SIX ALIASES, RE-DECLARED — AND THIS IS NOT TIDINESS ───────────────
      MEASURED 2026-08-23 by `rail-collapse.spec.ts`, in a browser, on the
      rendered colours: every label in the rail read **#57575a on #171717 —
      2.49:1** in LIGHT. That is the app's primary navigation, at every width,
@@ -685,17 +726,28 @@
      `tonal-ladder.test.ts` grades this scope and passes, because every token it
      reads IS correct. The rendered guard is in `rail-collapse.spec.ts`.
 
-     All five are listed, not just the one that was measured failing. `--s2` is
+     All six are listed, not just the one that was measured failing. `--s2` is
      the rail foot's hover fill and would have painted the LIGHT #f4f4f5 inside
      a dark panel; `--s1` is `--canvas`; `--bg` is `--surface`; `--faint` is
      `--ink-faint`. Every alias in L3 whose source this scope re-declares is
      re-declared here, because the next one to be reached for is the one nobody
-     measured. */
+     measured.
+
+     `--brand-deep` is the sixth, added with `--pstrong` above and for exactly
+     the reason this comment already gives: it is declared as
+     `--brand-deep: var(--pstrong)` on `:root`, so it was substituted there and
+     froze at #000000 before this scope existed. Re-declaring `--pstrong` alone
+     would have fixed `bg-primary-strong` — `@theme inline` in
+     `apps/web/globals.css` inlines the value, so that utility resolves here —
+     and left `bg-brand-deep` black, which is the SAME bug in half the call
+     sites. That is the "next one to be reached for" this paragraph warns
+     about, caught on the paragraph that warns about it. */
   --bg: var(--surface);
   --s1: var(--canvas);
   --s2: var(--surface-2);
   --muted: var(--ink-mute);
   --faint: var(--ink-faint);
+  --brand-deep: var(--pstrong);
 
   color: var(--ink-body);
 }
