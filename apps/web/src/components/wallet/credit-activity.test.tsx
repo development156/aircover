@@ -100,6 +100,74 @@ describe('CreditActivity', () => {
     expect(screen.queryByText('Reserved')).toBeNull()
   })
 
+  it('still marks a corrected row when the correction is on another page', async () => {
+    // ── THE SIBLING THE PAGINATION FIX LEFT OPEN ────────────────────────────
+    // `settled` was hoisted over the whole window for the reason the test above
+    // gives. `correctedSeqs` falls out of the SAME `groupCorrections` call and
+    // was not hoisted, so `LedgerTable` kept deriving it from the ten rows it
+    // was handed. A correction points at an entry far older than itself, so in
+    // any real history the two are on different pages: the superseded row then
+    // renders with no note at all, which reads as though it still stands. That
+    // is the exact claim the note exists to prevent.
+    //
+    // Eleven entries for the same reason as above: fewer fit on one page and
+    // the defect is never reproduced.
+    const original = entry(1, { entry_type: 'DEBIT', amount: 100 })
+    const reversal = entry(100, {
+      entry_type: 'ADJUST',
+      amount: 100,
+      meta: { correction: 'c-1', reverses_seq: 1 },
+    } as Partial<LedgerEntry>)
+    const filler = Array.from({ length: 9 }, (_, i) => entry(99 - i))
+
+    const user = userEvent.setup()
+    render(
+      <CreditActivity
+        entries={[reversal, ...filler, original]}
+        skipped={0}
+        limit={50}
+        total={11}
+      />,
+    )
+
+    await user.click(screen.getByLabelText('Page 2'))
+    expect(screen.getByText(/Showing/)).toHaveTextContent('Showing 11 to 11 of 11')
+    expect(screen.getByText(/Corrected by a later entry/)).toBeInTheDocument()
+  })
+
+  it('does not tell the reader to look "above" for something on another page', async () => {
+    // The second half of the same defect. Hoisting the set alone would restore
+    // the note and leave it pointing at a row that is forty places back on page
+    // one. A direction that is wrong is worse than no direction.
+    const original = entry(1, { entry_type: 'DEBIT', amount: 100 })
+    const reversal = entry(100, {
+      entry_type: 'ADJUST',
+      amount: 100,
+      meta: { correction: 'c-1', reverses_seq: 1 },
+    } as Partial<LedgerEntry>)
+    const filler = Array.from({ length: 9 }, (_, i) => entry(99 - i))
+
+    const user = userEvent.setup()
+    render(
+      <CreditActivity
+        entries={[reversal, ...filler, original]}
+        skipped={0}
+        limit={50}
+        total={11}
+      />,
+    )
+
+    await user.click(screen.getByLabelText('Page 2'))
+    expect(screen.getByText(/Corrected by a later entry/)).toHaveTextContent(/on a newer page/i)
+    expect(screen.queryByText(/See the correction above/)).toBeNull()
+  })
+
+  it('leaves an uncorrected row unmarked, so the two guards above are not just noise', () => {
+    // Without this, deleting the note from the component satisfies both.
+    render(<CreditActivity entries={many(3)} skipped={0} limit={50} total={3} />)
+    expect(screen.queryByText(/Corrected by a later entry/)).toBeNull()
+  })
+
   it('shows an unsettled hold as reserved, so the guard above is not just silence', () => {
     // The other direction. Without this, deleting the word "Reserved" from the
     // component entirely would satisfy the test above.

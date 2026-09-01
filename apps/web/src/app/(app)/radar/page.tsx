@@ -86,9 +86,17 @@ export default async function RadarPage() {
           NOT used here and this is the second screen to make that call
           deliberately (see `greeting-banner.tsx` on /home): a product feature
           that has to explain itself to a first-time reader needs a headline
-          that is a sentence, and `PageTitle` renders a noun. The `h1` is still
-          an `h1`, so `every-section-loads.spec.ts` and the document outline are
-          unchanged — it just says something. */}
+          that is a sentence, and `PageTitle` renders a noun.
+
+          THE DOCUMENT OUTLINE IS UNCHANGED. THE TESTS WERE NOT, and the comment
+          here used to claim both. Four assertions in three specs matched on the
+          heading's accessible NAME, not merely its presence, so changing the
+          words broke `every-section-loads.spec.ts` (twice), `radar-certainty`
+          and `radar-to-draft`. None of them could say so: the smoke leg has no
+          working environment in this repository, so it would have failed on the
+          way to production instead. The pattern now lives once, in
+          `e2e/helpers/headings.ts`, and the section name stays on the screen as
+          the eyebrow below. */}
       <section className="grid items-center gap-6 wide:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
         <div className="min-w-0">
           <p className="type-eyebrow flex items-center gap-2 text-accent">

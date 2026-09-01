@@ -122,9 +122,15 @@ const REFUSALS = {
   malformed: 'Describe the picture you want, in a few words at least.',
   unknownFormat: 'That size is not one Sahoda can make, so nothing was charged.',
   failed: 'Sahoda could not make this image. Nothing was charged.',
-  unusable:
-    'The model returned something Sahoda could not read as a picture. Nothing was charged, and you can try again.',
-  stored: 'The image was made but could not be saved to your library. Nothing was charged.',
+  /**
+   * Every picture the person picked was unreadable by the time we went to use it.
+   *
+   * Its own sentence rather than the mode block's, because the two say different
+   * things. "Pick the picture you want changed" is wrong here: they DID pick one,
+   * and telling them to do the thing they just did is a remedy that cannot work.
+   */
+  referencesUnreadable:
+    'Sahoda could not open the pictures you picked, so nothing was made and nothing was charged. Try picking them again.',
 } as const
 
 /**
@@ -195,6 +201,24 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
       parsed.data.referenceAssetIds,
     )
 
+    // ── ASK THE MODE'S RULE AGAIN, AGAINST WHAT SURVIVED SIGNING ─────────────
+    //
+    // The block above ran against the count the person PICKED. Signing drops
+    // anything it cannot resolve and returns `[]` outright on a query error, so
+    // a mode with a floor of one could reach the model with zero references —
+    // `edit` would send a bare prompt, get back a fresh unrelated picture
+    // instead of the edit, and charge in full for it. Dropping SOME references
+    // is the documented, deliberate behaviour; dropping ALL of them for a mode
+    // that structurally requires one is not the same event.
+    //
+    // Re-asking the same function is what makes this exact rather than a second
+    // rule that can drift from the first. A smaller count can only trip the
+    // `minReferences` branch, never the `maxReferences` one, so a non-null here
+    // can ONLY mean signing took it below the floor.
+    if (describeModeBlock({ mode: parsed.data.mode, references: referenceUrls.length }) !== null) {
+      return { ok: false, insufficient: false, message: REFUSALS.referencesUnreadable }
+    }
+
     // ── THE ROW, BEFORE THE MODEL ────────────────────────────────────────────
     const queued = await supabase
       .from('studio_generations')
@@ -256,6 +280,9 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
       // know whether the callback reached its end, and the error alone cannot say.
       let failure: string | null = null
       let deliveredThis = false
+      // What THIS press reserved, carried out of the callback so it can be added
+      // to `charged` only after the debit is known to have committed.
+      let chargedThis = 0
 
       const credits = await getWithCredits()(
         { workspaceId: workspace.id, action, objectRef: objectRefFor(idx) },
@@ -307,19 +334,19 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
 
           const bytes = Uint8Array.from(Buffer.from(result.data.base64, 'base64'))
           if (bytes.byteLength === 0 || bytes.byteLength > MEDIA_UPLOAD_CAP_BYTES) {
-            failure = REFUSALS.unusable
+            failure = FAILURE_REASON.IMAGE_UNREADABLE
             throw new Error('IMAGE_UNUSABLE')
           }
 
           // Facts, not the model's claim. `result.data.mime` is deliberately unused.
           const sniffed = sniffImage(bytes)
           if (!sniffed.ok) {
-            failure = REFUSALS.unusable
+            failure = FAILURE_REASON.IMAGE_UNREADABLE
             throw new Error('IMAGE_UNREADABLE')
           }
           const kind = kindForProvenMime(sniffed.image.mime)
           if (kind === null) {
-            failure = REFUSALS.unusable
+            failure = FAILURE_REASON.IMAGE_UNREADABLE
             throw new Error('IMAGE_UNSUPPORTED')
           }
 
@@ -334,7 +361,7 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
             upsert: false,
           })
           if (upload.error) {
-            failure = REFUSALS.stored
+            failure = FAILURE_REASON.IMAGE_NOT_STORED
             throw new Error('STORAGE_FAILED')
           }
 
@@ -353,12 +380,25 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
             // The object is already in storage and nothing points at it. Remove it
             // rather than leaving bytes nobody can reach or delete.
             await supabase.storage.from(MEDIA_BUCKET).remove([objectPath])
-            failure = REFUSALS.stored
+            failure = FAILURE_REASON.IMAGE_NOT_STORED
             throw new Error('ASSET_ROW_FAILED')
           }
 
-          charged += ctx.creditsCharged
-          await supabase.from('studio_generation_images').insert({
+          // ── THE PROVENANCE ROW, CHECKED LIKE EVERY OTHER WRITE ABOVE ───────
+          //
+          // This insert used to be awaited with its `.error` never read, while
+          // the storage upload and the `assets` insert directly above it both
+          // checked and threw. A lost row meant the person was charged, the
+          // picture reached their library, and NOTHING recorded which
+          // generation made it — after which `describeCount` would tell them
+          // "3 of the 4 options you asked for arrived. You were charged for
+          // those and for nothing else" about four they had paid for.
+          //
+          // Rolled back the same way the asset row above rolls back, so the
+          // failure costs a released hold rather than a false claim about
+          // money. The migration's §6 states this contract: an image row is
+          // written once, "create it, or do nothing".
+          const image = await supabase.from('studio_generation_images').insert({
             workspace_id: workspace.id,
             generation_id: generationId,
             idx,
@@ -366,12 +406,27 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
             width: sniffed.image.width,
             height: sniffed.image.height,
           })
+          if (image.error) {
+            await supabase.from('assets').delete().eq('id', newAssetId)
+            await supabase.storage.from(MEDIA_BUCKET).remove([objectPath])
+            failure = FAILURE_REASON.IMAGE_NOT_STORED
+            throw new Error('IMAGE_ROW_FAILED')
+          }
+
+          chargedThis = ctx.creditsCharged
           deliveredThis = true
         },
       )
 
       if (credits.ok) {
         delivered += 1
+        // ── COUNTED ONLY ONCE THE DEBIT ACTUALLY COMMITTED ─────────────────
+        // `withCredits` reaches its DEBIT after the callback returns, so a
+        // failure there releases the hold and charges nothing. Incrementing
+        // inside the callback counted a credit that never left the wallet, and
+        // when an earlier picture had succeeded the row was still written
+        // `ready` with `cost_credits` claiming it.
+        charged += chargedThis
         balanceAfter = credits.data.balanceAfter
         continue
       }
