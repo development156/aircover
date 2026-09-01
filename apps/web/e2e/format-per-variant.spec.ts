@@ -161,7 +161,7 @@ test.describe('relink never loses written words @smoke', () => {
     const OWN = 'Open till 9. Chai on the house after 8.'
     const xCard = page.locator('[data-version-card="x"]')
 
-    await page.getByLabel('Your post').fill(POST)
+    await page.getByLabel('Your post', { exact: true }).fill(POST)
     // Typing into the channel detaches it — this is the state relink exists for.
     await versionBox(page, 'X').fill(OWN)
     await saveVersionButton(page, 'x', 'X').click()
@@ -170,7 +170,7 @@ test.describe('relink never loses written words @smoke', () => {
 
     // The post moves on. X does not follow it, because X is its own now.
     const NEW_POST = 'Closed tomorrow for Ganesh Chaturthi.'
-    await page.getByLabel('Your post').fill(NEW_POST)
+    await page.getByLabel('Your post', { exact: true }).fill(NEW_POST)
     await expect(versionBox(page, 'X')).toHaveValue(OWN)
 
     // ── RELINK ───────────────────────────────────────────────────────────────

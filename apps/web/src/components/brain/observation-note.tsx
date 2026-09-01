@@ -36,7 +36,7 @@ function readValue(datum: ObservationDatum): string {
 
 export function ObservationNote({ observation }: { observation: MarketingObservation }) {
   return (
-    <div className="rounded-input bg-subtle p-3">
+    <div className="rounded-input bg-surface-2 p-3">
       <p className="type-body flex items-start gap-2 text-ink">
         <Sparkle size={15} strokeWidth={1.8} aria-hidden className="mt-0.5 shrink-0 text-muted" />
         <span className="max-w-[68ch]">{observation.claim}</span>
