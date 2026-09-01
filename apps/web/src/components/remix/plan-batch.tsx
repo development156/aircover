@@ -109,7 +109,7 @@ export function PlanBatch({ posts }: PlanBatchProps) {
             const reach = channelsForKind(spec.kind).filter((c) => channels.has(c))
             return (
               <li key={spec.kind}>
-                <label className="flex cursor-pointer items-start gap-3 rounded-input bg-subtle p-3">
+                <label className="flex cursor-pointer items-start gap-3 rounded-input bg-surface-2 p-3">
                   <input
                     type="checkbox"
                     checked={kinds.has(spec.kind)}
@@ -137,7 +137,7 @@ export function PlanBatch({ posts }: PlanBatchProps) {
           {REMIX_CHANNELS.map((channel) => (
             <label
               key={channel}
-              className="flex cursor-pointer items-center gap-2 rounded-input bg-subtle px-3 py-2"
+              className="flex cursor-pointer items-center gap-2 rounded-input bg-surface-2 px-3 py-2"
             >
               <input
                 type="checkbox"

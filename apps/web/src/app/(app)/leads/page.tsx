@@ -119,7 +119,7 @@ function Doors({ slug }: { slug: string | null }) {
             enquiry lands here the moment it is sent.
           </p>
           {slug ? (
-            <pre className="mt-2 overflow-x-auto rounded-input bg-subtle p-2.5 type-sm">
+            <pre className="mt-2 overflow-x-auto rounded-input bg-surface-2 p-2.5 type-sm">
               <code>{`<iframe src="${origin}/embed/lead?site=${slug}" style="width:100%;height:620px;border:0"></iframe>`}</code>
             </pre>
           ) : (

@@ -193,3 +193,43 @@ export const AssetDerivativeSchema = z.object({
   created_at: z.string(),
 })
 export type AssetDerivative = z.infer<typeof AssetDerivativeSchema>
+
+// ── asset_logo_facts ─────────────────────────────────────────────────────────
+/**
+ * What Sahoda learned about a logo FILE when it was uploaded: alpha, whether the
+ * background is see-through, where the ink sits, whether that ink is dark or
+ * light, and the overall shape. One row per `assets` row, keyed by the asset id.
+ * The render code reads this to place the logo on a light or dark surface and to
+ * pad it, without decoding the image every time.
+ */
+export const InkPolaritySchema = z.enum(['dark', 'light', 'mixed'])
+export type InkPolarity = z.infer<typeof InkPolaritySchema>
+
+export const LogoShapeClassSchema = z.enum(['square', 'wide', 'tall'])
+export type LogoShapeClass = z.infer<typeof LogoShapeClassSchema>
+
+export const AssetLogoFactsSchema = z.object({
+  /** The asset this describes. It is the primary key: one row per file. */
+  asset_id: z.uuid(),
+  workspace_id: z.uuid(),
+  has_alpha: z.boolean(),
+  transparent_background: z.boolean(),
+  /**
+   * The tight box around the ink, in pixels of the original. ALL FOUR NULL
+   * TOGETHER: a fully transparent image has no mark to measure, and "no box" is a
+   * real answer the DB CHECK enforces all-or-none. Width and height are positive
+   * when present. Never faked with zeros, so a reader may trust that a present box
+   * has area.
+   */
+  trim_x: z.int().nullable(),
+  trim_y: z.int().nullable(),
+  trim_width: z.int().nullable(),
+  trim_height: z.int().nullable(),
+  ink_polarity: InkPolaritySchema,
+  shape_class: LogoShapeClassSchema,
+  /** When the answers were computed, distinct from `updated_at`, the row's touch time. */
+  computed_at: z.string(),
+  created_at: z.string(),
+  updated_at: z.string(),
+})
+export type AssetLogoFacts = z.infer<typeof AssetLogoFactsSchema>

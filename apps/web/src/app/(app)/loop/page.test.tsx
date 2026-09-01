@@ -33,6 +33,26 @@ vi.mock('@/app/actions/loop-controls', () => ({
 }))
 vi.mock('@/app/actions/autopilot-stop', () => ({ stopAutopilotPost: vi.fn() }))
 
+/**
+ * INTEGRATION, NOT THIS TEST'S OWN CHANGE.
+ *
+ * This file and `loop-status.tsx` were written on different lanes and each was
+ * green alone. `747d9365` gave LoopStatus a `useRouter()`, and this mount
+ * renders it (`page.tsx:118`) — so on the trunk, where both arrived, all nine
+ * tests died on `invariant expected app router to be mounted` before a single
+ * assertion ran. Neither lane could see it; only the merge could.
+ *
+ * Same shape as `home/page.test.tsx`, including a `redirect` that THROWS the
+ * way Next's own does — a silent spy would let the page render on underneath
+ * the assertion.
+ */
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  redirect: vi.fn((to: string) => {
+    throw new Error(`NEXT_REDIRECT:${to}`)
+  }),
+}))
+
 const { default: LoopPage } = await import('./page')
 
 const snapshot = {

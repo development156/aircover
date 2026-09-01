@@ -41,7 +41,7 @@ test.describe('templates @smoke', () => {
     // template every future post starts from would quietly make X authoritative
     // over LinkedIn and Instagram, which is the exact collapse this product
     // exists to avoid.
-    await page.getByLabel('Your post').fill(BODY)
+    await page.getByLabel('Your post', { exact: true }).fill(BODY)
     // The X version follows the post, so it holds these words too — and the box
     // is what proves the mirror reached the screen and not just the state.
     await expect(page.locator('[data-variant-editor="x"]')).toHaveValue(BODY)
@@ -84,7 +84,7 @@ test.describe('templates @smoke', () => {
     // words here" is still the only reading of the line after it.
     await expect(page.locator('[data-variant-editor="linkedin"]')).toHaveValue(SEED_BODY)
     await page.getByText(NAME).click()
-    await expect(page.getByLabel('Your post')).toHaveValue(BODY)
+    await expect(page.getByLabel('Your post', { exact: true })).toHaveValue(BODY)
     await expect(page.locator('[data-variant-editor="linkedin"]')).toHaveValue(BODY)
     await page
       .locator('[data-version-card="linkedin"]')
