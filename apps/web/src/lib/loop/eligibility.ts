@@ -8,6 +8,7 @@ import { cycleCost } from '@/lib/loop/cost'
 // comments too — and would have matched the example.)
 import { credits } from '@/lib/credit-words'
 
+import { isPlannableChannel } from './plannable'
 import { LOOP_SCHEDULE_PHRASE } from './schedule'
 
 /**
@@ -42,8 +43,9 @@ import { LOOP_SCHEDULE_PHRASE } from './schedule'
  * `readLoopFacts` does the I/O, separately, and is the only part that needs one.
  */
 
-/** The four channels the Loop can plan for. */
-const PLANNABLE: readonly Channel[] = ['x', 'gbp', 'linkedin', 'instagram']
+// The channels the Loop plans for come from `./plannable`, derived from the
+// shared enum. This file carried its own four-channel literal, which refused a
+// Facebook or Telegram workspace that `actions/loop-cycle.ts` planned for.
 
 /**
  * The connection status a channel must hold to be planned for.
@@ -190,7 +192,7 @@ export function assess(facts: LoopFacts): LoopVerdict {
   const channels = facts.connections
     .filter((c) => c.status === PLANNABLE_STATUS)
     .map((c) => c.platform)
-    .filter((p): p is Channel => (PLANNABLE as readonly string[]).includes(p))
+    .filter(isPlannableChannel)
   const unique = [...new Set(channels)]
 
   if (unique.length === 0) {
@@ -203,7 +205,7 @@ export function assess(facts: LoopFacts): LoopVerdict {
         facts.connections
           .filter((c) => LAPSED_STATUSES.has(c.status))
           .map((c) => c.platform)
-          .filter((p): p is Channel => (PLANNABLE as readonly string[]).includes(p)),
+          .filter(isPlannableChannel),
       ),
     ]
     return lapsed.length > 0

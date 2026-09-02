@@ -11,6 +11,7 @@ vi.mock('./store', () => ({
   readPendingAnnouncements: vi.fn(),
   writeDecision: vi.fn(async () => 'row-id'),
   armForPublish: vi.fn(async () => true),
+  cancelAnnouncement: vi.fn(async () => true),
 }))
 vi.mock('@/lib/cron/loop-enabled', () => ({ loopCronEnabled: vi.fn(() => true) }))
 
@@ -62,6 +63,7 @@ function world(over: Partial<Record<string, unknown>> = {}) {
     dailyCap: 3,
     cancelMinutes: 30,
     weeklyBudgetCredits: 150,
+    paused: false,
     ...(over.settings as object),
   })
   vi.mocked(store.readDial).mockResolvedValue(
@@ -158,6 +160,11 @@ describe('dispatch hands the post to the existing sweep', () => {
     expect(store.armForPublish).not.toHaveBeenCalled()
     expect(report.cancelled).toBe(1)
     expect(report.refused).toBe(0)
+    // The env flag is Sahoda's switch, so the cancellation is Sahoda's row.
+    expect(store.writeDecision).toHaveBeenCalledWith(
+      expect.objectContaining({ postId: 'due-1', decision: 'cancelled' }),
+    )
+    expect(store.cancelAnnouncement).not.toHaveBeenCalled()
   })
 
   it('a refused arming is not an error and does not stop the tick', async () => {
@@ -166,5 +173,62 @@ describe('dispatch hands the post to the existing sweep', () => {
     const report = await runWorkspaceAutopilotTick(deps)
     expect(report.publishFailed).toBe(0)
     expect(report.dispatched).toBe(1)
+  })
+})
+
+describe('nothing is announced that cannot be sent', () => {
+  const gate = vi.fn(async () => PASS)
+
+  it('announces NOTHING while the deploy-wide flag is off, and does not even gate', async () => {
+    // MEASURED 2026-09-02: the env flag was consulted only at dispatch time, so
+    // with SAHODA_AUTOPILOT_ENABLED on and SAHODA_LOOP_CRON_MODE off every
+    // eligible post was announced ("going out at 10:15") and cancelled by
+    // Sahoda one window later, for every post, with nothing naming the flag.
+    world()
+    vi.mocked(loopCronEnabled).mockReturnValue(false)
+    const report = await runWorkspaceAutopilotTick({ ...deps, gateFor: gate })
+    expect(report.announced).toBe(0)
+    expect(store.writeDecision).not.toHaveBeenCalledWith(
+      expect.objectContaining({ decision: 'announced' }),
+    )
+    // The gate's third layer is a model call. A stopped Loop pays for none.
+    expect(gate).not.toHaveBeenCalled()
+  })
+
+  it('announces NOTHING while the customer has paused the Loop', async () => {
+    world({ settings: { paused: true } })
+    const report = await runWorkspaceAutopilotTick(deps)
+    expect(report.announced).toBe(0)
+    expect(store.writeDecision).not.toHaveBeenCalled()
+  })
+})
+
+describe("the customer's Stop reaches an announcement already made", () => {
+  const due = [
+    {
+      postId: 'due-1',
+      variantId: 'v-9',
+      channel: 'x' as const,
+      accountId: '44445555666677778888aaaa',
+      dispatchAfter: new Date('2020-01-01T00:00:00.000Z'),
+    },
+  ]
+
+  it('cancels the pending announcement AS THE PERSON and arms nothing', async () => {
+    // MEASURED 2026-09-02: `loop_settings.paused` was never read here. A person
+    // who pressed Stop inside the window saw the post reverted to draft, and
+    // the next tick found the announcement still pending, re-armed the draft
+    // (ARM_FOR_PUBLISH_SQL admits 'draft') and the sweep published it.
+    world({ rows: [], pending: due, settings: { paused: true } })
+    const report = await runWorkspaceAutopilotTick(deps)
+    expect(store.armForPublish).not.toHaveBeenCalled()
+    expect(report.dispatched).toBe(0)
+    expect(report.cancelled).toBe(1)
+    // Their stop, their row: the same statement the per-post Stop button
+    // uses, which writes actor 'person'. Not a Sahoda cancellation.
+    expect(store.cancelAnnouncement).toHaveBeenCalledWith('ws-1', 'due-1', 'v-9')
+    expect(store.writeDecision).not.toHaveBeenCalledWith(
+      expect.objectContaining({ decision: 'cancelled' }),
+    )
   })
 })

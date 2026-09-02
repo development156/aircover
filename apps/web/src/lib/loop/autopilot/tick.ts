@@ -8,6 +8,7 @@ import type { AnnouncedPost } from './dispatch-due'
 import { runAutopilotTick, type AutopilotTickReport } from './run'
 import {
   armForPublish,
+  cancelAnnouncement,
   readActiveBrain,
   readCandidateRows,
   readDial,
@@ -35,6 +36,20 @@ import { toAutopilotCandidate } from './verdicts'
  * anyway, because the scan joins the dial. Writing rows for a workspace that
  * never asked for autopilot would fill the log with the fact that nothing
  * happened, which is the `ops_audit_log` defect in a new column.
+ *
+ * ── TWO KILL SWITCHES, READ EVERY TICK, AND BOTH STOP THE ANNOUNCING TOO ─────
+ * `killed` is the OR of the deploy-wide flag (`SAHODA_LOOP_CRON_MODE`) and the
+ * customer's own Stop (`loop_settings.paused`). MEASURED 2026-09-02, two
+ * defects in one line. The env flag was consulted only at dispatch time, so
+ * with autopilot on and the Loop flag off every eligible post was ANNOUNCED
+ * ("going out at 10:15") and cancelled by Sahoda one window later, for every
+ * post, for ever. And `paused` was never read at all, so a person who pressed
+ * Stop inside a window saw the post reverted to draft and the next tick
+ * re-armed it. Now a killed tick announces NOTHING (phase one gets no
+ * candidates) and still runs phase two so an announcement made before the
+ * switch flipped gets its cancellation row instead of going out when the
+ * switch flips back. A cancellation caused by `paused` is written as the
+ * person's, because it was.
  */
 
 export interface WorkspaceTickDeps {
@@ -79,9 +94,18 @@ export async function runWorkspaceAutopilotTick(
   if (settings.dailyCap === null || settings.cancelMinutes === null) return EMPTY
   if (rows.length === 0 && pending.length === 0) return EMPTY
 
+  // Both switches, fresh, before anything is announced. A candidate is not
+  // even gated while killed: nothing may be announced that cannot be sent, and
+  // the gate's third layer is a model call nobody should pay for on a stopped
+  // Loop.
+  const paused = settings.paused
+  const killed = paused || !loopCronEnabled()
+
   const candidates: AutopilotCandidate[] = []
-  for (const row of rows) {
-    candidates.push(toAutopilotCandidate(row, await deps.gateFor(row)))
+  if (!killed) {
+    for (const row of rows) {
+      candidates.push(toAutopilotCandidate(row, await deps.gateFor(row)))
+    }
   }
 
   const announced: AnnouncedPost[] = pending
@@ -108,9 +132,9 @@ export async function runWorkspaceAutopilotTick(
     due: {
       now,
       levelFor: (channel) => dial.get(channel),
-      // The Loop's own kill switch, read fresh at dispatch time rather than
-      // trusted from the announcement.
-      killed: !loopCronEnabled(),
+      // Both kill switches, read fresh at dispatch time rather than trusted
+      // from the announcement. See the header.
+      killed,
     },
     write: writeDecision,
     publish: async (post) => {
@@ -118,5 +142,17 @@ export async function runWorkspaceAutopilotTick(
       // publishes, and a refused arming is not an error — see armForPublish.
       await armForPublish(workspaceId, post.postId)
     },
+    // The customer's Stop is the customer's cancellation. `cancelAnnouncement`
+    // is the same statement the per-post Stop button uses: it copies the
+    // identifiers from the announcement and writes actor 'person', inside one
+    // statement with the terminal-row check, so a dispatch that lands first
+    // wins and no cancellation is recorded over a post that went out.
+    ...(paused
+      ? {
+          cancelAsPerson: async (post: AnnouncedPost) => {
+            await cancelAnnouncement(workspaceId, post.postId, post.variantId)
+          },
+        }
+      : {}),
   })
 }

@@ -109,7 +109,36 @@ describe('readSettings', () => {
       dailyCap: null,
       cancelMinutes: null,
       weeklyBudgetCredits: null,
+      paused: false,
     })
+  })
+
+  it('reads the kill switch a person can press, and only a true is a stop', async () => {
+    // MEASURED 2026-09-02: the statement did not select `paused`, so a Loop
+    // stopped by its owner was indistinguishable from a running one here.
+    pool.query.mockResolvedValue({
+      rows: [
+        {
+          autopilot_daily_cap: 3,
+          autopilot_cancel_minutes: 30,
+          weekly_budget_credits: 150,
+          paused: true,
+        },
+      ],
+    })
+    expect((await store.readSettings('ws-1')).paused).toBe(true)
+
+    pool.query.mockResolvedValue({
+      rows: [
+        {
+          autopilot_daily_cap: 3,
+          autopilot_cancel_minutes: 30,
+          weekly_budget_credits: 150,
+          paused: null,
+        },
+      ],
+    })
+    expect((await store.readSettings('ws-1')).paused).toBe(false)
   })
 })
 

@@ -276,7 +276,9 @@ export async function runCycleToPreview(
 
       const result = await getMesh().runTask(
         planWeekTask.def,
-        { goals: parsed.data.goals, channels },
+        // `nowIso` is the anchor: without it the model plans in an arbitrary
+        // era and every slot is clamped (loop-cycle.now-iso.test.ts).
+        { goals: parsed.data.goals, channels, nowIso: parsed.data.nowIso },
         {
           workspaceId: workspaceId as string,
           traceId: cycle.id,
