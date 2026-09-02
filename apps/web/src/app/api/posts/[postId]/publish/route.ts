@@ -3,7 +3,9 @@ import { auth } from '@clerk/nextjs/server'
 import { PublishInfraError, publishPostDeps, runClaimedPublish } from '@sahoda/jobs/publish'
 import { ChannelSchema, type Channel } from '@sahoda/shared'
 
+import { CHANNEL_LABELS } from '@/components/posts/channel-label'
 import { reportServerError } from '@/lib/observability/report'
+import { publishFailureMessage } from '@/lib/posts/publish-failure-copy'
 import { getPost, listVariants } from '@/lib/posts/read'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { canPublish, getWorkspaceRole } from '@/lib/workspace-role'
@@ -27,10 +29,17 @@ import { readActiveWorkspace } from '@/lib/workspaces'
  * double-click, and it covers the far more dangerous case of someone pressing
  * Publish at the same minute the cron tick reaches the post.
  *
- * Zernio's request id is the second line, not the first: same post, same scheduled
- * minute, same key, so a repeat inside their five-minute window comes back as
- * `existingPost` rather than a new one. Two independent mechanisms, one database
- * and one platform, and neither is asked to carry the guarantee alone.
+ * Zernio's request id is meant to be a second line behind that one: same post,
+ * same channel, same `scheduled_at`, same key, so a repeat inside their window
+ * would come back as `existingPost` rather than a new post. Two things limit it.
+ * The window is documented at about five minutes and has never been observed
+ * (docs/13 §5, `[DOC]`), and until 2026-09-02 this route and the cron sweep did
+ * not mint the same key at all: the RPC hands `scheduled_at` back as jsonb text
+ * with microseconds and a numeric offset, the dispatcher uses the driver's
+ * `Date.toISOString()`, and the key is a plain concatenation. The route now
+ * normalises to the driver's shape before the key is built, and
+ * `route.publish.test.ts` asserts the two rails agree. The database claim is
+ * the guarantee; the request id is a courtesy to a retry, not a second guarantee.
  */
 
 /** pg needs a real Node runtime; the Edge runtime cannot open a TCP socket to Postgres. */
@@ -108,19 +117,37 @@ export async function POST(
     // both authorizes the request and confirms the post exists.
     const post = await getPost(postId)
     if (!post) return fail("You don't have access to this post.", 404)
+    // The label, never the key: `channel` is `gbp`, and the reader knows it as
+    // Google Business Profile.
+    const label = CHANNEL_LABELS[channel]
     if (!post.channels.includes(channel)) {
-      return fail(`This post is not set up for ${channel}.`, 400)
+      return fail(`This post is not set up for ${label}.`, 400)
     }
 
     const variants = await listVariants(postId)
     const variant = variants.find((row) => row.channel === channel)
-    if (!variant) return fail(`Write the ${channel} version first.`, 400)
+    if (!variant) return fail(`Write the ${label} version first.`, 400)
 
     // Already live: publishing again would be a second post, not a retry. The permalink
-    // is returned so the caller can just show it.
-    if (variant.publish_status === 'published' && variant.permalink) {
+    // is returned so the caller can just show it, and `mode` travels with it so the
+    // caller branches on the recorded mode exactly as it does for a fresh success.
+    //
+    // ── A `fixture://` PERMALINK IS NOT "ALREADY LIVE" ──────────────────────────
+    // The fixture rail marks a variant `published` with a permalink of its own
+    // minting, and nothing ever left the building. Until 2026-09-02 that row took
+    // this branch with no `mode`, so `publishOne`'s only fixture check passed and
+    // the screen read "Already live on X" in green for a post nobody could see.
+    // Worse, nothing could ever publish it: the claim never re-took a `published`
+    // row. So a fixture row falls through to the claim, which now accepts it, and
+    // this press is the first real attempt.
+    const alreadyLive =
+      variant.publish_status === 'published' &&
+      typeof variant.permalink === 'string' &&
+      variant.permalink !== '' &&
+      !variant.permalink.startsWith('fixture://')
+    if (alreadyLive) {
       return Response.json(
-        { ok: true, alreadyPublished: true, permalink: variant.permalink },
+        { ok: true, alreadyPublished: true, mode: 'live', permalink: variant.permalink },
         { status: 200, headers: { 'cache-control': 'no-store' } },
       )
     }
@@ -147,10 +174,35 @@ export async function POST(
       }
       return fail('Couldn’t get this post ready to publish. Try again.', 500)
     }
-    const scheduledAt = (released as { scheduled_at?: unknown } | null)?.scheduled_at
-    if (typeof scheduledAt !== 'string') {
+    const releasedAt = (released as { scheduled_at?: unknown } | null)?.scheduled_at
+    if (typeof releasedAt !== 'string') {
       return fail('Couldn’t get this post ready to publish. Try again.', 500)
     }
+
+    // ── ONE SHAPE FOR THE KEY, ON BOTH RAILS ──────────────────────────────────
+    // The RPC returns `scheduled_at` inside jsonb, which PostgREST renders with
+    // microseconds and a numeric offset ("…T15:00:00.123456+05:00"). The cron
+    // dispatcher reads the same column through the pg driver and mints
+    // `Date.toISOString()` ("…T10:00:00.123Z"). `publishIdempotencyKey` is a
+    // plain concatenation, so the two rails were sending Zernio two different
+    // request ids for one row, and the collapse the header promises never spanned
+    // them. Normalised here to the driver's shape; `pgDispatch` is left as it is.
+    //
+    // A value no clock can read is a 500 and not a key: `new Date('junk')` is
+    // "Invalid Date", and its ISO form throws, which would otherwise surface as
+    // a publish failure about a post that was never attempted.
+    const parsedAt = new Date(releasedAt)
+    if (Number.isNaN(parsedAt.getTime())) {
+      await reportServerError(
+        new Error(`release_post_for_publish returned an unreadable scheduled_at`),
+        {
+          action: 'publishNow',
+          workspaceId,
+        },
+      )
+      return fail('Couldn’t get this post ready to publish. Try again.', 500)
+    }
+    const scheduledAt = parsedAt.toISOString()
 
     // Built OUTSIDE the publish call and classified on its own. `publishPostDeps` reads
     // and validates the job env and constructs the pg pool; a throw here is a
@@ -182,12 +234,17 @@ export async function POST(
 
     if (outcome.status === 'failed') {
       // The job already wrote a post_publish_logs row and marked the variant failed.
-      // The message is the adapter's own, which is written for a person to read.
+      //
+      // `outcome.message` is NOT forwarded as it stands. When it was thrown by an
+      // adapter it is built from the provider's response body ("createPost: HTTP
+      // 500 <html>…"), and that reached a shop owner's screen until 2026-09-02.
+      // The job marks whose sentence it is; `publishFailureMessage` keeps Sahoda's
+      // own (figures and all) and maps everything else from the CODE.
       return Response.json(
         {
           ok: false,
           code: outcome.code,
-          message: outcome.message,
+          message: publishFailureMessage(outcome),
           reconnectRequired: outcome.reconnectRequired,
         },
         { status: 422, headers: { 'cache-control': 'no-store' } },

@@ -18,6 +18,19 @@ export interface CandidateVariant {
    * it is treated as such below.
    */
   publishedMode: PublishMode | null
+  /**
+   * `post_variants.publish_claimed_at`, ISO. Meaningful only with `publishStatus ===
+   * 'publishing'`: the pair is the lease. Null on a `publishing` row means no claim was
+   * ever recorded, which the store treats as stale, and so does the classifier.
+   */
+  claimedAt: string | null
+  /**
+   * True when this variant's MOST RECENT post_publish_logs row is a STILL_PROCESSING
+   * failure carrying the provider's post id and nothing has been written since: the
+   * platform accepted the post and the reconcile pass has not yet learned how it ended.
+   * Re-sending such a variant is how a customer's feed shows the same post twice.
+   */
+  awaitingPlatform: boolean
 }
 
 export interface DispatchCandidate {
@@ -32,6 +45,12 @@ export interface ClassifyOptions {
   now: Date
   /** How late a post may be and still be worth publishing. Past this it expires. */
   graceSeconds: number
+  /**
+   * How old a `publishing` claim may be before its holder is presumed dead. Must be
+   * the number `claimVariant` uses (PUBLISH_LEASE_SECONDS): a variant classified as
+   * dispatchable here is handed to that statement, which refuses a live claim.
+   */
+  leaseSeconds: number
 }
 
 /** One variant the dispatcher intends to enqueue. */
@@ -50,6 +69,7 @@ export type HoldReason =
   | 'not-eligible'
   | 'not-yet-due'
   | 'in-flight'
+  | 'awaiting-platform'
   | 'no-variants'
   | 'nothing-attemptable'
   | 'fixture-publish'
@@ -73,6 +93,27 @@ export type DispatchDecision =
 
 /** Variant states that still have work left to do. */
 const PENDING_STATES: readonly VariantPublishStatus[] = ['pending', 'scheduled']
+
+/** Variant states a platform answer could still change. */
+const UNSETTLED_STATES: readonly VariantPublishStatus[] = ['pending', 'scheduled', 'publishing']
+
+/**
+ * A `publishing` variant whose holder is presumed dead.
+ *
+ * Mirrors `claimVariant`'s predicate exactly: the store takes a `publishing` row over
+ * when `publish_claimed_at is null or publish_claimed_at < now() - lease`. A claim that
+ * is EXACTLY the lease old is still refused there, so it is still in flight here.
+ *
+ * This is what makes the lease reachable from the scheduled path at all. Before it,
+ * every `publishing` variant was held as in-flight with no notion of age, and a
+ * publisher killed mid-flight stranded its variant on every later tick for ever.
+ */
+function isStaleClaim(v: CandidateVariant, opts: ClassifyOptions): boolean {
+  if (v.publishStatus !== 'publishing') return false
+  if (v.claimedAt === null) return true
+  const ageMs = opts.now.getTime() - Date.parse(v.claimedAt)
+  return ageMs > opts.leaseSeconds * 1000
+}
 
 /**
  * Whether this release can actually post to the variant's channel.
@@ -115,9 +156,17 @@ export function classifyCandidate(
 
   const published = variants.filter((v) => v.publishStatus === 'published')
   const failed = variants.filter((v) => v.publishStatus === 'failed')
-  const inFlight = variants.filter((v) => v.publishStatus === 'publishing')
+  const inFlight = variants.filter(
+    (v) => v.publishStatus === 'publishing' && !isStaleClaim(v, opts),
+  )
+  const awaiting = variants.filter(
+    (v) => v.awaitingPlatform && UNSETTLED_STATES.includes(v.publishStatus),
+  )
   const publishable = variants.filter(
-    (v) => PENDING_STATES.includes(v.publishStatus) && canAttempt(v),
+    (v) =>
+      (PENDING_STATES.includes(v.publishStatus) || isStaleClaim(v, opts)) &&
+      canAttempt(v) &&
+      !v.awaitingPlatform,
   )
 
   const hold = (reason: HoldReason): DispatchDecision => ({
@@ -143,6 +192,13 @@ export function classifyCandidate(
   // An attempt holds this post right now. Enqueueing more work would double-post, and
   // settling or expiring would overwrite an outcome that is still being written.
   if (inFlight.length > 0) return hold('in-flight')
+
+  // The platform accepted this post and nobody has heard how it ended. Sending it again
+  // is a duplicate on the customer's feed; expiring or settling it would decide an
+  // outcome nobody knows. The reconcile pass (which runs BEFORE this sweep in the cron
+  // tick) is the only thing that may move it, and it is held — inside grace and past it
+  // — until that pass writes a later log row.
+  if (awaiting.length > 0) return hold('awaiting-platform')
 
   if (publishable.length > 0) {
     if (withinGrace) {

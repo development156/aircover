@@ -20,8 +20,8 @@ export default {
     {
       name: 'the lease can never release a claimed variant (the original bug)',
       file: 'apps/jobs/src/publish/store.ts',
-      find: "          and publish_status in ('pending', 'scheduled', 'failed', 'publishing')",
-      replace: "          and publish_status in ('pending', 'scheduled', 'failed')",
+      find: "          and (publish_status in ('pending', 'scheduled', 'failed', 'publishing')",
+      replace: "          and (publish_status in ('pending', 'scheduled', 'failed')",
     },
     {
       name: 'a live claim can be stolen mid-publish',
@@ -34,9 +34,21 @@ export default {
     {
       name: 'a published variant can be claimed again and posted twice',
       file: 'apps/jobs/src/publish/store.ts',
-      find: "          and publish_status in ('pending', 'scheduled', 'failed', 'publishing')",
+      find: "          and (publish_status in ('pending', 'scheduled', 'failed', 'publishing')",
       replace:
-        "          and publish_status in ('pending', 'scheduled', 'failed', 'publishing', 'published')",
+        "          and (publish_status in ('pending', 'scheduled', 'failed', 'publishing', 'published')",
+    },
+    {
+      name: 'a fixture-published variant is stranded for ever (the 2026-09-02 defect)',
+      file: 'apps/jobs/src/publish/store.ts',
+      find: "               or (publish_status = 'published' and permalink like 'fixture://%'))",
+      replace: '               or false)',
+    },
+    {
+      name: 'the fixture exception widens to every published variant',
+      file: 'apps/jobs/src/publish/store.ts',
+      find: "               or (publish_status = 'published' and permalink like 'fixture://%'))",
+      replace: "               or publish_status = 'published')",
     },
     {
       name: 'a late release undoes a terminal outcome',
@@ -46,7 +58,11 @@ export default {
     },
     {
       name: 'the lease is one minute rather than ten',
-      file: 'apps/jobs/src/publish/runClaimedPublish.ts',
+      // MOVED 2026-09-03: the constant now lives in `dispatch/lease.ts`, because
+      // the classifier reads it too and `@sahoda/jobs/sweeps` must not import the
+      // publishing adapters. `runClaimedPublish` re-exports it, so a mutation
+      // aimed at the old file silently found nothing and was recorded SURVIVED.
+      file: 'apps/jobs/src/dispatch/lease.ts',
       find: 'export const PUBLISH_LEASE_SECONDS = 600',
       replace: 'export const PUBLISH_LEASE_SECONDS = 60',
     },

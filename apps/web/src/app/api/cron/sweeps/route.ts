@@ -6,6 +6,7 @@ import {
   sweepExpiredHolds,
 } from '@sahoda/jobs/sweeps'
 import {
+  PUBLISH_LEASE_SECONDS,
   publishPostDeps,
   reconcileSweepDeps,
   runClaimedPublish,
@@ -153,6 +154,15 @@ export async function GET(request: Request): Promise<Response> {
 
         const report = await runDispatchSweep({
           ...dispatchSweepDeps({ limit: DISPATCH_BATCH }),
+          // The number `claimVariant` enforces, passed explicitly: the classifier
+          // hands a `publishing` variant older than this back to the claim, and the
+          // two must agree or a dead publisher's row is either held for ever or
+          // offered to a statement that refuses it.
+          leaseSeconds: PUBLISH_LEASE_SECONDS,
+          // The real cause goes to Sentry (apps/jobs/CLAUDE.md rule 5). The report
+          // that crosses the wire carries counts only, so without this a settle that
+          // throws on every post is `failed: 25` and nothing else, every five minutes.
+          onFailure: (e) => reportServerError(e.error, { action: `cron:dispatch:${e.stage}` }),
           enqueuePublish: async (intent) => {
             if (!canPublish || deps === null) {
               // Exactly the pre-release behaviour: classified, counted under
@@ -182,7 +192,15 @@ export async function GET(request: Request): Promise<Response> {
     // anyone who guesses the URL mark another customer's post published.
     runReconcile: () =>
       runReconcileSweep(
-        reconcileSweepDeps({ mode: loadJobsEnv().reconcileMode, limit: RECONCILE_BATCH }),
+        reconcileSweepDeps({
+          mode: loadJobsEnv().reconcileMode,
+          limit: RECONCILE_BATCH,
+          // `failures.ts` calls this hook "the only place the real error survives",
+          // and until it was wired here it was never reached: every per-connection and
+          // per-publish cause was classified to a code and then dropped.
+          onFailure: (e) =>
+            reportServerError(e.error, { action: `cron:reconcile:${e.scope}-${e.stage}` }),
+        }),
       ),
     // The real error goes to Sentry; the response says only which sweep failed, because
     // a database error message can carry a connection string, a host or a query.
