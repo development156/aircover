@@ -36,6 +36,13 @@ export const WorkspaceSchema = z.object({
   regime: z.string().nullable(),
   /** One of LOCALES. A jurisdiction, never a timezone. */
   locale: z.string().nullable(),
+  /**
+   * Points at the `assets` row that is the workspace's logo. NULL means either
+   * nobody has set one through the pointer yet, or the migration that adds this
+   * column has not been applied. `readBrandLogo` in apps/web falls back to a
+   * title match in both of those cases.
+   */
+  logo_asset_id: z.uuid().nullable(),
 })
 export type Workspace = z.infer<typeof WorkspaceSchema>
 

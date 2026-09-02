@@ -5,6 +5,7 @@ import { useState, useTransition } from 'react'
 import { Pause, Play } from 'lucide-react'
 
 import { setLoopSettings } from '@/app/actions/loop-dial'
+import { loopStatusView, type LoopStatusView } from '@/lib/loop/status-view'
 import { LOOP_SCHEDULE_SENTENCE } from '@/lib/loop/schedule'
 import { Button } from '@/components/ui/button'
 
@@ -51,11 +52,15 @@ export function LoopStatus({ enabled, paused, running }: LoopStatusProps) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const view = loopStatusView({ enabled, paused, running }, WAITING_FOR)
 
   function toggle() {
     setError(null)
     startTransition(async () => {
-      const result = await setLoopSettings({ paused: !paused })
+      // What the press MEANS, not a flag negated. `paused: !paused` created the
+      // settings row already paused for a workspace that had never turned the
+      // Loop on, which is the press the remedy link sends people to.
+      const result = await setLoopSettings({ paused: view.intent === 'pause' })
       if (!result.ok) {
         setError(result.message ?? 'Could not save that.')
         return
@@ -67,9 +72,9 @@ export function LoopStatus({ enabled, paused, running }: LoopStatusProps) {
   return (
     <div id="loop-controls" className="flex flex-col items-start gap-2 narrow:items-end">
       <div className="flex flex-wrap items-center gap-3">
-        <StatusPill enabled={enabled} paused={paused} running={running} />
+        <StatusPill view={view} />
         <Button variant="secondary" onClick={toggle} loading={pending}>
-          {paused ? (
+          {view.intent === 'turn-on' ? (
             <>
               <Play size={15} strokeWidth={1.8} aria-hidden />
               Turn the Loop on
@@ -91,33 +96,16 @@ export function LoopStatus({ enabled, paused, running }: LoopStatusProps) {
   )
 }
 
-function StatusPill({ enabled, paused, running }: LoopStatusProps) {
-  // `enabled` is asked FIRST. A missing settings row gives enabled:false with
-  // paused:false — the same pair as a live, idle Loop — so a label that only
-  // consults `enabled` inside the paused branch tells a workspace that has
-  // never opened the Loop that it is on and waiting.
-  const label = !enabled
-    ? 'Not turned on'
-    : paused
-      ? 'Paused'
-      : running
-        ? 'Running now'
-        : `On, ${WAITING_FOR}`
-
-  // The dot is decoration; the word carries the state. A pill that says its
-  // meaning only in colour is a pill that says nothing to a reader who cannot
-  // see it, and this one is the first thing on the page.
-  const tone = paused ? 'text-muted' : running ? 'text-accent' : 'text-ok'
-  const ground = paused ? 'bg-s2' : running ? 'bg-tint-100 dark:bg-s2' : 'bg-ok-bg'
-
+function StatusPill({ view }: { view: LoopStatusView }) {
   return (
     <span
-      className={['type-chip inline-flex items-center gap-2 rounded-pill px-3 py-1', ground].join(
-        ' ',
-      )}
+      className={[
+        'type-chip inline-flex items-center gap-2 rounded-pill px-3 py-1',
+        view.ground,
+      ].join(' ')}
     >
-      <span aria-hidden className={['size-1.5 rounded-pill bg-current', tone].join(' ')} />
-      <span className={paused ? 'text-muted' : 'text-ink'}>{label}</span>
+      <span aria-hidden className={['size-1.5 rounded-pill bg-current', view.tone].join(' ')} />
+      <span className={view.text}>{view.label}</span>
     </span>
   )
 }

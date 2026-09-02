@@ -127,6 +127,33 @@ describe('replaying the ink layer', () => {
     expect(calls.filter((c) => c.op === 'save')).toHaveLength(2)
   })
 
+  /**
+   * ── A MARK BEING MOVED IS ONE MARK ──────────────────────────────────────────
+   * `inProgress` during a MOVE is the same object translated, while the original
+   * is still in `objects` at its resting place. Both were painted, so dragging a
+   * mark showed the person a second copy of it that vanished on release.
+   *
+   * Counted through `save`, which the test above establishes is one per mark
+   * drawn.
+   */
+  test('a mark being dragged is painted once, not beside its own resting copy', () => {
+    const { ctx, calls } = recorder()
+    // Same id: this is the SAME mark, moved.
+    const moved: DrawObject = { ...stroke, id: stroke.id }
+    redraw(ctx, SIZE, [stroke], INK, moved)
+    expect(calls.filter((c) => c.op === 'save')).toHaveLength(1)
+  })
+
+  test('a NEW mark is still drawn on top of the finished ones', () => {
+    // The other direction. Skipping by id must not skip a mark being drawn for
+    // the first time, which is not in `objects` at all — without this, filtering
+    // everything would satisfy the test above.
+    const { ctx, calls } = recorder()
+    const fresh: DrawObject = { ...stroke, id: 'not-yet-committed' }
+    redraw(ctx, SIZE, [stroke], INK, fresh)
+    expect(calls.filter((c) => c.op === 'save')).toHaveLength(2)
+  })
+
   test('no marks at all still clears, so the last stroke does not linger', () => {
     const { ctx, calls } = recorder()
     redraw(ctx, SIZE, [], INK)

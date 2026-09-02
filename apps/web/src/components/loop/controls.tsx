@@ -211,7 +211,15 @@ export function LoopControls({
               />
               <span className="type-sm text-muted">credits</span>
             </span>
-            {run && run.budgetCredits !== null ? (
+            {/* `> 0`, not `!== null`. Zero is a real stored budget — it means
+                the Loop may spend nothing — and it is not a bar. Rendered as
+                one it gave `aria-valuemax=0` under `aria-valuenow=85` and read
+                "Used 85 of 0 credits", with the fill drawn EMPTY because
+                `share` divides by it. `CreditsCard` beside it already guards
+                `budget > 0`; this is the same rule. A zero-budget cycle falls
+                to the plain spent line below, which states what happened
+                without drawing a proportion of nothing. */}
+            {run && run.budgetCredits !== null && run.budgetCredits > 0 ? (
               <SpendBar spent={run.spentCredits} budget={run.budgetCredits} />
             ) : run ? (
               <span className="type-sm num mt-2 block text-muted">

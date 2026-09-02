@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Sparkles, Wallet } from 'lucide-react'
 
-import { Unmeasured, Unreadable } from '@/components/design-system/absence-row'
+import { NotYet, Unmeasured, Unreadable } from '@/components/design-system/absence-row'
 import { creditWord } from '@/lib/credit-words'
 import type { BalanceRead } from '@/lib/wallet/read'
 
@@ -37,10 +37,26 @@ import type { BalanceRead } from '@/lib/wallet/read'
 /** A figure the card can show, or the reason it cannot. */
 export interface Figure {
   label: string
-  /** The reading. `null` means nothing measured it. */
+  /** The reading. `null` means nothing measured it, UNLESS `absent` says otherwise. */
   value: number | string | null
   /** Set small beside the figure. Part of the phrase, not a second line. */
   unit?: string
+  /**
+   * What a `null` here actually MEANS, when it is not "not measured yet".
+   *
+   * ── WHY A FIGURE HAS TO BE ABLE TO SAY THIS ─────────────────────────────────
+   * Every null rendered as `Unmeasured`, which announces "<label> has not been
+   * measured yet". That is the right sentence for Reach before anything has
+   * published, and the wrong one for `Approved`: a null there means no spending
+   * was ever put to the customer for approval, which is not a reading we failed
+   * to take. Announcing a missing measurement for something that was never
+   * measurable is the seventh-kind-of-nothing mistake `absence-row.tsx` exists
+   * to prevent, made in the one place that file's own three states did not
+   * reach.
+   *
+   * The visible mark is identical either way. Only the CLAIM differs.
+   */
+  absent?: string
 }
 
 /**
@@ -70,8 +86,14 @@ export function AtAGlanceCard({ figures, note }: { figures: readonly Figure[]; n
             <dd className="mt-1 flex flex-wrap items-baseline gap-x-1.5">
               {figure.value === null ? (
                 // The absence mark, which is a UI token and not a zero in a
-                // costume — nothing measured this, and the card says so.
-                <Unmeasured what={figure.label} />
+                // costume. WHICH nothing it is comes from the figure: most are
+                // "not measured yet", and one is "there was never anything to
+                // measure".
+                figure.absent === undefined ? (
+                  <Unmeasured what={figure.label} />
+                ) : (
+                  <NotYet what={figure.label} because={figure.absent} />
+                )
               ) : (
                 <>
                   <span className="type-h2 num text-ink">{figure.value}</span>

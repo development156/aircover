@@ -138,8 +138,20 @@ export default async function LoopPage() {
         hasChannels={snapshot.connected.length > 0}
         cycleRunning={running}
         refusal={refusal}
-        scheduleSentence={LOOP_SCHEDULE_SENTENCE}
-        nextRunAt={formatRunMoment(nextLoopRun(new Date()))}
+        /* ── THE FACET HAD TO MOVE WITH THE SENTENCE ──────────────────────
+           These were passed unconditionally, so with the cron off the same card
+           read "Sahoda is not planning weeks automatically at the moment" in one
+           column and "Schedule: Every Sunday / Next run 7 Sept 2026" in the
+           next. The fix reached the refusal sentence and left the facet making
+           the same promise, more concretely.
+
+           The facet STAYS rather than disappearing: "when does this run" is a
+           question the reader still has, and a missing row answers it with
+           nothing. There is no next run to name, so none is claimed. */
+        scheduleSentence={
+          autoSchedule === 'armed' ? LOOP_SCHEDULE_SENTENCE : 'Not running automatically'
+        }
+        nextRunAt={autoSchedule === 'armed' ? formatRunMoment(nextLoopRun(new Date())) : undefined}
         run={
           cycle
             ? {

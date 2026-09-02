@@ -4,8 +4,6 @@ import { useState } from 'react'
 import { FolderInput, FolderMinus, Trash2, X } from 'lucide-react'
 import type { AssetFolder } from '@sahoda/shared'
 
-import { cn } from '@/lib/utils'
-
 /**
  * THE BULK BAR — appears once something is selected, and only then.
  *

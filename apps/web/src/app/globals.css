@@ -213,6 +213,7 @@
   --color-primary: var(--p);
   --color-primary-foreground: var(--pfg);
   --color-primary-strong: var(--pstrong);
+  --color-primary-strong-foreground: var(--pstrong-fg);
   --color-accent: var(--acc);
   --color-tint-50: var(--t50);
   --color-tint-100: var(--t100);

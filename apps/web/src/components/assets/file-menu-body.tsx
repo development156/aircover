@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { AssetFolder } from '@sahoda/shared'
 
-import { deleteAsset, updateAsset } from '@/app/actions/assets'
+import { updateAsset } from '@/app/actions/assets'
 import {
   DELETE_ITEM_KEY,
   OPEN_ITEM_KEY,
@@ -47,7 +47,6 @@ export function FileMenuBody({
   onOpen,
   onFileInto,
   onRemoveFromFolder,
-  onDeleted,
   onTrash,
 }: {
   card: AssetCard

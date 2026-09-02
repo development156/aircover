@@ -2,7 +2,7 @@ import 'server-only'
 
 import {
   StudioGenerationImageSchema,
-  StudioGenerationSchema,
+  StudioGenerationRowSchema,
   type StudioGeneration,
 } from '@sahoda/shared'
 
@@ -70,7 +70,14 @@ export type GenerationsRead =
  * reads make a failure a failure.
  */
 export async function readGenerations(limit = 24): Promise<GenerationsRead> {
+  // ── TWO ANSWERS, NOT ONE ────────────────────────────────────────────────
+  // `status !== 'ok'` collapsed `unreadable` into `no-workspace`, and this
+  // union carries both on purpose. `RecentGenerations` renders NOTHING for
+  // `no-workspace`, so a member whose workspace read failed lost the entire
+  // "What you have made" section with no picture, no error and no explanation.
+  // `read-brain.ts:117` fixed exactly this for the Brand Brain and states why.
   const workspace = await activeWorkspaceRead()
+  if (workspace.status === 'unreadable') return { status: 'unreadable' }
   if (workspace.status !== 'ok') return { status: 'no-workspace' }
   const workspaceId = workspace.workspace.id
 
@@ -89,7 +96,13 @@ export async function readGenerations(limit = 24): Promise<GenerationsRead> {
   const generations: StudioGeneration[] = []
   let unreadable = 0
   for (const row of data ?? []) {
-    const parsed = StudioGenerationSchema.safeParse(row)
+    // The REFINED schema, which is the whole reason it exists: it also asserts
+    // the migration's own CHECK that a settled row carries a finish time. It was
+    // exported with a comment saying the shape is "refused once, here" and then
+    // called by nothing, so a `ready` row with no finish time — from a restored
+    // backup or a hand-written fix — parsed cleanly and every screen downstream
+    // had to defend against it.
+    const parsed = StudioGenerationRowSchema.safeParse(row)
     if (parsed.success) generations.push(parsed.data)
     else unreadable += 1
   }

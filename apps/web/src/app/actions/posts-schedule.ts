@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
+import { workspaceForWrite } from '@/lib/workspaces'
 
 /**
  * Arm, move and cancel a scheduled post.

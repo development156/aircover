@@ -81,15 +81,24 @@ export default async function SettingsPage() {
               THE HONEST DISCLOSURE, AND WHY IT IS NOT OPTIONAL.
               This setting now reaches two screens and not the rest: Posts and
               the Planner render scheduled times in it, the picker still builds
-              times on the reader's own device clock, and the other 25 files that
+              times on the reader's own device clock, and the other files that
               name a zone still name IST. A setting that silently does less than
               a reader would assume is the same defect as one that does nothing,
               so the row states its reach rather than implying all of it. Narrow
               this line as the remaining screens are moved, never widen it first.
+
+              THE WEEK GRID IS NAMED SEPARATELY because it is the one part of the
+              Planner this does not reach. `week-window.ts` places every card by
+              `PLANNER_GRID_ZONE`, so a card's column and row are IST facts; its
+              caption was briefly rendered in the workspace zone instead, which
+              drew a New York post in the wrong column under the right time. The
+              caption now matches the grid, and this sentence says so rather than
+              letting "the Planner" imply the grid moved too.
             */}
             <p className="type-meta text-muted">
-              Posts and Planner show your scheduled times in this zone. Choosing a time still
-              follows your own device clock, and other timestamps in Sahoda are shown in IST.
+              Posts and Planner show your scheduled times in this zone. The Planner's week grid is
+              still laid out in IST, choosing a time still follows your own device clock, and other
+              timestamps in Sahoda are shown in IST.
             </p>
           </SettingRow>
         </SettingCard>
