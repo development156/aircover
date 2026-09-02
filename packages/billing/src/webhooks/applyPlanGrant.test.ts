@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { monthlyGrantKey, PLAN_CATALOG, type ApplyLedgerInput } from '@sahoda/shared'
-import { createApplyPlanGrant } from './applyPlanGrant'
+import { createApplyPlanGrant, purchaseGrantKey } from './applyPlanGrant'
 import type { LedgerApplyResult, LedgerPort } from '../ledger/port'
 import type { ParsedWebhookEvent } from '../providers/types'
 
@@ -36,7 +36,7 @@ const paidEvent = (over: Partial<ParsedWebhookEvent> = {}): ParsedWebhookEvent =
 const deps = { newTraceId: () => 'trace-fixed' }
 
 describe('applyPlanGrant', () => {
-  it('GRANTs the plan catalog monthly credits, keyed by monthlyGrantKey', async () => {
+  it('GRANTs the plan catalog monthly credits, keyed on the month AND the payment', async () => {
     const port = new RecordingPort()
     const applyPlanGrant = createApplyPlanGrant(port, deps)
 
@@ -49,7 +49,36 @@ describe('applyPlanGrant', () => {
     const call = port.calls[0]!
     expect(call.entryType).toBe('GRANT')
     expect(call.amount).toBe(1500)
-    expect(call.idempotencyKey).toBe(monthlyGrantKey('starter', '2026-07', 'ws-1'))
+    expect(call.idempotencyKey).toBe(purchaseGrantKey(paidEvent()))
+    // The monthly key is the readable prefix; the provider + event id is what names the payment.
+    expect(call.idempotencyKey).toBe(
+      `${monthlyGrantKey('starter', '2026-07', 'ws-1')}:fixture:evt-1`,
+    )
+  })
+
+  /**
+   * billing-ledger-4. Keyed on the bare month, a customer who bought Starter twice in one
+   * month was charged twice and credited once. The key must change when the PAYMENT changes
+   * and stay put when the same payment is delivered again.
+   */
+  it('a second payment for the same plan+period gets a DIFFERENT key; a redelivery gets the SAME one', async () => {
+    const port = new RecordingPort()
+    const applyPlanGrant = createApplyPlanGrant(port, deps)
+
+    await applyPlanGrant(paidEvent({ eventId: 'PAYMENT_SUCCESS_WEBHOOK:pay_1' }))
+    await applyPlanGrant(paidEvent({ eventId: 'PAYMENT_SUCCESS_WEBHOOK:pay_2' }))
+    await applyPlanGrant(paidEvent({ eventId: 'PAYMENT_SUCCESS_WEBHOOK:pay_1' }))
+
+    const keys = port.calls.map((c) => c.idempotencyKey)
+    expect(keys[0]).not.toBe(keys[1])
+    expect(keys[2]).toBe(keys[0])
+    expect(keys[1]).toContain('PAYMENT_SUCCESS_WEBHOOK:pay_2')
+  })
+
+  it('the same event id under a different provider is a different key', () => {
+    const a = purchaseGrantKey(paidEvent({ provider: 'fixture', eventId: 'e' }))
+    const b = purchaseGrantKey(paidEvent({ provider: 'cashfree', eventId: 'e' }))
+    expect(a).not.toBe(b)
   })
 
   it('does not source the grant amount from action pricing (uses PLAN_CATALOG)', async () => {
@@ -101,9 +130,9 @@ describe('applyPlanGrant', () => {
 
 /**
  * The grant boundary is where the period format contract actually has to hold. Providers
- * validate their own wire shapes, but `monthlyGrantKey` is built HERE — so an unpadded or
- * malformed period reaching this point would mint a second idempotency key for a month
- * already granted. Reject before the ledger is touched.
+ * validate their own wire shapes, but the grant key is built HERE and the period also bounds
+ * the subscription row — so an unpadded or malformed period reaching this point would stamp a
+ * wrong period on both. Reject before the ledger is touched.
  */
 describe('applyPlanGrant — period format contract', () => {
   it.each([
@@ -130,7 +159,9 @@ describe('applyPlanGrant — period format contract', () => {
     const result = await applyPlanGrant(paidEvent({ period: '2026-01' }))
 
     expect(result.ok).toBe(true)
-    expect(port.calls[0]?.idempotencyKey).toBe(monthlyGrantKey('starter', '2026-01', 'ws-1'))
+    expect(port.calls[0]?.idempotencyKey).toBe(
+      `${monthlyGrantKey('starter', '2026-01', 'ws-1')}:fixture:evt-1`,
+    )
   })
 
   /**

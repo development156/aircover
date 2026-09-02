@@ -23,7 +23,7 @@ export interface WebhookClaim {
 /**
  * Records provider webhook events with (provider, event_id) idempotency — the service-only
  * billing_webhook_events table (RLS on, no policies), reached over the direct pg connection.
- * This is provider-level replay dedup + an audit trail ON TOP of the ledger's monthlyGrantKey.
+ * This is provider-level replay dedup + an audit trail ON TOP of the ledger's per-payment key.
  */
 export interface WebhookEventStore {
   /** Claim an event for processing: insert a 'received' row, or return the existing one. */
