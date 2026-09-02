@@ -1,7 +1,7 @@
 import type { PostOrigin } from '@sahoda/shared'
 
 /** Every origin that means Sahoda acted. `manual` is the only one that does not. */
-const SAHODA_ORIGINS: readonly PostOrigin[] = ['plan_week', 'playbook']
+const SAHODA_ORIGINS: readonly PostOrigin[] = ['plan_week', 'playbook', 'radar']
 
 /**
  * The blade: Sahoda acted, rather than the user.
