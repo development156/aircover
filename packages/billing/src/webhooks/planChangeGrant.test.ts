@@ -5,7 +5,7 @@ import {
   PLAN_CATALOG,
   type ApplyLedgerInput,
 } from '@sahoda/shared'
-import { createApplyPlanGrant } from './applyPlanGrant'
+import { createApplyPlanGrant, purchaseGrantKey } from './applyPlanGrant'
 import { parseCashfreeWebhook, tagsToEventFields } from '../providers/cashfree/webhook'
 import type { LedgerApplyResult, LedgerPort } from '../ledger/port'
 import type { ParsedWebhookEvent } from '../providers/types'
@@ -73,9 +73,11 @@ describe('the grant for a plan change', () => {
     const fake = fakeLedger()
     const apply = createApplyPlanGrant(fake.port)
 
-    // A normal monthly purchase of Growth lands first.
-    await apply(event())
-    expect(fake.calls[0]?.idempotencyKey).toBe(monthlyGrantKey('growth', '2026-08', WS))
+    // A normal monthly purchase of Growth lands first: keyed on the month AND the payment.
+    const purchase = event()
+    await apply(purchase)
+    expect(fake.calls[0]?.idempotencyKey).toBe(purchaseGrantKey(purchase))
+    expect(fake.calls[0]?.idempotencyKey).toContain(monthlyGrantKey('growth', '2026-08', WS))
 
     // Then an upgrade to Growth in the same period. Under monthlyGrantKey this would replay
     // and grant nothing.

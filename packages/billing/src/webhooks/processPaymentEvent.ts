@@ -3,6 +3,7 @@ import { appError, err, ok, type Result } from '@sahoda/shared'
 import type { ParsedWebhookEvent } from '../providers/types'
 import type { PlanGrantResult } from './applyPlanGrant'
 import type { WebhookEventStore } from './store'
+import type { SubscriptionWriter } from './subscriptionWriter'
 
 export interface ProcessResult {
   /**
@@ -31,7 +32,12 @@ const GRANTING_EVENT_TYPES = new Set<ParsedWebhookEvent['eventType']>(['payment_
 const GENERIC_FAILURE = 'Could not process the payment event'
 
 export interface ProcessPaymentEventDeps {
-  store: WebhookEventStore
+  /**
+   * The audit-row store AND the subscriptions writer, in one dependency: `createPgWebhookEventStore`
+   * returns both over one pool, so the endpoint that already passes the store gets the plan
+   * activated without a second thing to wire. A store without `activate` does not compile.
+   */
+  store: WebhookEventStore & SubscriptionWriter
   applyPlanGrant: (event: ParsedWebhookEvent) => Promise<Result<PlanGrantResult>>
   newTraceId?: () => string
   /**
@@ -44,9 +50,10 @@ export interface ProcessPaymentEventDeps {
 /**
  * Idempotent webhook processing (owner ruling #1, now unblocked by the widened provider enum):
  * claim a billing_webhook_events row ((provider, event_id) dedup) → apply the plan grant →
- * mark the row processed / failed. An already-processed event is skipped with no re-grant.
- * This is provider-level replay dedup + audit ON TOP of the ledger's monthlyGrantKey — defence
- * in depth. Callers verify the signature and parse the event BEFORE handing it here.
+ * activate the subscription → mark the row processed / failed. An already-processed event is
+ * skipped with no re-grant. This is provider-level replay dedup + audit ON TOP of the ledger's
+ * per-payment grant key — defence in depth. Callers verify the signature and parse the event
+ * BEFORE handing it here.
  */
 export function createProcessPaymentEvent(
   deps: ProcessPaymentEventDeps,
@@ -90,8 +97,32 @@ export function createProcessPaymentEvent(
         return grant
       }
 
+      // The payment also has to reach `subscriptions`, or entitlements and the plan screen go
+      // on reading "free" for a customer who has paid (billing-ledger-2). A zero-credit plan
+      // change still activates: the customer bought the plan even if the proration rounded to
+      // nothing. Runs BEFORE markProcessed so a failure here leaves the row 'received' and the
+      // redelivery re-drives both writes; the grant replays on its payment key, this repeats.
+      try {
+        await store.activate({
+          workspaceId: event.workspaceId,
+          planId: event.planId,
+          provider: event.provider,
+          period: event.period,
+        })
+      } catch (cause) {
+        try {
+          deps.onError?.(cause, traceId)
+        } catch {
+          // a broken logger must not turn a typed error into a rejection
+        }
+        await store
+          .markFailed(claim.id, 'PROVIDER_ERROR: subscription not activated')
+          .catch(() => {})
+        return err(appError('PROVIDER_ERROR', GENERIC_FAILURE, traceId))
+      }
+
       // If markProcessed throws, the row stays 'received' → a redelivery re-drives the grant
-      // (which replays idempotently via monthlyGrantKey) and marks it then. Self-healing.
+      // (which replays idempotently on its payment key) and marks it then. Self-healing.
       await store.markProcessed(claim.id)
       return ok({ status: 'processed', grant: grant.data })
     } catch (unexpected) {

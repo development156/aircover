@@ -65,8 +65,11 @@ export * from './providers/cashfree/signature'
 export * from './providers/cashfree/webhook'
 export * from './providers/cashfree'
 
-// Webhook → ledger: idempotent event store + the process orchestrator + the grant
+// Webhook → ledger + subscriptions: idempotent event store + the process orchestrator + the
+// grant + the subscription writer a paid event activates
 export * from './webhooks/applyPlanGrant'
 export * from './webhooks/store'
 export * from './webhooks/pgStore'
+export * from './webhooks/subscriptionWriter'
+export * from './webhooks/pgSubscriptionWriter'
 export * from './webhooks/processPaymentEvent'
