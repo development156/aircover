@@ -29,6 +29,9 @@ const row = (over: Record<string, unknown> = {}) => ({
   channel: 'x',
   publish_status: 'pending',
   published_mode: null,
+  claimed_at: null,
+  last_error_code: null,
+  last_platform_post_id: null,
   ...over,
 })
 
@@ -51,9 +54,80 @@ describe('createDispatchStore — listCandidates', () => {
     expect(candidates).toHaveLength(1)
     expect(candidates[0]!.postId).toBe('p1')
     expect(candidates[0]!.variants).toEqual([
-      { variantId: 'v1', channel: 'x', publishStatus: 'pending', publishedMode: null },
-      { variantId: 'v2', channel: 'gbp', publishStatus: 'published', publishedMode: 'live' },
+      {
+        variantId: 'v1',
+        channel: 'x',
+        publishStatus: 'pending',
+        publishedMode: null,
+        claimedAt: null,
+        awaitingPlatform: false,
+      },
+      {
+        variantId: 'v2',
+        channel: 'gbp',
+        publishStatus: 'published',
+        publishedMode: 'live',
+        claimedAt: null,
+        awaitingPlatform: false,
+      },
     ])
+  })
+
+  it('reads the claim so the classifier can tell a live lease from a dead one', async () => {
+    // Without this column every `publishing` variant looked the same to the sweep, and
+    // the store's stale-lease reclaim could only ever be reached by a person pressing
+    // "Send now". pg hands timestamptz back as a Date; the classifier compares ISO.
+    const { pool, calls } = fakePool({
+      rows: [
+        row({
+          publish_status: 'publishing',
+          claimed_at: new Date('2026-07-25T08:50:00Z'),
+        }),
+      ],
+    })
+
+    const candidates = await createDispatchStore({ pool }).listCandidates()
+
+    expect(squash(calls[0]!.text)).toContain('publish_claimed_at')
+    expect(candidates[0]!.variants[0]!.claimedAt).toBe('2026-07-25T08:50:00.000Z')
+  })
+
+  it('flags a variant whose latest log is STILL_PROCESSING with a provider id', async () => {
+    // The platform accepted it and nobody knows how it ended. The classifier holds such a
+    // variant rather than sending it again; the reconcile pass is what settles it.
+    const { pool, calls } = fakePool({
+      rows: [
+        row({
+          variant_id: 'v-waiting',
+          publish_status: 'scheduled',
+          last_error_code: 'STILL_PROCESSING',
+          last_platform_post_id: '0123456789abcdef01234567',
+        }),
+        row({
+          variant_id: 'v-no-id',
+          publish_status: 'scheduled',
+          last_error_code: 'STILL_PROCESSING',
+          last_platform_post_id: null,
+        }),
+        row({
+          variant_id: 'v-other',
+          publish_status: 'scheduled',
+          last_error_code: 'RATE_LIMITED',
+          last_platform_post_id: '0123456789abcdef01234567',
+        }),
+      ],
+    })
+
+    const candidates = await createDispatchStore({ pool }).listCandidates()
+
+    const byId = Object.fromEntries(
+      candidates[0]!.variants.map((v) => [v.variantId, v.awaitingPlatform]),
+    )
+    expect(byId).toEqual({ 'v-waiting': true, 'v-no-id': false, 'v-other': false })
+    // The LATEST row of any status, not the latest succeeded one: a reconcile row
+    // appended after the STILL_PROCESSING one is what ends the wait.
+    const sql = squash(calls[0]!.text)
+    expect(sql).toContain("error ->> 'code'")
   })
 
   it('keeps separate posts separate', async () => {

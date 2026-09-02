@@ -3,20 +3,12 @@ import { runPublishPost, type PublishJobContext, type PublishOutcome } from './r
 import type { PublishPostDeps } from './runPublishPost'
 
 /**
- * How long a claim is honoured before its holder is presumed dead.
- *
- * Sized against the two things it sits between:
- *   · LONGER than any single publish can take. The publish-now route caps at 120s
- *     and the Instagram poll alone is 36s, so a live publisher must never have its
- *     row stolen mid-flight.
- *   · Rarely reached at all, because the normal transient path releases explicitly
- *     the moment the failure is classified. This number only governs the case
- *     where the process was killed and could not release anything.
- *
- * Ten minutes is comfortably clear of the first and, being the crash-only path,
- * costs nothing in the common case.
+ * The lease length. Defined in ../dispatch/lease so the classifier can read the same
+ * number without pulling the adapters into the sweeps entry point; re-exported here
+ * because this is where every caller of the claim looks for it.
  */
-export const PUBLISH_LEASE_SECONDS = 600
+export { PUBLISH_LEASE_SECONDS } from '../dispatch/lease'
+import { PUBLISH_LEASE_SECONDS } from '../dispatch/lease'
 
 /** Why a run did nothing, when it did nothing. */
 export type ClaimRefusal = 'already-claimed'

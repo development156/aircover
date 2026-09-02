@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { type PublishRequest } from '@sahoda/shared'
+import { AdapterError, type PublishRequest } from '@sahoda/shared'
 import { createZernioAdapter } from './zernio'
-import { ZERNIO_ID_RE, type ZernioClient, type ZernioPost } from '../zernio/client'
+import { ZERNIO_ID_RE, ZernioError, type ZernioClient, type ZernioPost } from '../zernio/client'
 
 const FIXED_NOW = new Date('2026-08-08T00:00:00.000Z')
 
@@ -463,5 +463,273 @@ describe('an X thread on the wire', () => {
     // writer's words with its first segment — a caller's mistake becoming a wrong
     // post rather than an error. The root now follows the FORMAT.
     expect(body.content).toBe('The real body.')
+  })
+})
+
+/**
+ * ── "PUBLISHED" MEANS A LIVE HTTPS LINK, NOT A TRUTHY FIELD ──────────────────
+ * The settle loop and the success condition both keyed off `leg.platformPostUrl`
+ * being truthy. A `fixture://` string, `true`, or an object would all have been
+ * stored as the permalink and the row flipped to `published`. The rule is doc 13
+ * §5's: a post is real when there is a link to it on the internet.
+ */
+async function adapterError(run: () => Promise<unknown>): Promise<AdapterError> {
+  try {
+    await run()
+  } catch (err) {
+    if (err instanceof AdapterError) return err
+    throw err
+  }
+  throw new Error('expected an AdapterError and got a value')
+}
+
+describe('Zernio adapter — a post is published only on a parsed https permalink', () => {
+  it.each([
+    ['a fixture scheme', 'fixture://instagram/DbdSNpHDbtj'],
+    ['an empty string', ''],
+    ['a plain http link', 'http://www.instagram.com/p/DbdSNpHDbtj/'],
+    ['a bare path', '/p/DbdSNpHDbtj/'],
+  ])('does not report success when the url is %s', async (_label, url) => {
+    const err = await adapterError(() =>
+      adapterFor(igPost({ platformPostId: IG_MEDIA_ID, platformPostUrl: url })).publish(
+        igRequest(),
+      ),
+    )
+
+    // No live link yet. Transient, so a later read can still find the real one.
+    expect(err.code).toBe('STILL_PROCESSING')
+    expect(err.classification).toBe('transient')
+  })
+
+  it('does not report success when the url is a boolean the client type never promised', async () => {
+    const err = await adapterError(() =>
+      adapterFor(igPost({ platformPostId: IG_MEDIA_ID, platformPostUrl: true })).publish(
+        igRequest(),
+      ),
+    )
+
+    expect(err.code).toBe('STILL_PROCESSING')
+  })
+
+  it('reports success on an https permalink and returns it unchanged', async () => {
+    const result = await adapterFor(
+      igPost({ platformPostId: IG_MEDIA_ID, platformPostUrl: PERMALINK }),
+    ).publish(igRequest())
+
+    expect(result.permalink).toBe(PERMALINK)
+    expect(result.mode).toBe('live')
+  })
+})
+
+/**
+ * ── CLASSIFYING WHAT ZERNIO'S 4XX ACTUALLY MEANS ─────────────────────────────
+ * The adapter forwarded Zernio's own `code` string and a blanket `permanent`. The
+ * publish path only raises the reconnect prompt and marks the connection expired
+ * for UNAUTHORIZED and FORBIDDEN, which the native adapters mint from the HTTP
+ * status and this one never did. And a 409 (the same words and photos inside 24
+ * hours, docs/31 §6.4) is not a failure that a retry can fix.
+ */
+function failingClient(err: ZernioError): ZernioClient {
+  return {
+    ...stubClient(igPost({})),
+    createPost: async () => {
+      throw err
+    },
+  }
+}
+
+function zernioError(status: number, code: string, existingPostId: string | null = null) {
+  return new ZernioError({
+    message: `createPost: HTTP ${status}`,
+    status,
+    code,
+    type: 'x',
+    rateLimit: { limit: null, remaining: null, reset: null },
+    existingPostId,
+  })
+}
+
+describe('Zernio adapter — auth failures name the account and say to reconnect it', () => {
+  it('maps a 403 ACCOUNT_DISCONNECTED to FORBIDDEN with a reconnect sentence', async () => {
+    const adapter = createZernioAdapter('instagram', {
+      client: failingClient(zernioError(403, 'ACCOUNT_DISCONNECTED')),
+      poll: { attempts: 1, intervalMs: 0 },
+      sleep: async () => {},
+      now: () => FIXED_NOW,
+    })
+
+    const err = await adapterError(() => adapter.publish(igRequest()))
+
+    expect(err.code).toBe('FORBIDDEN')
+    expect(err.classification).toBe('permanent')
+    expect(err.message).toBe(
+      'Instagram is no longer connected to Sahoda. Reconnect it, then publish again.',
+    )
+    expect(err.raw).toEqual({ status: 403, zernioCode: 'ACCOUNT_DISCONNECTED' })
+  })
+
+  it('leaves any other 403 on Zernio’s code, with a sentence that offers no reconnect', async () => {
+    const adapter = createZernioAdapter('linkedin', {
+      client: failingClient(zernioError(403, 'INSUFFICIENT_PERMISSIONS')),
+      poll: { attempts: 1, intervalMs: 0 },
+      sleep: async () => {},
+      now: () => FIXED_NOW,
+    })
+
+    const err = await adapterError(() =>
+      adapter.publish(
+        igRequest({
+          content: { channel: 'linkedin', text: 'hello', media: [] },
+          media: [],
+        } as Partial<PublishRequest>),
+      ),
+    )
+
+    // Not FORBIDDEN: that code marks the customer's connection expired, and a
+    // 403 without ACCOUNT_DISCONNECTED has not said the account is the problem.
+    expect(err.code).toBe('INSUFFICIENT_PERMISSIONS')
+    expect(err.classification).toBe('permanent')
+    expect(err.message).toBe('LinkedIn refused Sahoda permission to post this.')
+    expect(err.message).not.toMatch(/reconnect/i)
+  })
+
+  it('does NOT map a 401 to a reconnect: the bearer is Sahoda’s key, not the customer’s', async () => {
+    const adapter = createZernioAdapter('instagram', {
+      client: failingClient(zernioError(401, 'UNAUTHORIZED')),
+      poll: { attempts: 1, intervalMs: 0 },
+      sleep: async () => {},
+      now: () => FIXED_NOW,
+    })
+
+    const err = await adapterError(() => adapter.publish(igRequest()))
+
+    expect(err.code).toBe('PROVIDER_UNAUTHORIZED')
+    expect(err.code).not.toBe('UNAUTHORIZED')
+    expect(err.classification).toBe('permanent')
+    expect(err.message).toBe(
+      "Sahoda could not sign in to its publishing service, so nothing was sent to Instagram. This is on Sahoda's side, not your account.",
+    )
+  })
+
+  it('leaves an unrelated 4xx as Zernio classified it, code intact', async () => {
+    const adapter = createZernioAdapter('instagram', {
+      client: failingClient(zernioError(400, 'VALIDATION_ERROR')),
+      poll: { attempts: 1, intervalMs: 0 },
+      sleep: async () => {},
+      now: () => FIXED_NOW,
+    })
+
+    const err = await adapterError(() => adapter.publish(igRequest()))
+
+    expect(err.code).toBe('VALIDATION_ERROR')
+    expect(err.classification).toBe('permanent')
+  })
+})
+
+describe('Zernio adapter — a 409 duplicate is "already posted", not a failure to retry', () => {
+  const EXISTING = '6a6c9771556939203a9bafad'
+
+  it('classifies the 409 as ALREADY_POSTED and says what to change', async () => {
+    const adapter = createZernioAdapter('instagram', {
+      client: failingClient(zernioError(409, 'DUPLICATE_CONTENT', EXISTING)),
+      poll: { attempts: 1, intervalMs: 0 },
+      sleep: async () => {},
+      now: () => FIXED_NOW,
+    })
+
+    const err = await adapterError(() => adapter.publish(igRequest()))
+
+    expect(err.code).toBe('ALREADY_POSTED')
+    // Permanent: a retry sends the same words to the same 24-hour window.
+    expect(err.classification).toBe('permanent')
+    expect(err.message).toBe(
+      'Instagram already has a post with these exact words and photos from the last 24 hours, so this one was not sent again. Change the wording or a photo to post it.',
+    )
+    // The earlier post's Zernio id rides on `raw.postId`, the shape the publish
+    // log already lifts into its handle column.
+    expect(err.raw).toEqual({ status: 409, zernioCode: 'DUPLICATE_CONTENT', postId: EXISTING })
+  })
+
+  it('still classifies a 409 with no existingPostId as ALREADY_POSTED', async () => {
+    const adapter = createZernioAdapter('instagram', {
+      client: failingClient(zernioError(409, 'DUPLICATE_CONTENT')),
+      poll: { attempts: 1, intervalMs: 0 },
+      sleep: async () => {},
+      now: () => FIXED_NOW,
+    })
+
+    const err = await adapterError(() => adapter.publish(igRequest()))
+
+    expect(err.code).toBe('ALREADY_POSTED')
+    expect(err.raw).toEqual({ status: 409, zernioCode: 'DUPLICATE_CONTENT' })
+  })
+})
+
+/**
+ * ── THE READER GETS A NAME, NOT A KEY ─────────────────────────────────────────
+ * `${channel}` is the lowercase enum key. "gbp allows 1 media items" reached the
+ * publish button verbatim (api-contracts-1). Every sentence here now goes through
+ * CHANNEL_LABELS.
+ */
+describe('Zernio adapter — refusal sentences name the channel, never the enum key', () => {
+  const gbpRequest = (mediaCount: number): PublishRequest => {
+    const media = Array.from({ length: mediaCount }, (_, i) => ({
+      url: `https://media.zernio.com/media/${i}.jpg`,
+      mime: 'image/jpeg',
+    }))
+    return igRequest({
+      content: { channel: 'gbp', summary: 'Open today.', media },
+      media,
+    } as unknown as Partial<PublishRequest>)
+  }
+
+  it('says "Google Business Profile allows 1 attachment per post", not "gbp"', async () => {
+    const adapter = createZernioAdapter('gbp', {
+      client: stubClient(igPost({})),
+      poll: { attempts: 1, intervalMs: 0 },
+      sleep: async () => {},
+      now: () => FIXED_NOW,
+    })
+
+    const err = await adapterError(() => adapter.publish(gbpRequest(2)))
+
+    expect(err.code).toBe('MAX_MEDIA_COUNT')
+    expect(err.message).toBe('Google Business Profile allows 1 attachment per post.')
+    expect(err.message).not.toMatch(/\bgbp\b/)
+  })
+
+  it('says "Instagram needs at least one photo", not "instagram"', async () => {
+    const err = await adapterError(() =>
+      adapterFor(igPost({})).publish(
+        igRequest({
+          content: { channel: 'instagram', caption: 'hi', media: [] },
+          media: [],
+        } as Partial<PublishRequest>),
+      ),
+    )
+
+    expect(err.code).toBe('MEDIA_REQUIRED')
+    expect(err.message).toBe(
+      'Instagram needs at least one photo. There is no text-only post there.',
+    )
+    expect(err.message).not.toMatch(/\binstagram\b/)
+  })
+
+  it('names the channel in the still-processing sentence', async () => {
+    const err = await adapterError(() =>
+      adapterFor(igPost({ status: 'processing' })).publish(igRequest()),
+    )
+
+    expect(err.code).toBe('STILL_PROCESSING')
+    expect(err.message).toBe('Instagram is still processing this post. There is no live link yet.')
+  })
+
+  it('names the channel in the refusal sentence', async () => {
+    const err = await adapterError(() =>
+      adapterFor(igPost({ status: 'failed', error: 'Media too small' })).publish(igRequest()),
+    )
+
+    expect(err.code).toBe('PLATFORM_REJECTED')
+    expect(err.message).toBe('Instagram refused this post: Media too small')
   })
 })

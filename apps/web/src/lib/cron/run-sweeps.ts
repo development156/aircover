@@ -65,7 +65,7 @@ const ERROR_FOR: Record<SweepScope, SweepError['error']> = {
 }
 
 /**
- * One cron tick: run both scheduled sweeps and describe what happened in counters.
+ * One cron tick: run the three scheduled sweeps and describe what happened in counters.
  *
  * Two rules shape the response. First, the sweeps are independent — a dispatcher failure
  * must not stop the hold reaper, because stranded credits are the user's money and the
@@ -74,16 +74,26 @@ const ERROR_FOR: Record<SweepScope, SweepError['error']> = {
  * (`dispatch-sweep-failed`) rather than described, since a database error message can
  * carry a connection string, a host or a query.
  *
+ * ── THE ORDER IS LOAD-BEARING ────────────────────────────────────────────────
+ * Reconcile runs FIRST. It used to run last, "because it is the only one that can
+ * wait", and that ordering was the second half of a double post: an Instagram publish
+ * the platform ACCEPTED but had not finished (STILL_PROCESSING) hands its claim back as
+ * `scheduled`, and a tick that dispatched before reconciling re-sent it ~5m40s after the
+ * first — on or past the ~5-minute idempotency window doc 13 §5 puts on Zernio's request
+ * id. The classifier now holds such a variant, and this order makes sure the pass that
+ * can END that hold has run before the dispatcher looks at the row. Reconcile is a
+ * bounded batch of Zernio reads (RECONCILE_BATCH per queue); dispatch is the one that
+ * can spend ~200s publishing, so it goes last, and the hold reaper — fifty guarded
+ * updates — sits ahead of it rather than behind a wall-clock it cannot influence.
+ *
  * A failed sweep answers 500 so a broken tick shows up as an error in the cron dashboard
  * instead of a green run that quietly did nothing. Vercel does not retry a failed
- * invocation; the next tick is the retry, and both sweeps re-read their candidates.
+ * invocation; the next tick is the retry, and every sweep re-reads its candidates.
  */
 export async function runCronSweeps(runners: CronSweepRunners): Promise<CronSweepOutcome> {
-  const dispatch = await attempt('dispatch', runners.runDispatch, runners.onError)
-  const holds = await attempt('holds', runners.runHolds, runners.onError)
-  // Last on purpose: it is the only one that can wait. A tick that runs out of
-  // wall-clock should lose the reconciliation pass, not the publishing.
   const reconcile = await attempt('reconcile', runners.runReconcile, runners.onError)
+  const holds = await attempt('holds', runners.runHolds, runners.onError)
+  const dispatch = await attempt('dispatch', runners.runDispatch, runners.onError)
 
   const ok = !isError(dispatch) && !isError(holds) && !isError(reconcile)
 

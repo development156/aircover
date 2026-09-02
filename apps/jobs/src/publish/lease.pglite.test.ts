@@ -156,6 +156,36 @@ describe('the publish lease (real Postgres, in-process)', () => {
     expect(await store.claimVariant(payload(), PUBLISH_LEASE_SECONDS)).toBe(false)
   })
 
+  it('a variant published for real stays unclaimable whatever its permalink looks like', async () => {
+    // The sibling shape of the test above: a real permalink, not a null one. The
+    // fixture exception below must key on the `fixture://` prefix and nothing wider.
+    await db.query(
+      `update post_variants
+          set publish_status = 'published',
+              permalink = 'https://instagram.com/p/1',
+              publish_claimed_at = now() - make_interval(secs => $2::int)
+        where id = $1`,
+      [variantId, PUBLISH_LEASE_SECONDS * 100],
+    )
+
+    expect(await store.claimVariant(payload(), PUBLISH_LEASE_SECONDS)).toBe(false)
+  })
+
+  it('a variant whose only "publish" was the fixture rail is claimable again', async () => {
+    // MEASURED before this clause: three X variants sat `published` with a
+    // `fixture://` permalink, and no button, cron or RPC could ever publish them for
+    // real. Nothing left the building, so claiming it again cannot post twice.
+    await db.query(
+      `update post_variants
+          set publish_status = 'published', permalink = 'fixture://instagram/abc'
+        where id = $1`,
+      [variantId],
+    )
+
+    expect(await store.claimVariant(payload(), PUBLISH_LEASE_SECONDS)).toBe(true)
+    expect(await readRow()).toMatchObject({ publish_status: 'publishing' })
+  })
+
   it('hands the row back to scheduled when the publisher releases it', async () => {
     await store.claimVariant(payload(), PUBLISH_LEASE_SECONDS)
 
