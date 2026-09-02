@@ -14,7 +14,13 @@ import { pickerCopyFor, SELECT_PATH } from '@/lib/zernio/picker-copy'
 import { connectFailedPage, nothingToPickPage, pickerPage } from '@/lib/zernio/picker-page'
 import { connectFailureCopy, readConnectFailure } from '@/lib/zernio/connect-error'
 import { PLATFORM_LABELS } from '@/components/posts/channel-label'
-import { readSelectionRedirect, unresolvedSelection } from '@/lib/zernio/selection'
+import {
+  CLEAR_CONNECT_NONCE,
+  readSelectionRedirect,
+  unresolvedSelection,
+  verifyConnectNonce,
+  type NonceVerdict,
+} from '@/lib/zernio/selection'
 import { RETURN_MODE_PARAM, RETURN_PLATFORM_PARAM } from '@/lib/zernio/return-url'
 import { zernioClient } from '@/lib/zernio/server'
 
@@ -158,17 +164,32 @@ function popupCloser(
       `})();</script></body></html>`,
     {
       status: httpStatus,
-      headers: {
+      // NO `location`. See the header: this response is HTML that must RENDER,
+      // and a `Location` on the 3xx this used to send made the browser follow
+      // it instead. `backError` can keep one only because 4xx/5xx are not
+      // followed.
+      headers: spentCookies({
         'content-type': 'text/html; charset=utf-8',
         'cache-control': 'no-store',
-        'set-cookie': CLEAR_PENDING_CONNECT,
-        // NO `location`. See the header: this response is HTML that must RENDER,
-        // and a `Location` on the 3xx this used to send made the browser follow
-        // it instead. `backError` can keep one only because 4xx/5xx are not
-        // followed.
-      },
+      }),
     },
   )
+}
+
+/**
+ * The headers every FINISHED trip leaves with: the given ones, plus both
+ * one-press cookies spent. Two `Set-Cookie` lines need a `Headers` object; a
+ * plain record holds one and the second silently replaces the first.
+ *
+ * The nonce goes with the pending-connect cookie because they authorise the
+ * same press. A nonce that survived a finished trip would still match a
+ * bookmarked copy of that trip's URL.
+ */
+function spentCookies(base: Record<string, string>): Headers {
+  const headers = new Headers(base)
+  headers.append('set-cookie', CLEAR_PENDING_CONNECT)
+  headers.append('set-cookie', CLEAR_CONNECT_NONCE)
+  return headers
 }
 
 /**
@@ -185,11 +206,10 @@ function backOk(
   // `Location` — `real outcomes keep their 303` still holds.
   return new Response(null, {
     status: 303,
-    headers: {
+    headers: spentCookies({
       location: connectionsUrl(request, status, detail),
-      'set-cookie': CLEAR_PENDING_CONNECT,
       'cache-control': 'no-store',
-    },
+    }),
   })
 }
 
@@ -238,16 +258,59 @@ function backError(
       `<a href="${safe}">Go back to Connections</a> to try again.</p></body></html>`,
     {
       status: httpStatus,
-      headers: {
+      // Spent on a failure too. A cookie surviving a failed trip would sit
+      // there authorising a create on whatever the customer did next.
+      headers: spentCookies({
         'content-type': 'text/html; charset=utf-8',
         'cache-control': 'no-store',
-        // Spent on a failure too. A cookie surviving a failed trip would sit
-        // there authorising a create on whatever the customer did next.
-        'set-cookie': CLEAR_PENDING_CONNECT,
         // Not followed by browsers on a 4xx/5xx, and deliberately kept anyway: it is
         // what makes the intended destination visible to a log reader and to curl -I.
         location: target,
+      }),
+    },
+  )
+}
+
+/**
+ * A picker this browser did not ask for, refused in one sentence.
+ *
+ * ── WHY THIS IS ITS OWN PAGE AND NOT `fail(403, …)` ──────────────────────────
+ * `backError` says "That connection didn't finish", which is true and useless
+ * here: nothing was attempted. The two facts this page can state are different
+ * from each other and from that, and each has a remedy that works.
+ *
+ *   absent      the record of the press did not reach us. A dropped cookie, or a
+ *               URL with the nonce stripped. Pressing Connect again mints both.
+ *   mismatched  the link belongs to another attempt: an old return URL replayed,
+ *               or one built by somebody else. Pressing Connect again is still
+ *               the only way a real one starts.
+ *
+ * No token from the URL is read, echoed or stored on this path: the response is
+ * built before `readSelectionRedirect`'s state is used for anything.
+ */
+function attemptUnverifiedPage(request: Request, verdict: NonceVerdict): Response {
+  const body =
+    verdict === 'mismatched'
+      ? 'This link belongs to a different connect attempt, so nothing was connected and no account was chosen.'
+      : 'The record of your press did not reach Sahoda, so nothing was connected and no account was chosen.'
+  return new Response(
+    connectFailedPage(
+      {
+        headline: 'Sahoda could not confirm this connect started from your Connections page',
+        body,
+        remedy: 'Go back to Connections and press Connect again.',
       },
+      null,
+      connectionsUrl(request, 'error', `attempt-${verdict}`),
+    ),
+    {
+      // A 403: the request was understood and is refused. Visible to the
+      // 4xx/5xx log filter this route was rebuilt around.
+      status: 403,
+      headers: spentCookies({
+        'content-type': 'text/html; charset=utf-8',
+        'cache-control': 'no-store',
+      }),
     },
   )
 }
@@ -310,9 +373,31 @@ export async function GET(request: Request): Promise<Response> {
   // the cookie parses against the allowlist and the query parameter is checked by
   // `isZernioPlatform` — and stating that in the type is what lets this value be
   // handed to the selection helpers without a cast that would erase the check.
+  const urlPlatform: ZernioPlatform | null =
+    askedPlatform !== null && isZernioPlatform(askedPlatform) ? askedPlatform : null
+
+  /**
+   * ── DID THIS TRIP START FROM A PRESS IN THIS BROWSER? ─────────────────────
+   * The start route mints a random value per press and puts it in an httpOnly
+   * cookie AND on the return URL. They agree only for a trip that press
+   * started. A link somebody else built cannot carry the cookie's value, and an
+   * old URL's value stops matching once the next press overwrites the cookie.
+   *
+   * Two things below depend on it. A PICKER is refused without it, because
+   * every parameter a picker runs on came through the browser and a profile id
+   * is not a secret. And the URL's `platform` may scope a CREATE only with it:
+   * the pending-connect cookie is still the first authority (it is httpOnly
+   * and only our own start route sets it), and the URL is the fallback for the
+   * trip that cookie did not survive, which is now a fallback that has to
+   * prove itself rather than one that is taken at its word.
+   */
+  const nonce = verifyConnectNonce(request.headers.get('cookie'), params)
+
+  /** What was pressed, as far as PRESENTATION and recognising a pick are concerned. */
+  const pressed: ZernioPlatform | null = pending?.platform ?? urlPlatform
+  /** Which platform may have a row CREATED on this trip. See the nonce note. */
   const createFor: ZernioPlatform | null =
-    pending?.platform ??
-    (askedPlatform !== null && isZernioPlatform(askedPlatform) ? askedPlatform : null)
+    pending?.platform ?? (nonce === 'matched' ? urlPlatform : null)
 
   const ok = (status: 'connected' | 'nothing' | 'limit', detail?: string) =>
     // 200, NOT 303. A 303 is a redirect and a browser follows it, so the closer's
@@ -346,10 +431,10 @@ export async function GET(request: Request): Promise<Response> {
   const failure = readConnectFailure(params)
   if (failure !== null) {
     await reportServerError(
-      new Error(`zernioReturn: ${createFor ?? 'unknown'} refused — ${failure.code}`),
+      new Error(`zernioReturn: ${pressed ?? 'unknown'} refused — ${failure.code}`),
       { action: 'zernioReturn' },
     )
-    const channel = createFor === null ? 'That channel' : PLATFORM_LABELS[createFor]
+    const channel = pressed === null ? 'That channel' : PLATFORM_LABELS[pressed]
     const copy = connectFailureCopy(failure, channel)
     const body = connectFailedPage(
       copy,
@@ -433,8 +518,24 @@ export async function GET(request: Request): Promise<Response> {
      * `upsert_zernio_connection` enforces as PROFILE_MISMATCH, applied a layer up
      * so a mismatched pick never reaches Zernio at all.
      */
-    const selection = readSelectionRedirect(params, createFor)
+    const selection = readSelectionRedirect(params, pressed)
     if (selection !== null) {
+      /**
+       * ── THE NONCE FIRST, BEFORE ANYTHING ON THIS URL IS COMPARED OR USED ──
+       * `profileId === ours` was the only binding here, and a profile id is on
+       * every return URL this browser ever visited. A top-level GET carrying
+       * the victim's profile id and an attacker's `tempToken` rendered a normal
+       * picker, and one click committed the attacker's Page under the victim's
+       * profile. Refused here, with the reason named, and with no token from
+       * the URL read into anything.
+       */
+      if (nonce !== 'matched') {
+        await reportServerError(
+          new Error(`zernioReturn: ${selection.platform} pick refused, nonce ${nonce}`),
+          { action: 'zernioReturn', workspaceId },
+        )
+        return attemptUnverifiedPage(request, nonce)
+      }
       if (selection.state.profileId !== profileId) return fail(403, 'profile-mismatch')
 
       const copy = pickerCopyFor(selection.platform)
@@ -595,7 +696,7 @@ export async function GET(request: Request): Promise<Response> {
      * in an error report where the token is not.
      */
     if (accounts.length === 0 && unreadable.length === 0) {
-      const owed = unresolvedSelection(createFor, params)
+      const owed = unresolvedSelection(pressed, params)
       if (owed !== null) {
         await reportServerError(
           new Error(

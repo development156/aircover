@@ -7,6 +7,7 @@ import { reportServerError } from '@/lib/observability/report'
 import { eraseConfirmationMatches } from '@/lib/privacy/confirm'
 import { sweepWorkspaceStorage } from '@/lib/privacy/storage'
 import { createServerSupabase } from '@/lib/supabase/server'
+import { getWorkspaceRole } from '@/lib/workspace-role'
 import { getActiveWorkspace } from '@/lib/workspaces'
 
 /**
@@ -38,6 +39,20 @@ import { getActiveWorkspace } from '@/lib/workspaces'
  * so is the RPC. The check here exists to give a person a sentence instead of a
  * database error code, not to be the control.
  *
+ * ## Why the ROLE is checked here too, and before the sweep
+ *
+ * The RPC refuses anyone but the owner (`ERASURE_NOT_OWNER`), and that is still
+ * the control. But the RPC runs SECOND, and the sweep before it runs on the RLS
+ * client, whose storage delete policy admits every member of the workspace. So
+ * an editor who reached this action had every file removed, was refused by the
+ * RPC, and was then told nothing had been deleted. The role is read before the
+ * first irreversible step so the refusal lands while that sentence is true.
+ *
+ * And when something IS removed before a refusal (the RPC throws, or ownership
+ * changes between the role read and the RPC), the sentence counts the files
+ * rather than claiming nothing happened. `filesRemoved` is threaded through the
+ * refusals for that reason alone.
+ *
  * ## What it does NOT do
  *
  * It does not delete the Clerk account. Signing out of Sahoda and closing a
@@ -57,37 +72,62 @@ export type EraseState =
   | { ok: true; rowsRemoved: number; filesRemoved: number; retained: string[] }
   | { ok: false; message: string }
 
-function refusal(error: { code?: string | null; message?: string | null }): string {
+/**
+ * The clause that closes a refusal. "Nothing was deleted." is the whole promise
+ * of these sentences, so it is only ever said when the sweep removed nothing.
+ */
+function nothingDeleted(filesRemoved: number): string {
+  if (filesRemoved === 0) return 'Nothing was deleted.'
+  const files = filesRemoved === 1 ? 'One file was' : `${filesRemoved} files were`
+  return `${files} already removed from storage before this refusal. The rest of your workspace is untouched.`
+}
+
+function refusal(
+  error: { code?: string | null; message?: string | null },
+  filesRemoved: number,
+): string {
   const message = error.message ?? ''
+  const nothing = nothingDeleted(filesRemoved)
   // PostgREST cannot find the function: the migration has not been applied. Say
   // that, rather than "something went wrong" — the remedy is somebody else's,
   // and a customer told to try again would try forever.
   if (error.code === 'PGRST202' || message.includes('erase_workspace')) {
-    return 'Deleting a workspace is not switched on for this database yet. Nothing was deleted. Write to support@sahodalabs.com and we will do it by hand.'
+    return `Deleting a workspace is not switched on for this database yet. ${nothing} Write to support@sahodalabs.com and we will do it by hand.`
   }
   if (message.includes('ERASURE_NOT_OWNER')) {
-    return 'Only the owner of this workspace can delete it. Nothing was deleted.'
+    return `Only the owner of this workspace can delete it. ${nothing}`
   }
   if (message.includes('ERASURE_NOT_SIGNED_IN')) {
-    return 'Sign in again and try once more. Nothing was deleted.'
+    return `Sign in again and try once more. ${nothing}`
   }
   if (message.includes('ERASURE_NAME_MISMATCH')) {
-    return 'The name did not match, so nothing was deleted.'
+    return filesRemoved === 0
+      ? 'The name did not match, so nothing was deleted.'
+      : `The name did not match. ${nothing}`
   }
   if (message.includes('ERASURE_UNKNOWN_WORKSPACE')) {
     return 'That workspace no longer exists.'
   }
   if (message.includes('ERASURE_INCOMPLETE')) {
-    // The RPC rolled back, so this is genuinely "nothing happened" and not a
-    // half-deletion. Saying so is the difference between a customer who waits
-    // and a customer who assumes the worst.
-    return 'Something refused to be deleted, so the whole deletion was undone and your workspace is exactly as it was. Write to support@sahodalabs.com. This one needs a person.'
+    // The RPC rolled back, so the database half is genuinely "nothing happened"
+    // and not a half-deletion. Saying so is the difference between a customer
+    // who waits and a customer who assumes the worst. The storage half is
+    // counted honestly: the sweep ran first and is not part of that rollback.
+    const database =
+      filesRemoved === 0
+        ? 'Something refused to be deleted, so the whole deletion was undone and your workspace is exactly as it was.'
+        : `Something refused to be deleted, so the database deletion was undone. ${nothing}`
+    return `${database} Write to support@sahodalabs.com. This one needs a person.`
   }
-  return 'That deletion was not applied, and nothing was deleted.'
+  return filesRemoved === 0
+    ? 'That deletion was not applied, and nothing was deleted.'
+    : `That deletion was not applied. ${nothing}`
 }
 
 export async function eraseWorkspaceData(typed: string): Promise<EraseState> {
   let workspaceId: string | undefined
+  /** How many files the sweep has removed so far. Zero until it runs. */
+  let filesRemoved = 0
   try {
     const { userId } = await auth()
     if (!userId) return { ok: false, message: 'Sign in to delete your workspace.' }
@@ -104,10 +144,30 @@ export async function eraseWorkspaceData(typed: string): Promise<EraseState> {
       return { ok: false, message: 'The name did not match, so nothing was deleted.' }
     }
 
+    // 0 · Who is asking. BEFORE the sweep, because the sweep is the irreversible
+    // step and the storage policy would let any member run it. `null` is "could
+    // not tell", which is a different fact from "not the owner" and gets its own
+    // sentence rather than borrowing one that names a role we never read.
+    const role = await getWorkspaceRole(workspace.id)
+    if (role === null) {
+      return {
+        ok: false,
+        message:
+          'Sahoda could not confirm you own this workspace, so nothing was deleted. Try again in a moment.',
+      }
+    }
+    if (role !== 'owner') {
+      return {
+        ok: false,
+        message: 'Only the owner of this workspace can delete it. Nothing was deleted.',
+      }
+    }
+
     const supabase = createServerSupabase()
 
     // 1 · The files. See the header for why this is first.
     const sweep = await sweepWorkspaceStorage(supabase, workspace.id)
+    filesRemoved = sweep.removed
     if (sweep.failed.length > 0 || sweep.leftUnread.length > 0) {
       // NOT rounded up into a success. A customer told their data is gone, whose
       // photographs are still in a bucket, has been lied to — so the database is
@@ -125,7 +185,7 @@ export async function eraseWorkspaceData(typed: string): Promise<EraseState> {
       p_workspace_id: parsed.data.workspaceId,
       p_typed_name: parsed.data.typed,
     })
-    if (error) return { ok: false, message: refusal(error) }
+    if (error) return { ok: false, message: refusal(error, filesRemoved) }
 
     const result = (data ?? {}) as {
       rowsRemoved?: unknown
@@ -144,6 +204,12 @@ export async function eraseWorkspaceData(typed: string): Promise<EraseState> {
     }
   } catch (error) {
     await reportServerError(error, { action: 'eraseWorkspaceData', workspaceId })
-    return { ok: false, message: 'That deletion was not applied, and nothing was deleted.' }
+    return {
+      ok: false,
+      message:
+        filesRemoved === 0
+          ? 'That deletion was not applied, and nothing was deleted.'
+          : `That deletion was not applied. ${nothingDeleted(filesRemoved)}`,
+    }
   }
 }

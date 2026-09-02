@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  CLEAR_CONNECT_NONCE,
+  CONNECT_NONCE_COOKIE,
+  mintConnectNonce,
   ourPlatformFor,
+  readNonceCookie,
   readSelectionRedirect,
+  RETURN_NONCE_PARAM,
   selectionPlatformFor,
+  setConnectNonceHeader,
   unresolvedSelection,
+  verifyConnectNonce,
 } from './selection'
 
 /**
@@ -134,5 +141,77 @@ describe('the two vocabularies stay paired', () => {
         new URLSearchParams({ step: 'select_board', profileId: FB.profileId, tempToken: 'pina_x' }),
       )?.platform,
     ).toBe('pinterest')
+  })
+})
+
+/**
+ * THE NONCE THAT BINDS A RETURN TRIP TO THE PRESS THAT STARTED IT.
+ *
+ * A profile id is on every return URL the browser ever visited, so it cannot be
+ * the thing that proves a picker belongs to this customer. Sixteen random bytes
+ * per press, in an httpOnly cookie and on the URL, can: a link somebody else
+ * built cannot carry a value that lives in the customer's own cookie jar.
+ */
+describe('the per-attempt nonce', () => {
+  it('mints a fresh, well-formed value every time', () => {
+    const a = mintConnectNonce()
+    const b = mintConnectNonce()
+    expect(a).toMatch(/^[A-Za-z0-9_-]{22}$/)
+    expect(a).not.toBe(b)
+  })
+
+  it('writes a cookie the trip home can carry, and one that expires', () => {
+    const header = setConnectNonceHeader('abcdefghijklmnopqrstuv')
+    expect(header).toContain(`${CONNECT_NONCE_COOKIE}=abcdefghijklmnopqrstuv`)
+    expect(header).toContain('HttpOnly')
+    expect(header).toContain('SameSite=Lax')
+    expect(header).toContain('Path=/')
+    expect(header).toMatch(/Max-Age=\d+/)
+    expect(CLEAR_CONNECT_NONCE).toContain('Max-Age=0')
+    expect(CLEAR_CONNECT_NONCE).toContain('Path=/')
+  })
+
+  it('reads its own cookie out of a jar full of others', () => {
+    const jar = `__session=abc; ${CONNECT_NONCE_COOKIE}=abcdefghijklmnopqrstuv; sahoda_connect=facebook.popup`
+    expect(readNonceCookie(jar)).toBe('abcdefghijklmnopqrstuv')
+  })
+
+  it('refuses a malformed cookie value rather than comparing it', () => {
+    expect(readNonceCookie(`${CONNECT_NONCE_COOKIE}=short`)).toBeNull()
+    expect(readNonceCookie(`${CONNECT_NONCE_COOKIE}=`)).toBeNull()
+    expect(readNonceCookie('sahoda_connect=facebook.popup')).toBeNull()
+    expect(readNonceCookie(null)).toBeNull()
+  })
+
+  it('is matched only when the cookie and the URL agree', () => {
+    const nonce = mintConnectNonce()
+    const cookie = `${CONNECT_NONCE_COOKIE}=${nonce}`
+    expect(verifyConnectNonce(cookie, params({ [RETURN_NONCE_PARAM]: nonce }))).toBe('matched')
+  })
+
+  it('names a missing half as absent, not as a mismatch', () => {
+    const nonce = mintConnectNonce()
+    // Cookie dropped by the browser: the URL alone proves nothing.
+    expect(verifyConnectNonce(null, params({ [RETURN_NONCE_PARAM]: nonce }))).toBe('absent')
+    // URL stripped: the cookie alone proves nothing either.
+    expect(verifyConnectNonce(`${CONNECT_NONCE_COOKIE}=${nonce}`, params({}))).toBe('absent')
+    // Neither.
+    expect(verifyConnectNonce(null, params({}))).toBe('absent')
+  })
+
+  it('names two different well-formed values as a mismatch', () => {
+    // A link built from an OLD return URL: its nonce is real, and it is not the
+    // one the latest press wrote to the cookie.
+    const cookie = `${CONNECT_NONCE_COOKIE}=${mintConnectNonce()}`
+    expect(verifyConnectNonce(cookie, params({ [RETURN_NONCE_PARAM]: mintConnectNonce() }))).toBe(
+      'mismatched',
+    )
+  })
+
+  it('treats a malformed URL value as absent, whatever the cookie holds', () => {
+    const nonce = mintConnectNonce()
+    expect(
+      verifyConnectNonce(`${CONNECT_NONCE_COOKIE}=${nonce}`, params({ [RETURN_NONCE_PARAM]: 'x' })),
+    ).toBe('absent')
   })
 })
