@@ -25,10 +25,11 @@ import {
   type ResolveActionState,
 } from '@/lib/brand/resolve-result'
 import { IntakeSchema } from '@/lib/onboarding/intake'
-import { activeBrandMemory } from '@/lib/onboarding/read-brain'
+import { FREE_RESOLVES_PER_DAY, freeResolveAllowed } from '@/lib/onboarding/limits'
+import { readActiveBrandMemory } from '@/lib/onboarding/read-brain'
 import { toResolveInput } from '@/lib/onboarding/to-resolve-input'
 import { reportServerError } from '@/lib/observability/report'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { workspaceForWrite } from '@/lib/workspaces'
 
 // 'use server' modules may export only async functions — these stay module-private.
 let meshSingleton: Mesh | undefined
@@ -58,6 +59,16 @@ export type OnboardingResolveState =
 const FALLBACK_MESSAGE =
   'Showing a sample Brand Brain. The model could not be reached, so nothing was charged. Retry to resolve yours.'
 
+/**
+ * The read that decides free-or-charged did not get an answer. Neither arm may
+ * be assumed: "free" would give away a 50-credit build on a database hiccup,
+ * and "charged" would bill for a first build the product promised for nothing.
+ */
+const BRAIN_UNREADABLE_MESSAGE =
+  'Sahoda could not read your saved Brand Brain just now, so it cannot tell whether this build is free. Nothing ran and nothing was charged. Try again.'
+
+const FREE_LIMIT_MESSAGE = `Sahoda has built a free Brand Brain for this workspace ${FREE_RESOLVES_PER_DAY} times today, which is the daily limit. Nothing ran and nothing was charged. Try again tomorrow.`
+
 // NOTHING ELSE IS EXPORTED FROM HERE. Every export of a `'use server'` module
 // is a callable endpoint, so `isFirstResolve` (which takes a workspace id) and
 // the cost lookup live in `read-brain.ts` and `@sahoda/shared` respectively —
@@ -79,12 +90,29 @@ interface ChargedArgs extends ResolveArgs {
   activeVersion: number
 }
 
-/** The free path: the model call, with no ledger involvement whatsoever. */
+/**
+ * The free path: the model call, with no ledger involvement whatsoever.
+ *
+ * BOUNDED, not counted. Nothing durable records a free build (the brain is
+ * written only when the customer keeps one), so a person who never keeps one
+ * could loop a real model call at zero credits for ever. A daily window per
+ * person and per workspace ends that without a schema change.
+ *
+ * A mesh error is REPORTED here and MAPPED for the customer. It used to return
+ * `result.error.message` verbatim, so the first build a customer ever ran was
+ * the only one that could read "model output hit the 4096-token ceiling for
+ * brand_guidelines and was cut off". The charged path never did; now neither
+ * does.
+ */
 async function resolveFree({
   workspaceId,
   userId,
   input,
 }: ResolveArgs): Promise<OnboardingResolveState> {
+  if (!(await freeResolveAllowed(userId, workspaceId))) {
+    return { ok: false, kind: 'error', message: FREE_LIMIT_MESSAGE }
+  }
+
   const result = await getMesh().runTask(brandGuidelinesTask.def, input, {
     workspaceId,
     traceId: randomUUID(),
@@ -93,7 +121,16 @@ async function resolveFree({
     creditsCharged: 0,
   })
 
-  if (!result.ok) return { ok: false, kind: 'error', message: result.error.message }
+  if (!result.ok) {
+    reportServerError(new Error(result.error.message), {
+      action: 'resolveOnboarding.free',
+      workspaceId,
+    })
+    return mapResolveOutcome(
+      { kind: 'error', message: result.error.message },
+      { ok: false, insufficient: false, message: result.error.message },
+    )
+  }
   if ((result as { fallback?: boolean }).fallback === true) {
     return { ok: true, kind: 'fallback', brain: result.data, message: FALLBACK_MESSAGE }
   }
@@ -184,8 +221,11 @@ export async function resolveOnboarding(
     const { userId } = await auth()
     if (!userId) return { ok: false, kind: 'error', message: 'Sign in to resolve your brand.' }
 
-    const workspace = await getActiveWorkspace()
-    if (!workspace) return { ok: false, kind: 'error', message: 'Create a workspace first.' }
+    // Two refusals, two sentences. "Create a workspace first" on a read that
+    // failed is a remedy for a workspace the customer already has.
+    const write = await workspaceForWrite()
+    if (!write.ok) return { ok: false, kind: 'error', message: write.message }
+    const workspace = write.workspace
     workspaceId = workspace.id
 
     const intake = IntakeSchema.safeParse({
@@ -222,11 +262,14 @@ export async function resolveOnboarding(
      * as well as the existence, and reading it twice would let the two answers
      * disagree under a concurrent save.
      */
-    const active = await activeBrandMemory(workspace.id)
+    const active = await readActiveBrandMemory(workspace.id)
+    if (active.status === 'unreadable') {
+      return { ok: false, kind: 'error', message: BRAIN_UNREADABLE_MESSAGE }
+    }
     const args: ResolveArgs = { workspaceId: workspace.id, userId, input }
-    return active === null
+    return active.status === 'none'
       ? await resolveFree(args)
-      : await resolveCharged({ ...args, activeVersion: active.version })
+      : await resolveCharged({ ...args, activeVersion: active.brain.version })
   } catch (error) {
     reportServerError(error, { action: 'resolveOnboarding', workspaceId })
     reportPaidActionFailure('onboarding-resolve', error)
