@@ -1,4 +1,5 @@
 import { expect as pwExpect, type Page } from '@playwright/test'
+import { dismissPlanOffer } from './fixtures/compose'
 
 import { adminClient, expect, test } from './fixtures/seeded-user'
 
@@ -209,6 +210,7 @@ test('Save & exit reaches the dashboard, and the next visit lands in the flow ag
 
   // And it holds for the rest of the visit rather than for one navigation.
   await page.goto('/home')
+  await dismissPlanOffer(page)
   expect(new URL(page.url()).pathname).toBe('/home')
 
   /**
@@ -261,6 +263,8 @@ test('a finished account goes straight to the dashboard and is never offered the
   await giveBrain(await workspaceIdOf(signedIn.clerkUserId))
 
   await page.goto('/home')
+
+  await dismissPlanOffer(page)
   // No redirect. This is the assertion a `null`-collapsing read would fail the
   // moment a query hiccupped.
   expect(new URL(page.url()).pathname).toBe('/home')

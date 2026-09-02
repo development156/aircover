@@ -397,7 +397,17 @@ export const ImageGenerateInputSchema = z.object({
    * here so a malformed request cannot send a hundred, and bounded lower by
    * `MAX_REFERENCES` where the product knows which model it routes to.
    */
-  references: z.array(z.string().min(1)).max(14).optional(),
+  references: z.array(z.string().min(1)).max(16).optional(),
+  /**
+   * WHICH MODEL DRAWS IT, when the caller has let somebody choose.
+   *
+   * Optional: a caller that does not care gets the tier's default. The string is
+   * NOT trusted here, and the mesh checks it against `ALLOWED_IMAGE_MODELS`
+   * before it reaches a provider. Validating the shape in this schema and the
+   * VALUE at the router is deliberate: a schema cannot know what this account is
+   * willing to be billed for.
+   */
+  modelId: z.string().min(1).optional(),
 })
 export type ImageGenerateInput = z.infer<typeof ImageGenerateInputSchema>
 

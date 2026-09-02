@@ -199,21 +199,6 @@ export const INK_FAINT_EXCEPTIONS: Readonly<Record<string, InkFaintException>> =
       'Three uses — role and seat meta, all read by an operator managing access. Was four: the table header moved to `type-eyebrow text-muted`, the recipe every table shares, on 2026-08-31. Pre-dates the v3 readability guards.',
   },
   /**
-   * THE ONE USE HERE THAT THE WCAG DISABLED EXEMPTION ACTUALLY COVERS.
-   *
-   * A calendar day before the channels' own minimum lead is rendered as a real
-   * `<button disabled>`: it cannot be pressed, cannot be focused and cannot be
-   * activated by any input method. That is precisely the case 1.4.3 exempts,
-   * and it is what `--ink-faint` exists for.
-   *
-   * `text-muted` would be worse rather than safer. A past day drawn at the same
-   * weight as a selectable one invites the click it is going to refuse, and the
-   * grid then has to explain itself. The contrast step IS the affordance.
-   *
-   * Adjacent-month days, which ARE selectable, deliberately use `text-muted`
-   * instead — the two states are different and are drawn differently.
-   */
-  /**
    * THE REPORT'S ORDINAL, WHICH IS DECORATION AND NOTHING ELSE.
    *
    * `01…05` beside each section of the CMO Report. It is `aria-hidden`, it
@@ -236,6 +221,21 @@ export const INK_FAINT_EXCEPTIONS: Readonly<Record<string, InkFaintException>> =
     reason:
       'The 01-05 ordinal beside each report section. aria-hidden, carries no fact, and the heading beside it names the section. Warms to --ink-mute on hover.',
   },
+  /**
+   * THE ONE USE HERE THAT THE WCAG DISABLED EXEMPTION ACTUALLY COVERS.
+   *
+   * A calendar day before the channels' own minimum lead is rendered as a real
+   * `<button disabled>`: it cannot be pressed, cannot be focused and cannot be
+   * activated by any input method. That is precisely the case 1.4.3 exempts,
+   * and it is what `--ink-faint` exists for.
+   *
+   * `text-muted` would be worse rather than safer. A past day drawn at the same
+   * weight as a selectable one invites the click it is going to refuse, and the
+   * grid then has to explain itself. The contrast step IS the affordance.
+   *
+   * Adjacent-month days, which ARE selectable, deliberately use `text-muted`
+   * instead — the two states are different and are drawn differently.
+   */
   'src/components/posts/schedule-calendar.tsx': {
     uses: 1,
     // `legitimate`, not `debt`: this is correct and permanent. WCAG 1.4.3

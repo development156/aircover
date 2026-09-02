@@ -791,8 +791,13 @@ export async function attachAssetToPost(
     //
     // The refusal already exists a few lines up, for a file whose dimensions are
     // missing; this is the same sentence for the same reason.
-    const existing = await readMedia(postId)
-    const formats = await readVariantFormatsStrict(postId)
+    // Both take only `postId` and neither reads the other, so they go together.
+    // Serially this cost the customer two database round trips before the first
+    // byte of their photo was judged.
+    const [existing, formats] = await Promise.all([
+      readMedia(postId),
+      readVariantFormatsStrict(postId),
+    ])
     if (existing === null || formats === null) {
       return {
         ok: false,

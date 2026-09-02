@@ -37,6 +37,24 @@ export interface LedgerTableProps {
    * for any caller rendering every entry it holds.
    */
   settled?: ReadonlySet<string>
+  /**
+   * Which entries a later entry has corrected, computed over EVERY entry read.
+   *
+   * ── THE SIBLING OF `settled`, AND IT WAS LEFT OPEN ──────────────────────────
+   * The prop above was added because a page-scoped derivation is wrong for a
+   * paginated caller. `correctedSeqs` comes out of the same `groupCorrections`
+   * call and has the identical problem, and it was not passed: a correction is
+   * written as a reversal plus a re-issue whose `corrects_seq` points at an
+   * entry that is usually far older, so in any workspace with more than one page
+   * of history the original and its correction land on DIFFERENT pages. The
+   * original then renders with no note at all, which reads as though it still
+   * stands. That is precisely the claim the note exists to prevent.
+   *
+   * `rows` stays per-page, because `rows` is what gets drawn. Only the corrected
+   * SET is window-scoped. Omitted, the page-scoped derivation still applies,
+   * which is correct for a caller rendering every entry it holds.
+   */
+  correctedSeqs?: ReadonlySet<number>
   /** Adds the running balance column. Every row records `balance_after`. */
   showBalance?: boolean
   /**
@@ -147,7 +165,18 @@ function EntryRow({
   showBalance,
 }: {
   entry: LedgerEntry
-  corrected: boolean
+  /**
+   * Where the correcting entry is, from this row's point of view.
+   *
+   * `'above'` means it is on screen. `'elsewhere'` means it exists but is on
+   * another page, which is the ordinary case once the list paginates: a
+   * correction points at an entry far older than itself. `false` means none.
+   *
+   * Three states rather than a boolean because the sentence differs. Telling a
+   * reader to "see the correction above" when it is forty rows back on page one
+   * sends them looking for something that is not there.
+   */
+  corrected: 'above' | 'elsewhere' | false
   /** Credits frozen RIGHT NOW — a HOLD with no settling entry in the window. */
   open: boolean
   showBalance: boolean
@@ -198,12 +227,14 @@ function EntryRow({
             {display.why}
           </span>
         ) : null}
-        {corrected ? (
+        {corrected !== false ? (
           // Left in place, never rewritten: the ledger is append-only and this
           // row is still exactly what happened. But an entry that a later
           // correction has superseded must not read as though it still stands.
           <span className="mt-1 block text-[13px] text-warn">
-            Corrected by a later entry. See the correction above.
+            {corrected === 'above'
+              ? 'Corrected by a later entry. See the correction above.'
+              : 'Corrected by a later entry, on a newer page.'}
           </span>
         ) : null}
       </td>
@@ -268,12 +299,13 @@ function EntryRow({
  */
 function CorrectionGroup({
   row,
-  correctedSeqs,
+  correctionPlace,
   settled,
   showBalance,
 }: {
   row: Extract<LedgerRow, { kind: 'correction' }>
-  correctedSeqs: ReadonlySet<number>
+  /** Passed rather than a set, so "above" means the same thing in both places. */
+  correctionPlace: (seq: number) => 'above' | 'elsewhere' | false
   /** Ids of holds closed by an entry in the window — see hold-settlement.ts. */
   settled: ReadonlySet<string>
   showBalance: boolean
@@ -331,7 +363,7 @@ function CorrectionGroup({
         <EntryRow
           key={entry.id}
           entry={entry}
-          corrected={correctedSeqs.has(entry.seq)}
+          corrected={correctionPlace(entry.seq)}
           open={isOpenHold(entry, settled)}
           showBalance={showBalance}
         />
@@ -345,6 +377,7 @@ export function LedgerTable({
   skipped,
   limit,
   settled: settledProp,
+  correctedSeqs: correctedSeqsProp,
   showBalance = false,
   notes = true,
 }: LedgerTableProps) {
@@ -370,7 +403,19 @@ export function LedgerTable({
   // A correction is written as two or more append-only rows that undo and
   // re-issue an earlier entry. Read as separate lines they look like a
   // clawback; grouped, they read as the one event they are.
-  const { rows, correctedSeqs } = groupCorrections(entries)
+  const { rows, correctedSeqs: pageCorrectedSeqs } = groupCorrections(entries)
+  // Window-scoped when the caller paginates, page-scoped otherwise. Same rule as
+  // `settled` directly below, and for the same reason.
+  const correctedSeqs = correctedSeqsProp ?? pageCorrectedSeqs
+
+  /**
+   * `pageCorrectedSeqs` is the subset whose correcting entry is on THIS page, so
+   * it is exactly the test for whether "above" is a true word to use.
+   */
+  const correctionPlace = (seq: number): 'above' | 'elsewhere' | false => {
+    if (pageCorrectedSeqs.has(seq)) return 'above'
+    return correctedSeqs.has(seq) ? 'elsewhere' : false
+  }
 
   // Derived once for the page, not per row. Safe to read from this page alone:
   // a settling entry always has a higher `seq` than its hold, and the page is
@@ -415,7 +460,7 @@ export function LedgerTable({
               <CorrectionGroup
                 key={row.id}
                 row={row}
-                correctedSeqs={correctedSeqs}
+                correctionPlace={correctionPlace}
                 settled={settled}
                 showBalance={showBalance}
               />
@@ -423,7 +468,7 @@ export function LedgerTable({
               <tbody key={row.entry.id}>
                 <EntryRow
                   entry={row.entry}
-                  corrected={correctedSeqs.has(row.entry.seq)}
+                  corrected={correctionPlace(row.entry.seq)}
                   open={isOpenHold(row.entry, settled)}
                   showBalance={showBalance}
                 />

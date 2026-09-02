@@ -5,13 +5,14 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 import { queueGeneration, startPostFromPicture } from '@/app/actions/studio'
 import { StudioWorkbench } from '@/components/studio/studio-workbench'
 import { generatableFormats } from '@/lib/studio/formats'
+import { routedModels, unroutedModels } from '@/lib/studio/models'
 import { uploadAccept } from '@/lib/studio/upload'
 import {
-  MAX_REFERENCES,
   MAX_TRIES_PER_PRESS,
   describeModeBlock,
   promptHintFor,
   readyModes,
+  ruleFor,
 } from '@/lib/studio/modes'
 
 /**
@@ -32,11 +33,24 @@ vi.mock('@/app/actions/assets', () => ({ uploadAsset: vi.fn() }))
 
 afterEach(cleanup)
 
+/**
+ * Deliberately LARGER than any model's reference ceiling.
+ *
+ * It held four, which was more than the old cap of three. The models now take up
+ * to sixteen, so a four-picture library could not reach any cap and the tests
+ * that exercise the limit silently stopped exercising anything. Seventeen is one
+ * past the highest ceiling in the catalogue.
+ */
 const LIBRARY = [
   { assetId: 'a1', url: 'https://example.test/1.png', title: 'A shopfront' },
   { assetId: 'a2', url: 'https://example.test/2.png', title: null },
   { assetId: 'a3', url: null, title: 'No preview' },
   { assetId: 'a4', url: 'https://example.test/4.png', title: null },
+  ...Array.from({ length: 13 }, (_unused, i) => ({
+    assetId: `b${i}`,
+    url: `https://example.test/b${i}.png`,
+    title: null,
+  })),
 ]
 
 const MADE = [
@@ -76,13 +90,71 @@ const open = (library = LIBRARY, pictures: typeof MADE = []) =>
     />,
   )
 
+describe('choosing which model draws it', () => {
+  test('the reachable models are offered by what they are good at, never by id', () => {
+    const { container } = open()
+    const picker = container.querySelector('[data-guide="studio-model"]') as HTMLElement
+    expect(picker).not.toBeNull()
+
+    // One button per reachable model, and each label and description present.
+    // Matched by TEXT rather than by accessible name: the name of a card is its
+    // whole content, so a word in one model's description collides with
+    // another's label and `getByRole` finds two.
+    expect(within(picker).getAllByRole('button')).toHaveLength(routedModels().length)
+    for (const model of routedModels()) {
+      expect(picker.textContent, model.id).toContain(model.label)
+      expect(picker.textContent, model.id).toContain(model.goodAt)
+      // The id is for the router, never for a shop owner.
+      expect(picker.textContent, model.id).not.toContain(model.id)
+    }
+  })
+
+  /**
+   * RETARGETED. Every model in the catalogue is reachable now, so there is no
+   * "not connected" section to show. The claim that survives is the one that
+   * mattered: nothing is offered that cannot be drawn. When a model is added
+   * ahead of its route, `models.test.ts` covers the sentence it gets.
+   */
+  test('nothing is offered that cannot be drawn', () => {
+    const { container } = open()
+    expect(container.querySelector('[data-guide="studio-model-waiting"]')).toBeNull()
+    expect(unroutedModels()).toHaveLength(0)
+  })
+
+  /**
+   * THE ONE THAT MAKES THE PICKER REAL. `series` is refused because the routed
+   * model draws one picture per call. That was never a fact about the mode. If
+   * a model that draws a whole set does not make the mode appear, the picker is
+   * decoration.
+   */
+  test('a matching set is refused for a model that draws one at a time', () => {
+    expect(readyModes('google/gemini-3-pro-image').map((r) => r.mode)).not.toContain('series')
+  })
+
+  test('and offered for a model that draws the whole set in one call', () => {
+    expect(readyModes('openai/gpt-image-1').map((r) => r.mode)).toContain('series')
+    expect(readyModes('bytedance-seed/seedream-5-0-lite').map((r) => r.mode)).toContain('series')
+  })
+
+  test('the model also decides how many pictures may be matched against', () => {
+    expect(ruleFor('match', 'bytedance-seed/seedream-5-0-lite').maxReferences).toBe(14)
+    expect(ruleFor('match', 'openai/gpt-image-1').maxReferences).toBe(16)
+  })
+})
+
 describe('the modes on offer', () => {
-  test('offers the three that work and not the one that cannot be made honestly', () => {
+  /**
+   * RETARGETED, and the change is the point. "A set that matches" used to be
+   * absent because the only routed model drew ONE picture per call. The default
+   * model now draws four in one go, so the mode is OFFERED. What still has to
+   * hold is that the offer tracks the model rather than a hardcoded list, which
+   * the model tests above assert from both directions.
+   */
+  test('offers every mode the default model can actually do', () => {
     open()
-    expect(screen.getByRole('button', { name: /on brand/i })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /explore/i })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /match a picture/i })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /a set that matches/i })).toBeNull()
+    for (const rule of readyModes()) {
+      expect(screen.getByRole('button', { name: new RegExp(rule.label, 'i') })).toBeTruthy()
+    }
   })
 
   test('on brand is chosen to begin with, because it is the one that uses the brand', () => {
@@ -261,7 +333,10 @@ describe('matching a picture', () => {
     const pressed = within(picker)
       .getAllByRole('button')
       .filter((b) => b.getAttribute('aria-pressed') === 'true')
-    expect(pressed).toHaveLength(MAX_REFERENCES)
+    // The CHOSEN MODEL's ceiling, not the catalogue's outer bound.
+    // `MAX_REFERENCES` is now 14 (the most any model takes) and the number a
+    // person meets on the default model is 3, which is what the picker enforces.
+    expect(pressed).toHaveLength(ruleFor('match').maxReferences)
   })
 
   test('switching to a mode that ignores references clears them, rather than leaving a contradiction', async () => {
@@ -314,7 +389,14 @@ describe('a press that changes nothing must say why', () => {
     const thumbs = within(picker).getAllByRole('button')
     for (const thumb of thumbs) await user.click(thumb)
 
-    expect(screen.getByRole('alert').textContent).toMatch(/3 pictures at once/i)
+    // The DEFAULT model's ceiling, read from the rule rather than typed in. It
+    // was 3 when one model was routed and is 14 now; a literal here would have
+    // gone stale silently, which is the defect this whole test guards against
+    // in the product.
+    const ceiling = ruleFor('match').maxReferences
+    expect(screen.getByRole('alert').textContent).toMatch(
+      new RegExp(`${ceiling} pictures at once`, 'i'),
+    )
   })
 
   test('the sentence is the one the action would refuse with, not a second wording', async () => {

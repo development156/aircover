@@ -144,8 +144,12 @@ describe('making a picture, which now lives in the Studio', () => {
     )
     await userEvent.type(screen.getByPlaceholderText(/plate of fresh samosas/i), 'a cup of chai')
     await userEvent.click(screen.getByRole('button', { name: /make this picture/i }))
-    await screen.findByText(/needs/i)
-    expect(document.body.textContent).toMatch(/needs\s*6\s*credits and you have\s*0\s*credits/)
-    expect(document.body.textContent).toMatch(/nothing was charged/i)
+    // Scoped to the ALERT, not to the whole document. `/needs/i` used to be
+    // unique on this screen and stopped being so when the model picker landed:
+    // one model's description ends "this is what a carousel needs". The claim
+    // was always about the refusal, so the query now asks the refusal.
+    const refusal = await screen.findByRole('alert')
+    expect(refusal.textContent).toMatch(/needs\s*6\s*credits and you have\s*0\s*credits/)
+    expect(refusal.textContent).toMatch(/nothing was charged/i)
   })
 })

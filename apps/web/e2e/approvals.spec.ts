@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures/seeded-user'
-import { leaveOnboarding } from './fixtures/compose'
+import { leaveOnboarding, dismissPlanOffer } from './fixtures/compose'
 
 /**
  * APPROVALS — the queue, and the two claims it must never make.
@@ -81,6 +81,7 @@ test.describe('approvals @smoke', () => {
     void signedIn
 
     await page.goto('/home')
+
     await page
       .locator('#main')
       .getByRole('button', { name: /create workspace/i })
@@ -90,6 +91,7 @@ test.describe('approvals @smoke', () => {
 
     await page.setViewportSize({ width: 390, height: 900 })
     await page.goto('/home')
+    await dismissPlanOffer(page)
 
     // The rail is hidden below 700px. Before this pass the bottom bar's four
     // tabs were the complete map on a phone, and /approvals was not one of them

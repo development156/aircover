@@ -16,7 +16,7 @@
   "/(app)/analytics/loading": 603637,
   "/(app)/analytics": 637261,
   "/(app)/approvals": 682344,
-  "/(app)/assets": 822072,
+  "/(app)/assets": 830104,
   "/(app)/billing/checkout/[orderId]": 608791,
   "/(app)/campaigns": 684061,
   "/(app)/create/post": 603637,
@@ -25,7 +25,7 @@
   "/(app)/home/loading": 603637,
   "/(app)/home": 686882,
   "/(app)/leads": 617122,
-  "/(app)/loop": 745422,
+  "/(app)/loop": 757341,
   "/(app)/planner/loading": 603637,
   "/(app)/planner": 803244,
   "/(app)/posts/loading": 603637,
@@ -38,7 +38,7 @@
   "/(auth)/layout": 617709,
   "/(auth)/error": 639243,
   "/(auth)/sign-in/[[...sign-in]]": 763883,
-  "/(app)/studio": 749730,
+  "/(app)/studio": 761123,
   "/(auth)/sign-up/[[...sign-up]]": 763883,
   "/(app)/remix": 746152,
   "/(onboarding)/error": 639498,
@@ -79,5 +79,6 @@
   "/(app)/settings/profile": 603637,
   "/(app)/settings": 686187,
   "/(app)/settings/plan": 734347,
-  "/(app)/inbox/comments": 608759
+  "/(app)/inbox/comments": 608759,
+  "/(app)/report/loading": 604060
 }
