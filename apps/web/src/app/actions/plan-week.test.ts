@@ -38,7 +38,7 @@ const state = vi.hoisted(() => ({
     configs: [] as WithCreditsConfig[],
     insertedRows: null as Array<Record<string, unknown>> | null,
     meshRuns: 0,
-    meshInput: null as { goals: string; channels: string[] } | null,
+    meshInput: null as { goals: string; channels: string[]; nowIso?: string } | null,
   },
 }))
 
@@ -125,7 +125,7 @@ vi.mock('@sahoda/mesh', async (importOriginal) => {
         throw new Error('@sahoda/mesh: missing required env var(s): OPENAI_API_KEY')
       }
       return {
-        runTask: (_def: unknown, input: { goals: string; channels: string[] }) => {
+        runTask: (_def: unknown, input: { goals: string; channels: string[]; nowIso?: string }) => {
           state.calls.meshRuns += 1
           state.calls.meshInput = input
           return Promise.resolve(state.meshResult)
@@ -266,6 +266,23 @@ describe('planMyWeek', () => {
     await planMyWeek('', ['x', 'x', 'x', 'gbp', 'x'])
 
     expect(state.calls.meshInput?.channels).toEqual(['x', 'gbp'])
+  })
+
+  test('the model is told what today is: the mesh input carries a nowIso within 1s of now', async () => {
+    // Without this the model plans in an arbitrary era, every slot is clamped
+    // to the fallback ladder, and the customer pays 20 credits for timing the
+    // model never actually chose. The action parsed `nowIso` into the schema
+    // and then built the task input without it, so the mesh never saw it.
+    const before = Date.now()
+    await planMyWeek('More footfall on weekends', ['x'])
+    const after = Date.now()
+
+    const nowIso = state.calls.meshInput?.nowIso
+    expect(typeof nowIso).toBe('string')
+    const at = new Date(nowIso as string).getTime()
+    expect(Number.isNaN(at)).toBe(false)
+    expect(at).toBeGreaterThanOrEqual(before - 1_000)
+    expect(at).toBeLessThanOrEqual(after + 1_000)
   })
 
   test('model text is capped before insert — a degenerate 50KB body cannot become a row', async () => {
