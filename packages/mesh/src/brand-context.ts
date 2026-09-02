@@ -2,6 +2,7 @@ import { BrandMemoryPayloadSchema } from '@sahoda/shared'
 import type { BrandMemoryPayload } from '@sahoda/shared'
 import type { ChatMessage, FetchLike } from './providers/types'
 import { assertServerOnly } from './config'
+import { CONTEXT_FETCH_TIMEOUT_MS } from './timeouts'
 
 /** The active Brand Brain rendered as a cache-controlled prefix, plus its version (the cache key). */
 export interface BrandContext {
@@ -47,6 +48,8 @@ export interface PostgrestBrandContextOptions {
   /** Service-role key — server-only; never logged, never returned to a client. */
   serviceKey: string
   fetchImpl?: FetchLike
+  /** Ceiling on the read, in ms. Defaults to CONTEXT_FETCH_TIMEOUT_MS. */
+  timeoutMs?: number
 }
 
 interface BrandRow {
@@ -83,6 +86,9 @@ export function createPostgrestBrandContext(
           authorization: `Bearer ${opts.serviceKey}`,
           accept: 'application/json',
         },
+        // A grounding read is best-effort and a person is waiting on it. Past
+        // the ceiling the runner proceeds without this block.
+        signal: AbortSignal.timeout(opts.timeoutMs ?? CONTEXT_FETCH_TIMEOUT_MS),
       })
       if (!res.ok) throw new BrandContextError(res.status)
 
