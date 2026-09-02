@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { CONSTRAINTS } from '@sahoda/shared'
+import { CONSTRAINTS, MESH_TASK_ACTION } from '@sahoda/shared'
 import { formatsFor, isPostFormat } from '@sahoda/publishing/format'
 
 import {
@@ -103,11 +103,45 @@ describe('every kind that is missing says what it needs', () => {
   })
 
   test('the tasks it names are tasks the mesh does NOT have', () => {
-    // A "missing" entry naming a task that already exists would be a feature
-    // withheld for no reason. These three are the ones the copy names.
-    const named = MISSING_KINDS.flatMap((m) => m.needs.match(/\b[a-z_]+_[a-z_]+\b/g) ?? [])
-    expect(named).toContain('carousel_outline')
-    expect(named).toContain('video_script')
-    expect(named).toContain('seo_article')
+    // A "missing" entry whose blocker is a task the mesh already runs would be
+    // a feature withheld for no reason. `MESH_TASK_ACTION` is keyed by every
+    // task the mesh can run, so membership there IS "the mesh has it". The
+    // three names are the ones the drawing's outputs would need.
+    const blockers = MISSING_KINDS.flatMap((m) => (m.meshTask ? [m.meshTask] : []))
+    expect(blockers).toEqual(
+      expect.arrayContaining(['carousel_outline', 'video_script', 'seo_article']),
+    )
+    for (const task of blockers) {
+      expect(Object.keys(MESH_TASK_ACTION)).not.toContain(task)
+    }
+  })
+})
+
+describe('what the customer reads under "What Remix cannot make yet"', () => {
+  /** The sentence the reader gets: the page prefixes every `needs` with "Needs ". */
+  const rendered = MISSING_KINDS.map((m) => `Needs ${m.needs}`)
+
+  test('no dash inside a sentence', () => {
+    for (const sentence of rendered) expect(sentence).not.toMatch(/—|–/)
+  })
+
+  test('names nothing from the repository: no task names, no files, no mesh', () => {
+    for (const sentence of rendered) {
+      expect(sentence).not.toMatch(/\b[a-z]+_[a-z_]+\b/)
+      expect(sentence).not.toMatch(/mesh|pricing\.config|\bmime\b|derivative|pipeline/i)
+    }
+  })
+
+  test('reads as one or more full sentences after the page\'s "Needs "', () => {
+    for (const missing of MISSING_KINDS) {
+      // "Needs A carousel needs…" is a stitched sentence. A proper noun
+      // (WhatsApp, Sahoda) after "Needs " is not.
+      expect(missing.needs).not.toMatch(/^(A|An|The|It|This|There)\b/)
+      expect(missing.needs).toMatch(/\.$/)
+    }
+  })
+
+  test('Sahoda speaks in the third person', () => {
+    for (const sentence of rendered) expect(sentence).not.toMatch(/\b(I|we|our|us)\b/)
   })
 })
