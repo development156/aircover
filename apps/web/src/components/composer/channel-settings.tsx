@@ -102,7 +102,7 @@ export function ChannelSettings({ channel, format, extras, children }: ChannelSe
       // A nested surface takes a SMALLER radius than the card holding it —
       // docs/37 §5. `bg-s2` rather than `bg-s1`, because `--s1` IS `--canvas` and
       // a panel painted in the canvas colour separates nothing from it.
-      className="narrow:col-span-2 rounded-sm bg-s2 shadow-[inset_0_0_0_1px_var(--line)]"
+      className="narrow:col-span-2 rounded-sm bg-s2 surface-ring-firm"
     >
       <summary
         // `list-none` plus the marker rule removes the browser's default triangle

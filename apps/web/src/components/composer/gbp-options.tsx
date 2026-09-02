@@ -16,7 +16,7 @@ const CTA_LABEL: Readonly<Record<string, string>> = {
 }
 
 const SELECT_CLASS =
-  'h-input w-full rounded-sm bg-s1 px-2.5 text-[13px] text-ink transition-micro shadow-[inset_0_0_0_1px_var(--line)] focus:bg-surface focus:outline-none max-narrow:min-h-[44px]'
+  'h-input w-full rounded-sm bg-s1 px-2.5 text-[13px] text-ink transition-micro surface-ring-firm focus:bg-surface focus:outline-none max-narrow:min-h-[44px]'
 
 export interface GbpOptionsProps {
   extras: VariantExtras

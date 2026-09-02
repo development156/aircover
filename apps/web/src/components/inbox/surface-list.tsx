@@ -45,7 +45,7 @@ export function SurfaceList({
         <div className="flex items-center gap-2">
           <h2 className="type-h3">{title}</h2>
           {count !== undefined && count > 0 ? (
-            <span className="ml-auto grid h-[18px] min-w-[18px] place-items-center rounded-full bg-brand-tint px-[5px] text-[11px] font-bold text-accent tabular-nums">
+            <span className="ml-auto grid h-[18px] min-w-[18px] place-items-center rounded-pill bg-brand-tint px-[5px] text-[11px] font-bold text-accent tabular-nums">
               {count}
             </span>
           ) : null}

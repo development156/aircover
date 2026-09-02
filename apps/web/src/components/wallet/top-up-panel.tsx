@@ -382,7 +382,7 @@ export function TopUpPanel({ currency = null, fx = null }: TopUpPanelProps) {
                       <span key={line} className="flex items-start gap-2.5 type-sm text-muted">
                         {/* ── THE CIRCLED TICK, AND WHY IT COSTS NO ACCENT ──────
                           The reference draws each feature's tick inside a ring:
-                          `h-6 w-6 bg-white border border-orange-500 rounded-full`
+                          `h-6 w-6 bg-white border border-orange-500 rounded-pill`
                           with an orange glyph. That exact class list is
                           unaffordable here and the arithmetic is the same one
                           this file already records for the card edge — a real
@@ -421,7 +421,7 @@ export function TopUpPanel({ currency = null, fx = null }: TopUpPanelProps) {
                             'mt-icon-nudge grid size-[18px] shrink-0 place-content-center rounded-pill bg-surface',
                             checked
                               ? 'shadow-[inset_0_0_0_1px_var(--brand-lift)]'
-                              : 'shadow-[inset_0_0_0_1px_var(--line)]',
+                              : 'surface-ring-firm',
                           )}
                         >
                           <Check

@@ -38,7 +38,10 @@ export function PendingLines({ lines, className }: PendingLinesProps) {
       aria-live="polite"
       className={cn('flex items-center gap-2 text-[13px] text-muted', className)}
     >
-      <span aria-hidden className="size-1.5 shrink-0 animate-pulse rounded-pill bg-accent" />
+      <span
+        aria-hidden
+        className="size-1.5 shrink-0 motion-safe:animate-pulse rounded-pill bg-accent"
+      />
       {line}
     </p>
   )

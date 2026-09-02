@@ -70,7 +70,7 @@ export function LibrarySearch({
             onChange={(event) => setValue(event.target.value)}
             placeholder="Find a price, an hour, a policy"
             aria-label="Find a price, an hour, a policy"
-            className="h-11 w-full rounded-input bg-surface pr-3 pl-9 type-body text-ink shadow-[inset_0_0_0_1px_var(--line)] placeholder:text-muted focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-[var(--brand)]"
+            className="h-11 w-full rounded-input bg-surface pr-3 pl-9 type-body text-ink surface-ring-firm placeholder:text-muted focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-[var(--brand)]"
           />
         </div>
         <Button type="submit" variant="secondary">

@@ -62,7 +62,7 @@ export function PickChips<T extends string>({
               // nothing stands out" (RETHEME.md §9). Orange stays rationed to
               // the one action that moves you forward.
               className={cn(
-                'inline-flex h-7 cursor-pointer items-center rounded-full px-[10px] text-[13px] font-[550] transition-micro',
+                'inline-flex h-7 cursor-pointer items-center rounded-pill px-[10px] type-sm font-[550] transition-micro max-narrow:min-h-[44px]',
                 'focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent',
                 checked
                   ? 'bg-ink text-white dark:bg-white dark:text-[var(--canvas)]'

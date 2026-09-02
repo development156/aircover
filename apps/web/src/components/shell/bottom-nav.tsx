@@ -107,7 +107,7 @@ export function BottomNav({ hasWorkspace = true }: { hasWorkspace?: boolean }) {
           <Link
             href="/posts/new"
             aria-label="Create a post"
-            className="absolute -top-[18px] grid size-[50px] place-items-center rounded-full bg-primary text-primary-foreground shadow-pop transition-micro active:translate-y-[0.5px]"
+            className="absolute -top-[18px] grid size-[50px] place-items-center rounded-pill bg-primary text-primary-foreground shadow-pop transition-micro active:translate-y-[0.5px]"
           >
             <Plus size={24} strokeWidth={2.2} aria-hidden />
           </Link>

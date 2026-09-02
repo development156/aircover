@@ -192,7 +192,10 @@ describe('the ported card craft', () => {
     // Not the brand ring — an unselected card must not borrow the selected
     // card's mark, or the tick stops reporting state at all.
     expect(mark?.className).not.toMatch(/--brand-lift/)
-    expect(mark?.className).toMatch(/var\(--line\)/)
+    // The hairline ring is the `surface-ring-firm` utility now (2026-08-31),
+    // not a hand-written `shadow-[inset_0_0_0_1px_var(--line)]`; same box-shadow,
+    // one spelling. The claim is unchanged: an unselected card has its OWN edge.
+    expect(mark?.className).toMatch(/surface-ring-firm/)
   })
 
   it('sets the plan name above the caption that describes it, on the type scale', () => {

@@ -345,7 +345,7 @@ export function StudioWorkbench({
                         />
                       )}
                       {on ? (
-                        <span className="absolute right-1 top-1 flex size-[18px] items-center justify-center rounded-full bg-primary type-sm text-primary-foreground">
+                        <span className="absolute right-1 top-1 flex size-[18px] items-center justify-center rounded-pill bg-primary type-sm text-primary-foreground">
                           <span className="num">{at + 1}</span>
                         </span>
                       ) : null}

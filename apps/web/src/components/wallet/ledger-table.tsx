@@ -112,7 +112,8 @@ const AMOUNT_TONE: Record<Direction, string> = {
   neutral: 'text-muted',
 }
 
-const CELL = 'px-3 py-3 align-top'
+// The DataTable recipe (ui/data-table.tsx): 12px inset, 10px of row padding.
+const CELL = 'px-3 py-2.5 align-top'
 
 const formatCredits = (value: number): string => Math.abs(value).toLocaleString('en-IN')
 
@@ -163,12 +164,12 @@ function EntryRow({
       // `proposed` never occur here: both describe things that have not
       // happened, and every row is a fact.
       data-certainty={open ? 'committed' : 'real'}
-      className="border-b border-line last:border-b-0"
+      className="border-b border-line-soft transition-micro last:border-b-0 hover:bg-s2"
     >
       {/* `whitespace-normal` below `narrow`: "30 Aug 2026, 02:30 pm" on one
           line is ~150px of a 390px screen, and wrapping it to two costs a row
           of height and buys back the width the amount column needs. */}
-      <td className={cn(CELL, 'text-[13px] text-muted narrow:whitespace-nowrap')}>
+      <td className={cn(CELL, 'type-sm text-muted narrow:whitespace-nowrap')}>
         {when === null ? (
           <span className="text-muted">Date not recorded</span>
         ) : (
@@ -184,7 +185,7 @@ function EntryRow({
           {isSahodaActor(entry.actor) ? (
             <span className="blade" role="img" aria-label="Sahoda did this on its own" />
           ) : null}
-          <span className="text-[14px] font-semibold">{display.label}</span>
+          <span className="type-body font-semibold">{display.label}</span>
           {open ? (
             // Credits reserved and not yet resolved: committed, not real. Only
             // an UNSETTLED hold earns this — a settled one is history, and
@@ -193,10 +194,7 @@ function EntryRow({
           ) : null}
         </span>
         {display.why !== null ? (
-          <span
-            data-testid={`ledger-why-${entry.seq}`}
-            className="mt-1 block text-[13px] text-muted"
-          >
+          <span data-testid={`ledger-why-${entry.seq}`} className="mt-1 block type-sm text-muted">
             {display.why}
           </span>
         ) : null}
@@ -303,7 +301,7 @@ function CorrectionGroup({
               {netEffectCopy(row.net)}
             </span>
           </span>
-          <span className="mt-1 block text-[13px] text-muted">
+          <span className="mt-1 block type-sm text-muted">
             {row.entries.length === 1
               ? 'Part of a correction to an earlier entry. Its other half is outside the entries shown here.'
               : 'These entries were written together to correct an earlier one. Nothing was charged for them.'}
@@ -316,7 +314,7 @@ function CorrectionGroup({
               user can scroll to it. When nothing was recorded, this says
               nothing rather than guessing. */}
           {corrects.length > 0 ? (
-            <span className="mt-1 block text-[13px] text-muted">
+            <span className="mt-1 block type-sm text-muted">
               {corrects.length === 1 ? 'Corrects entry ' : 'Corrects entries '}
               {corrects.map((seq, index) => (
                 <span key={seq}>
@@ -390,20 +388,22 @@ export function LedgerTable({
               : 'Credit activity, newest first'}
           </caption>
           <thead>
-            <tr className="border-b border-line text-[12px] text-muted">
-              <th scope="col" className={cn(CELL, 'font-semibold')}>
+            {/* `type-eyebrow` headers: the one header recipe every table in
+                the product shares (ui/data-table.tsx). This one had its own. */}
+            <tr className="border-b border-line-soft text-muted">
+              <th scope="col" className={cn(CELL, 'type-eyebrow')}>
                 When
               </th>
-              <th scope="col" className={cn(CELL, 'font-semibold')}>
+              <th scope="col" className={cn(CELL, 'type-eyebrow')}>
                 Activity
               </th>
-              <th scope="col" className={cn(CELL, 'text-right font-semibold')}>
+              <th scope="col" className={cn(CELL, 'type-eyebrow text-right')}>
                 Credits
               </th>
               {showBalance ? (
                 <th
                   scope="col"
-                  className={cn(CELL, 'hidden text-right font-semibold narrow:table-cell')}
+                  className={cn(CELL, 'type-eyebrow hidden text-right narrow:table-cell')}
                 >
                   Balance
                 </th>
