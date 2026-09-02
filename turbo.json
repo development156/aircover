@@ -77,6 +77,8 @@
         "CLOUDFLARE_ZONE_ID",
         "RESEND_API_KEY",
         "SENTRY_DSN",
+        "NEXT_PUBLIC_SENTRY_DSN",
+        "NEXT_PUBLIC_SENTRY_ENVIRONMENT",
         "SENTRY_ORG",
         "SENTRY_PROJECT",
         "SENTRY_AUTH_TOKEN",
