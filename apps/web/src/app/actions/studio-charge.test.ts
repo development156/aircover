@@ -1,3 +1,4 @@
+import { creditCost } from '@sahoda/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
@@ -320,5 +321,78 @@ describe('the specific refusal sentences actually reach a reader', () => {
     if (out.ok || out.insufficient) throw new Error('expected a refusal with a sentence')
     expect(out.message).toMatch(/could not be saved to your library/i)
     expect(out.message).not.toBe('Could not complete this action. You were not charged. Try again.')
+  })
+})
+
+describe('the hold is priced by the model that draws, before anything is held', () => {
+  /** What `withCredits` was asked to reserve on the first press. */
+  const heldAction = () => (withCredits.mock.calls[0]?.[0] as { action: string }).action
+
+  /**
+   * MUTATION: put `const action = MESH_TASK_ACTION.image_generate` back at the
+   * top of `queueGeneration` (or set gemini's `tier` to 'draft' in `models.ts`)
+   * and this goes red. That is the defect: every model was held at the flat 6
+   * credits, including the two the catalogue calls "billed by what it draws",
+   * so each premium press was sold below what the provider charged for it.
+   */
+  it('holds the premium price for the best one', async () => {
+    const out = await ask({ modelId: 'google/gemini-3-pro-image' })
+
+    expect(out.ok).toBe(true)
+    expect(heldAction()).toBe('image_premium')
+    expect(creditCost(heldAction() as 'image_premium')).toBe(creditCost('image_premium'))
+  })
+
+  it('holds the premium price for words and detail too', async () => {
+    await ask({ modelId: 'openai/gpt-image-1' })
+    expect(heldAction()).toBe('image_premium')
+  })
+
+  it('holds the standard price for the everyday model', async () => {
+    await ask({ modelId: 'bytedance-seed/seedream-5-0-lite' })
+    expect(heldAction()).toBe('image_standard')
+    expect(creditCost(heldAction() as 'image_standard')).toBe(creditCost('image_standard'))
+  })
+
+  it('a request that names no model gets the everyday price, never the dear one', async () => {
+    await ask()
+    expect(heldAction()).toBe('image_standard')
+  })
+
+  /**
+   * The price is a fact about the model, so a model that is not in the
+   * catalogue has none. It is refused before any hold rather than priced at a
+   * guess a hand-made request could be sold at.
+   */
+  it('refuses a model that is not on offer, with no hold and no call', async () => {
+    const out = await ask({ modelId: 'nobody/made-this-up' })
+
+    expect(out.ok).toBe(false)
+    expect(withCredits).not.toHaveBeenCalled()
+    expect(runImage).not.toHaveBeenCalled()
+  })
+
+  /**
+   * Four premium pictures are four premium holds. One press at the dear price
+   * and three at the cheap one would be the same undercharge in a new coat.
+   */
+  it('prices every picture of a press at the chosen tier', async () => {
+    await ask({ modelId: 'openai/gpt-image-1', count: 3 })
+
+    const actions = withCredits.mock.calls.map((call) => (call[0] as { action: string }).action)
+    expect(actions).toEqual(['image_premium', 'image_premium', 'image_premium'])
+  })
+
+  /**
+   * The row records the tier it was charged at, in the column the migration
+   * made for exactly this and nothing had ever written. A row that only carries
+   * the model id cannot say what it cost once the routing table has moved on.
+   */
+  it('records the tier on the row, alongside the model', async () => {
+    await ask({ modelId: 'google/gemini-3-pro-image' })
+
+    const queued = writes.find((w) => w.table === 'studio_generations' && w.op === 'insert')
+    expect(queued?.row?.model_id).toBe('google/gemini-3-pro-image')
+    expect(queued?.row?.image_tier).toBe('finish')
   })
 })

@@ -35,7 +35,7 @@ export function describeUploadRefusal(file: { type: string; size: number }): str
   }
 
   if (file.size > MEDIA_UPLOAD_CAP_BYTES) {
-    return `That picture is larger than ${UPLOAD_CAP_MB} MB, which no channel accepts. Make it smaller and add it again.`
+    return `That picture is larger than ${UPLOAD_CAP_MB} MB, which is the most an upload can carry. Make it smaller and add it again.`
   }
 
   // Absent or unrecognised goes THROUGH. See this file's header: the server

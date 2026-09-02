@@ -1,12 +1,15 @@
 import { describe, expect, test } from 'vitest'
 
 import { ALLOWED_IMAGE_MODELS } from '@sahoda/mesh'
+import { IMAGE_TIER_ACTION, MESH_TASK_ACTION, creditCost } from '@sahoda/shared'
 
 import {
   STUDIO_MODELS,
   defaultModelId,
   describeModelBlock,
   describeModelBlockFor,
+  imageActionFor,
+  imageTierFor,
   modelById,
   routedModels,
   unroutedModels,
@@ -228,5 +231,52 @@ describe('one model for each kind of job', () => {
    */
   test('a matching set is possible on more than one model', () => {
     expect(STUDIO_MODELS.filter((model) => model.maxPerPress > 1).length).toBeGreaterThan(1)
+  })
+})
+
+describe('what each model costs the person', () => {
+  /**
+   * THE ONE THAT WAS MISSING. Every model was held and debited at the flat
+   * everyday price, while the catalogue's own copy called two of them "billed
+   * by what it draws" and "the dearest". The tier is what the hold is priced
+   * by, so it is pinned per model rather than per family.
+   *
+   * MUTATION: set `tier: 'draft'` on gemini-3-pro-image in `models.ts` and the
+   * second assertion goes red, which is the undercharge coming back.
+   */
+  test('the everyday model is a draft and the two billed by what they draw are finishes', () => {
+    expect(imageTierFor('bytedance-seed/seedream-5-0-lite')).toBe('draft')
+    expect(imageTierFor('google/gemini-3-pro-image')).toBe('finish')
+    expect(imageTierFor('openai/gpt-image-1')).toBe('finish')
+  })
+
+  test('the pricing key is the shared map read through the tier, never a literal here', () => {
+    for (const model of STUDIO_MODELS) {
+      expect(imageActionFor(model.id), model.id).toBe(IMAGE_TIER_ACTION[model.tier])
+    }
+    expect(imageActionFor('google/gemini-3-pro-image')).toBe('image_premium')
+    expect(imageActionFor('bytedance-seed/seedream-5-0-lite')).toBe(MESH_TASK_ACTION.image_generate)
+  })
+
+  test('a finish costs more than a draft, or the second tier is pointless', () => {
+    const draft = imageActionFor('bytedance-seed/seedream-5-0-lite')
+    const finish = imageActionFor('google/gemini-3-pro-image')
+    if (draft === null || finish === null) throw new Error('a catalogue model has no price')
+    expect(creditCost(finish)).toBeGreaterThan(creditCost(draft))
+  })
+
+  /**
+   * An id that is not in the catalogue has no tier to price by. It is REFUSED
+   * by `describeModelBlock` before any hold (the charge test proves the hold
+   * never happens), so the answer here is the absence, not a guessed price
+   * that a hand-made request could be sold at.
+   */
+  test('an unknown id has no tier and no price', () => {
+    expect(imageTierFor('nobody/made-this-up')).toBeNull()
+    expect(imageActionFor('nobody/made-this-up')).toBeNull()
+  })
+
+  test('the default model is the draft tier, so the first press is the cheap one', () => {
+    expect(imageTierFor(defaultModelId())).toBe('draft')
   })
 })
