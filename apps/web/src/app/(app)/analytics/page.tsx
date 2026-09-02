@@ -10,6 +10,7 @@ import { TimingHeatmap } from '@/components/analytics/timing-heatmap'
 import { ViewControls } from '@/components/analytics/view-controls'
 import { changeFor, type Headline } from '@/lib/analytics/headline'
 import { HeadlineStrip } from '@/components/analytics/headline-strip'
+import { ACCOUNT_READ_TTL_MINUTES } from '@/lib/analytics/account-insights'
 import { readAnalyticsPage } from '@/lib/analytics/page-data'
 import {
   DEFAULT_DIRECTION,
@@ -20,6 +21,7 @@ import {
 import { readMetricSeries } from '@/lib/analytics/series'
 import { hrefFor, resolveView, windowLabel } from '@/lib/analytics/view-params'
 import { readWindow } from '@/lib/analytics/window-data'
+import { formatScheduledAt } from '@/lib/posts/schedule-format'
 
 export const metadata = { title: 'Analytics' }
 
@@ -86,6 +88,18 @@ export default async function AnalyticsPage({
 
   const label = windowLabel(view)
   const ready = window.kind === 'ready' ? window : null
+
+  /**
+   * When the account figures were asked for. A reading is reused for
+   * `ACCOUNT_READ_TTL_MINUTES` per server instance, so the panel below may be
+   * showing numbers older than this render; the line under it says how old.
+   * `null` when there is no reading to date, in which case the panel's own
+   * state sentence is the whole story.
+   */
+  const accountReadAt =
+    account.kind === 'ready' && account.readAt
+      ? formatScheduledAt(account.readAt, window.kind === 'ready' ? window.timezone : null)
+      : null
   const channels = ready ? [...new Set(ready.rows.map((row) => row.channel))].sort() : []
 
   /**
@@ -250,6 +264,12 @@ export default async function AnalyticsPage({
           Account health
         </h2>
         <AccountPanel analytics={account} reasonStated={false} />
+        {accountReadAt ? (
+          <p className="type-meta text-muted tabular-nums">
+            Read from Instagram at {accountReadAt}. Sahoda asks again once a reading is{' '}
+            {ACCOUNT_READ_TTL_MINUTES} minutes old.
+          </p>
+        ) : null}
       </section>
     </div>
   )
