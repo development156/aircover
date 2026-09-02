@@ -71,6 +71,7 @@ const MADE = [
     referenceAssetIds: [],
     stampedUrl: null,
     stampOutcome: null,
+    madeAgo: null,
   },
   {
     imageId: 'p2',
@@ -85,6 +86,7 @@ const MADE = [
     referenceAssetIds: ['a2'],
     stampedUrl: null,
     stampOutcome: null,
+    madeAgo: null,
   },
 ]
 
@@ -95,6 +97,7 @@ const open = (
   // point of the result-screen tests below — could not be passed in.
   pictures: CanvasPicture[] = [],
   signals: BrandSignal[] | null = [],
+  balance: number | null = null,
 ) =>
   render(
     <StudioWorkbench
@@ -103,6 +106,7 @@ const open = (
       library={library}
       pictures={pictures}
       signals={signals}
+      balance={balance}
     />,
   )
 
@@ -872,6 +876,7 @@ describe('the result screen: which version, and why there is only one', () => {
     referenceAssetIds: [],
     stampedUrl: 'https://example.test/stamped.png',
     stampOutcome: 'stamped' as const,
+    madeAgo: null,
   }
 
   test('shows the stamped version first, because that is the one they will post', () => {
@@ -933,5 +938,80 @@ describe('the result screen: which version, and why there is only one', () => {
 
     open(LIBRARY, [{ ...stamped, stampedUrl: null, stampOutcome: 'failed' }])
     expect(screen.queryByRole('link', { name: /add your logo|replace your logo/i })).toBeNull()
+  })
+})
+
+describe('the rest of the composer the design asked for', () => {
+  test('shows the balance when it was read, and nothing at all when it was not', () => {
+    open(LIBRARY, [], [], 1240)
+    expect(screen.getByText(/credits left/i).textContent).toMatch(/1,240/)
+    cleanup()
+
+    // NULL IS NOT ZERO. `readBalance` answers three ways and only one is a
+    // number; rendering "0 credits left" for a read that FAILED would tell
+    // somebody with a full wallet they cannot afford to work.
+    open(LIBRARY, [], [], null)
+    expect(screen.queryByText(/credits left/i)).toBeNull()
+    expect(screen.queryByText(/\b0\b/)).toBeNull()
+  })
+
+  test('names the controls that are designed and not built, as text not buttons', () => {
+    open()
+    for (const title of ['Leave out', 'Same again', 'Follow how closely', 'Tidy my words']) {
+      expect(screen.getByText(title), title).toBeTruthy()
+      // A disabled button is still announced as an action a reader could take,
+      // which `design-lint.mjs` rule 3 refuses outright. These are spans.
+      expect(screen.queryByRole('button', { name: title }), title).toBeNull()
+    }
+    expect(screen.getByText(/nothing here changes what a press does today/i)).toBeTruthy()
+  })
+
+  test('a picture can be added without leaving the composer', async () => {
+    const user = userEvent.setup()
+    open()
+    // Two upload controls exist and they carry DIFFERENT names, so a screen
+    // reader — and this query — can say which is which.
+    const inComposer = screen.getByLabelText(/add a picture to match/i)
+    const inSettings = screen.getByLabelText(/add a picture from this device/i)
+    expect(inComposer).not.toBe(inSettings)
+    expect(inComposer.getAttribute('accept')).toBe(uploadAccept())
+    await user.click(screen.getByRole('button', { name: /hide settings/i }))
+    // The composer's route survives the settings being put away; the other does
+    // not, which is the whole reason the composer has one.
+    expect(screen.getByLabelText(/add a picture to match/i)).toBeTruthy()
+    expect(screen.queryByLabelText(/add a picture from this device/i)).toBeNull()
+  })
+
+  test('every earlier picture carries the two facts that tell it from the others', () => {
+    const made = [
+      { ...MADE[0]!, formatId: 'square', madeAgo: '2 h ago', stampedUrl: null, stampOutcome: null },
+      {
+        ...MADE[1]!,
+        formatId: 'story',
+        madeAgo: '3 days ago',
+        stampedUrl: null,
+        stampOutcome: null,
+      },
+    ]
+    open(LIBRARY, made)
+
+    expect(screen.getByText(/square · 2 h ago/i)).toBeTruthy()
+    expect(screen.getByText(/story · 3 days ago/i)).toBeTruthy()
+  })
+
+  test('a picture whose age would not parse still shows its shape', () => {
+    // `madeAgo` is null when the row's timestamp will not parse. The caption
+    // carries what it has rather than inventing a time.
+    open(LIBRARY, [{ ...MADE[0]!, formatId: 'square', madeAgo: null }])
+    expect(screen.getByText('square')).toBeTruthy()
+  })
+
+  test('the earlier strip shows the stamped version where there is one', () => {
+    open(LIBRARY, [
+      { ...MADE[0]!, stampedUrl: 'https://example.test/stamped.png', stampOutcome: 'stamped' },
+    ])
+    // What they would post is what the thumbnail should show.
+    const thumb = screen.getAllByRole('button', { name: MADE[0]!.prompt })[0]!
+    expect(thumb.querySelector('img')!.getAttribute('src')).toBe('https://example.test/stamped.png')
   })
 })

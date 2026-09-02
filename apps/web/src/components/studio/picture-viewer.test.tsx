@@ -46,6 +46,7 @@ const PICTURE: CanvasPicture = {
   referenceAssetIds: [],
   stampedUrl: null,
   stampOutcome: null,
+  madeAgo: null,
 }
 
 const open = (picture: CanvasPicture | null = PICTURE) =>

@@ -142,6 +142,7 @@ const CONTROLS: ReadonlyArray<{
           library={[]}
           pictures={[]}
           signals={[]}
+          balance={null}
         />,
       )
       await user.type(screen.getByPlaceholderText(/plate of fresh samosas/i), 'a warm shopfront')
@@ -236,6 +237,7 @@ describe('the spend controls do not pre-disable on a balance they did not read',
         library={[]}
         pictures={[]}
         signals={[]}
+        balance={null}
       />,
     )
 
