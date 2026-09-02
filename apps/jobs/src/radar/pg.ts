@@ -24,10 +24,34 @@ export function createRadarPgDb(pool: Pool): RadarDb {
     /**
      * What is due tonight.
      *
-     * "Due" is cadence-relative, and NULL sorts first — a source Radar has never
-     * managed to see is the most urgent thing on the list, not the least. The
-     * interval is shaved by an hour so a job that starts a few minutes late two
-     * nights running does not drift a daily source into every-other-day.
+     * "Due" is cadence-relative, and a source nothing has been tried on sorts
+     * first — one Radar has never managed to see is the most urgent thing on
+     * the list, not the least. The interval is shaved by an hour so a job that
+     * starts a few minutes late two nights running does not drift a daily
+     * source into every-other-day.
+     *
+     * ⚠ THE STARVATION THIS ORDER EXISTS TO PREVENT ⚠
+     * The order was `last_seen_at asc nulls first`, and `last_seen_at` moves
+     * ONLY on a successful read (see `rememberCheck`). So a source that never
+     * succeeds — a hostname that does not resolve, a 404, an Instagram account
+     * with no provider key — stayed NULL and sorted ahead of every source ever
+     * seen, for ever. One careless watch list of 100 dead hostnames filled the
+     * whole weekly batch of 100 every Monday and no other customer's competitor
+     * was read again, while the pass reported `ok: true`.
+     *
+     * Three parts, and each is load-bearing:
+     *
+     *   1. ORDER BY THE LAST ATTEMPT. `radar_fetch_log` records every attempt,
+     *      including the zero-cost gaps, so `greatest(last_seen_at, max
+     *      (fetched_at))` is "when did we last bother this source". Postgres's
+     *      GREATEST ignores NULLs and is NULL only when both are, which is
+     *      exactly "never tried" — and that still sorts first.
+     *   2. `cs.id` AS A TIEBREAKER, so a pass with no attempts on record is
+     *      deterministic rather than whatever order the heap came back in.
+     *   3. ONLY SOURCES SOMEBODY WATCHES. Unsubscribing deletes the
+     *      subscription and leaves the source in the shared registry;
+     *      `app.radar_begin_fetch` then refuses it NO_SUBSCRIBERS every pass,
+     *      and with no stamp it occupied a slot for ever too.
      */
     async dueSources(limit) {
       const { rows } = await pool.query<{
@@ -45,12 +69,19 @@ export function createRadarPgDb(pool: Pool): RadarDb {
                 cs.etag, cs.last_modified, cs.content_hash,
                 cs.last_seen_at::text as last_seen_at
            from competitor_sources cs
-          where cs.last_seen_at is null
+          where exists (select 1
+                          from competitor_subscriptions sub
+                         where sub.competitor_id = cs.competitor_id)
+            and (cs.last_seen_at is null
              or cs.last_seen_at < now() - (case cs.cadence
                   when 'daily'  then interval '23 hours'
                   when 'weekly' then interval '6 days 23 hours'
-                end)
-          order by cs.last_seen_at asc nulls first
+                end))
+          order by greatest(
+                     cs.last_seen_at,
+                     (select max(l.fetched_at) from radar_fetch_log l where l.source_id = cs.id)
+                   ) asc nulls first,
+                   cs.id asc
           limit $1`,
         [limit],
       )
@@ -65,6 +96,29 @@ export function createRadarPgDb(pool: Pool): RadarDb {
         contentHash: r.content_hash,
         lastSeenAt: r.last_seen_at,
       }))
+    },
+
+    /**
+     * WHO PAYS FOR THIS SOURCE.
+     *
+     * A source belongs to a competitor and a competitor is watched by any
+     * number of workspaces, so the join goes through the competitor rather than
+     * the source: both of a rival's sources answer the same list. `distinct`
+     * because the unique constraint is on (workspace, competitor) and a
+     * competitor with two sources would otherwise repeat a payer per source
+     * were the join ever widened. Ordered so a pass charges the same wallets in
+     * the same order twice running.
+     */
+    async subscribers(sourceId: string): Promise<string[]> {
+      const { rows } = await pool.query<{ workspace_id: string }>(
+        `select distinct sub.workspace_id
+           from competitor_subscriptions sub
+           join competitor_sources cs on cs.competitor_id = sub.competitor_id
+          where cs.id = $1::uuid
+          order by sub.workspace_id`,
+        [sourceId],
+      )
+      return rows.map((r) => r.workspace_id)
     },
 
     async beginFetch(request: BeginFetchRequest): Promise<BeginFetchResult> {

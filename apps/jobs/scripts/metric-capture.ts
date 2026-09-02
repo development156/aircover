@@ -180,6 +180,29 @@ function summarise(report: MetricCaptureReport, now: Date): { line: string; exit
   if (report.targets === 0) {
     return { exit: EXIT.ok, line: 'No published channel could be asked about. Nothing to collect.' }
   }
+  /**
+   * EVERY READ FAILED, WHICH IS NOT A QUIET NIGHT.
+   *
+   * Added 2026-09-03 alongside `report.outcome`. Without it this function judged
+   * the night from `collected` and `written` alone, and a pass where all 120
+   * reads threw produced `collected: 0, written: 0` — which fell through to the
+   * last branch and printed "Stored 0 new rows across 0 day-key(s)" with exit 0.
+   * That is the same sentence a genuinely empty night prints, so an operator
+   * watching this script could not tell an outage from nothing to do, and no
+   * scheduler would ever have flagged it.
+   *
+   * `degraded` deliberately stays ok: some numbers landed, and a platform that
+   * answered for four accounts out of five is not a run to fail.
+   */
+  if (report.outcome === 'failed') {
+    return {
+      exit: EXIT.failed,
+      line:
+        `EVERY READ FAILED: ${report.targets} channel(s) were asked and not one answered, ` +
+        'so nothing was collected and nothing was stored. The causes are in the error ' +
+        'reporter; this is an outage, not an empty night.',
+    }
+  }
   if (report.newestMeasuredAt !== null) {
     const age = daysBetween(now, new Date(report.newestMeasuredAt))
     if (age >= STALE_AFTER_DAYS) {

@@ -61,8 +61,13 @@ export async function GET(request: Request): Promise<Response> {
     return Response.json({ ok: true, ...result })
   } catch (error) {
     reportServerError(error, { action: 'cron.brain' })
-    // 200 with an error body, not a 500: Vercel retries a failing cron, and the
-    // upsert makes a retry harmless but a retry storm is not worth inviting.
-    return Response.json({ ok: false, error: 'BRAIN_CRON_FAILED' })
+    // 500, matching the metrics, radar and autopilot siblings: a 200 here hid a
+    // broken weekly pass from Vercel's cron log and from every 5xx filter, while
+    // the heartbeat above (stamped before the work) still read as alive.
+    //
+    // This said "200, because Vercel retries a failing cron". Vercel documents
+    // no automatic retry for a cron invocation, and the upsert makes a re-entry
+    // harmless in any case.
+    return Response.json({ ok: false, error: 'BRAIN_CRON_FAILED' }, { status: 500 })
   }
 }

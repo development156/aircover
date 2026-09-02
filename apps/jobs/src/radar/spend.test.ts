@@ -39,6 +39,9 @@ function fakeDb(options: FakeDbOptions) {
     async dueSources() {
       return []
     },
+    async subscribers() {
+      return []
+    },
     async beginFetch(request) {
       began.push(request)
       return options.permission
