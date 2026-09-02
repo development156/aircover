@@ -130,25 +130,25 @@ export function TeamView({
         </section>
       ) : null}
 
-      <section className="rounded-card border border-line bg-bg shadow-card">
+      <section className="surface-ring rounded-card bg-surface">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[560px] border-collapse text-left">
             <caption className="sr-only">Everyone with access to the admin console</caption>
             <thead>
-              <tr className="border-b border-line text-[12px] text-faint">
-                <th scope="col" className="px-4 py-3 font-semibold">
+              <tr className="border-b border-line-soft text-muted">
+                <th scope="col" className="type-eyebrow px-3 py-2">
                   Who
                 </th>
-                <th scope="col" className="px-4 py-3 font-semibold">
+                <th scope="col" className="type-eyebrow px-3 py-2">
                   Role
                 </th>
-                <th scope="col" className="px-4 py-3 font-semibold">
+                <th scope="col" className="type-eyebrow px-3 py-2">
                   Status
                 </th>
-                <th scope="col" className="px-4 py-3 font-semibold">
+                <th scope="col" className="type-eyebrow px-3 py-2">
                   Added
                 </th>
-                {isOwner ? <th scope="col" className="px-4 py-3" /> : null}
+                {isOwner ? <th scope="col" className="px-3 py-2" /> : null}
               </tr>
             </thead>
             <tbody>
@@ -163,17 +163,20 @@ export function TeamView({
                   activeOwners <= 1
 
                 return (
-                  <tr key={admin.id} className="border-b border-line last:border-b-0">
-                    <td className="px-4 py-3 align-top">
-                      <span className="text-[13px] font-medium">{admin.email}</span>
-                      {isSelf ? <span className="ml-1.5 text-[12px] text-muted">(you)</span> : null}
+                  <tr
+                    key={admin.id}
+                    className="border-b border-line-soft transition-micro last:border-b-0 hover:bg-s2"
+                  >
+                    <td className="px-3 py-2.5 align-top">
+                      <span className="type-sm font-medium">{admin.email}</span>
+                      {isSelf ? <span className="ml-1.5 type-meta text-muted">(you)</span> : null}
                       {/* An unlinked seat cannot sign in yet, and saying so beats
                           leaving someone to wonder why /admin 404s for them. */}
                       {admin.user_id === null && admin.status === 'active' ? (
-                        <span className="ml-1.5 text-[12px] text-warn">not signed in yet</span>
+                        <span className="ml-1.5 type-meta text-warn">not signed in yet</span>
                       ) : null}
                     </td>
-                    <td className="px-4 py-3 align-top">
+                    <td className="px-3 py-2.5 align-top">
                       {isOwner && !isLastOwner ? (
                         <>
                           <label className="sr-only" htmlFor={`role-${admin.id}`}>
@@ -202,7 +205,7 @@ export function TeamView({
                         <span className="text-[13px]">{admin.role}</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 align-top">
+                    <td className="px-3 py-2.5 align-top">
                       <span
                         className={cn(
                           'rounded-pill px-2 py-[2px] text-[11px] font-semibold',

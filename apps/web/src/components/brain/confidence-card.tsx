@@ -39,7 +39,7 @@ export function ConfidenceCard({ provenance }: { provenance: Provenance }) {
         {/* The split bar. Two segments, each with its own texture, so the ratio
             is readable before any label is. */}
         <div
-          className="surface-ring flex h-[10px] w-full overflow-hidden rounded-full bg-surface"
+          className="surface-ring flex h-[10px] w-full overflow-hidden rounded-pill bg-surface"
           role="img"
           aria-label={`${ring.confirmed} of ${ring.total} fields confirmed by a person; ${inferred} still inferred by Sahoda.`}
         >

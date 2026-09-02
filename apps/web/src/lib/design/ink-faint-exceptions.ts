@@ -191,12 +191,12 @@ export const INK_FAINT_EXCEPTIONS: Readonly<Record<string, InkFaintException>> =
       'Inactive nav item at ~2.5:1. An inactive tab is still actionable, so the WCAG disabled exemption does not apply. Pre-dates the v3 readability guards.',
   },
   'src/components/admin/team-view.tsx': {
-    uses: 4,
+    uses: 3,
     kind: 'debt',
     since: '2026-07-28',
     card: 'SL-044',
     reason:
-      'Four uses — table headers plus role and seat meta, all read by an operator managing access. Pre-dates the v3 readability guards.',
+      'Three uses — role and seat meta, all read by an operator managing access. Was four: the table header moved to `type-eyebrow text-muted`, the recipe every table shares, on 2026-08-31. Pre-dates the v3 readability guards.',
   },
   /**
    * THE ONE USE HERE THAT THE WCAG DISABLED EXEMPTION ACTUALLY COVERS.

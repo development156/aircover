@@ -277,10 +277,10 @@ function SpendBar({ spent, budget }: { spent: number; budget: number }) {
         aria-valuemax={budget}
         aria-valuenow={spent}
         aria-label="Credits used this cycle"
-        className="h-1.5 w-full overflow-hidden rounded-full bg-s2"
+        className="h-1.5 w-full overflow-hidden rounded-pill bg-s2"
       >
         <div
-          className="h-full rounded-full bg-accent transition-panel"
+          className="h-full rounded-pill bg-accent transition-panel"
           style={{ width: `${share}%` }}
         />
       </div>

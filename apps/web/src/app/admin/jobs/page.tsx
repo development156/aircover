@@ -62,24 +62,40 @@ export default async function DeadLettersPage() {
         <div className="overflow-x-auto">
           <table className="type-sm w-full text-left">
             <thead className="text-muted">
-              <tr>
-                <th className="py-2 pr-4 font-medium">When</th>
-                <th className="py-2 pr-4 font-medium">Channel</th>
-                <th className="py-2 pr-4 font-medium">Mode</th>
-                <th className="py-2 pr-4 font-medium tabular-nums">Attempt</th>
-                <th className="py-2 pr-4 font-medium">Workspace</th>
-                <th className="py-2 font-medium">What the platform said</th>
+              <tr className="border-b border-line-soft">
+                <th scope="col" className="type-eyebrow py-2 pr-4">
+                  When
+                </th>
+                <th scope="col" className="type-eyebrow py-2 pr-4">
+                  Channel
+                </th>
+                <th scope="col" className="type-eyebrow py-2 pr-4">
+                  Mode
+                </th>
+                {/* A count is a number, and numbers sit on the right. */}
+                <th scope="col" className="type-eyebrow py-2 pr-4 text-right">
+                  Attempt
+                </th>
+                <th scope="col" className="type-eyebrow py-2 pr-4">
+                  Workspace
+                </th>
+                <th scope="col" className="type-eyebrow py-2">
+                  What the platform said
+                </th>
               </tr>
             </thead>
             <tbody>
               {letters.data.map((letter) => (
-                <tr key={letter.id} className="border-t border-line align-top">
+                <tr
+                  key={letter.id}
+                  className="border-b border-line-soft align-top transition-micro last:border-0 hover:bg-s2"
+                >
                   <td className="py-2 pr-4 tabular-nums whitespace-nowrap">
                     {letter.created_at.slice(0, 16).replace('T', ' ')}
                   </td>
                   <td className="py-2 pr-4">{letter.channel}</td>
                   <td className="py-2 pr-4">{letter.mode}</td>
-                  <td className="py-2 pr-4 tabular-nums">{letter.attempt}</td>
+                  <td className="num py-2 pr-4 text-right tabular-nums">{letter.attempt}</td>
                   <td className="py-2 pr-4 font-mono type-chip text-muted">
                     {letter.workspace_id.slice(0, 8)}
                   </td>

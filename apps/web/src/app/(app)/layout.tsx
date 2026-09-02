@@ -1,5 +1,3 @@
-import { Toaster } from 'sonner'
-
 import { hasDeferredOnboarding } from '@/lib/onboarding/defer'
 import { landingDecision } from '@/lib/onboarding/landing'
 import { onboardingStateRead } from '@/lib/onboarding/read-onboarding-state'
@@ -10,6 +8,7 @@ import { activeWorkspaceRead } from '@/lib/workspaces'
 import { FirstRun } from '@/components/home/first-run'
 import { BottomNav } from '@/components/shell/bottom-nav'
 import { Rail } from '@/components/shell/rail'
+import { AppToaster } from '@/components/shell/app-toaster'
 import { Topbar } from '@/components/shell/topbar'
 
 /**
@@ -136,8 +135,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </main>
       </div>
       <BottomNav hasWorkspace={workspace.status !== 'none'} />
-      {/* Lifted clear of the bottom bar on a phone, or it covers the tabs. */}
-      <Toaster position="bottom-left" offset={{ bottom: 16 }} mobileOffset={{ bottom: 72 }} />
+      <AppToaster />
     </div>
   )
 }

@@ -148,7 +148,7 @@ function SaveSearch({
         event.preventDefault()
         submit()
       }}
-      className="surface-ring flex shrink-0 items-center gap-2 rounded-pill bg-surface px-3 py-1.5"
+      className="surface-ring flex shrink-0 items-center gap-2 rounded-pill bg-surface px-3 py-1.5 transition-micro focus-within:shadow-[inset_0_0_0_1.5px_var(--brand)]"
     >
       <input
         autoFocus
@@ -157,7 +157,7 @@ function SaveSearch({
         onChange={(event) => setName(event.target.value)}
         placeholder="Name this search"
         aria-label="Name this search"
-        className="h-6 w-[140px] border-0 bg-transparent type-sm text-ink outline-none placeholder:text-muted"
+        className="h-6 w-[140px] border-0 bg-transparent type-sm text-ink outline-none placeholder:text-muted max-narrow:min-h-[44px]"
       />
       <button
         type="submit"

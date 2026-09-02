@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils'
  * whatever width it is given and `vector-effect` keeps the stroke honest. It is
  * wrong for a bar with a rounded cap: non-uniform scaling turns every circle
  * into an ellipse, so a 62px-wide panel and a 900px-wide one draw visibly
- * different bars. Flex children with `rounded-full` fill the container by
+ * different bars. Flex children with `rounded-pill` fill the container by
  * construction, and the cap is a cap at every width.
  *
  * ── THE THREE THINGS A DAY CAN BE, AND THEY ARE NOT THE SAME THING ───────────
@@ -134,7 +134,7 @@ export function Bars({
                 <span
                   data-bar={(point.value as number) === 0 ? 'zero' : 'value'}
                   className={cn(
-                    'w-full max-w-[14px] rounded-full',
+                    'w-full max-w-[14px] rounded-pill',
                     // Neutral. Lines take the accent, bars do not — see the
                     // header for the two measurements that produced that rule.
                     point.hatched ? 'is-simulated' : 'bg-ink-mute',

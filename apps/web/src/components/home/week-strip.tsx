@@ -136,7 +136,7 @@ export function WeekStrip({ buckets, variantStates }: WeekStripProps) {
               // rather than coincidental: tokens.css:305 sets a nested surface's
               // radius at the parent's MINUS the gap, and 24px card - 12px pad is
               // the 12px (--r-sm) the chips already carry.
-              'min-h-[116px] rounded-lg border border-line bg-surface p-3',
+              'min-h-[116px] rounded-card border border-line bg-surface p-3',
               // Phone: a row per day, not a 40px column. Hairlines instead of
               // seven boxes, so the list reads as one thing.
               'max-narrow:flex max-narrow:min-h-0 max-narrow:items-start max-narrow:gap-3 max-narrow:rounded-none max-narrow:border-0 max-narrow:border-b max-narrow:bg-transparent max-narrow:px-0 max-narrow:py-2.5',

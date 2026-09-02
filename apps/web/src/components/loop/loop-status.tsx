@@ -112,11 +112,11 @@ function StatusPill({ enabled, paused, running }: LoopStatusProps) {
 
   return (
     <span
-      className={['type-chip inline-flex items-center gap-2 rounded-full px-3 py-1', ground].join(
+      className={['type-chip inline-flex items-center gap-2 rounded-pill px-3 py-1', ground].join(
         ' ',
       )}
     >
-      <span aria-hidden className={['size-1.5 rounded-full bg-current', tone].join(' ')} />
+      <span aria-hidden className={['size-1.5 rounded-pill bg-current', tone].join(' ')} />
       <span className={paused ? 'text-muted' : 'text-ink'}>{label}</span>
     </span>
   )
