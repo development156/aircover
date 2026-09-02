@@ -29,11 +29,14 @@ import { describeUploadRefusal, uploadAccept } from '@/lib/studio/upload'
 export function ReferenceUpload({
   onAdded,
   disabled,
+  compact = false,
 }: {
   /** Called with the stored asset's id, so the caller can select it at once. */
   onAdded: (assetId: string) => void
   /** True when the mode already holds as many references as it can use. */
   disabled: boolean
+  /** A 44px icon tile for the composer, rather than the full drop target. */
+  compact?: boolean
 }) {
   const input = useRef<HTMLInputElement>(null)
   const [over, setOver] = useState(false)
@@ -66,6 +69,16 @@ export function ReferenceUpload({
     })
   }
 
+  // ── COMPACT IS A SIZE, NOT A SECOND CONTROL ───────────────────────────────
+  // The composer needs a 44px tile beside the pictures it is already matching;
+  // the settings need the full drop target with its sentence. Both are THIS
+  // component, so the mode switch, the limit and the refusal copy have one
+  // implementation. A second upload control is how one of them stops switching
+  // modes — which this file's own header records already happening once.
+  const shell = compact
+    ? 'surface-ring flex size-[44px] cursor-pointer items-center justify-center rounded-sm transition-micro focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent'
+    : 'surface-ring flex cursor-pointer items-center justify-center gap-2 rounded-card px-3 py-3 type-sm transition-micro focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent'
+
   return (
     <div className="flex flex-col gap-1">
       <label
@@ -81,18 +94,32 @@ export function ReferenceUpload({
           if (disabled) return
           take(event.dataTransfer.files)
         }}
-        className={`surface-ring flex cursor-pointer items-center justify-center gap-2 rounded-card px-3 py-3 type-sm transition-micro focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent ${
-          over ? 'bg-tint-50 text-ink dark:bg-s2' : 'bg-s2 text-muted'
-        } ${disabled ? 'opacity-60' : ''}`}
+        className={`${shell} ${over ? 'bg-tint-50 text-ink dark:bg-s2' : 'bg-s2 text-muted'} ${
+          disabled ? 'opacity-60' : ''
+        }`}
         data-guide="studio-upload"
+        title={compact ? 'Add a picture to match' : undefined}
       >
         <ImagePlus className="size-[16px]" aria-hidden />
-        <span>{busy ? 'Adding your picture' : 'Add a picture from this device'}</span>
+        {compact ? null : (
+          <span>{busy ? 'Adding your picture' : 'Add a picture from this device'}</span>
+        )}
         <input
           ref={input}
           type="file"
           accept={uploadAccept()}
           className="sr-only"
+          // ── AN ICON NEEDS A NAME, AND IT GOES ON THE CONTROL ────────────────
+          // On the INPUT rather than the wrapping label: the input is what the
+          // assistive tree exposes as the control, and a name on the label leaves
+          // `getByLabelText` — and a screen reader's forms list — pointing at a
+          // wrapper that does nothing. The full-size variant is named by its own
+          // visible span and needs none.
+          //
+          // Deliberately NOT the full control's wording. Both live on the Studio
+          // at once, and two controls sharing an accessible name leave a reader
+          // unable to say which is which.
+          aria-label={compact ? 'Add a picture to match' : undefined}
           // Disabled rather than hidden: the control still reads to a screen
           // reader, and its state explains why nothing happens, where a missing
           // control would just be missing.

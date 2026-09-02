@@ -4,10 +4,11 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { Sparkles } from 'lucide-react'
+import { Lock, Sparkles } from 'lucide-react'
 import type { BrandSignal, GenerationMode } from '@sahoda/shared'
 
 import { queueGeneration } from '@/app/actions/studio'
+import { creditWord } from '@/lib/credit-words'
 // Lazy: a canvas editor is a large chunk that most visits never open, and the
 // Studio's first paint is where a person is deciding whether to spend.
 const DrawModal = dynamic(() =>
@@ -55,12 +56,33 @@ import { describeInsufficient, describePartial } from '@/lib/studio/refusal-copy
  * that offered a mode the action refuses would waste a press; one that hid a
  * mode the action allows would cost a feature.
  */
+/**
+ * The controls this screen is designed for and does not have.
+ *
+ * ── WHY THEY ARE ON THE SCREEN AT ALL ───────────────────────────────────────
+ * Named so the gap is trackable rather than invisible: a person wondering
+ * whether Sahoda can exclude a subject gets an answer, and so does the next
+ * session opening this file. Each is a title and nothing more, because a
+ * description of an unbuilt control is a specification pretending to be copy.
+ *
+ * They render as spans. `design-lint.mjs` rule 3 refuses `<button disabled>`
+ * beside a coming-soon label, and it is right: a disabled button is still
+ * announced as an action.
+ */
+const COMING_SOON = [
+  { title: 'Leave out' },
+  { title: 'Same again' },
+  { title: 'Follow how closely' },
+  { title: 'Tidy my words' },
+] as const
+
 export function StudioWorkbench({
   formats,
   cost,
   library,
   pictures,
   signals,
+  balance,
 }: {
   formats: StudioFormat[]
   cost: number
@@ -77,6 +99,15 @@ export function StudioWorkbench({
    * correct. `BrandSignalsSchema`'s own header forbids collapsing the two.
    */
   signals: BrandSignal[] | null
+  /**
+   * Spendable credits, or null when the read did not produce a number.
+   *
+   * NULL RENDERS AS NOTHING, never as zero and never as a diagnosis. "0 credits
+   * left" for a read that failed would tell somebody with a full wallet they
+   * cannot afford to work; the page's own comment carries why the sentence for
+   * a failed read belongs to the wallet screen rather than here.
+   */
+  balance: number | null
 }) {
   const router = useRouter()
   const [wanted, setWanted] = useState('')
@@ -180,6 +211,35 @@ export function StudioWorkbench({
     setPicked((current) => [...current, assetId])
   }
 
+  /**
+   * A picture added from the device, from EITHER upload control.
+   *
+   * Extracted the moment the composer got its own tile: two call sites doing
+   * the mode switch, the limit and the refresh separately is how one of them
+   * quietly stops doing the mode switch. `reference-upload.tsx`'s own header
+   * records what that already cost once.
+   */
+  function addReference(assetId: string) {
+    setNote(null)
+    // Explore uses no reference by definition, so adding one means the other
+    // mode. Same move, same sentence, as picking a tile.
+    if (rule.maxReferences === 0) {
+      setMode('match')
+      setPicked([assetId])
+      setNote('Explore ignores a picture, so Sahoda moved you to Match a picture.')
+      router.refresh()
+      return
+    }
+    // Selected at once. Somebody who adds a picture to match wants to match it,
+    // and it appears in the grid below on the refresh already chosen.
+    setPicked((current) =>
+      current.includes(assetId) || current.length >= rule.maxReferences
+        ? current
+        : [...current, assetId],
+    )
+    router.refresh()
+  }
+
   function chooseMode(next: GenerationMode) {
     setNote(null)
     setMode(next)
@@ -252,9 +312,19 @@ export function StudioWorkbench({
       data-guide="studio-workbench"
     >
       <section aria-labelledby="studio-make" className="flex flex-col gap-3">
-        <h2 id="studio-make" className="type-h2">
-          Make a picture
-        </h2>
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <h2 id="studio-make" className="type-h2">
+            Make a picture
+          </h2>
+          {balance === null ? null : (
+            <span className="type-sm text-muted" data-guide="studio-balance">
+              {/* `creditWord`, never a hardcoded plural: a wallet holding one
+                  credit would read "1 credits left". `credit-words.test.ts`
+                  scans for exactly this and caught it here. */}
+              <span className="num">{balance.toLocaleString()}</span> {creditWord(balance)} left
+            </span>
+          )}
+        </div>
 
         {/* ── THE COMPOSER: ONE DARK OBJECT ON A LIGHT PAGE ───────────────────
             `data-surface="inverse"` rather than a hand-written dark fill, so
@@ -318,8 +388,18 @@ export function StudioWorkbench({
               the grid below carries one: `signReferences` sends them in pick
               order and the first weighs most. A count alone ("3 refs") states
               a fact nobody can check; the tiles show the claim. */}
+          <ul className="flex flex-wrap items-center gap-2" data-guide="studio-picked">
+            {picked.length === 0 ? (
+              <>
+                <li>
+                  <ReferenceUpload compact disabled={false} onAdded={addReference} />
+                </li>
+                <li className="type-sm text-muted">Add a picture to match, if you have one</li>
+              </>
+            ) : null}
+          </ul>
           {picked.length === 0 ? null : (
-            <ul className="flex flex-wrap items-center gap-2" data-guide="studio-picked">
+            <ul className="flex flex-wrap items-center gap-2">
               {picked.map((assetId, at) => {
                 const picture = library.find((one) => one.assetId === assetId) ?? null
                 return (
@@ -349,6 +429,20 @@ export function StudioWorkbench({
                   </li>
                 )
               })}
+              {/* ── ADD ONE WITHOUT LEAVING THE COMPOSER ────────────────────
+                  The full picker lives in the settings, where the library grid
+                  and the mode rules are. This is the shortest route for the one
+                  case that does not need any of that: a photograph on the
+                  device right now. It is the SAME `ReferenceUpload`, so the
+                  mode switch, the limit and the refusal copy are the component's
+                  and not a second implementation of them. */}
+              <li>
+                <ReferenceUpload
+                  compact
+                  disabled={rule.maxReferences > 0 && picked.length >= rule.maxReferences}
+                  onAdded={addReference}
+                />
+              </li>
               <li className="type-sm text-muted">
                 <span className="num">{picked.length}</span> to match, in order
               </li>
@@ -482,6 +576,33 @@ export function StudioWorkbench({
               )}
             </div>
 
+            {/* ── COMING SOON, LISTED RATHER THAN HIDDEN ────────────────────
+                The same choice `ModelPicker` makes for a model we cannot reach:
+                shown, visibly not a control, with the reason. Hiding them would
+                be tidier and would leave somebody wondering whether Sahoda can
+                do this at all — a wall instead of a door.
+
+                SPANS, not `<button disabled>`. `design-lint.mjs` rule 3 refuses
+                that pairing outright, because a screen reader still announces a
+                disabled button as an action the reader could take. */}
+            <div className="flex flex-col gap-2" data-guide="studio-coming-soon">
+              <span className="type-eyebrow text-muted">Coming soon</span>
+              <ul className="flex flex-wrap gap-2">
+                {COMING_SOON.map((one) => (
+                  <li
+                    key={one.title}
+                    className="surface-ring flex items-center gap-2 rounded-pill px-3 py-1 opacity-70"
+                  >
+                    <Lock className="size-[12px] text-muted" aria-hidden />
+                    <span className="type-sm text-muted">{one.title}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="type-sm text-muted">
+                Designed and not built yet. Nothing here changes what a press does today.
+              </p>
+            </div>
+
             <div className="h-px bg-line" />
 
             {/* ── ABOVE THE MODES, BECAUSE IT CHANGES WHAT THEY CAN DO ───────
@@ -554,27 +675,7 @@ export function StudioWorkbench({
                   screen said why. */}
               <ReferenceUpload
                 disabled={rule.maxReferences > 0 && picked.length >= rule.maxReferences}
-                onAdded={(assetId) => {
-                  setNote(null)
-                  // Explore uses no reference by definition, so adding one means
-                  // the other mode. Same move, same sentence, as picking a tile.
-                  if (rule.maxReferences === 0) {
-                    setMode('match')
-                    setPicked([assetId])
-                    setNote('Explore ignores a picture, so Sahoda moved you to Match a picture.')
-                    router.refresh()
-                    return
-                  }
-                  // Selected at once. Somebody who adds a picture to match wants
-                  // to match it, and it appears in the grid below on the refresh
-                  // already chosen.
-                  setPicked((current) =>
-                    current.includes(assetId) || current.length >= rule.maxReferences
-                      ? current
-                      : [...current, assetId],
-                  )
-                  router.refresh()
-                }}
+                onAdded={addReference}
               />
 
               {library.length === 0 ? (
@@ -842,37 +943,60 @@ export function StudioWorkbench({
             newest first. Judging one against the last one is the work, and it
             cannot be done by scrolling to a grid and back. */}
         {pictures.length === 0 ? null : (
-          <ul className="flex gap-2 overflow-x-auto pb-1" data-guide="studio-strip">
-            {pictures.map((picture) => {
-              const on = picture.imageId === (active?.imageId ?? null)
-              return (
-                <li key={picture.imageId} className="shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setActiveId(picture.imageId)}
-                    aria-pressed={on}
-                    aria-label={picture.prompt}
-                    className={`surface-ring block size-[64px] overflow-hidden rounded-card transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-                      on ? 'ring-2 ring-accent' : ''
-                    }`}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element -- as above. */}
-                    <img
-                      src={picture.url}
-                      // Empty on purpose: the BUTTON is already labelled with the
-                      // prompt, and a screen reader announcing it twice makes a
-                      // strip of twelve read as twenty-four things.
-                      alt=""
-                      // Top-anchored: a square crop of a portrait photograph cuts
-                      // a face off at the chin, and this product's pictures are
-                      // food, shopfronts and people.
-                      className="size-full object-cover object-top"
-                    />
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-3">
+              <span className="type-eyebrow text-muted">Made earlier</span>
+              <div className="h-px flex-1 bg-line" />
+            </div>
+
+            {/* ── A GRID, NOT A SCROLLING RIBBON ──────────────────────────────
+                Judging one picture against the last one is the work, and a
+                64px ribbon that scrolls sideways shows about four of them at a
+                size nothing can be judged at. Square tiles at six across show a
+                fortnight of work at a glance, and each carries the two facts
+                that separate one from another: the shape it was drawn at and
+                how long ago.
+
+                The age is rendered on the SERVER and passed down — a relative
+                time computed in the browser is computed against a clock the
+                server never saw, and React re-renders the mismatch. */}
+            <ul
+              className="grid grid-cols-3 gap-3 narrow:grid-cols-4 wide:grid-cols-6"
+              data-guide="studio-strip"
+            >
+              {pictures.map((picture) => {
+                const on = picture.imageId === (active?.imageId ?? null)
+                const meta = [picture.formatId, picture.madeAgo].filter(Boolean).join(' · ')
+                return (
+                  <li key={picture.imageId} className="flex flex-col gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setActiveId(picture.imageId)}
+                      aria-pressed={on}
+                      aria-label={picture.prompt}
+                      className={`surface-ring relative block aspect-square w-full overflow-hidden rounded-card transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                        on ? 'ring-2 ring-accent' : ''
+                      }`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element -- as above. */}
+                      <img
+                        src={picture.stampedUrl ?? picture.url}
+                        // Empty on purpose: the BUTTON is already labelled with
+                        // the prompt, and a screen reader announcing it twice
+                        // makes a strip of twelve read as twenty-four things.
+                        alt=""
+                        // Top-anchored: a square crop of a portrait photograph
+                        // cuts a face off at the chin, and this product's
+                        // pictures are food, shopfronts and people.
+                        className="size-full object-cover object-top"
+                      />
+                    </button>
+                    {meta === '' ? null : <span className="num type-sm text-muted">{meta}</span>}
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
         )}
 
         <p className="type-sm text-muted">

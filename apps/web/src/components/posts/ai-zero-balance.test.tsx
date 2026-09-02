@@ -124,6 +124,7 @@ describe('making a picture, which now lives in the Studio', () => {
         library={[]}
         pictures={[]}
         signals={[]}
+        balance={null}
       />,
     )
     // `MESH_TASK_ACTION.image_generate` maps to `image_standard` (6), not
@@ -142,6 +143,7 @@ describe('making a picture, which now lives in the Studio', () => {
         library={[]}
         pictures={[]}
         signals={[]}
+        balance={null}
       />,
     )
     await userEvent.type(screen.getByPlaceholderText(/plate of fresh samosas/i), 'a cup of chai')
