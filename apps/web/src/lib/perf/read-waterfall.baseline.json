@@ -603,7 +603,7 @@
   },
   {
     "route": "/(onboarding)/onboarding",
-    "awaits": ["getActiveWorkspace"]
+    "awaits": ["activeWorkspaceRead"]
   },
   {
     "route": "/admin",
