@@ -1,7 +1,9 @@
 import { ClerkProvider } from '@clerk/nextjs'
 import type { Metadata } from 'next'
 import { Plus_Jakarta_Sans } from 'next/font/google'
+import { headers } from 'next/headers'
 
+import { EMBED_SURFACE, SURFACE_HEADER } from '@/components/embed/surface'
 import { ThemeAttributeGuard } from '@/components/shell/theme-attribute-guard'
 import { RailScript } from '@/components/shell/rail-script'
 import { ThemeScript } from '@/components/shell/theme-script'
@@ -109,32 +111,52 @@ export const metadata: Metadata = {
    */
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // suppressHydrationWarning is required and narrow: ThemeScript writes
+  // data-theme — and RailScript `data-rail` — onto this exact element before
+  // React hydrates, so the server's markup and the client's DOM differ by those
+  // attributes by design. It suppresses the warning for <html>'s own attributes
+  // only, not for any subtree.
+  const shell = (
+    <html lang="en" className={sans.variable} suppressHydrationWarning>
+      <head>
+        <ThemeScript />
+        {/* The rail's collapsed/expanded state, before first paint. Only the
+            non-default (`expanded`) is ever written, so a document rendered
+            with no JavaScript gets the founder's default rather than a rail
+            that opens wide and then shuts. */}
+        <RailScript />
+      </head>
+      <body>
+        {/* Puts `data-theme` back when React re-renders <html> instead of
+            hydrating it, which is what the root not-found boundary does —
+            MEASURED: the 404 was light-only in a dark session while
+            localStorage said 'dark'. See the component. */}
+        <ThemeAttributeGuard />
+        {children}
+      </body>
+    </html>
+  )
+
+  /**
+   * THE SAME SHELL, WITHOUT CLERK, FOR THE SURFACES THAT HAVE NO USER.
+   *
+   * `/embed/*` is framed into somebody else's website and `/design-system`
+   * renders tokens; neither has a Clerk component beneath it, and neither has
+   * anyone to be signed in as. MEASURED 2026-09-02 on the production build:
+   * `/embed/lead` pulled 241,200 bytes of Clerk's browser SDK across 8 requests
+   * — plus a telemetry POST and a four-hop handshake redirect — before a
+   * four-field contact form appeared, on a phone, on mobile data.
+   *
+   * The header is set by `middleware.ts` and DELETED by it from every other
+   * request before forwarding, so a visitor cannot send it themselves and strip
+   * the provider off a page that needs one. `surface.ts` carries the full note.
+   */
+  if ((await headers()).get(SURFACE_HEADER) === EMBED_SURFACE) return shell
+
   return (
     <ClerkProvider appearance={clerkAppearance} signInUrl="/sign-in" signUpUrl="/sign-up">
-      {/* suppressHydrationWarning is required and narrow: ThemeScript writes
-          data-theme — and RailScript `data-rail` — onto this exact element
-          before React hydrates, so the server's markup and the client's DOM
-          differ by those attributes by design. It suppresses the warning for
-          <html>'s own attributes only, not for any subtree. */}
-      <html lang="en" className={sans.variable} suppressHydrationWarning>
-        <head>
-          <ThemeScript />
-          {/* The rail's collapsed/expanded state, before first paint. Only the
-              non-default (`expanded`) is ever written, so a document rendered
-              with no JavaScript gets the founder's default rather than a rail
-              that opens wide and then shuts. */}
-          <RailScript />
-        </head>
-        <body>
-          {/* Puts `data-theme` back when React re-renders <html> instead of
-              hydrating it, which is what the root not-found boundary does —
-              MEASURED: the 404 was light-only in a dark session while
-              localStorage said 'dark'. See the component. */}
-          <ThemeAttributeGuard />
-          {children}
-        </body>
-      </html>
+      {shell}
     </ClerkProvider>
   )
 }
