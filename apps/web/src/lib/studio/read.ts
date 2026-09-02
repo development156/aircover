@@ -207,19 +207,37 @@ export type LibraryPicture = {
 }
 
 /**
+ * The picker's read: the pictures, or which of two reasons there are none.
+ *
+ * The same three answers `GenerationsRead` keeps apart, for the same reason.
+ * `ok` with an empty list is "we asked and there are none", and only that one
+ * has "add a picture" as its natural remedy. `unreadable` is "we asked and
+ * could not get an answer", and a screen that calls it empty is telling
+ * somebody with thirty pictures that they have never added one.
+ */
+export type LibraryRead =
+  | { status: 'ok'; pictures: LibraryPicture[] }
+  | { status: 'no-workspace' }
+  | { status: 'unreadable' }
+
+/**
  * Recent pictures from this workspace, newest first, for the reference picker.
  *
  * Images only, and live only: a trashed file is not something to build a look
  * from, and offering one would let somebody condition a paid generation on a
  * picture they had already decided to throw away.
  *
- * Returns an EMPTY list on a failed read. The picker then says there is nothing
- * to match, which is wrong in a harmless direction: the person can still make a
- * picture. Failing the screen over a picker would be worse.
+ * NON-FATAL, AND HONEST ABOUT IT. A failed read comes back as `unreadable`
+ * rather than throwing: the person can still add a picture from their device
+ * or make one below, so failing the whole screen over a picker would be worse.
+ * It used to come back as `[]`, and the workbench read that as "You have no
+ * pictures yet", a claim that was false on every transient failure. The status
+ * is what lets the screen say what actually happened.
  */
-export async function readLibraryPictures(limit = 12): Promise<LibraryPicture[]> {
+export async function readLibraryPictures(limit = 12): Promise<LibraryRead> {
   const workspace = await activeWorkspaceRead()
-  if (workspace.status !== 'ok') return []
+  if (workspace.status === 'unreadable') return { status: 'unreadable' }
+  if (workspace.status !== 'ok') return { status: 'no-workspace' }
 
   const supabase = createServerSupabase()
   const { data, error } = await supabase
@@ -231,7 +249,7 @@ export async function readLibraryPictures(limit = 12): Promise<LibraryPicture[]>
     .order('created_at', { ascending: false })
     .limit(limit)
 
-  if (error || !data) return []
+  if (error || !data) return { status: 'unreadable' }
 
   const rows = data
     .filter((row) => typeof row.id === 'string' && typeof row.storage_path === 'string')
@@ -243,11 +261,14 @@ export async function readLibraryPictures(limit = 12): Promise<LibraryPicture[]>
   const signed = await signMediaPreviews(rows)
   const urls = new Map(signed.map((one) => [one.id, one.url]))
 
-  return rows.map((row) => ({
-    assetId: row.id,
-    // Null when the link would not sign. The picker shows the card anyway,
-    // because the picture exists and can still be picked.
-    url: urls.get(row.id) ?? null,
-    title: row.title !== null && row.title !== '' ? row.title : null,
-  }))
+  return {
+    status: 'ok',
+    pictures: rows.map((row) => ({
+      assetId: row.id,
+      // Null when the link would not sign. The picker shows the card anyway,
+      // because the picture exists and can still be picked.
+      url: urls.get(row.id) ?? null,
+      title: row.title !== null && row.title !== '' ? row.title : null,
+    })),
+  }
 }

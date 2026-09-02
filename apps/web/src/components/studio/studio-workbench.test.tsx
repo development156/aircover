@@ -6,6 +6,7 @@ import { queueGeneration, startPostFromPicture } from '@/app/actions/studio'
 import { StudioWorkbench } from '@/components/studio/studio-workbench'
 import { generatableFormats } from '@/lib/studio/formats'
 import { routedModels, unroutedModels } from '@/lib/studio/models'
+import type { LibraryPicture, LibraryRead } from '@/lib/studio/read'
 import { uploadAccept } from '@/lib/studio/upload'
 import {
   MAX_TRIES_PER_PRESS,
@@ -80,12 +81,15 @@ const MADE = [
   },
 ]
 
-const open = (library = LIBRARY, pictures: typeof MADE = []) =>
+/**
+ * A list is the ok read, the common case. A `LibraryRead` is passed whole when a
+ * test is about the OTHER answers, which a list cannot express.
+ */
+const open = (library: LibraryPicture[] | LibraryRead = LIBRARY, pictures: typeof MADE = []) =>
   render(
     <StudioWorkbench
       formats={generatableFormats()}
-      cost={6}
-      library={library}
+      library={Array.isArray(library) ? { status: 'ok', pictures: library } : library}
       pictures={pictures}
     />,
   )
@@ -369,6 +373,45 @@ describe('matching a picture', () => {
     open([])
     await user.click(screen.getByRole('button', { name: /match a picture/i }))
     expect(screen.getByText(/you have no pictures yet/i)).toBeTruthy()
+  })
+
+  /**
+   * THE CLAIM, NOT THE WORDING. "You have no pictures yet" is a statement about
+   * the library, and on a failed read it is false: the person may have thirty.
+   * "We asked and got nothing" and "we could not ask" are different sentences
+   * and only the true one may be shown.
+   *
+   * MUTATION: render the empty-library paragraph for every non-ok status and
+   * the second assertion goes red.
+   */
+  test('a library that could not be read says so, and never claims it is empty', async () => {
+    const user = userEvent.setup()
+    open({ status: 'unreadable' })
+    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    expect(screen.getByText(/sahoda could not read your pictures/i)).toBeTruthy()
+    expect(screen.queryByText(/no pictures yet/i)).toBeNull()
+  })
+
+  /** The remedy that still works is kept; the one that does not (retry the read) is not offered. */
+  test('a failed read still offers the device, which works regardless of the read', async () => {
+    const user = userEvent.setup()
+    open({ status: 'unreadable' })
+    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    expect(screen.getByText(/sahoda could not read your pictures/i).textContent).toMatch(
+      /from this device/i,
+    )
+    expect(screen.getByText(/sahoda could not read your pictures/i).textContent).not.toMatch(
+      /reload|try again|refresh/i,
+    )
+  })
+
+  test('no workspace is a third answer, not an empty library and not a failure', async () => {
+    const user = userEvent.setup()
+    open({ status: 'no-workspace' })
+    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    expect(screen.queryByText(/no pictures yet/i)).toBeNull()
+    expect(screen.queryByText(/could not read/i)).toBeNull()
+    expect(screen.getByText(/no workspace/i)).toBeTruthy()
   })
 })
 
@@ -717,6 +760,34 @@ describe('before any spend', () => {
   test('the price is named, from the pricing file rather than a literal', () => {
     open()
     expect(document.body.textContent).toMatch(/6\s*credits/)
+  })
+
+  /**
+   * THE MONEY SENTENCE, PER MODEL. The total beside the button was a fixed
+   * number handed in by the page, so choosing "The best one" left it reading
+   * the everyday price while the hold was taken at the premium one. The label
+   * a person reads before pressing has to be the figure that leaves the wallet.
+   *
+   * MUTATION: compute `cost` from `IMAGE_TIER_ACTION.draft` regardless of
+   * `modelId` in `studio-workbench.tsx` and this goes red.
+   */
+  test('the total follows the chosen model, before the press', async () => {
+    const user = userEvent.setup()
+    const { container } = open()
+    const picker = container.querySelector('[data-guide="studio-model"]') as HTMLElement
+    const best = within(picker)
+      .getAllByRole('button')
+      .find((button) => button.textContent?.includes('The best one'))
+    if (!best) throw new Error('no card for the best one')
+
+    await user.click(best)
+    // Anchored on the button's own label, so the card's "12 credits a picture"
+    // cannot satisfy it on the picker's behalf.
+    expect(document.body.textContent).toMatch(/Make a picture · 12\s*credits/)
+
+    const counts = container.querySelector('[data-guide="studio-count"]') as HTMLElement
+    await user.click(within(counts).getByRole('button', { name: '2' }))
+    expect(document.body.textContent).toMatch(/Make 2 pictures · 24\s*credits/)
   })
 
   test('the button waits for a description, because an empty prompt cannot be drawn', async () => {

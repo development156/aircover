@@ -1,5 +1,3 @@
-import { MESH_TASK_ACTION, creditCost } from '@sahoda/shared'
-
 import { PageTitle } from '@/components/page-title'
 import { StudioWorkbench } from '@/components/studio/studio-workbench'
 import { RecentGenerations } from '@/components/studio/recent-generations'
@@ -29,7 +27,9 @@ export default async function StudioPage() {
   const [recent, library] = await Promise.all([readGenerations(), readLibraryPictures()])
 
   const formats = generatableFormats()
-  const cost = creditCost(MESH_TASK_ACTION.image_generate)
+  // The price is not handed in from here any more: it depends on which model
+  // the person picks, so the workbench derives it from `modelId` through the
+  // same function the action prices the hold with.
   // An empty canvas on a FAILED read, deliberately. A read that failed produced
   // no pictures, and the list below is where that distinction is stated: the
   // canvas inventing a reason would be a second, vaguer answer to the same
@@ -42,7 +42,7 @@ export default async function StudioPage() {
         Studio
       </PageTitle>
 
-      <StudioWorkbench formats={formats} cost={cost} library={library} pictures={pictures} />
+      <StudioWorkbench formats={formats} library={library} pictures={pictures} />
 
       <RecentGenerations read={recent} />
     </div>
