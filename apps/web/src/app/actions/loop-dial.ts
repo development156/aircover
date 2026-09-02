@@ -11,11 +11,14 @@ import {
   MAX_WEEKLY_BUDGET_CREDITS,
   MIN_AUTOPILOT_CANCEL_MINUTES,
   MIN_AUTOPILOT_DAILY_CAP,
+  PlanIdSchema,
 } from '@sahoda/shared'
 
+import { getCheckEntitlement } from '@/lib/billing/entitlements'
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { autopilotRefusalMessage } from '@/lib/loop/autopilot-refusal-copy'
+import { LEVEL_EVERY_PLAN_ALLOWS, levelPlanSentence } from '@/lib/loop/level-plan-copy'
 import { workspaceForWrite } from '@/lib/workspaces'
 import { credits } from '@/lib/credit-words'
 
@@ -29,13 +32,19 @@ import { credits } from '@/lib/credit-words'
  * them through an owner connection would make a settings form one of the few
  * places in this app that bypasses the security model.
  *
- * ── L3 IS ACCEPTED HERE AND ADJUDICATED BY THE DATABASE ──────────────────────
- * `AutonomyLevelSchema` now admits 3, and the trigger in
- * `20260828120000_loop_autopilot_l3.sql` is what decides whether this workspace
- * may have it. That split is deliberate: the preconditions are facts about rows
- * (a supervised cycle that reached 'reported', a Brand Brain with four fields
- * confirmed) and re-deriving them in TypeScript would be a second opinion that
- * can disagree with the one that actually governs the write.
+ * ── THE PLAN IS CHECKED HERE; THE READINESS IS ADJUDICATED BY THE DATABASE ───
+ * Two different questions. Whether the workspace has EARNED a rung (a
+ * supervised cycle that reached 'reported', a Brand Brain with four fields
+ * confirmed) is a fact about rows, and the trigger in
+ * `20260828120000_loop_autopilot_l3.sql` decides it; re-deriving that in
+ * TypeScript would be a second opinion that can disagree with the one that
+ * governs the write. Whether the workspace's PLAN includes the rung is the
+ * entitlements gate's question (`PLAN_CATALOG.limits.loopLevel`, owner ruling
+ * #5: checked before the write, never inside it), and until 2026-09-02 nobody
+ * asked it: a Free workspace could arm Autopilot, a Growth-tier feature, and
+ * was never told otherwise. The check runs only for a rung above what every
+ * plan grants, so turning the dial DOWN can never be refused by a plan read
+ * that failed, and it fails closed for the rungs it does gate.
  *
  * ── SO THE THREE REFUSALS MUST BECOME SENTENCES SOMEBODY WROTE ───────────────
  * The trigger raises AUTOPILOT_NEEDS_SUPERVISED_CYCLE, AUTOPILOT_NEEDS_BRAIN
@@ -69,6 +78,36 @@ export async function setChannelAutonomy(channel: unknown, level: unknown): Prom
     const parsedLevel = AutonomyLevelSchema.safeParse(level)
     if (!parsedLevel.success) {
       return { ok: false, message: 'Pick a level between suggest and autopilot.' }
+    }
+
+    // ── THE PLAN GATE, before the write and only above the floor ──────────
+    if (parsedLevel.data > LEVEL_EVERY_PLAN_ALLOWS) {
+      const plan = await getCheckEntitlement()({
+        workspaceId,
+        dimension: 'loopLevel',
+        currentUsage: parsedLevel.data,
+      })
+      if (!plan.ok) {
+        // A refusal by the plan is an answer with a sentence built from the
+        // catalog. Anything else (a dead pool, an unknown plan id) is not
+        // "your plan forbids this": it says so and fails closed.
+        const details = plan.error.details as { limit?: unknown; planId?: unknown } | undefined
+        if (
+          plan.error.code === 'ENTITLEMENT_ERROR' &&
+          typeof details?.limit === 'number' &&
+          PlanIdSchema.safeParse(details.planId).success
+        ) {
+          return {
+            ok: false,
+            message: levelPlanSentence({
+              level: parsedLevel.data,
+              planId: PlanIdSchema.parse(details.planId),
+              limit: details.limit,
+            }),
+          }
+        }
+        return { ok: false, message: 'Sahoda could not check your plan. Try again in a moment.' }
+      }
     }
 
     const supabase = createServerSupabase()

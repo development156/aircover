@@ -16,6 +16,8 @@ import { RING_DENOMINATOR } from '@/lib/brand/fields'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { activeWorkspaceRead } from '@/lib/workspaces'
 
+import { isPlannableChannel } from './plannable'
+
 /**
  * The `connections.status` values that mean Sahoda can publish, and the ones
  * that mean it once could.
@@ -31,8 +33,9 @@ import { activeWorkspaceRead } from '@/lib/workspaces'
  */
 const LIVE_STATUS = ['active'] as const
 const LAPSED_STATUS = ['expired', 'revoked', 'error'] as const
-/** The channels the Loop can plan for. Others may be connected and are not planned. */
-const PLANNABLE: readonly string[] = ['x', 'gbp', 'linkedin', 'instagram']
+// The channels the Loop plans for come from `./plannable`, derived from the
+// shared enum. This file carried its own four-channel literal, which hid
+// Facebook and Telegram from the dial while the manual run planned for them.
 
 /**
  * EVERYTHING THE LOOP SCREEN READS — through the RLS-scoped client, always.
@@ -333,9 +336,9 @@ export async function readLoopSnapshot(workspaceId: string): Promise<LoopSnapsho
         // Filter the STRING, then narrow — see the same change in
         // `actions/radar.ts`. `connections.platform` holds fourteen values now
         // and `Channel` is six of them, so `as Channel` here asserted something
-        // untrue of eight rows. `PLANNABLE` still does the real work.
+        // untrue of eight rows. `isPlannableChannel` still does the real work.
         .map((r) => r.platform as string)
-        .filter((p): p is Channel => PLANNABLE.includes(p)),
+        .filter(isPlannableChannel),
     )
   const connected = channelsWith(LIVE_STATUS)
   // Lapsed only where it is not ALSO live: a workspace with two Instagram
