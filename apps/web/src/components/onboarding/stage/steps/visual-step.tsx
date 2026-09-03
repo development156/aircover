@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react'
 
 import { extractPalette } from '@/lib/brand/color-extract'
+import { LOGO_FILE_ACCEPT } from '@/lib/brand/logo-accept'
 import type { StepProps } from './types'
 
 /**
@@ -82,7 +83,10 @@ export function VisualStep({ data, patch, onLogo }: StepProps & { onLogo?: (file
         <input
           ref={input}
           type="file"
-          accept="image/png,image/jpeg,image/webp"
+          /* SVG included. It reaches `setBrandLogo`, which rasterises it and
+             discards the vector, so nothing stored is ever an SVG. See
+             `lib/brand/logo-accept.ts` for why this list lives in one place. */
+          accept={LOGO_FILE_ACCEPT}
           className="sr-only"
           onChange={(e) => {
             const file = e.target.files?.[0]

@@ -115,6 +115,44 @@ export async function readBalance(): Promise<BalanceRead> {
  */
 
 /**
+ * How many ledger entries this workspace has, in total.
+ *
+ * ── WHY A SECOND READ RATHER THAN COUNTING WHAT WE LOADED ───────────────────
+ * `readLedger` is windowed to `HISTORY_LIMIT`. Counting the rows it returned
+ * answers "how many did we fetch", and the wallet needs to answer "how many are
+ * there" — the two agree only until a workspace crosses fifty entries, at which
+ * point the first silently becomes a wrong number about somebody's records.
+ *
+ * `head: true` fetches no rows at all, and `credit_ledger (workspace_id, seq)`
+ * makes it an index range scan. Same shape as `lib/sites/read.ts` and
+ * `lib/inbox/read.ts`.
+ *
+ * `null` is NOT ZERO. It means the count could not be taken, and the caller
+ * must say so rather than printing "0 entries" over a list that has some.
+ */
+export async function countLedger(): Promise<number | null> {
+  try {
+    const workspaceId = await activeWorkspaceId()
+    if (workspaceId === null) return null
+
+    const supabase = createServerSupabase()
+    const { count, error } = await supabase
+      .from('credit_ledger')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)
+
+    if (error) {
+      console.error('[wallet] ledger count failed', error.code, error.message)
+      return null
+    }
+    return count ?? null
+  } catch (error) {
+    console.error('[wallet] ledger count threw', error instanceof Error ? error.message : 'unknown')
+    return null
+  }
+}
+
+/**
  * Ledger history, newest first. Sorted by `seq` (the int8 identity) rather than
  * `created_at`, which can invert for entries written inside one transaction.
  * Rows are parsed individually: `model_tier` has no DB CHECK backing it, so a

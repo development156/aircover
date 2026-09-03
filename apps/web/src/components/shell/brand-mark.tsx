@@ -1,7 +1,7 @@
 'use client'
 
 import { ChevronDown } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 
 import {
@@ -60,6 +60,47 @@ export function BrandMark({
   hasTheme: boolean
 }) {
   const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const chevronRef = useRef<HTMLButtonElement>(null)
+
+  /**
+   * ── A DIALOG WITH NO WAY OUT BUT THE MOUSE ────────────────────────────────
+   * `BrandPanel` renders `role="dialog"` and had no Escape handler, no outside
+   * press, and nothing that returned focus. A keyboard user could open it and
+   * then had to tab blindly past every control inside it to get back to the
+   * page. `workspace-switcher.tsx`, three files along in this same directory,
+   * has handled exactly this since it was written; the pattern was in the repo
+   * and this control simply did not follow it.
+   *
+   * NOT `aria-modal`, and not a focus trap. Nothing about this panel is modal:
+   * there is no scrim, the page behind it stays live, and it hangs off its own
+   * button rather than covering the viewport. Claiming modality in the
+   * accessibility tree would tell a screen reader the rest of the page is
+   * inert when it is not, which is a worse lie than the silence it replaces.
+   * It renders immediately after its trigger in the DOM, so Tab reaches it and
+   * Tab leaves it, which is the correct behaviour for a popover.
+   */
+  useEffect(() => {
+    if (!open) return
+
+    function onPointerDown(event: PointerEvent) {
+      if (!containerRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return
+      setOpen(false)
+      // Back to the control that opened it. Closing without this drops focus on
+      // `<body>`, so the next Tab restarts at the top of the document.
+      chevronRef.current?.focus()
+    }
+
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
 
   /**
    * Read from the DOCUMENT, not from storage, and only after mount.
@@ -99,7 +140,7 @@ export function BrandMark({
   const on = mounted && skin === 'on'
 
   return (
-    <div className="relative flex shrink-0 items-center">
+    <div ref={containerRef} className="relative flex shrink-0 items-center">
       <button
         type="button"
         // A switch, so it reports its state rather than merely being pressable.
@@ -114,7 +155,7 @@ export function BrandMark({
             })}
         data-guide="topbar.brand"
         onClick={() => (hasTheme ? toggleSkin() : setOpen(true))}
-        className="surface-ring grid h-8 min-w-8 place-items-center overflow-hidden rounded-l-control bg-s2 px-1.5 transition-micro hover:bg-s3 active:scale-[.97]"
+        className="surface-ring grid h-control min-w-control place-items-center overflow-hidden rounded-l-control bg-s2 px-1.5 transition-micro hover:bg-surface-3 active:scale-[.97] max-narrow:h-11 max-narrow:min-w-11"
       >
         {logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -131,13 +172,18 @@ export function BrandMark({
       {/* The rarer half: which colour is primary, and replacing the file. Its own
           button so the common act stays one press. `-ml-px` so the two share an
           edge and read as one control rather than as two beside each other. */}
+      {/* `w-6`, not `w-5`. WCAG 2.5.8 asks 24x24 CSS pixels for a pointer
+          target and this was 20 across — the smaller half of a split control,
+          which is the half a shaky hand or a thumb misses. The height was
+          already 32. One pixel column of the logo half pays for it. */}
       <button
+        ref={chevronRef}
         type="button"
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label="Open brand options"
         onClick={() => setOpen((was) => !was)}
-        className="surface-ring -ml-px grid h-8 w-5 place-items-center rounded-r-control bg-s2 text-muted transition-micro hover:bg-s3 hover:text-ink active:scale-[.97]"
+        className="surface-ring -ml-px grid h-control w-6 place-items-center rounded-r-control bg-s2 text-muted transition-micro hover:bg-surface-3 hover:text-ink active:scale-[.97] max-narrow:h-11 max-narrow:w-11"
       >
         <ChevronDown size={13} strokeWidth={1.8} aria-hidden />
       </button>
@@ -145,6 +191,7 @@ export function BrandMark({
       {open ? (
         <BrandPanel
           logoUrl={logoUrl}
+          current={primary}
           skinOn={on}
           hasTheme={hasTheme}
           onToggleSkin={toggleSkin}

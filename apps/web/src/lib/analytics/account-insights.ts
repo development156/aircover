@@ -9,8 +9,6 @@ import {
 
 import type { ZernioPlatform } from '@sahoda/shared'
 
-import { cache } from 'react'
-
 import { createServerSupabase } from '@/lib/supabase/server'
 import { activeWorkspaceRead } from '@/lib/workspaces'
 import { scopeForWorkspace } from '@/lib/zernio/scope'
@@ -29,12 +27,6 @@ import { zernioClientReads } from '@/lib/zernio/server'
  * `metrics` arrives as `Record<string, unknown>`, so every series is narrowed before
  * it can reach a chart. An unparseable point is dropped, never coerced to 0.
  */
-
-/** Memoised per request so the two reads on one page share a lookup. */
-const activeWorkspaceId = cache(async (): Promise<string | null> => {
-  const read = await activeWorkspaceRead()
-  return read.status === 'ok' ? read.workspace.id : null
-})
 
 /** How far back the dashboard asks. Instagram's own windows are shorter than this. */
 const WINDOW_DAYS = 30

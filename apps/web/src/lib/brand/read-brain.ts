@@ -29,11 +29,6 @@ import { provenanceOf, type Provenance } from './provenance'
  * longer evidence about anything on this page.
  */
 
-const activeWorkspaceId = cache(async (): Promise<string | null> => {
-  const read = await activeWorkspaceRead()
-  return read.status === 'ok' ? read.workspace.id : null
-})
-
 /**
  * Four answers, four different remedies — the same discipline `BalanceRead` uses.
  *

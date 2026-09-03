@@ -34,6 +34,8 @@ const state = vi.hoisted(() => ({
   derivatives: [] as Array<Record<string, unknown>>,
   available: 1_000,
   balanceStatus: 'ok' as 'ok' | 'unreadable' | 'no-workspace',
+  /** Whether THIS request won the run claim. False models a second tab. */
+  claimWon: true,
   sourceBody: 'A long piece about the bakery, with more in it than one caption can hold.',
   calls: {
     configs: [] as WithCreditsConfig[],
@@ -69,6 +71,13 @@ vi.mock('@/lib/wallet/read', () => ({
 vi.mock('@/lib/remix/store', () => ({
   readBatch: async () => state.batch,
   readDerivatives: async () => state.derivatives,
+  // The compare-and-swap. `state.claimWon` is what a test sets to be the SECOND
+  // tab: the row was already claimed, the UPDATE matched nothing, and this
+  // returns false.
+  startBatchRun: async () => {
+    state.calls.statuses.push('running')
+    return state.claimWon
+  },
   setBatchStatus: async (_id: string, _ws: string, status: string) => {
     state.calls.statuses.push(status)
   },
@@ -152,6 +161,7 @@ function approvedTotal(): number {
 }
 
 beforeEach(() => {
+  state.claimWon = true
   state.batch = batch()
   state.derivatives = DERIVATIVES
   state.available = 1_000
@@ -324,5 +334,33 @@ describe('an approved, affordable batch does spend', () => {
       expect(config.workspaceId).toBe(WS_ID)
     }
     expect(new Set(state.calls.configs.map((c) => c.objectRef)).size).toBe(2)
+  })
+
+  test('a second tab that loses the run claim charges nothing', async () => {
+    // ── THE READ-THEN-WRITE GAP, AND WHY THE OLD CODE PAID TWICE ────────────
+    // The gate above reads `batch.status` and refuses `running`. Two tabs both
+    // passed that read before either wrote, and `setBatchStatus` carried no
+    // status predicate and returned void — so both went on to spend. The batch
+    // was charged twice for one set of drafts, and `withCredits` could not stop
+    // it because `object-ref.ts` mints a fresh uuid per run, so exactly-once
+    // never matched.
+    //
+    // `startBatchRun` is now a compare-and-swap. This is the tab that lost it.
+    // APPROVED, so the run gets past the cost gate and actually reaches the
+    // claim. The default fixture is `planned` with no approval, which refuses
+    // three checks earlier — this test passed against the unguarded code until
+    // that was noticed, which is the whole reason the mutation is run.
+    state.batch = batch({
+      status: 'approved',
+      approved_at: '2026-08-21T01:00:00Z',
+      approved_credits: approvedTotal(),
+    })
+    state.claimWon = false
+
+    const result = await runRemixBatch(BATCH_ID)
+
+    expect(result.ok).toBe(false)
+    // The assertion this file exists for: no hold, no debit, no release.
+    expect(state.calls.configs).toHaveLength(0)
   })
 })

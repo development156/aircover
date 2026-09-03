@@ -12,14 +12,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Tile } from '@/components/ui/tile'
 import type { PlanActionState, PlanPreviewState } from '@/lib/billing/plan-state'
-import {
-  count,
-  onDate,
-  planChangeAction,
-  planIncludes,
-  prorationSummary,
-  rupees,
-} from '@/lib/billing/plan-copy'
+import { count, onDate, planChangeAction, prorationSummary, rupees } from '@/lib/billing/plan-copy'
 import { creditWord } from '@/lib/credit-words'
 
 /**

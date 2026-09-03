@@ -174,7 +174,21 @@ export async function runRemixBatch(batchId: string): Promise<RunState> {
       }
     }
 
-    await store.setBatchStatus(batchId, workspaceId, 'running')
+    // ── CLAIM IT ATOMICALLY, OR CHARGE NOTHING ──────────────────────────────
+    // The gate above read the status; this WINS or LOSES it. Between the read
+    // and here, a second tab could have claimed the same batch, and the old
+    // unguarded write let both proceed to spend. The loser gets the same
+    // sentence the `running` gate gives, because that is exactly the state it
+    // is now in — and it gets it before a single credit moves.
+    if (!(await store.startBatchRun(batchId, workspaceId))) {
+      return {
+        ok: false,
+        insufficient: false,
+        message:
+          'This batch stopped part-way through. Whatever was written is in your posts, and ' +
+          'nothing more will be charged for it. Start a new batch when you are ready.',
+      }
+    }
 
     const outcome = await spend({
       batchId,
