@@ -58,7 +58,7 @@ describe('applyPlanGrant against the real ledger', () => {
     ...over,
   })
 
-  it('grants once, replays a duplicate webhook (no double-grant), grants again next period', async () => {
+  it('grants once, replays the SAME payment, grants again for a DIFFERENT payment and next period', async () => {
     const applyPlanGrant = createApplyPlanGrant(port)
 
     const first = await applyPlanGrant(paid({ eventId: 'evt-a' }))
@@ -68,9 +68,6 @@ describe('applyPlanGrant against the real ledger', () => {
     expect(first.data.replayed).toBe(false)
     expect(await port.balance(ws)).toEqual({ total: 1500, held: 0 })
 
-    // Same plan+period+workspace but a DIFFERENT provider event id → the ledger's
-    // monthlyGrantKey still replays. (This is the safety net while billing_webhook_events
-    // — provider-level dedup — is deferred behind the enum widening.)
     // Spend some of it FIRST, so the assertions below can actually discriminate. Asserting
     // balanceAfter === 1500 while the live balance is also 1500 pins nothing — it cannot tell
     // "the original entry's balance" from "a fresh read". After a HOLD+DEBIT of 400 the live
@@ -90,7 +87,8 @@ describe('applyPlanGrant against the real ledger', () => {
     })
     expect(await port.balance(ws)).toEqual({ total: 1100, held: 0 })
 
-    const dup = await applyPlanGrant(paid({ eventId: 'evt-b' }))
+    // The SAME payment delivered again (same provider event id) → the ledger replays.
+    const dup = await applyPlanGrant(paid({ eventId: 'evt-a' }))
     expect(dup.ok && dup.data.replayed).toBe(true)
     if (!dup.ok) throw new Error('expected ok')
     // Owner ruling, pinned: on replay these describe the ORIGINAL grant, not one applied by this
@@ -100,13 +98,22 @@ describe('applyPlanGrant against the real ledger', () => {
     expect(dup.data.balanceAfter).toBe(1500)
     expect(await port.balance(ws)).toEqual({ total: 1100, held: 0 }) // no second grant
 
+    // A DIFFERENT payment for the same plan+period+workspace is real money and grants again
+    // (billing-ledger-4). Under the old monthly key this replayed and the customer got nothing.
+    const second = await applyPlanGrant(paid({ eventId: 'evt-b' }))
+    expect(second.ok).toBe(true)
+    if (!second.ok) throw new Error('expected ok')
+    expect(second.data.replayed).toBe(false)
+    expect(second.data.balanceAfter).toBe(2600)
+    expect(await port.balance(ws)).toEqual({ total: 2600, held: 0 })
+
     // A new billing period is a fresh grant.
     const next = await applyPlanGrant(paid({ eventId: 'evt-c', period: '2026-08' }))
     expect(next.ok).toBe(true)
     if (!next.ok) throw new Error('expected ok')
     expect(next.data.replayed).toBe(false)
-    // 1100 carried forward + 1500 for the new period (the 400 spent above stays spent).
-    expect(next.data.balanceAfter).toBe(2600)
-    expect(await port.balance(ws)).toEqual({ total: 2600, held: 0 })
+    // 2600 carried forward + 1500 for the new period (the 400 spent above stays spent).
+    expect(next.data.balanceAfter).toBe(4100)
+    expect(await port.balance(ws)).toEqual({ total: 4100, held: 0 })
   })
 })

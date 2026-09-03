@@ -41,7 +41,7 @@ import { creditWord } from '@/lib/credit-words'
 export function PlanPicker({ subscription }: { subscription: SubscriptionView }) {
   const [selected, setSelected] = useState<PlanId | null>(null)
   const [preview, setPreview] = useState<PlanPreviewState | null>(null)
-  const [outcome, setOutcome] = useState<PlanActionState | null>(null)
+  const [outcome, setOutcome] = useState<Outcome | null>(null)
   const [pending, startTransition] = useTransition()
 
   const plans = Object.values(PLAN_CATALOG)
@@ -74,7 +74,14 @@ export function PlanPicker({ subscription }: { subscription: SubscriptionView })
                   `${rupees(checkout.amountDuePaise)}. Nothing was charged and no credits ` +
                   `were added. The payment page is not reachable from the app yet.`,
               }
-            : { ok: true, message: 'Checkout is ready. Credits land once the payment clears.' }
+            : {
+                ok: true,
+                message:
+                  'Your upgrade order is open and nothing has been charged yet. ' +
+                  'Cashfree takes the payment on its own page and brings you back here. ' +
+                  'Credits land once Cashfree confirms the payment.',
+                url: checkout.url,
+              }
           : { ok: false, message: checkout.message },
       )
     })
@@ -248,16 +255,31 @@ function PendingChange({
   )
 }
 
-function Outcome({ outcome }: { outcome: PlanActionState }) {
+/**
+ * What pressing the button produced. A live order carries the bridge URL, and the link is
+ * the same one the wallet's `CheckoutResult` renders: without it a real Cashfree order was
+ * opened for the prorated rupees and the screen offered nothing to pay it with, so it
+ * expired unpaid while the customer read "Checkout is ready".
+ */
+type Outcome = PlanActionState | { ok: true; message: string; url: string }
+
+function Outcome({ outcome }: { outcome: Outcome }) {
   return (
     <div
       role="status"
-      className={`type-body mt-3 rounded-input px-3 py-2.5 ${
+      className={`type-body mt-3 space-y-2 rounded-input px-3 py-2.5 ${
         outcome.ok ? 'bg-ok-bg text-ok' : 'bg-danger-bg text-danger'
       }`}
     >
-      {outcome.message}
-      {outcome.ok ? '' : ' Nothing was charged.'}
+      <p>
+        {outcome.message}
+        {outcome.ok ? '' : ' Nothing was charged.'}
+      </p>
+      {outcome.ok && 'url' in outcome ? (
+        <a href={outcome.url} className="inline-block font-semibold underline underline-offset-2">
+          Open the payment page
+        </a>
+      ) : null}
     </div>
   )
 }

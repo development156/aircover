@@ -28,8 +28,13 @@ describe('live-test guard', () => {
   it.skipIf(liveTestsEnabled)('does not read the repo-root .env while the flag is absent', () => {
     // The gate is upstream of the credential: with the flag off, loadEnv never runs, so the
     // helper sees nothing even though .env exists on this machine.
-    expect(ENV.dbUrl).toBe('')
-    expect(ENV.serviceKey).toBe('')
+    //
+    // Asserted as a BOOLEAN on purpose. `expect(ENV.dbUrl).toBe('')` printed the whole
+    // connection string, password included, in its diff whenever the invoking shell exported
+    // SUPABASE_DB_URL (a direct vitest run; turbo strips it) and that red output was pasted into
+    // a handoff on 2026-08-28. A red run here now says only true or false.
+    expect(ENV.dbUrl === '', 'SUPABASE_DB_URL or DATABASE_URL reached the test process').toBe(true)
+    expect(ENV.serviceKey === '', 'SUPABASE_SERVICE_ROLE_KEY reached the test process').toBe(true)
   })
 
   it.skipIf(!liveTestsEnabled)('opens the gate only when the flag is set AND creds exist', () => {

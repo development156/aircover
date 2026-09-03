@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { Sparkles } from 'lucide-react'
-import type { GenerationMode } from '@sahoda/shared'
+import { IMAGE_TIER_ACTION, creditCost, type GenerationMode } from '@sahoda/shared'
 
 import { queueGeneration } from '@/app/actions/studio'
 // Lazy: a canvas editor is a large chunk that most visits never open, and the
@@ -30,8 +30,8 @@ import {
   readyModes,
   ruleFor,
 } from '@/lib/studio/modes'
-import { defaultModelId } from '@/lib/studio/models'
-import type { LibraryPicture } from '@/lib/studio/read'
+import { defaultModelId, imageActionFor } from '@/lib/studio/models'
+import type { LibraryRead } from '@/lib/studio/read'
 import { PROMPT_STARTERS } from '@/lib/studio/prompt'
 import { describeInsufficient, describePartial } from '@/lib/studio/refusal-copy'
 
@@ -53,17 +53,25 @@ import { describeInsufficient, describePartial } from '@/lib/studio/refusal-copy
  * may not, all come from one module the server action asks as well. A screen
  * that offered a mode the action refuses would waste a press; one that hid a
  * mode the action allows would cost a feature.
+ *
+ * ── AND THE PRICE FOLLOWS THE MODEL, HERE AND IN THE HOLD ───────────────────
+ * The total beside the button used to be one number handed in by the page, so
+ * choosing "The best one" left it reading the everyday price while the action
+ * was meant to hold the premium one. It is derived from `modelId` through the
+ * same `imageActionFor` the action prices the hold with, so what is read before
+ * the press is what leaves the wallet.
  */
 export function StudioWorkbench({
   formats,
-  cost,
   library,
   pictures,
 }: {
   formats: StudioFormat[]
-  cost: number
-  /** Pictures already in this workspace, offered as things to match. */
-  library: LibraryPicture[]
+  /**
+   * Pictures already in this workspace, offered as things to match, or which
+   * of two reasons there are none. A failed read is not an empty library.
+   */
+  library: LibraryRead
   /** What this workspace has already made, newest first, for the canvas. */
   pictures: CanvasPicture[]
 }) {
@@ -92,6 +100,10 @@ export function StudioWorkbench({
 
   const rule = ruleFor(mode, modelId)
   const chosen = formats.find((f) => f.id === formatId) ?? null
+  // `modelId` only ever holds a catalogue id (the default or a picker choice),
+  // so the null arm is the type's; the draft price is its total answer and not
+  // a state a person reaches. The server refuses an unknown id before any hold.
+  const cost = creditCost(imageActionFor(modelId) ?? IMAGE_TIER_ACTION.draft)
   // Asked, never re-derived. See this file's header.
   const blocked = describeModeBlock({ mode, references: picked.length, modelId })
   const ready = wanted.trim().length >= 3 && chosen !== null && blocked === null
@@ -342,14 +354,34 @@ export function StudioWorkbench({
             }}
           />
 
-          {library.length === 0 ? (
+          {/* ── THREE ANSWERS, THREE SENTENCES ──────────────────────────────
+              A failed read used to arrive as an empty list and be told "You
+              have no pictures yet", which is false for anybody with a library.
+              Each status gets the claim that is true of it, and the failed one
+              keeps only the remedy that works without the read: the device. */}
+          {library.status === 'unreadable' ? (
+            <p
+              role="status"
+              className="surface-ring rounded-card bg-s2 px-3 py-2 type-sm text-muted"
+            >
+              Sahoda could not read your pictures just now. You can still add one from this device,
+              or make one below.
+            </p>
+          ) : library.status === 'no-workspace' ? (
+            <p
+              role="status"
+              className="surface-ring rounded-card bg-s2 px-3 py-2 type-sm text-muted"
+            >
+              There is no workspace to read pictures from, so there is nothing here to match.
+            </p>
+          ) : library.pictures.length === 0 ? (
             <p className="surface-ring rounded-card bg-s2 px-3 py-2 type-sm text-muted">
               You have no pictures yet. Add one from this device, or make one below, and it appears
               here to match.
             </p>
           ) : (
             <ul className="grid grid-cols-4 gap-2">
-              {library.map((picture) => {
+              {library.pictures.map((picture) => {
                 // The POSITION, not a yes. `signReferences` sends them in pick
                 // order and the first weighs most, so an order-free tick hides
                 // something the model acts on.

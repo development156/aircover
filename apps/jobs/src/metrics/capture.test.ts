@@ -312,3 +312,139 @@ describe('the metric-history pass', () => {
     expect(report.daysInBatch).toBe(0)
   })
 })
+
+/**
+ * ── THE NIGHT EVERY READ FAILED ──────────────────────────────────────────────
+ *
+ * A rotated Zernio key, a missing one, or an outage makes every `readPostAnalytics`
+ * throw. Each throw was caught and counted, the report carried counts only, and
+ * the route answered 200 `ok: true` with `unreadable: 120`. Nothing reached Sentry
+ * because the catch discarded the error. That is a whole feature down, reported
+ * as a healthy night, indefinitely.
+ */
+describe('how the whole pass went', () => {
+  it('is clean when nothing failed, including a night with nothing to ask', async () => {
+    expect((await runMetricCapture(harness([], async () => measured()).deps)).outcome).toBe('clean')
+    expect((await runMetricCapture(harness([target()], async () => measured()).deps)).outcome).toBe(
+      'clean',
+    )
+  })
+
+  it('is clean when the platform has nothing to say yet: pending is not a failure', async () => {
+    const h = harness([target({ publishedAt: '2026-08-18T22:00:00Z' })], async () =>
+      measured({ impressions: 0, reach: 0, likes: 0, comments: 0 }),
+    )
+    expect((await runMetricCapture(h.deps)).outcome).toBe('clean')
+  })
+
+  it('is degraded when some reads failed and some landed', async () => {
+    const targets = [target(), target({ postId: 'p2', platformPostId: '17900000000000001' })]
+    const h = harness(targets, async (t) => {
+      if (t.postId === 'p1') throw new Error('network')
+      return measured()
+    })
+    expect((await runMetricCapture(h.deps)).outcome).toBe('degraded')
+  })
+
+  it('is failed when every read threw', async () => {
+    const targets = [target(), target({ postId: 'p2', platformPostId: '17900000000000001' })]
+    const h = harness(targets, async () => {
+      throw new Error('No Zernio API key in this environment')
+    })
+
+    const report = await runMetricCapture(h.deps)
+
+    expect(report).toMatchObject({ outcome: 'failed', targets: 2, measured: 0, unreadable: 2 })
+  })
+
+  it('counts an unresolved post as answered, so a night of orphans is degraded rather than failed', async () => {
+    // The platform DID answer; it said it cannot tie the post to an account. That
+    // is a state on their side, not an outage on ours, and a retry will not fix it.
+    const orphaned = {
+      status: 200,
+      post: {
+        status: 'published',
+        syncStatus: 'orphaned',
+        analytics: {
+          impressions: 0,
+          reach: 0,
+          likes: 0,
+          comments: 0,
+          lastUpdated: '2026-08-19 01:30:00',
+        },
+      },
+    } as unknown as ZernioPostAnalyticsResult
+    const targets = [target(), target({ postId: 'p2', platformPostId: '17900000000000001' })]
+    const h = harness(targets, async (t) => {
+      if (t.postId === 'p1') throw new Error('network')
+      return orphaned
+    })
+    expect((await runMetricCapture(h.deps)).outcome).toBe('degraded')
+  })
+})
+
+describe('where the cause goes', () => {
+  it('forwards a thrown read to onFailure, with the channel and without any id', async () => {
+    const cause = new Error('network')
+    const onFailure = vi.fn()
+    const h = harness([target()], async () => {
+      throw cause
+    })
+
+    await runMetricCapture({ ...h.deps, onFailure })
+
+    expect(onFailure).toHaveBeenCalledTimes(1)
+    expect(onFailure).toHaveBeenCalledWith({ error: cause, channel: 'instagram' })
+    // The report crosses a public URL and Sentry is not the place for a customer's
+    // post id either: the event names the channel and nothing that identifies a row.
+    expect(Object.keys(onFailure.mock.calls[0]![0])).toEqual(['error', 'channel'])
+  })
+
+  it('forwards each DISTINCT cause once, so 120 identical throws are one event', async () => {
+    const onFailure = vi.fn()
+    const targets = Array.from({ length: 120 }, (_, i) =>
+      target({ postId: `p${i}`, platformPostId: `1790000000000${String(i).padStart(4, '0')}` }),
+    )
+    const h = harness(targets, async () => {
+      throw new Error('No Zernio API key in this environment')
+    })
+
+    const report = await runMetricCapture({ ...h.deps, onFailure })
+
+    expect(report.unreadable).toBe(120)
+    expect(onFailure).toHaveBeenCalledTimes(1)
+  })
+
+  it('forwards different causes separately, up to a bound', async () => {
+    const onFailure = vi.fn()
+    const targets = Array.from({ length: 12 }, (_, i) =>
+      target({ postId: `p${i}`, platformPostId: `1790000000000${String(i).padStart(4, '0')}` }),
+    )
+    const h = harness(targets, async (t) => {
+      throw new Error(`timeout on ${t.postId}`)
+    })
+
+    await runMetricCapture({ ...h.deps, onFailure })
+
+    // Twelve distinct messages, and fewer forwarded than thrown: a bound exists.
+    expect(onFailure.mock.calls.length).toBeGreaterThan(1)
+    expect(onFailure.mock.calls.length).toBeLessThan(12)
+  })
+
+  it('does not let a throwing onFailure take the night down', async () => {
+    const h = harness(
+      [target(), target({ postId: 'p2', platformPostId: '17900000000000001' })],
+      async (t) => {
+        if (t.postId === 'p1') throw new Error('network')
+        return measured()
+      },
+    )
+    const onFailure = vi.fn(() => {
+      throw new Error('the reporter is broken too')
+    })
+
+    const report = await runMetricCapture({ ...h.deps, onFailure })
+
+    expect(report).toMatchObject({ measured: 1, unreadable: 1, outcome: 'degraded' })
+  })
+})

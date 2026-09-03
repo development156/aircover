@@ -66,6 +66,18 @@ export function doorErrorCode(body: unknown): string | null {
  * never reached our handler (a proxy timeout, a platform 502), where the only
  * honest statement is that the request did not arrive.
  */
+const UPLOAD_TOO_LARGE: DoorTransportFailure = {
+  message:
+    'That upload was too large to reach Sahoda, so it was never opened. Try a smaller PDF, or paste your website link instead.',
+  retryable: false,
+}
+
+const TOO_MANY_READS: DoorTransportFailure = {
+  message:
+    'Too many reads in a row, so this one was turned away before your link or PDF was opened. Wait a minute and press Read this again.',
+  retryable: true,
+}
+
 export function doorTransportFailure(status: number, code: string | null): DoorTransportFailure {
   switch (code) {
     case 'signed_out':
@@ -94,26 +106,27 @@ export function doorTransportFailure(status: number, code: string | null): DoorT
           'Sahoda broke before it opened your link or PDF, so there is nothing to report about the document itself. Try again.',
         retryable: true,
       }
+    // The three the route added when it gained a limiter, a body cap and a
+    // schema. Named, so a proxy's own 413 or 429 and the route's are the same
+    // sentence by two paths rather than one sentence and one fall-through.
+    case 'rate_limited':
+      return TOO_MANY_READS
+    case 'too_large':
+      return UPLOAD_TOO_LARGE
+    case 'invalid_input':
+      return {
+        message:
+          'The link or sentence sent was longer than Sahoda accepts, so nothing was opened. Shorten it and press Read this again.',
+        retryable: false,
+      }
     default:
       break
   }
 
   // No named cause. Say the truth available at this altitude and no more: the
   // request did not come back, and the document is therefore unexamined.
-  if (status === 413) {
-    return {
-      message:
-        'That upload was too large to reach Sahoda, so it was never opened. Try a smaller PDF, or paste your website link instead.',
-      retryable: false,
-    }
-  }
-  if (status === 429) {
-    return {
-      message:
-        'Too many reads in a row, so this one was turned away before your link or PDF was opened. Wait a minute and press Read this again.',
-      retryable: true,
-    }
-  }
+  if (status === 413) return UPLOAD_TOO_LARGE
+  if (status === 429) return TOO_MANY_READS
   return {
     message:
       'The request did not reach Sahoda, so your link or PDF was never opened. This is not a verdict on the document. Try again.',

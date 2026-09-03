@@ -60,7 +60,7 @@ export async function attachMedia(postId: string, formData: FormData): Promise<A
     if (file.size > MEDIA_UPLOAD_CAP_BYTES) {
       return {
         ok: false,
-        message: `That file is larger than ${Math.floor(MEDIA_UPLOAD_CAP_BYTES / 1_000_000)} MB, which no channel accepts.`,
+        message: `That file is larger than ${Math.floor(MEDIA_UPLOAD_CAP_BYTES / 1_000_000)} MB, which is the most an upload can carry.`,
       }
     }
 

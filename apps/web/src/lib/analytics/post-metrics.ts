@@ -10,6 +10,12 @@ import type { PostVariant } from '@sahoda/shared'
 
 import { cache } from 'react'
 
+import {
+  LIVE_READ_CONCURRENCY,
+  LIVE_READ_TTL_MS,
+  mapBounded,
+  memoLiveRead,
+} from '@/lib/analytics/read-cache'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { activeWorkspaceRead } from '@/lib/workspaces'
 import { profileForWorkspace } from '@/lib/zernio/scope'
@@ -58,8 +64,19 @@ const activeWorkspaceId = cache(async (): Promise<string | null> => {
 export const LIST_METRIC_CALLS = 6
 export const DETAIL_METRIC_CALLS = 8
 
-/** In-flight calls at once. Zernio rate-limits at 60/min; this stays well under. */
-const CONCURRENCY = 4
+/**
+ * One platform post's answer is remembered for `LIVE_READ_TTL_MS` (ten minutes)
+ * per server instance, keyed by workspace, profile and platform post id. Within
+ * that window a refresh or a second teammate costs Zernio nothing. The answer is
+ * the platform's own; every render still classifies it against its own clock,
+ * and a failed read is never remembered (see `read-cache.ts`).
+ */
+function liveReadKey(workspaceId: string, profile: string, platformPostId: string): string {
+  return `post-analytics:${workspaceId}:${profile}:${platformPostId}`
+}
+
+/** Named so the sentence on the screen and the constant cannot drift apart. */
+export const LIVE_READ_TTL_MINUTES = LIVE_READ_TTL_MS / 60_000
 
 export interface ChannelMetrics {
   channel: PostVariant['channel']
@@ -114,19 +131,6 @@ async function publishTimes(workspaceId: string, postIds: string[]): Promise<Map
     if (!seen || Date.parse(row.published_at) > Date.parse(seen)) times.set(key, row.published_at)
   }
   return times
-}
-
-/** Run `work` over `items` a few at a time rather than all at once. */
-async function mapCapped<T, R>(
-  items: readonly T[],
-  limit: number,
-  work: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const out: R[] = []
-  for (let i = 0; i < items.length; i += limit) {
-    out.push(...(await Promise.all(items.slice(i, i + limit).map(work))))
-  }
-  return out
 }
 
 /**
@@ -245,9 +249,16 @@ async function fetchInto(
   const asked = targets.slice(0, maxCalls)
   const skipped = targets.slice(maxCalls)
 
-  const fetched = await mapCapped(asked, CONCURRENCY, async (target) => {
+  // A pool, not batches: the next read starts the moment one finishes, so one
+  // slow answer never holds the other slots idle. Bounded so a page cannot spend
+  // the shared 60/min budget in one burst.
+  const fetched = await mapBounded(asked, LIVE_READ_CONCURRENCY, async (target) => {
     try {
-      const answer = await reads.postAnalytics(profile, target.platformPostId)
+      const { value: answer } = await memoLiveRead(
+        liveReadKey(workspaceId, profile, target.platformPostId),
+        () => reads.postAnalytics(profile, target.platformPostId),
+        now.getTime(),
+      )
       return { target, state: classify(target, answer, times, now) }
     } catch {
       // A thrown call is "we could not read it" — never "there is nothing".

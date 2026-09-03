@@ -227,5 +227,29 @@ describe('pricing a change before it is charged', () => {
 
     const status = await screen.findByText(/sandbox order was opened/i)
     expect(status).toHaveTextContent(/Nothing was charged and no credits were added/)
+    expect(screen.queryByRole('link', { name: /open the payment page/i })).not.toBeInTheDocument()
+  })
+
+  it('a live order links to the payment page instead of dead-ending on "ready"', async () => {
+    // The action returned a real order and the URL of the page that collects it. Discarding
+    // the URL, as this screen once did, left a real Cashfree order open with nothing to click.
+    previewPlanChange.mockResolvedValue({ ok: true, proration, impact: null })
+    startPlanUpgrade.mockResolvedValue({
+      ok: true,
+      simulated: false,
+      mode: 'live',
+      sessionId: 'sah_42',
+      url: 'https://app.sahoda.test/billing/checkout/sah_42',
+    })
+    const user = userEvent.setup()
+    render(<PlanPicker subscription={view({ planId: 'starter' })} />)
+
+    await user.click(screen.getByRole('button', { name: /^Growth/ }))
+    await user.click(await screen.findByRole('button', { name: 'Pay ₹1,000 and switch to Growth' }))
+
+    const link = await screen.findByRole('link', { name: /open the payment page/i })
+    expect(link).toHaveAttribute('href', 'https://app.sahoda.test/billing/checkout/sah_42')
+    expect(screen.getByRole('status')).toHaveTextContent(/nothing has been charged yet/i)
+    expect(screen.queryByText(/Checkout is ready/)).not.toBeInTheDocument()
   })
 })

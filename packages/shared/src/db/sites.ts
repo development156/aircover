@@ -125,6 +125,19 @@ export type LeadInsert = z.infer<typeof LeadInsertSchema>
  * `website` is the honeypot, exactly as `OpsBetaApplyInputSchema` uses it: a bot
  * that fills every field fails here and never reaches Turnstile or the database.
  */
+/**
+ * A browser form posts EVERY field, and an empty one arrives as `''`, never as
+ * an absent key. zod treats `''` as present-and-invalid for `z.email()`, so
+ * without this a visitor who left email blank and typed a phone number was
+ * refused as "invalid email" before the one-or-the-other rule was reached.
+ * Blank means absent, for the four fields a visitor may leave empty. The
+ * honeypot and the token are deliberately NOT routed through it: an empty
+ * honeypot must stay `''` (that is what a real browser sends) and an empty
+ * token must fail, not vanish.
+ */
+const blankIsAbsent = (value: unknown): unknown =>
+  typeof value === 'string' && value.trim() === '' ? undefined : value
+
 export const SiteLeadSubmitSchema = z.object({
   site_slug: z
     .string()
@@ -134,10 +147,10 @@ export const SiteLeadSubmitSchema = z.object({
     // The subdomain shape `sites.slug` already holds. A slug that could not be a
     // subdomain cannot name a real site, so it is refused before any lookup.
     .regex(/^[a-z0-9][a-z0-9-]*$/, 'That is not a site address.'),
-  name: z.string().trim().max(120).optional(),
-  email: z.email().max(254).optional(),
-  phone: z.string().trim().max(40).optional(),
-  message: z.string().trim().max(4000).optional(),
+  name: z.preprocess(blankIsAbsent, z.string().trim().max(120).optional()),
+  email: z.preprocess(blankIsAbsent, z.email().max(254).optional()),
+  phone: z.preprocess(blankIsAbsent, z.string().trim().max(40).optional()),
+  message: z.preprocess(blankIsAbsent, z.string().trim().max(4000).optional()),
   source_url: z.string().trim().max(500).optional(),
   website: z.string().max(0).optional(),
   turnstile_token: z.string().min(1).max(4096),

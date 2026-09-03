@@ -4,6 +4,7 @@ import type { PublishMode } from '../publish/mode'
 import { classifyCandidate, type DispatchCandidate, type CandidateVariant } from './classify'
 
 const GRACE = 3600
+const LEASE = 600
 const NOW = new Date('2026-07-25T12:00:00Z')
 
 /** `minutesLate` is how far in the past the schedule sits; negative means still ahead. */
@@ -25,11 +26,25 @@ function variant(
   channel: Channel,
   publishStatus: VariantPublishStatus,
   publishedMode: PublishMode | null = null,
+  over: Partial<CandidateVariant> = {},
 ): CandidateVariant {
-  return { variantId: `v-${channel}`, channel, publishStatus, publishedMode }
+  return {
+    variantId: `v-${channel}`,
+    channel,
+    publishStatus,
+    publishedMode,
+    claimedAt: null,
+    awaitingPlatform: false,
+    ...over,
+  }
 }
 
-const decide = (c: DispatchCandidate) => classifyCandidate(c, { now: NOW, graceSeconds: GRACE })
+const decide = (c: DispatchCandidate) =>
+  classifyCandidate(c, { now: NOW, graceSeconds: GRACE, leaseSeconds: LEASE })
+
+/** A `publishing` variant whose claim was taken `ageSeconds` before NOW. */
+const claimedAgo = (ageSeconds: number): string =>
+  new Date(NOW.getTime() - ageSeconds * 1000).toISOString()
 
 describe('classifyCandidate — dispatching', () => {
   it('dispatches every publishable variant of a post due inside the grace window', () => {
@@ -77,7 +92,7 @@ describe('classifyCandidate — dispatching', () => {
     // The key is `${postId}:${channel}:${scheduledAt}`. If the dispatcher passed its own
     // clock instead, every tick would mint a new key and re-post the same content.
     const c = candidate(10, [variant('x', 'pending')])
-    const d = classifyCandidate(c, { now: NOW, graceSeconds: GRACE })
+    const d = classifyCandidate(c, { now: NOW, graceSeconds: GRACE, leaseSeconds: LEASE })
 
     expect(d.kind).toBe('dispatch')
     if (d.kind !== 'dispatch') return
@@ -87,11 +102,126 @@ describe('classifyCandidate — dispatching', () => {
   it('never dispatches while a sibling attempt is in flight', () => {
     // `publishing` means a run holds this variant right now. Adding work on top of it is
     // how the same post goes out twice.
-    const d = decide(candidate(10, [variant('x', 'publishing'), variant('gbp', 'pending')]))
+    const d = decide(
+      candidate(10, [
+        variant('x', 'publishing', null, { claimedAt: claimedAgo(30) }),
+        variant('gbp', 'pending'),
+      ]),
+    )
 
     expect(d.kind).toBe('hold')
     if (d.kind !== 'hold') return
     expect(d.reason).toBe('in-flight')
+  })
+})
+
+/**
+ * The lease, seen from the scheduled path.
+ *
+ * `claimVariant` (publish/store.ts) already takes over a `publishing` row whose claim is
+ * older than PUBLISH_LEASE_SECONDS. That branch was unreachable from the cron: this
+ * classifier held EVERY `publishing` variant as in-flight with no notion of age, so a
+ * publisher killed mid-flight stranded its variant on every later tick, and the only
+ * thing that could unstick it was a person pressing "Send now". The threshold here has
+ * to agree with the store's: a claim the store would refuse is held, a claim the store
+ * would take over is dispatched.
+ */
+describe('classifyCandidate — a stale lease', () => {
+  it('holds a `publishing` variant whose claim is still inside the lease', () => {
+    const d = decide(
+      candidate(10, [variant('instagram', 'publishing', null, { claimedAt: claimedAgo(599) })]),
+    )
+
+    expect(d.kind).toBe('hold')
+    if (d.kind !== 'hold') return
+    expect(d.reason).toBe('in-flight')
+  })
+
+  it('dispatches a `publishing` variant whose claim is older than the lease', () => {
+    const d = decide(
+      candidate(10, [variant('instagram', 'publishing', null, { claimedAt: claimedAgo(601) })]),
+    )
+
+    expect(d.kind).toBe('dispatch')
+    if (d.kind !== 'dispatch') return
+    expect(d.variants.map((v) => v.variantId)).toEqual(['v-instagram'])
+  })
+
+  it('treats a `publishing` variant with no claim at all as stale, not as untouchable', () => {
+    // No path writes `publishing` without a claim, so such a row predates the claim
+    // existing. The store reclaims it; so must the classifier, or it is held for ever.
+    const d = decide(candidate(10, [variant('instagram', 'publishing', null, { claimedAt: null })]))
+
+    expect(d.kind).toBe('dispatch')
+  })
+
+  it('still holds a live claim when a stale sibling would otherwise dispatch', () => {
+    const d = decide(
+      candidate(10, [
+        variant('x', 'publishing', null, { claimedAt: claimedAgo(30) }),
+        variant('instagram', 'publishing', null, { claimedAt: claimedAgo(601) }),
+      ]),
+    )
+
+    expect(d.kind).toBe('hold')
+    if (d.kind !== 'hold') return
+    expect(d.reason).toBe('in-flight')
+  })
+})
+
+/**
+ * A variant the platform ACCEPTED but has not finished with.
+ *
+ * The adapter gives up on Instagram's container flow as STILL_PROCESSING, records
+ * Zernio's id on the failed log row, and the claim is handed back as `scheduled`. The
+ * next tick used to classify that as publishable and POST the same content again,
+ * ~5m40s after the first — on or past the ~5-minute idempotency window doc 13 §5 puts
+ * on Zernio's request id. Two Instagram posts. The reconcile pass is what settles an
+ * accepted post, and until it has, re-sending is the one thing this must not do.
+ */
+describe('classifyCandidate — a publish the platform is still processing', () => {
+  it('holds a variant whose latest log is an unresolved STILL_PROCESSING', () => {
+    const d = decide(
+      candidate(10, [variant('instagram', 'scheduled', null, { awaitingPlatform: true })]),
+    )
+
+    expect(d.kind).toBe('hold')
+    if (d.kind !== 'hold') return
+    expect(d.reason).toBe('awaiting-platform')
+    expect(d.unpublishedChannels).toEqual(['instagram'])
+  })
+
+  it('never re-sends the awaiting channel, even when a sibling is publishable', () => {
+    const d = decide(
+      candidate(10, [
+        variant('instagram', 'scheduled', null, { awaitingPlatform: true }),
+        variant('x', 'pending'),
+      ]),
+    )
+
+    expect(d.kind).toBe('hold')
+    if (d.kind !== 'hold') return
+    expect(d.reason).toBe('awaiting-platform')
+  })
+
+  it('keeps holding past grace: expiring would call a post that may be live "never sent"', () => {
+    const d = decide(
+      candidate(120, [variant('instagram', 'scheduled', null, { awaitingPlatform: true })]),
+    )
+
+    expect(d.kind).toBe('hold')
+    if (d.kind !== 'hold') return
+    expect(d.reason).toBe('awaiting-platform')
+  })
+
+  it('dispatches once the log has been superseded by a terminal row', () => {
+    // `awaitingPlatform` is false whenever a later log row exists — the reconcile pass
+    // appended one, or a later attempt did. Then the variant is whatever its status says.
+    const d = decide(
+      candidate(10, [variant('instagram', 'scheduled', null, { awaitingPlatform: false })]),
+    )
+
+    expect(d.kind).toBe('dispatch')
   })
 })
 
@@ -159,7 +289,7 @@ describe('classifyCandidate — expiry', () => {
         for (const mode of ['live', 'fixture', null] as const) {
           const d = classifyCandidate(
             candidate(late, [variant('x', 'published', mode), variant('gbp', other)]),
-            { now: NOW, graceSeconds: GRACE },
+            { now: NOW, graceSeconds: GRACE, leaseSeconds: LEASE },
           )
           expect(d.kind, `published + ${other} @ ${late}m late, mode ${mode}`).not.toBe('expire')
         }

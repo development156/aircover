@@ -1,5 +1,6 @@
 import type { Channel } from '@sahoda/shared'
 import type { DispatchMode } from '../env'
+import { PUBLISH_LEASE_SECONDS } from './lease'
 import { isPublishQueueUnavailable } from './queue'
 import {
   classifyCandidate,
@@ -18,9 +19,23 @@ export interface EnqueuePublishIntent {
   scheduledAt: string
 }
 
+/** Which write failed. The post id is for the log, never for the response body. */
+export interface DispatchFailureEvent {
+  stage: 'settle' | 'enqueue' | 'expire'
+  postId: string
+  /** The untouched cause, for a logger that is allowed to see it. */
+  error: unknown
+}
+
 export interface DispatchSweepDeps {
   mode: DispatchMode
   graceSeconds: number
+  /**
+   * How old a `publishing` claim may be before the variant is dispatched again.
+   * Defaults to PUBLISH_LEASE_SECONDS, the number `claimVariant` enforces; a caller
+   * passes it only to make the two agree explicitly.
+   */
+  leaseSeconds?: number
   listCandidates(): Promise<DispatchCandidate[]>
   enqueuePublish(intent: EnqueuePublishIntent): Promise<void>
   /**
@@ -35,6 +50,12 @@ export interface DispatchSweepDeps {
     status: 'published' | 'partial' | 'failed',
   ): Promise<boolean>
   now?(): Date
+  /**
+   * Where the real error goes. The report crosses a public URL and carries counts
+   * only, so without this hook a write that throws on every post leaves no trace but
+   * a number. A refused queue is NOT reported here: nothing was attempted.
+   */
+  onFailure?(event: DispatchFailureEvent): void
 }
 
 /** A decision flattened for the report. Enough to review without re-reading the database. */
@@ -116,8 +137,9 @@ export async function runDispatchSweep(deps: DispatchSweepDeps): Promise<Dispatc
   const candidates = await deps.listCandidates()
   report.scanned = candidates.length
 
+  const leaseSeconds = deps.leaseSeconds ?? PUBLISH_LEASE_SECONDS
   const decisions = candidates.map((c) =>
-    classifyCandidate(c, { now, graceSeconds: deps.graceSeconds }),
+    classifyCandidate(c, { now, graceSeconds: deps.graceSeconds, leaseSeconds }),
   )
 
   for (const decision of decisions) {
@@ -141,14 +163,20 @@ export async function runDispatchSweep(deps: DispatchSweepDeps): Promise<Dispatc
 
   if (deps.mode === 'report') return report
 
+  /** Count it, and hand the real thing to the logger (CLAUDE.md rule 5: no `catch {}`). */
+  const fail = (stage: DispatchFailureEvent['stage'], postId: string, error: unknown): void => {
+    report.failed += 1
+    deps.onFailure?.({ stage, postId, error })
+  }
+
   // Fan-in first, then dispatch, then expiry — the destructive one goes last.
   for (const d of decisions) {
     if (d.kind !== 'settle') continue
     try {
       if (await deps.settlePost(d.postId, d.workspaceId, d.status)) report.settled += 1
       else report.blockedByGuard += 1
-    } catch {
-      report.failed += 1
+    } catch (error) {
+      fail('settle', d.postId, error)
     }
   }
 
@@ -166,7 +194,7 @@ export async function runDispatchSweep(deps: DispatchSweepDeps): Promise<Dispatc
         report.enqueued += 1
       } catch (e) {
         if (isPublishQueueUnavailable(e)) report.queueUnavailable += 1
-        else report.failed += 1
+        else fail('enqueue', d.postId, e)
       }
     }
   }
@@ -176,8 +204,8 @@ export async function runDispatchSweep(deps: DispatchSweepDeps): Promise<Dispatc
     try {
       if (await deps.expirePost(d.postId, d.workspaceId)) report.expired += 1
       else report.blockedByGuard += 1
-    } catch {
-      report.failed += 1
+    } catch (error) {
+      fail('expire', d.postId, error)
     }
   }
 

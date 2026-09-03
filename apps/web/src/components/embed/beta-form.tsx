@@ -1,6 +1,9 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
+
+import { CHALLENGE_MISSING_MESSAGE } from './challenge-copy'
+import { useTurnstile } from './use-turnstile'
 
 /**
  * The embeddable beta form (doc 13 §5).
@@ -17,6 +20,15 @@ import { useEffect, useRef, useState } from 'react'
  * WITHOUT A SITE KEY THE FORM DOES NOT PRETEND. The submit is disabled and says
  * why, because the endpoint fails closed on a missing captcha and a form that
  * submits into a guaranteed rejection is a control that does nothing.
+ *
+ * AND WHEN THE CHECK CANNOT LOAD IT SAYS THAT, NOT "CHECK THE DETAILS". MEASURED
+ * 2026-09-02 in a browser: with Cloudflare's widget blocked this form rendered
+ * no notice, left the button enabled, posted an empty token and the visitor was
+ * told to re-check details that were right. `useTurnstile` names every way the
+ * widget can fail; here that is one sentence and a button that waits for a token.
+ *
+ * Every field here is required, so a blank one is posted as it is and the
+ * endpoint names it. Only the contact form has optional fields to omit.
  */
 
 type Status =
@@ -46,22 +58,13 @@ const LABEL = 'mb-[6px] block text-[12px] font-[550] text-muted'
 export function BetaForm({ siteKey, source }: { siteKey: string | null; source: string | null }) {
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
   const [invalid, setInvalid] = useState<string[]>([])
-  const widgetRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!siteKey) return
-    // Cloudflare's script renders any .cf-turnstile it finds and writes the
-    // token into a hidden input named cf-turnstile-response.
-    const script = document.createElement('script')
-    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js'
-    script.async = true
-    script.defer = true
-    document.head.appendChild(script)
-    return () => script.remove()
-  }, [siteKey])
+  const challenge = useTurnstile(siteKey)
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    // The button is disabled until a token is held, but a form can be submitted
+    // by other means, and an empty token is a guaranteed refusal.
+    if (challenge.state !== 'ready') return
     const form = event.currentTarget
     const data = new FormData(form)
 
@@ -77,9 +80,11 @@ export function BetaForm({ siteKey, source }: { siteKey: string | null; source: 
           business_name: String(data.get('business_name') ?? ''),
           email: String(data.get('email') ?? ''),
           phone: String(data.get('phone') ?? ''),
+          // The honeypot travels as `''` on purpose: the schema wants it present
+          // and empty, and a bot is what fills it.
           website: String(data.get('website') ?? ''),
           source_url: source ?? undefined,
-          turnstile_token: String(data.get('cf-turnstile-response') ?? ''),
+          turnstile_token: challenge.token,
         }),
       })
 
@@ -104,9 +109,12 @@ export function BetaForm({ siteKey, source }: { siteKey: string | null; source: 
       // A network failure is ours to own, and it genuinely did not save.
       setStatus({
         kind: 'error',
-        message: 'We could not reach us just now. Nothing was saved. Please try again.',
+        message: 'We could not send that just now. Nothing was saved. Please try again.',
       })
     }
+    // A token is single-use at Cloudflare. Whatever refused the send, the next
+    // attempt needs a fresh one, and the button stays disabled until it arrives.
+    challenge.reset()
   }
 
   if (status.kind === 'sent') {
@@ -118,6 +126,15 @@ export function BetaForm({ siteKey, source }: { siteKey: string | null; source: 
   }
 
   const sending = status.kind === 'sending'
+
+  // One notice at a time. A check that cannot load outranks a refused send:
+  // nothing more can be sent until it loads, whatever the last answer was.
+  const notice =
+    challenge.state === 'failed'
+      ? CHALLENGE_MISSING_MESSAGE
+      : status.kind === 'error'
+        ? status.message
+        : null
 
   return (
     <form onSubmit={submit} noValidate className="surface-ring rounded-card bg-surface p-4">
@@ -192,30 +209,27 @@ export function BetaForm({ siteKey, source }: { siteKey: string | null; source: 
       </div>
 
       {siteKey ? (
-        <div
-          ref={widgetRef}
-          className="cf-turnstile mt-4"
-          data-sitekey={siteKey}
-          data-theme="light"
-        />
+        // Turnstile renders into this box explicitly (see the hook), so the
+        // widget's own failure callbacks reach the form instead of the console.
+        <div ref={challenge.containerRef} className="mt-4" />
       ) : (
         <p className="mt-4 rounded-input bg-warn-bg px-3 py-2 text-[13px] text-warn">
           This form is not finished being set up yet, so it cannot take submissions.
         </p>
       )}
 
-      {status.kind === 'error' ? (
+      {notice ? (
         <p
           role="alert"
           className="mt-3 rounded-input bg-danger-bg px-3 py-2 text-[13px] text-danger"
         >
-          {status.message}
+          {notice}
         </p>
       ) : null}
 
       <button
         type="submit"
-        disabled={sending || !siteKey}
+        disabled={sending || challenge.state !== 'ready'}
         className="mt-4 h-10 w-full rounded-sm bg-primary text-[14px] leading-none font-[550] text-primary-foreground transition-micro hover:bg-ink dark:hover:bg-white dark:hover:text-[var(--canvas)] active:translate-y-[0.5px] disabled:pointer-events-none disabled:bg-line disabled:text-white"
       >
         {sending ? 'Sending…' : 'Request early access'}

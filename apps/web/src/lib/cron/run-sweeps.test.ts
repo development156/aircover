@@ -181,6 +181,52 @@ describe('runCronSweeps', () => {
     expect(onError).toHaveBeenCalledWith('dispatch', boom)
   })
 
+  it('runs the reconcile pass BEFORE dispatch, so an accepted post is settled before it can be re-sent', async () => {
+    // Tick T0 publishes an Instagram variant; Meta takes longer than the adapter's 36s
+    // poll; the adapter throws STILL_PROCESSING and the claim is handed back as
+    // `scheduled`. If the next tick dispatched first, the reconcile pass that would have
+    // found the first post live would run AFTER the second POST had already gone out.
+    // Reconcile is one bounded batch of Zernio reads; dispatch can spend ~200s
+    // publishing, so the pass that can wait is also the one that must not be last.
+    const order: string[] = []
+    const outcome = await runCronSweeps({
+      config: SIMULATED_RAIL,
+      runDispatch: async () => {
+        order.push('dispatch')
+        return dispatchReport()
+      },
+      runHolds: async () => {
+        order.push('holds')
+        return holdReport()
+      },
+      runReconcile: async () => {
+        order.push('reconcile')
+        return reconcileReport()
+      },
+    })
+
+    expect(outcome.status).toBe(200)
+    expect(order.indexOf('reconcile')).toBeLessThan(order.indexOf('dispatch'))
+    expect(order).toEqual(['reconcile', 'holds', 'dispatch'])
+  })
+
+  it('still dispatches when the reconcile pass throws, so a Zernio outage cannot stop publishing', async () => {
+    const runDispatch = vi.fn(async () => dispatchReport({ scanned: 1, enqueued: 1 }))
+
+    const outcome = await runCronSweeps({
+      config: SIMULATED_RAIL,
+      runDispatch,
+      runHolds: async () => holdReport(),
+      runReconcile: async () => {
+        throw new Error('Zernio returned 500')
+      },
+    })
+
+    expect(runDispatch).toHaveBeenCalledOnce()
+    expect(outcome.body.dispatch).toMatchObject({ enqueued: 1 })
+    expect(outcome.body.reconcile).toEqual({ error: 'reconcile-sweep-failed' })
+  })
+
   it('is an all-zero no-op when every flag is off', async () => {
     // The deploy-changes-nothing property, at the layer the route actually returns.
     // Three sweeps now, and the property must hold for all of them: the reconcile

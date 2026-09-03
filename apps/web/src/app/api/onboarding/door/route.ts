@@ -1,8 +1,10 @@
 import { auth } from '@clerk/nextjs/server'
 
-import { reportServerError } from '@/lib/observability/report'
+import { bodyTooLarge, parseDoorForm } from '@/lib/onboarding/door-request'
+import { doorReadAllowed } from '@/lib/onboarding/limits'
 import { readDoorStreaming, type Stage } from '@/lib/onboarding/read-door'
 import { seedLibraryFromSite } from '@/lib/onboarding/seed-library'
+import { reportServerError } from '@/lib/observability/report'
 import { readActiveWorkspace } from '@/lib/workspaces'
 
 /**
@@ -22,6 +24,18 @@ import { readActiveWorkspace } from '@/lib/workspaces'
  *
  * NDJSON rather than SSE: the client needs one JSON object per line and nothing
  * SSE adds (no reconnection, no event ids — a re-read is a new request).
+ *
+ * ── THE ORDER OF THE REFUSALS IS THE DESIGN ─────────────────────────────────
+ *   1. session          nothing without a person
+ *   2. workspace        nothing without somewhere to save, and `unreadable` is
+ *                       its own arm (503), never "you have no workspace"
+ *   3. body length      a header compare, before `formData()` buffers the body
+ *   4. rate limit       per person AND per workspace, before anything is parsed
+ *   5. shape            zod, before the read
+ *   6. the read         the PDF arm holds credits inside `read-door.ts`
+ *
+ * Each refusal returns a named cause, and `lib/onboarding/door-transport-failure.ts`
+ * owns the sentence for every one of them. Add a cause here, add it there.
  */
 
 export const runtime = 'nodejs'
@@ -34,21 +48,9 @@ export async function POST(request: Request): Promise<Response> {
     if (!userId) return Response.json({ error: 'signed_out' }, { status: 401 })
 
     /**
-     * ── `no_workspace` WAS ALSO SAYING "THE READ BROKE" ────────────────────────
-     * The lookup returned null for both, so a failed workspace query left here as
-     * a 400 tagged `no_workspace`: a client-error status, and a named cause that
-     * was not the cause. Run 23 split this at the reader and named the handlers as
-     * unaudited; this is one of them.
-     *
-     * The caller USED TO collapse every non-ok into one sentence — "We could not
-     * read that — tell us in your own words instead" — which is a claim about
-     * the SITE the customer submitted, and wrong on every arm below because
-     * none of them opens the document. That report is now actioned: the four
-     * named causes each get their own sentence in
-     * `lib/onboarding/door-transport-failure.ts`, and `door-step.tsx` reads the
-     * code off this body rather than discarding it. Renaming a cause here
-     * without adding it there falls through to the unnamed default, which is
-     * honest but vaguer — so keep the two in step.
+     * `no_workspace` and `workspace_unreadable` are two different facts with two
+     * different remedies, and the second is not a client error. The reader was
+     * split for this; the caller reads the code off the body.
      */
     const workspaceRead = await readActiveWorkspace()
     if (workspaceRead.status === 'unreadable') {
@@ -59,12 +61,21 @@ export async function POST(request: Request): Promise<Response> {
     }
     const workspace = workspaceRead.workspace
 
-    const form = await request.formData()
-    const file = form.get('pdf')
-    const pdf =
-      file instanceof File && file.size > 0
-        ? { name: file.name, size: file.size, bytes: await file.arrayBuffer() }
-        : null
+    // BEFORE the body is parsed: `request.formData()` buffers the whole
+    // multipart body, so a size check after it has already paid for the bytes.
+    if (bodyTooLarge(request.headers.get('content-length'))) {
+      return Response.json({ error: 'too_large' }, { status: 413 })
+    }
+
+    // Keyed on the person as well as the workspace, because a workspace can be
+    // erased and re-created and the person cannot.
+    if (!(await doorReadAllowed(userId, workspace.id))) {
+      return Response.json({ error: 'rate_limited' }, { status: 429 })
+    }
+
+    const form = parseDoorForm(await request.formData())
+    if (!form.ok) return Response.json({ error: form.reason }, { status: 400 })
+    const { pdf, url, sentence } = form
 
     const encoder = new TextEncoder()
     const stream = new ReadableStream<Uint8Array>({
@@ -78,13 +89,7 @@ export async function POST(request: Request): Promise<Response> {
         }
         try {
           const result = await readDoorStreaming(
-            {
-              pdf,
-              url: String(form.get('url') ?? ''),
-              sentence: String(form.get('sentence') ?? ''),
-              workspaceId: workspace.id,
-              userId,
-            },
+            { pdf, url, sentence, workspaceId: workspace.id, userId },
             (stage: Stage) => line({ type: 'stage', ...stage }),
           )
           line({ type: 'done', result })
@@ -108,7 +113,7 @@ export async function POST(request: Request): Promise<Response> {
           if (result.ok && result.kind === 'url') {
             await seedLibraryFromSite({
               workspaceId: workspace.id,
-              url: String(form.get('url') ?? ''),
+              url,
               text: result.text,
               title: result.foundName || null,
             })
@@ -121,13 +126,8 @@ export async function POST(request: Request): Promise<Response> {
            * catch means it THREW — an unclassified fault in Sahoda, at an
            * unknown point, possibly before the document was opened at all.
            *
-           * This used to emit "We could not read that — tell us in your own
-           * words instead", the same claim the caller made on every transport
-           * failure and the reason `lib/onboarding/door-transport-failure.ts`
-           * exists. It is wrong for the same reason here: it is a verdict on
-           * the customer's website issued by a code path that does not know
-           * whether the website was ever fetched, and the remedy it offers
-           * sends someone to retype their business by hand over our own crash.
+           * "Nothing was charged" is true here by construction: the only paid
+           * work is inside a `withCredits` whose throw path releases the hold.
            */
           line({
             type: 'done',
@@ -137,6 +137,7 @@ export async function POST(request: Request): Promise<Response> {
                 'Sahoda broke part-way through reading, so it cannot say whether your link or PDF is usable. Nothing was charged. Try again.',
               stages: [],
               costUsd: 0,
+              creditsCharged: 0,
             },
           })
         } finally {

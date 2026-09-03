@@ -9,6 +9,7 @@ import {
 
 import type { ZernioPlatform } from '@sahoda/shared'
 
+import { LIVE_READ_TTL_MS, memoLiveRead } from '@/lib/analytics/read-cache'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { activeWorkspaceRead } from '@/lib/workspaces'
 import { scopeForWorkspace } from '@/lib/zernio/scope'
@@ -30,6 +31,13 @@ import { zernioClientReads } from '@/lib/zernio/server'
 
 /** How far back the dashboard asks. Instagram's own windows are shorter than this. */
 const WINDOW_DAYS = 30
+
+/**
+ * How long one account reading is reused before Instagram is asked again, in
+ * minutes, for the sentence on the screen that says so. Derived from the memo's
+ * own constant so the copy and the behaviour cannot drift apart.
+ */
+export const ACCOUNT_READ_TTL_MINUTES = LIVE_READ_TTL_MS / 60_000
 
 /** One day of a series: a date and a value that was actually reported. */
 export interface SeriesPoint {
@@ -64,6 +72,16 @@ export type AccountAnalytics =
        */
       followerLagHours: number
       insightsLagHours: number
+      /**
+       * When Sahoda asked Instagram for these figures, ISO-8601 UTC.
+       *
+       * A reading is reused for `ACCOUNT_READ_TTL_MINUTES` per server instance,
+       * so the figures on a screen may be up to that much older than the render.
+       * The screen prints this so a figure never travels without its time.
+       * Optional only because typed fixtures elsewhere build this variant by
+       * hand; `readInstagramAnalytics` always sets it.
+       */
+      readAt?: string
       /**
        * True when BOTH reads came back with nothing.
        *
@@ -298,17 +316,32 @@ export async function readInstagramAnalytics(now: Date = new Date()): Promise<Ac
   const until = isoDaysAgo(now, 0)
 
   try {
-    const [history, insights] = await Promise.all([
-      // `time_series` is asked for EXPLICITLY. The endpoint defaults to `total_value`,
-      // which answers `{ follower_count: { total: 1 } }` — a single number for the whole
-      // window, and no history at all. A chart cannot be drawn from it, and the previous
-      // code drew one anyway (see `seriesFrom`).
-      reads.instagramFollowerHistory(account, { since, until, metricType: 'time_series' }),
-      // Insights stays on the default. `time_series` is REFUSED here — the endpoint
-      // answers HTTP 400, "Metrics [views, accounts_engaged, total_interactions] only
-      // support metricType=total_value" — and these four are read as tiles, not a line.
-      reads.instagramAccountInsights(account, { since, until }),
-    ])
+    /**
+     * ── ONE READING PER WORKSPACE, ACCOUNT AND WINDOW, FOR TEN MINUTES ──────────
+     * /home and /analytics each made these two calls on every render, and
+     * nothing remembered the answer between them or between refreshes. Keyed by
+     * workspace so a reading can never be served across tenants, by account so a
+     * reconnected account starts fresh, and by the day window so a reading from
+     * yesterday's window is not today's. A rejected pair is not remembered: the
+     * next render asks again and reports `unreadable` only for itself.
+     */
+    const { value: answer, readAt } = await memoLiveRead(
+      `account-insights:${workspaceId}:${account}:${since}:${until}`,
+      () =>
+        Promise.all([
+          // `time_series` is asked for EXPLICITLY. The endpoint defaults to `total_value`,
+          // which answers `{ follower_count: { total: 1 } }` — a single number for the whole
+          // window, and no history at all. A chart cannot be drawn from it, and the previous
+          // code drew one anyway (see `seriesFrom`).
+          reads.instagramFollowerHistory(account, { since, until, metricType: 'time_series' }),
+          // Insights stays on the default. `time_series` is REFUSED here — the endpoint
+          // answers HTTP 400, "Metrics [views, accounts_engaged, total_interactions] only
+          // support metricType=total_value" — and these four are read as tiles, not a line.
+          reads.instagramAccountInsights(account, { since, until }),
+        ]),
+      now.getTime(),
+    )
+    const [history, insights] = answer
 
     // Each endpoint's own statement of its own delay wins over our constant, and
     // neither borrows the other's — they are genuinely different numbers, and the
@@ -331,6 +364,7 @@ export async function readInstagramAnalytics(now: Date = new Date()): Promise<Ac
       insights: tiles,
       followerLagHours,
       insightsLagHours,
+      readAt,
       nothingReported: followers.length === 0 && tiles.length === 0,
     }
   } catch {

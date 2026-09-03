@@ -7,7 +7,7 @@ import { BatchPreview } from '@/components/remix/batch-preview'
 import { PlanBatch } from '@/components/remix/plan-batch'
 import { buttonVariants } from '@/components/ui/button'
 import { MISSING_KINDS } from '@/lib/remix/catalogue'
-import { readCurrentBatch } from '@/lib/remix/read'
+import { readCurrentBatchOutcome, REMIX_UNREADABLE_COPY } from '@/lib/remix/read'
 import { isSettled } from '@/lib/remix/status'
 import { listPosts } from '@/lib/posts/read'
 import { activeWorkspaceRead } from '@/lib/workspaces'
@@ -61,8 +61,36 @@ export default async function RemixPage() {
     )
   }
 
-  const [posts, batch] = await Promise.all([listPosts(), readCurrentBatch(workspace.workspace.id)])
+  const [posts, batchRead] = await Promise.all([
+    listPosts(),
+    readCurrentBatchOutcome(workspace.workspace.id),
+  ])
   const sources = posts.filter((post) => (post.body ?? '').trim() !== '').slice(0, SOURCE_LIMIT)
+
+  /**
+   * A READ THAT FAILED IS NOT A WORKSPACE WITH NOTHING IN IT.
+   *
+   * `readCurrentBatch` answered `null` for both, so a database that refused to
+   * answer put the planner back on screen beside a run that may well have been
+   * in progress: press it again and the same work is planned, and paid for,
+   * twice. The two are now told apart, and the failed read says so and offers
+   * the one remedy that can work.
+   */
+  if (batchRead.status === 'unreadable') {
+    return (
+      <div className="space-y-grid">
+        <PageTitle sub="Turn one thing you already wrote into a week of posts.">Remix</PageTitle>
+        <EmptyState
+          icon={Sparkles}
+          title="Could not read your remix runs"
+          body={REMIX_UNREADABLE_COPY}
+        />
+        <Missing />
+      </div>
+    )
+  }
+
+  const batch = batchRead.batch
 
   return (
     <div className="space-y-grid">

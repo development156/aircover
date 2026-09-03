@@ -105,8 +105,14 @@ export async function planMyWeek(goals: unknown, channels: unknown): Promise<Pla
     const requested = toChannelSet(parsedInput.data.channels)
     // A plain array for the mesh call — `PlanWeekInputSchema` types it mutable, and
     // `ChannelSet` is readonly. The copy is still the distinct list; the spread only
-    // drops the brand at the package seam.
-    const taskInput = { goals: parsedInput.data.goals, channels: [...requested] }
+    // drops the brand at the package seam. `nowIso` rides along: parsing it above
+    // and then building the task input without it is exactly what shipped a
+    // model with no notion of today (plan-week.test.ts pins it).
+    const taskInput = {
+      goals: parsedInput.data.goals,
+      channels: [...requested],
+      nowIso: parsedInput.data.nowIso,
+    }
 
     // SERVER-DERIVED ledger key, fresh per invocation — a stable ref would
     // replay a spent HOLD+DEBIT. See lib/planner/object-ref.ts.

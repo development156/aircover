@@ -14,6 +14,7 @@ import {
   type WithCreditsFn,
 } from '@sahoda/shared'
 
+import { draftShapeFor } from '@/lib/loop/draft-shape'
 import { governingLevel } from '@/lib/loop/governing-level'
 import { filterVariants } from '@/lib/posts/filter-variants'
 import { RUN_ACTION, previewRunCost, shortfallMessage } from '@/lib/playbooks/cost'
@@ -182,12 +183,15 @@ export interface ExecuteRunState {
  * SPEND — but only against a fresh read of the gate.
  *
  * ── THIS FUNCTION NEVER PUBLISHES, AT ANY AUTONOMY LEVEL ────────────────────
- * L0 writes no draft at all and is charged nothing for the item. L1 leaves a
- * draft in the Planner with no schedule. L2 puts a schedule on it and sets
- * `status = 'approved'`, which is where the dispatcher would pick it up — and the
- * dispatcher is behind its own flag. There is no L3 branch, because L3 cannot be
- * stored: `AutonomyLevel` is 0 | 1 | 2 and the column refuses a 3. The absence of
- * that branch is what makes an unattended publish unreachable from here.
+ * `draftShapeFor` decides the row per rung, and its own header says why. L0
+ * writes no draft at all and is charged nothing for the item. L1 leaves a draft
+ * in the Planner with no schedule. L2 writes `review` with the slot attached:
+ * the one status that is on the approvals queue AND outside the sweep's gate,
+ * so a person's Approve is what turns it into `approved`. (It was written
+ * `approved` with a slot until 2026-09-02, which the sweep would have sent at
+ * the slot with nobody having approved that post.) L3 leaves a plain draft
+ * with no time on it, because only the autopilot dispatcher may schedule an
+ * autopilot post, after its cancel window.
  */
 export async function executeRun(runId: string): Promise<ExecuteRunState> {
   let workspaceId: string | undefined
@@ -273,6 +277,7 @@ export async function executeRun(runId: string): Promise<ExecuteRunState> {
       const objectRef = newPlaybookItemRef(item.id)
       if (!isPlaybookRef(objectRef)) throw new Error('PLAYBOOK_REF_INVARIANT')
 
+      const shape = draftShapeFor(level, item.suggested_slot)
       let postId: string | null = null
       const charged = await getWithCredits()(
         { workspaceId, action: recipe.outputAction, objectRef },
@@ -315,9 +320,9 @@ export async function executeRun(runId: string): Promise<ExecuteRunState> {
             body: item.body,
             // Draft capture (REQUESTS.md §22): a playbook item is model output.
             generated_body: item.body,
-            status: level === 2 ? 'approved' : 'draft',
+            status: shape.status,
             channels: [...item.channels],
-            scheduled_at: level === 2 ? item.suggested_slot : null,
+            scheduled_at: shape.scheduledAt,
             origin: 'playbook',
             created_by: userId,
           })
@@ -353,12 +358,7 @@ export async function executeRun(runId: string): Promise<ExecuteRunState> {
         continue
       }
 
-      await store.linkItemToPost(
-        item.id,
-        workspaceId,
-        postId,
-        level === 2 ? 'awaiting_approval' : 'drafted',
-      )
+      await store.linkItemToPost(item.id, workspaceId, postId, shape.outcome)
       drafted += 1
       spent += creditCost(recipe.outputAction)
       await store.addSpend(runId, workspaceId, creditCost(recipe.outputAction))
@@ -369,6 +369,7 @@ export async function executeRun(runId: string): Promise<ExecuteRunState> {
     revalidatePath('/playbooks')
     revalidatePath('/planner')
     revalidatePath('/posts')
+    revalidatePath('/approvals')
     return { ok: true, drafted, suggested, spent }
   } catch (error) {
     reportServerError(error, { action: 'executeRun', workspaceId })

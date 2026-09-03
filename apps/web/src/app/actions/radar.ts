@@ -2,9 +2,10 @@
 
 import { revalidatePath } from 'next/cache'
 import { auth } from '@clerk/nextjs/server'
-import { PostInsertSchema, toChannelSet, type Channel } from '@sahoda/shared'
+import { ChannelSchema, PostInsertSchema, toChannelSet, type Channel } from '@sahoda/shared'
 
 import { generateVariants } from '@/app/actions/posts-ai'
+import { reportServerError } from '@/lib/observability/report'
 import { briefFromChange } from '@/lib/radar/brief'
 import { normalizeUrl } from '@/lib/radar/locator'
 import { radarStore } from '@/lib/radar/read'
@@ -75,6 +76,36 @@ function isKind(value: unknown): value is CompetitorKind {
   return value === 'website' || value === 'instagram' || value === 'google_business'
 }
 
+/**
+ * The store's OWN refusals: sentences it writes for the customer, which pass
+ * through unchanged. Everything else the store throws is built by interpolating
+ * what PostgREST said (`Could not add that competitor: relation "x" does not
+ * exist`), and that text is for the server log, never the screen.
+ *
+ * Matched by phrase rather than by a code because `lib/radar/store.ts` throws
+ * plain `Error`s; a typed error carrying a code is the better shape and is owed
+ * there. Until then the safe default is the one below: an unrecognised sentence
+ * is treated as raw, so a new interpolating throw cannot reach a customer.
+ */
+const STORE_REFUSALS: readonly RegExp[] = [
+  /not collecting/i,
+  /only an owner or an editor/i,
+  /could not read that address/i,
+  /cannot watch/i,
+]
+
+function isStoreRefusal(cause: unknown): cause is Error {
+  return cause instanceof Error && STORE_REFUSALS.some((pattern) => pattern.test(cause.message))
+}
+
+/** Third person, and each says what is true of the watch list afterwards. */
+const ADD_FAILED = 'Sahoda could not add that business to your watch list. The list is unchanged.'
+const REMOVE_FAILED =
+  'Sahoda could not stop watching that business. It is still on your watch list.'
+const DRAFT_NOT_STARTED = 'Sahoda could not read your Radar just now, so no draft was started.'
+const DRAFT_REFUSED = 'Could not start a draft from that change.'
+const DRAFT_UNFINISHED = 'Sahoda started the draft but could not finish it. Find it in your posts.'
+
 export async function addCompetitor(
   name: unknown,
   url: unknown,
@@ -119,14 +150,17 @@ export async function addCompetitor(
     revalidatePath(RADAR_CHANGE_REVALIDATE)
     return { ok: true, competitorId: added.id }
   } catch (cause) {
-    const message = cause instanceof Error ? cause.message : 'Could not add that business.'
-    // The "not collecting yet" case is its OWN reason rather than a generic
-    // failure: it is the expected state of an unshipped collector, and telling
-    // someone to try again would be advice that cannot work.
-    if (message.includes('not collecting')) {
-      return { ok: false, reason: 'not-collecting', message }
+    if (isStoreRefusal(cause)) {
+      // The "not collecting yet" case is its OWN reason rather than a generic
+      // failure: it is the expected state of an unshipped collector, and telling
+      // someone to try again would be advice that cannot work.
+      if (/not collecting/i.test(cause.message)) {
+        return { ok: false, reason: 'not-collecting', message: cause.message }
+      }
+      return { ok: false, reason: 'failed', message: cause.message }
     }
-    return { ok: false, reason: 'failed', message }
+    reportServerError(cause, { action: 'addCompetitor', workspaceId: ws.workspace.id })
+    return { ok: false, reason: 'failed', message: ADD_FAILED }
   }
 }
 
@@ -158,10 +192,9 @@ export async function removeCompetitor(
   try {
     await radarStore().remove(ws.workspace.id, competitorId)
   } catch (cause) {
-    return {
-      ok: false,
-      message: cause instanceof Error ? cause.message : 'Could not stop watching that business.',
-    }
+    if (isStoreRefusal(cause)) return { ok: false, message: cause.message }
+    reportServerError(cause, { action: 'removeCompetitor', workspaceId: ws.workspace.id })
+    return { ok: false, message: REMOVE_FAILED }
   }
   revalidatePath(RADAR_CHANGE_REVALIDATE)
   return { ok: true }
@@ -218,10 +251,14 @@ export async function draftFromRadarChange(
   // hand-rolled call with ['x','x','x'] would ask the model for three X variants
   // against one flat charge — the duplicate-channel defect this repo has already
   // shipped three times. Deduped HERE, before anything reads it.
+  //
+  // FILTERED THROUGH THE SCHEMA, not a literal restated here. This was
+  // `['x','gbp','linkedin','instagram'].includes(c)`, which kept typechecking
+  // after `facebook` and `telegram` joined `ChannelSchema` and silently refused
+  // both as "no channel picked".
   const requested = toChannelSet(
     (Array.isArray(channels) ? channels : []).filter(
-      (c): c is Channel =>
-        typeof c === 'string' && ['x', 'gbp', 'linkedin', 'instagram'].includes(c),
+      (c): c is Channel => ChannelSchema.safeParse(c).success,
     ),
   )
   if (requested.length === 0) {
@@ -233,7 +270,18 @@ export async function draftFromRadarChange(
     }
   }
 
-  const change = await findChange(workspace.id, changeId)
+  // Everything from here reads or writes, and the client does
+  // `setOutcome(await draftFromRadarChange(...))`: a rejection is not a state it
+  // can render. Two catches rather than one, because "could not read your Radar"
+  // and "could not start a draft" are different facts and each is only true on
+  // its own path.
+  let change: RadarChange | null
+  try {
+    change = await findChange(workspace.id, changeId)
+  } catch (cause) {
+    reportServerError(cause, { action: 'draftFromRadarChange', workspaceId: workspace.id })
+    return { ok: false, insufficient: false, postId: null, message: DRAFT_NOT_STARTED }
+  }
   if (!change) {
     return {
       ok: false,
@@ -243,61 +291,75 @@ export async function draftFromRadarChange(
     }
   }
 
-  const brief = briefFromChange(change, change.reading?.brandBasis ?? null)
+  // `postId` lives outside the try so the catch can say truthfully whether a
+  // draft exists.
+  let postId: string | null = null
+  try {
+    const brief = briefFromChange(change, change.reading?.brandBasis ?? null)
 
-  const supabase = createServerSupabase()
-  const { data, error } = await supabase
-    .from('posts')
-    .insert(
-      PostInsertSchema.parse({
-        workspace_id: workspace.id,
-        title: brief.title,
-        body: brief.body,
-        status: 'draft',
-        channels: [...requested],
-        origin: RADAR_POST_ORIGIN,
-        created_by: userId,
-      }),
-    )
-    .select('id')
-    .single()
+    // `safeParse`, because a refused row is a failure to START the draft, not a
+    // failure to read the Radar, and the two get different sentences. The refusal
+    // itself is logged whole: it names the field.
+    const row = PostInsertSchema.safeParse({
+      workspace_id: workspace.id,
+      title: brief.title,
+      body: brief.body,
+      status: 'draft',
+      channels: [...requested],
+      origin: RADAR_POST_ORIGIN,
+      created_by: userId,
+    })
+    if (!row.success) {
+      reportServerError(row.error, { action: 'draftFromRadarChange', workspaceId: workspace.id })
+      return { ok: false, insufficient: false, postId: null, message: DRAFT_REFUSED }
+    }
 
-  if (error || !data) {
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase.from('posts').insert(row.data).select('id').single()
+
+    if (error || !data) {
+      if (error) {
+        reportServerError(error, { action: 'draftFromRadarChange', workspaceId: workspace.id })
+      }
+      return { ok: false, insufficient: false, postId: null, message: DRAFT_REFUSED }
+    }
+    postId = data.id as string
+
+    // The ONLY paid step, and it owns its own ledger entry end to end.
+    const generated = await generateVariants(postId, [...requested])
+    revalidatePath(RADAR_CHANGE_REVALIDATE)
+    revalidatePath('/posts')
+
+    if (!generated.ok) {
+      if (generated.insufficient) {
+        // `postId` is deliberately NOT surfaced on this arm: the shortfall message
+        // is about money, and offering a link to a draft in the same breath buries
+        // the one thing the reader has to act on. The draft is still there, and
+        // /posts is where they will meet it.
+        return {
+          ok: false,
+          insufficient: true,
+          required: generated.required,
+          available: generated.available,
+        }
+      }
+      return { ok: false, insufficient: false, postId, message: generated.message }
+    }
+
+    return {
+      ok: true,
+      postId,
+      variants: generated.variants.length,
+      creditsCharged: generated.creditsCharged,
+    }
+  } catch (cause) {
+    reportServerError(cause, { action: 'draftFromRadarChange', workspaceId: workspace.id })
     return {
       ok: false,
       insufficient: false,
-      postId: null,
-      message: 'Could not start a draft from that change.',
+      postId,
+      message: postId === null ? DRAFT_REFUSED : DRAFT_UNFINISHED,
     }
-  }
-  const postId = data.id as string
-
-  // The ONLY paid step, and it owns its own ledger entry end to end.
-  const generated = await generateVariants(postId, [...requested])
-  revalidatePath(RADAR_CHANGE_REVALIDATE)
-  revalidatePath('/posts')
-
-  if (!generated.ok) {
-    if (generated.insufficient) {
-      // `postId` is deliberately NOT surfaced on this arm: the shortfall message
-      // is about money, and offering a link to a draft in the same breath buries
-      // the one thing the reader has to act on. The draft is still there, and
-      // /posts is where they will meet it.
-      return {
-        ok: false,
-        insufficient: true,
-        required: generated.required,
-        available: generated.available,
-      }
-    }
-    return { ok: false, insufficient: false, postId, message: generated.message }
-  }
-
-  return {
-    ok: true,
-    postId,
-    variants: generated.variants.length,
-    creditsCharged: generated.creditsCharged,
   }
 }
 
@@ -324,28 +386,38 @@ export async function draftFromRadarChange(
 export async function connectedChannels(): Promise<readonly Channel[]> {
   const workspace = await getActiveWorkspace()
   if (!workspace) return []
-  const supabase = createServerSupabase()
-  const { data } = await supabase
-    .from('connections')
-    .select('platform')
-    .eq('workspace_id', workspace.id)
-    .eq('status', 'active')
-  return toChannelSet(
-    (data ?? [])
-      // ── FILTER THE STRING, THEN NARROW. NEVER THE OTHER WAY ROUND ────────
-      // This was `.map((r) => r.platform as Channel)` followed by this filter.
-      // The filter saved it, but the cast itself became a lie on 2026-08-26:
-      // `connections.platform` can now hold `discord`, `tiktok` and six more
-      // that are not `Channel` at all, and an `as` is precisely what the
-      // compiler cannot check. Narrowing after the test costs nothing and
-      // leaves no false statement for the next reader to trust.
-      //
-      // ⚠ THE LIST IS STALE AND IS DELIBERATELY LEFT ALONE HERE. `facebook` and
-      // `telegram` became channels on 2026-08-26 and this literal still names
-      // four, so Radar silently ignores both. That is a real defect and it is
-      // NOT this change's to fix: widening it alters what Radar reports, which
-      // is a product decision outside "make these platforms connectable".
-      .map((r) => r.platform as string)
-      .filter((p): p is Channel => ['x', 'gbp', 'linkedin', 'instagram'].includes(p)),
-  )
+  try {
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase
+      .from('connections')
+      .select('platform')
+      .eq('workspace_id', workspace.id)
+      .eq('status', 'active')
+    // An empty offer is what the caller renders either way, but a read that
+    // FAILED must not pass as "nothing connected" in silence: it is logged with
+    // the action named, so the two are told apart where somebody can act on it.
+    if (error) {
+      reportServerError(error, { action: 'connectedChannels', workspaceId: workspace.id })
+      return []
+    }
+    return toChannelSet(
+      (data ?? [])
+        // ── FILTER THE STRING, THEN NARROW. NEVER THE OTHER WAY ROUND ────────
+        // This was `.map((r) => r.platform as Channel)` followed by this filter.
+        // The filter saved it, but the cast itself became a lie on 2026-08-26:
+        // `connections.platform` can now hold `discord`, `tiktok` and six more
+        // that are not `Channel` at all, and an `as` is precisely what the
+        // compiler cannot check. Narrowing after the test costs nothing and
+        // leaves no false statement for the next reader to trust.
+        //
+        // Through `ChannelSchema`, not a literal. The four-item literal that
+        // stood here silently dropped `facebook` and `telegram` from Radar's
+        // offer for a week after they became channels.
+        .map((r) => r.platform as string)
+        .filter((p): p is Channel => ChannelSchema.safeParse(p).success),
+    )
+  } catch (cause) {
+    reportServerError(cause, { action: 'connectedChannels', workspaceId: workspace.id })
+    return []
+  }
 }

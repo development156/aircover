@@ -1,6 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse, type NextFetchEvent, type NextRequest } from 'next/server'
 
+import { EMBED_SURFACE, isClerkFreeSurface, SURFACE_HEADER } from '@/components/embed/surface'
 import { provesOpsAdmin } from '@/lib/ops/gate-decision'
 import { cspFor } from '@/lib/security/csp'
 
@@ -167,6 +168,41 @@ function notFound(csp: string): NextResponse {
   return new NextResponse(null, { status: 404, headers: { 'Content-Security-Policy': csp } })
 }
 
+/**
+ * ── THE SURFACES CLERK NEVER RUNS ON, AND HOW THE LAYOUT LEARNS THAT ─────────
+ * MEASURED 2026-09-02 against the production build: `/embed/lead`, a public
+ * contact form with no user, shipped 241,200 bytes of Clerk's browser SDK in 8
+ * requests plus a telemetry POST, and inside a third-party iframe the document
+ * went 307 → Clerk handshake → 307 → 307 → 200 before rendering. Being on
+ * `isPublicRoute` did not help: public decides what clerkMiddleware DOES, not
+ * whether it RUNS, and the handshake happens while it computes request state.
+ *
+ * So `/embed/*` and `/design-system` are answered here, BEFORE `clerk()`. They
+ * stay in `config.matcher` on purpose: this function is what sets their CSP,
+ * and `/embed/*` is the one surface whose `frame-ancestors *` is the point.
+ * `middleware.coverage.test.ts` still classifies them public+matched, which
+ * remains true of the matcher; what changed is that Clerk is not consulted.
+ *
+ * The request is forwarded with `x-sahoda-surface: embed`, and `app/layout.tsx`
+ * renders the same shell without `<ClerkProvider>` when it sees it. Every OTHER
+ * path forwards its request with that header DELETED, so a visitor cannot send
+ * it to `/sign-in` and strip the provider from a page whose components need it.
+ */
+function clerkFreeResponse(req: NextRequest): NextResponse {
+  const headers = new Headers(req.headers)
+  headers.set(SURFACE_HEADER, EMBED_SURFACE)
+  const response = NextResponse.next({ request: { headers } })
+  response.headers.set('Content-Security-Policy', cspFor(req.nextUrl.pathname))
+  return response
+}
+
+/** The request headers to forward on every path Clerk does run on: ours, minus the surface mark. */
+function withoutSurfaceHeader(req: NextRequest): Headers {
+  const headers = new Headers(req.headers)
+  headers.delete(SURFACE_HEADER)
+  return headers
+}
+
 const clerk = clerkMiddleware(
   async (auth, req) => {
     const csp = cspFor(req.nextUrl.pathname)
@@ -193,7 +229,7 @@ const clerk = clerkMiddleware(
     // This is the coarse gate only. Every /admin page still calls
     // requireOpsAdmin() and every server action re-checks, because a routing
     // layer is the wrong place for the last word on authorisation.
-    const response = NextResponse.next()
+    const response = NextResponse.next({ request: { headers: withoutSurfaceHeader(req) } })
     response.headers.set('Content-Security-Policy', csp)
     return response
   },
@@ -243,6 +279,10 @@ export default async function middleware(
   req: NextRequest,
   event: NextFetchEvent,
 ): Promise<NextResponse> {
+  // BEFORE Clerk, not inside its callback: the callback runs after Clerk has
+  // computed the request state, which is the work these paths must not pay for.
+  if (isClerkFreeSurface(req.nextUrl.pathname)) return clerkFreeResponse(req)
+
   try {
     return (await clerk(req, event)) as NextResponse
   } catch (error) {
@@ -259,7 +299,7 @@ export default async function middleware(
     )
 
     if (isPublicRoute(req)) {
-      const response = NextResponse.next()
+      const response = NextResponse.next({ request: { headers: withoutSurfaceHeader(req) } })
       response.headers.set('Content-Security-Policy', csp)
       return response
     }

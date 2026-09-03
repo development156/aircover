@@ -24,8 +24,19 @@
  * capability that arrives from our own code regardless of which model is
  * chosen, and would go on promising it if we swapped the model out.
  *
+ * ── AND WHAT IT COSTS IS THE TIER, PRICED BY THE SHARED MAP ─────────────────
+ * Each model declares the product tier it belongs to (`draft` or `finish`, the
+ * same two words `studio_generations.image_tier` records) and `imageActionFor`
+ * turns that into the pricing key through `IMAGE_TIER_ACTION`. Every model was
+ * held at the flat everyday price until 2026-09-03 while the copy on two of the
+ * cards said "billed by what it draws" and "the dearest": nothing read the
+ * premium key at all. The tier is on the catalogue rather than in the action so
+ * the picker, the total beside the button and the hold all price from ONE fact.
+ *
  * Pure: no I/O, no clock, no database.
  */
+
+import { IMAGE_TIER_ACTION, type ActionType, type ImageTier } from '@sahoda/shared'
 
 export type StudioModel = {
   /** The provider id, exactly as addressed. */
@@ -45,6 +56,13 @@ export type StudioModel = {
   maxReferences: number
   /** Roughly what one picture costs the business, for the ordering below. */
   costNote: string
+  /**
+   * The product tier, which is what the person is CHARGED by. `draft` is the
+   * everyday price; `finish` is the premium one. Declared per model rather than
+   * derived from the id or the provider rate, so swapping a model for a newer
+   * one never moves a price by accident.
+   */
+  tier: ImageTier
   /**
    * False when the mesh does not route to it yet. A model listed as available
    * that the router cannot reach would spend a press and fail.
@@ -93,6 +111,7 @@ export const STUDIO_MODELS: readonly StudioModel[] = [
     maxPerPress: 4,
     maxReferences: 14,
     costNote: 'A flat price per picture, the cheapest of the three',
+    tier: 'draft',
     routed: true,
   },
   {
@@ -104,6 +123,7 @@ export const STUDIO_MODELS: readonly StudioModel[] = [
     maxPerPress: 10,
     maxReferences: 16,
     costNote: 'Billed by what it draws, so a large picture costs more',
+    tier: 'finish',
     routed: true,
   },
   {
@@ -115,6 +135,7 @@ export const STUDIO_MODELS: readonly StudioModel[] = [
     maxPerPress: 1,
     maxReferences: 14,
     costNote: 'The dearest, billed by what it draws',
+    tier: 'finish',
     routed: true,
   },
 ]
@@ -129,6 +150,29 @@ export function defaultModelId(): string {
 
 export function modelById(id: string): StudioModel | null {
   return STUDIO_MODELS.find((model) => model.id === id) ?? null
+}
+
+/**
+ * The product tier a model is charged at, or null for an id not in the catalogue.
+ *
+ * Null rather than a guess: an unknown id is refused by `describeModelBlock`
+ * before any hold, and a made-up price here would be one a hand-made request
+ * could be sold at.
+ */
+export function imageTierFor(id: string): ImageTier | null {
+  return modelById(id)?.tier ?? null
+}
+
+/**
+ * The pricing key a press with this model is held and debited under.
+ *
+ * Always through `IMAGE_TIER_ACTION`, never a literal: the key is what the
+ * ledger records and what `creditCost` prices, and the shared map is the only
+ * place the two tiers are named.
+ */
+export function imageActionFor(id: string): ActionType | null {
+  const tier = imageTierFor(id)
+  return tier === null ? null : IMAGE_TIER_ACTION[tier]
 }
 
 /** The models a person may actually pick. */

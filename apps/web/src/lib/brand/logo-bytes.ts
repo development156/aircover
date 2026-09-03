@@ -3,7 +3,7 @@ import 'server-only'
 import { cache } from 'react'
 import sharp from 'sharp'
 
-import { MEDIA_BUCKET, MEDIA_UPLOAD_CAP_BYTES } from '@/lib/posts/media-constants'
+import { CHANNEL_MEDIA_CAP_BYTES, MEDIA_BUCKET } from '@/lib/posts/media-constants'
 import { createServerSupabase } from '@/lib/supabase/server'
 
 import { readBrandLogo } from './logo'
@@ -64,15 +64,19 @@ export interface BrandLogoBytes {
 const MAX_PIXELS = 100_000_000
 
 /**
- * A logo over this is refused rather than decoded. It is `MEDIA_UPLOAD_CAP_BYTES`
- * and not a number invented here: the file arrived through the same upload path
- * as every other asset, so nothing larger can be in the library to begin with,
- * and a second, smaller cap would mean a file the library accepted and this
- * reader silently declines to stamp. If a stricter logo-only limit is ever
- * wanted it belongs next to the upload that would enforce it, where a person can
- * be told at the moment they choose the file.
+ * A logo over this is refused rather than decoded. It is
+ * `CHANNEL_MEDIA_CAP_BYTES` and not a number invented here: a cap smaller than
+ * what the library HOLDS would mean a file the library accepted and this reader
+ * silently declines to stamp. If a stricter logo-only limit is ever wanted it
+ * belongs next to the upload that would enforce it, where a person can be told
+ * at the moment they choose the file.
+ *
+ * It followed the upload cap until 2026-09-02, when that cap dropped to 4 MB to
+ * fit inside a Vercel function request body. This read happens server-side on a
+ * STORED object, so no request limit applies to it, and following the new cap
+ * would have quietly stopped stamping every logo already in a library above 4 MB.
  */
-const LOGO_CAP_BYTES = MEDIA_UPLOAD_CAP_BYTES
+const LOGO_CAP_BYTES = CHANNEL_MEDIA_CAP_BYTES
 
 interface AssetRow {
   id: string
