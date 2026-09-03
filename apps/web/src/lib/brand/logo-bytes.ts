@@ -6,7 +6,7 @@ import sharp from 'sharp'
 import { CHANNEL_MEDIA_CAP_BYTES, MEDIA_BUCKET } from '@/lib/posts/media-constants'
 import { createServerSupabase } from '@/lib/supabase/server'
 
-import { readBrandLogo } from './logo'
+import { readBrandLogo, readBrandLogoDark } from './logo'
 import { logoFactsFromRaw, type LogoFacts } from './logo-facts'
 
 /**
@@ -161,4 +161,57 @@ export const readBrandLogoBytes = cache(async function readBrandLogoBytes(
     // generation fails.
     return null
   }
+})
+
+/**
+ * The workspace's DARK-background logo variant, as bytes plus facts. Null for
+ * every reason `readBrandLogoBytes` above can be null, plus the ordinary case:
+ * no dark variant has been chosen.
+ *
+ * Deliberately not built by generalising `readBrandLogoBytes` to take a reader
+ * function as a parameter: the two are already this short, and a shared helper
+ * would need to thread `cache()` through a parameter, which `react`'s `cache()`
+ * cannot do without becoming a different cache key per call, per React's own
+ * dedup-by-function-identity rule. Duplicating five lines is cheaper than
+ * getting that wrong.
+ */
+export const readBrandLogoBytesDark = cache(async function readBrandLogoBytesDark(
+  workspaceId: string,
+): Promise<BrandLogoBytes | null> {
+  try {
+    const logo = await readBrandLogoDark(workspaceId)
+    if (logo === null) return null
+
+    const bytes = await downloadLogo(workspaceId, logo.assetId)
+    if (bytes === null) return null
+
+    const facts = await measure(bytes)
+    if (facts === null) return null
+
+    return { assetId: logo.assetId, bytes, facts }
+  } catch {
+    return null
+  }
+})
+
+export interface BrandLogoBytesVariants {
+  light: BrandLogoBytes | null
+  dark: BrandLogoBytes | null
+}
+
+/**
+ * Both logo variants a workspace may hold, as bytes plus facts, read together.
+ * Added alongside `readBrandLogoBytes` for the same reason `readBrandLogoVariants`
+ * sits alongside `readBrandLogo`: every existing caller wants exactly one file,
+ * and this is for the caller (the stamping pipeline) that wants both so it can
+ * choose which fits the picture it is stamping.
+ */
+export const readBrandLogoBytesVariants = cache(async function readBrandLogoBytesVariants(
+  workspaceId: string,
+): Promise<BrandLogoBytesVariants> {
+  const [light, dark] = await Promise.all([
+    readBrandLogoBytes(workspaceId),
+    readBrandLogoBytesDark(workspaceId),
+  ])
+  return { light, dark }
 })

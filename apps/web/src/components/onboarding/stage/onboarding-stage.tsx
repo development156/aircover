@@ -455,7 +455,12 @@ export function OnboardingStage({
     ) : step === '3' ? (
       <AudienceStep data={data} patch={patch} />
     ) : step === '4' ? (
-      <VisualStep data={data} patch={patch} onLogo={build.takeLogo} />
+      <VisualStep
+        data={data}
+        patch={patch}
+        onLogo={build.takeLogo}
+        onLogoDark={build.takeLogoDark}
+      />
     ) : step === '5' ? (
       <KnowledgeStep data={data} patch={patch} />
     ) : step === 'comp' ? (

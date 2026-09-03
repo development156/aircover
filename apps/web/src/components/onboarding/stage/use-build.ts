@@ -119,6 +119,8 @@ export function useBuild({
    * says which it still has.
    */
   const logoRef = useRef<File | null>(null)
+  /** The dark-background variant of the logo, held the same way and for the same reason. */
+  const logoDarkRef = useRef<File | null>(null)
   const [wasFree, setWasFree] = useState(false)
   const [fallbackMessage, setFallbackMessage] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -331,14 +333,17 @@ export function useBuild({
        * rather than sent — a session saved before this screen asked for one
        * comes back holding them, and `addCompetitor` would refuse them anyway.
        */
-      const [watchNote, sourcesNote, logoNote] = [
+      const [watchNote, sourcesNote, logoNote, logoDarkNote] = [
         await sendWatchList(data.competitors),
         await sendSources(data.sources, data.sourceUrls),
         await sendLogo(logoRef.current),
+        await sendLogoDark(logoDarkRef.current),
       ]
-      // Joined rather than nested: two independent things went wrong or did
-      // not, and the reader needs both sentences, not the first one only.
-      setWatchListNote([watchNote, sourcesNote, logoNote].filter(Boolean).join(' ') || null)
+      // Joined rather than nested: independent things went wrong or did not,
+      // and the reader needs every sentence, not the first one only.
+      setWatchListNote(
+        [watchNote, sourcesNote, logoNote, logoDarkNote].filter(Boolean).join(' ') || null,
+      )
       setWasFree(state.kind === 'free')
       setFallbackMessage(state.kind === 'fallback' ? state.message : null)
 
@@ -458,6 +463,10 @@ export function useBuild({
     takeLogo: (file: File) => {
       logoRef.current = file
     },
+    /** The optional dark-background variant. Held the same way, sent the same way. */
+    takeLogoDark: (file: File) => {
+      logoDarkRef.current = file
+    },
     saving,
     saveError,
     themeError,
@@ -533,6 +542,10 @@ async function sendSources(
 const LOGO_NOT_KEPT =
   'Sahoda could not keep your logo file. Your colours are saved. Add it again from Assets.'
 
+/** Same shape as `LOGO_NOT_KEPT`, for the optional dark-background variant. */
+const LOGO_DARK_NOT_KEPT =
+  'Sahoda could not keep your dark-background logo. Your colours are saved. Add it again from Assets.'
+
 /**
  * Make the file the workspace's logo.
  *
@@ -581,6 +594,26 @@ async function sendLogo(file: File | null): Promise<string | null> {
     return LOGO_NOT_KEPT
   } catch {
     return LOGO_NOT_KEPT
+  }
+}
+
+/**
+ * Same shape as `sendLogo`, for the optional dark-background variant.
+ *
+ * `null` when nothing was offered: this variant is optional and most workspaces
+ * will never set one, so "nothing to send" must not read as a failure.
+ */
+async function sendLogoDark(file: File | null): Promise<string | null> {
+  if (!file) return null
+  try {
+    const form = new FormData()
+    form.set('file', file)
+    const { setBrandLogoDark } = await import('@/app/actions/brand-logo')
+    const result = await setBrandLogoDark(form)
+    if (result.ok) return null
+    return LOGO_DARK_NOT_KEPT
+  } catch {
+    return LOGO_DARK_NOT_KEPT
   }
 }
 
