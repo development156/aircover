@@ -1,5 +1,6 @@
 import 'server-only'
 
+import type { StampOutcome } from '@sahoda/shared'
 import {
   StudioGenerationImageSchema,
   StudioGenerationRowSchema,
@@ -48,6 +49,18 @@ export type GenerationPicture = {
    * and a download then carries no extension rather than a wrong one.
    */
   mime: string | null
+  /**
+   * The logo-stamped copy's link, or null when there is no stamped copy — or
+   * when there is one and ITS link would not sign. Same three states `url`
+   * keeps apart one field up, for the same reason.
+   */
+  stampedUrl: string | null
+  /**
+   * WHY this picture does or does not carry the logo. Null means stamping was
+   * never attempted, which is a different answer from every value in the enum
+   * and must never be rendered as a failure.
+   */
+  stampOutcome: StampOutcome | null
 }
 
 export type GenerationCard = {
@@ -152,9 +165,13 @@ async function picturesFor(
     .filter((parsed) => parsed.success)
     .map((parsed) => parsed.data)
 
-  const assetIds = images
-    .map((image) => image.asset_id)
-    .filter((id): id is string => typeof id === 'string')
+  // BOTH the original and its stamped copy, because the screen offers a choice
+  // between them and a choice needs two links. One extra id per stamped image,
+  // through the same two round trips rather than a third.
+  const assetIds = [
+    ...images.map((image) => image.asset_id),
+    ...images.map((image) => image.stamped_asset_id),
+  ].filter((id): id is string => typeof id === 'string')
 
   // One round trip for the paths, one for the signatures.
   const paths = new Map<string, string>()
@@ -192,6 +209,9 @@ async function picturesFor(
       width: image.width,
       height: image.height,
       mime: image.asset_id === null ? null : (mimes.get(image.asset_id) ?? null),
+      stampedUrl:
+        image.stamped_asset_id === null ? null : (urls.get(image.stamped_asset_id) ?? null),
+      stampOutcome: image.stamp_outcome,
     })
     grouped.set(image.generation_id, list)
   }

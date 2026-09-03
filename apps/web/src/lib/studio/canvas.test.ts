@@ -33,6 +33,8 @@ const picture = (over: Partial<GenerationCard['pictures'][number]> = {}) => ({
   width: 1080,
   height: 1080,
   mime: 'image/png',
+  stampedUrl: null,
+  stampOutcome: null,
   ...over,
 })
 

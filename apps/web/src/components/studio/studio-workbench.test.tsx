@@ -2,8 +2,12 @@ import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
+import type { BrandSignal } from '@sahoda/shared'
+
 import { queueGeneration, startPostFromPicture } from '@/app/actions/studio'
 import { StudioWorkbench } from '@/components/studio/studio-workbench'
+import type { CanvasPicture } from '@/lib/studio/canvas'
+import { stampNote } from '@/lib/studio/stamp-copy'
 import { generatableFormats } from '@/lib/studio/formats'
 import { routedModels, unroutedModels } from '@/lib/studio/models'
 import type { LibraryPicture, LibraryRead } from '@/lib/studio/read'
@@ -66,6 +70,9 @@ const MADE = [
     mime: 'image/png',
     mode: 'on_brand' as const,
     referenceAssetIds: [],
+    stampedUrl: null,
+    stampOutcome: null,
+    madeAgo: null,
   },
   {
     imageId: 'p2',
@@ -78,6 +85,9 @@ const MADE = [
     mime: 'image/webp',
     mode: 'match' as const,
     referenceAssetIds: ['a2'],
+    stampedUrl: null,
+    stampOutcome: null,
+    madeAgo: null,
   },
 ]
 
@@ -85,14 +95,45 @@ const MADE = [
  * A list is the ok read, the common case. A `LibraryRead` is passed whole when a
  * test is about the OTHER answers, which a list cannot express.
  */
-const open = (library: LibraryPicture[] | LibraryRead = LIBRARY, pictures: typeof MADE = []) =>
+const open = (
+  library: LibraryPicture[] | LibraryRead = LIBRARY,
+  // `CanvasPicture[]`, not `typeof MADE`: the literal's inferred type pinned
+  // `stampedUrl` and `stampOutcome` to null, so a stamped fixture — the whole
+  // point of the result-screen tests below — could not be passed in.
+  pictures: CanvasPicture[] = [],
+  signals: BrandSignal[] | null = [],
+  balance: number | null = null,
+) =>
   render(
     <StudioWorkbench
       formats={generatableFormats()}
       library={Array.isArray(library) ? { status: 'ok', pictures: library } : library}
       pictures={pictures}
+      signals={signals}
+      balance={balance}
     />,
   )
+
+/**
+ * The MODE control, not "any button on the screen whose name contains this".
+ *
+ * ── WHY THESE QUERIES WERE NARROWED ─────────────────────────────────────────
+ * They read `modeButton(/on brand/i)` and passed for
+ * as long as exactly one button carried that word. The composer's chip row now
+ * SUMMARISES the chosen mode, so two do, and `getByRole` refused with "found
+ * multiple elements" — correctly. The old query was ambiguous before the chip
+ * existed; nothing had made the ambiguity visible.
+ *
+ * Scoped to the fieldset rather than made more specific by string, because the
+ * thing these tests are about is the mode CONTROL. A query pinned to the exact
+ * label would go green again and break the next time the copy moved.
+ */
+function modeButton(name: RegExp): HTMLElement {
+  return within(screen.getByRole('group', { name: /how should sahoda approach it/i })).getByRole(
+    'button',
+    { name },
+  )
+}
 
 describe('choosing which model draws it', () => {
   test('the reachable models are offered by what they are good at, never by id', () => {
@@ -157,16 +198,13 @@ describe('the modes on offer', () => {
   test('offers every mode the default model can actually do', () => {
     open()
     for (const rule of readyModes()) {
-      expect(screen.getByRole('button', { name: new RegExp(rule.label, 'i') })).toBeTruthy()
+      expect(modeButton(new RegExp(rule.label, 'i'))).toBeTruthy()
     }
   })
 
   test('on brand is chosen to begin with, because it is the one that uses the brand', () => {
     open()
-    expect(screen.getByRole('button', { name: /on brand/i })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
+    expect(modeButton(/on brand/i)).toHaveAttribute('aria-pressed', 'true')
   })
 })
 
@@ -306,7 +344,7 @@ describe('matching a picture', () => {
   test('matching asks for a picture before it will run', async () => {
     const user = userEvent.setup()
     open()
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
     expect(screen.getByRole('status').textContent).toMatch(/pick one picture/i)
     expect(screen.getByRole('button', { name: /make this picture/i })).toBeDisabled()
   })
@@ -314,7 +352,7 @@ describe('matching a picture', () => {
   test('picking one clears the block', async () => {
     const user = userEvent.setup()
     open()
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
     await user.type(screen.getByLabelText(/what should the picture show/i), 'a cup of chai')
     await user.click(screen.getAllByRole('button', { pressed: false })[3]!)
     expect(screen.queryByText(/pick one picture/i)).toBeNull()
@@ -328,7 +366,7 @@ describe('matching a picture', () => {
   test('the selection cannot grow past what the model will look at', async () => {
     const user = userEvent.setup()
     const { container } = open()
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
 
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     const thumbs = within(picker).getAllByRole('button')
@@ -346,12 +384,12 @@ describe('matching a picture', () => {
   test('switching to a mode that ignores references clears them, rather than leaving a contradiction', async () => {
     const user = userEvent.setup()
     const { container } = open()
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     await user.click(within(picker).getAllByRole('button')[0]!)
 
     await user.click(screen.getByRole('button', { name: /explore/i }))
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
     expect(screen.getByRole('status').textContent).toMatch(/pick one picture/i)
   })
 
@@ -362,7 +400,7 @@ describe('matching a picture', () => {
   test('a picture with no preview is still offered, not hidden', async () => {
     const user = userEvent.setup()
     const { container } = open()
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     expect(within(picker).getAllByRole('button')).toHaveLength(LIBRARY.length)
     expect(within(picker).getByText(/no preview/i)).toBeTruthy()
@@ -371,7 +409,7 @@ describe('matching a picture', () => {
   test('an empty library says how to fill it rather than showing nothing', async () => {
     const user = userEvent.setup()
     open([])
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
     expect(screen.getByText(/you have no pictures yet/i)).toBeTruthy()
   })
 
@@ -426,7 +464,7 @@ describe('a press that changes nothing must say why', () => {
   test('a pick beyond the limit is explained rather than ignored', async () => {
     const user = userEvent.setup()
     const { container } = open()
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
 
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     const thumbs = within(picker).getAllByRole('button')
@@ -471,7 +509,7 @@ describe('adding a picture from this device', () => {
   test('the way in is a real file control, reachable by name', async () => {
     const user = userEvent.setup()
     open()
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
     expect(screen.getByLabelText(/add a picture from this device/i)).toBeTruthy()
   })
 
@@ -483,7 +521,7 @@ describe('adding a picture from this device', () => {
   test('it is an input, not a drop target pretending to be one', async () => {
     const user = userEvent.setup()
     open()
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
     const control = screen.getByLabelText(/add a picture from this device/i)
     expect(control.tagName).toBe('INPUT')
     expect(control.getAttribute('type')).toBe('file')
@@ -492,7 +530,7 @@ describe('adding a picture from this device', () => {
   test('what it offers is the proven list, so it cannot drift from the server', async () => {
     const user = userEvent.setup()
     open()
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
     const control = screen.getByLabelText(/add a picture from this device/i)
     expect(control.getAttribute('accept')).toBe(uploadAccept())
   })
@@ -500,7 +538,7 @@ describe('adding a picture from this device', () => {
   test('the empty library points at this device rather than at a library trip', async () => {
     const user = userEvent.setup()
     open([])
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
     expect(screen.getByText(/add one from this device/i)).toBeTruthy()
   })
 })
@@ -555,10 +593,7 @@ describe('asking for the same thing again', () => {
     expect(
       (screen.getByLabelText(/what should the picture show/i) as HTMLTextAreaElement).value,
     ).toBe(MADE[0]!.prompt)
-    expect(screen.getByRole('button', { name: /on brand/i })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
+    expect(modeButton(/on brand/i)).toHaveAttribute('aria-pressed', 'true')
   })
 
   /**
@@ -580,10 +615,7 @@ describe('asking for the same thing again', () => {
     await user.click(within(strip).getAllByRole('button')[1]!)
     await user.click(screen.getByRole('button', { name: /use these words again/i }))
 
-    expect(screen.getByRole('button', { name: /match a picture/i })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
+    expect(modeButton(/match a picture/i)).toHaveAttribute('aria-pressed', 'true')
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     expect(within(picker).getByRole('button', { name: /picked 1 of 1/i })).toBeTruthy()
   })
@@ -638,10 +670,7 @@ describe('picking a picture in a mode that ignores one', () => {
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     await user.click(within(picker).getAllByRole('button')[0]!)
 
-    expect(screen.getByRole('button', { name: /match a picture/i })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
+    expect(modeButton(/match a picture/i)).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('alert').textContent).toMatch(/moved you to match a picture/i)
   })
 
@@ -665,7 +694,7 @@ describe('which picture is which', () => {
   test('a picked reference shows its position, not just that it is picked', async () => {
     const user = userEvent.setup()
     const { container } = open()
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     const thumbs = within(picker).getAllByRole('button')
 
@@ -679,7 +708,7 @@ describe('which picture is which', () => {
   test('the position is announced, not only drawn', async () => {
     const user = userEvent.setup()
     const { container } = open()
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await user.click(modeButton(/match a picture/i))
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     await user.click(within(picker).getAllByRole('button')[0]!)
 
@@ -797,5 +826,344 @@ describe('before any spend', () => {
     expect(button).toBeDisabled()
     await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
     expect(button).toBeEnabled()
+  })
+})
+
+describe('the composer', () => {
+  /**
+   * ── THE SCOPE IS THE DESIGN, NOT A COLOUR ─────────────────────────────────
+   * The composer is a dark panel on a light page, and `data-surface="inverse"`
+   * is the only correct way to paint one here. A hand-written dark fill would
+   * look identical in a screenshot and be wrong in every token inside it:
+   * `--ink` is #000000 on light, so `text-ink` would be black on near-black,
+   * and `--pstrong` would be black on black at 1.23:1 the moment somebody
+   * hovered the button they came to press. tokens.css's INVERSE SURFACE header
+   * carries the measurements.
+   *
+   * This is asserted rather than left to review because the failure is
+   * invisible in the theme most people develop in.
+   */
+  test('the composer paints itself with the inverse scope, not a hand-written fill', () => {
+    const { container } = open()
+    const prompt = screen.getByPlaceholderText(promptHintFor('on_brand'))
+    expect(prompt.closest('[data-surface="inverse"]')).not.toBeNull()
+    // And the settings sit on the same object, which is a second scope: a CSS
+    // scope does not cross a sibling boundary, so the tray needs its own.
+    expect(container.querySelectorAll('[data-surface="inverse"]').length).toBeGreaterThanOrEqual(2)
+  })
+
+  /**
+   * The chip row is a SUMMARY of what the press will do. It reads its labels
+   * from `models.ts` and `modes.ts`, the same modules the rules come from, so a
+   * chip cannot name a model the picker no longer offers.
+   */
+  test('says which model, look, size and count this press will use', async () => {
+    const user = userEvent.setup()
+    const { container } = open()
+    const chips = () => container.querySelector('[data-guide="studio-chips"]')!.textContent ?? ''
+
+    // Read from `models.ts` and `modes.ts`, the modules the RULES come from, so
+    // a chip cannot name a model the picker no longer offers.
+    expect(chips()).toContain(routedModels()[0]!.label)
+    expect(chips()).toContain(ruleFor('on_brand').label)
+
+    // And it tracks the control rather than the first render.
+    await user.click(modeButton(/explore/i))
+    expect(chips()).toContain(ruleFor('explore').label)
+    expect(chips()).not.toContain(ruleFor('on_brand').label)
+  })
+
+  test('the settings can be put away, and the composer stays', async () => {
+    const user = userEvent.setup()
+    open()
+    expect(screen.getByRole('group', { name: /how should sahoda approach it/i })).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: /hide settings/i }))
+
+    expect(screen.queryByRole('group', { name: /how should sahoda approach it/i })).toBeNull()
+    // The thing a person came to do is still there. A composer that folded the
+    // prompt away with the settings would be a screen with nothing on it.
+    //
+    // BY ROLE, not by placeholder: `getByPlaceholderText` finds an element that
+    // is `hidden`, so the placeholder query passed against a prompt nobody
+    // could see. MEASURED — adding `hidden={!settingsOpen}` to the Textarea
+    // left this test green until the query moved. `getByRole` excludes what is
+    // hidden from the accessibility tree, which is the thing being claimed.
+    expect(screen.getByRole('textbox')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /make this picture/i })).toBeTruthy()
+  })
+})
+
+describe('what Sahoda will send, shown before the spend', () => {
+  const SIGNALS: BrandSignal[] = [
+    { field: 'voice', certainty: 'confirmed', value: 'Warm, plain-spoken, never salesy' },
+    { field: 'palette', certainty: 'guessed', value: 'Warm cream, deep brown, one orange' },
+  ]
+
+  test('names each signal, and marks which ones were guessed', () => {
+    open(LIBRARY, [], SIGNALS)
+
+    expect(screen.getByText('Warm, plain-spoken, never salesy')).toBeTruthy()
+    expect(screen.getByText('Warm cream, deep brown, one orange')).toBeTruthy()
+    // The certainty is carried for a screen reader too, not by a dot alone.
+    expect(screen.getByText(/which Sahoda guessed/i)).toBeTruthy()
+    expect(screen.getByText(/which you confirmed/i)).toBeTruthy()
+  })
+
+  /**
+   * ── THREE STATES, NEVER TWO ───────────────────────────────────────────────
+   * `BrandSignalsSchema`'s own header forbids collapsing these: an empty array
+   * means the Brand Brain had nothing to add, which a person can act on; null
+   * means the read failed, which they cannot. A screen that said "no brand
+   * signals" for both would tell somebody their brain was empty when it was
+   * unreadable.
+   */
+  test('an empty Brand Brain and an unreadable one are different sentences', () => {
+    open(LIBRARY, [], [])
+    const empty = screen.getByText(/nothing from your brand brain/i).textContent ?? ''
+    expect(empty).toMatch(/fill it in/i)
+    cleanup()
+
+    open(LIBRARY, [], null)
+    const unread = screen.getByText(/could not read your brand brain/i).textContent ?? ''
+    // It must not claim the brain is empty, and it must not offer filling it in
+    // as the remedy for a read that failed.
+    expect(unread).not.toMatch(/nothing from your brand brain/i)
+    expect(screen.queryByText(/fill it in/i)).toBeNull()
+  })
+})
+
+describe('the result screen: which version, and why there is only one', () => {
+  const stamped = {
+    imageId: 'p9',
+    assetId: 'asset-9',
+    url: 'https://example.test/original.png',
+    width: 1080,
+    height: 1080,
+    prompt: 'a plate of samosas',
+    formatId: 'square',
+    mime: 'image/png',
+    mode: 'on_brand' as const,
+    referenceAssetIds: [],
+    stampedUrl: 'https://example.test/stamped.png',
+    stampOutcome: 'stamped' as const,
+    madeAgo: null,
+  }
+
+  test('shows the stamped version first, because that is the one they will post', () => {
+    open(LIBRARY, [stamped])
+    expect(screen.getByAltText(/with your logo/i)).toHaveAttribute('src', stamped.stampedUrl)
+  })
+
+  test('the original is one press away, and nothing is deleted to get to it', async () => {
+    const user = userEvent.setup()
+    open(LIBRARY, [stamped])
+
+    await user.click(screen.getByRole('button', { name: /without it/i }))
+
+    expect(screen.getByAltText(stamped.prompt)).toHaveAttribute('src', stamped.url)
+    expect(screen.getByText(/does not delete the other/i)).toBeTruthy()
+  })
+
+  /**
+   * ── A TOGGLE OVER ONE PICTURE IS A CONTROL THAT DOES NOTHING ──────────────
+   * Same defect class as a remedy that leads nowhere. Every answer but
+   * `stamped` has exactly one picture, so the control is absent rather than
+   * present-and-inert.
+   */
+  test.each([['no_logo'], ['logo_unreadable'], ['failed']] as const)(
+    'offers no choice when the outcome is %s',
+    (outcome) => {
+      open(LIBRARY, [{ ...stamped, stampedUrl: null, stampOutcome: outcome }])
+      expect(screen.queryByRole('button', { name: /without it/i })).toBeNull()
+    },
+  )
+
+  test('offers no choice when a stamped copy exists but its link would not sign', () => {
+    // The outcome says stamped and there is no URL to show. Offering the toggle
+    // would put a control on screen with nothing behind half of it.
+    open(LIBRARY, [{ ...stamped, stampedUrl: null }])
+    expect(screen.queryByRole('button', { name: /without it/i })).toBeNull()
+  })
+
+  test('asks stamp-copy for the sentence rather than writing its own', () => {
+    for (const outcome of [null, 'no_logo', 'logo_unreadable', 'failed', 'stamped'] as const) {
+      cleanup()
+      open(LIBRARY, [{ ...stamped, stampOutcome: outcome }])
+      const note = stampNote(outcome)
+      expect(screen.getByText(note.title), String(outcome)).toBeTruthy()
+      expect(screen.getByText(note.body), String(outcome)).toBeTruthy()
+    }
+  })
+
+  test('a picture made before stamping is not reported as a failure', () => {
+    open(LIBRARY, [{ ...stamped, stampedUrl: null, stampOutcome: null }])
+    expect(screen.getByText(/nothing went wrong/i)).toBeTruthy()
+    expect(screen.queryByRole('link', { name: /add your logo/i })).toBeNull()
+  })
+
+  test('the one remedy that exists is offered, and only where it works', () => {
+    open(LIBRARY, [{ ...stamped, stampedUrl: null, stampOutcome: 'no_logo' }])
+    expect(screen.getByRole('link', { name: /add your logo/i })).toBeTruthy()
+    cleanup()
+
+    open(LIBRARY, [{ ...stamped, stampedUrl: null, stampOutcome: 'failed' }])
+    expect(screen.queryByRole('link', { name: /add your logo|replace your logo/i })).toBeNull()
+  })
+})
+
+describe('the rest of the composer the design asked for', () => {
+  test('shows the balance when it was read, and nothing at all when it was not', () => {
+    open(LIBRARY, [], [], 1240)
+    expect(screen.getByText(/credits left/i).textContent).toMatch(/1,240/)
+    cleanup()
+
+    // NULL IS NOT ZERO. `readBalance` answers three ways and only one is a
+    // number; rendering "0 credits left" for a read that FAILED would tell
+    // somebody with a full wallet they cannot afford to work.
+    open(LIBRARY, [], [], null)
+    expect(screen.queryByText(/credits left/i)).toBeNull()
+    expect(screen.queryByText(/\b0\b/)).toBeNull()
+  })
+
+  test('names the controls that are designed and not built, as text not buttons', () => {
+    open()
+    for (const title of ['Leave out', 'Same again', 'Follow how closely', 'Tidy my words']) {
+      expect(screen.getByText(title), title).toBeTruthy()
+      // A disabled button is still announced as an action a reader could take,
+      // which `design-lint.mjs` rule 3 refuses outright. These are spans.
+      expect(screen.queryByRole('button', { name: title }), title).toBeNull()
+    }
+    expect(screen.getByText(/nothing here changes what a press does today/i)).toBeTruthy()
+  })
+
+  test('a picture can be added without leaving the composer', async () => {
+    const user = userEvent.setup()
+    open()
+    // Two upload controls exist and they carry DIFFERENT names, so a screen
+    // reader — and this query — can say which is which.
+    const inComposer = screen.getByLabelText(/add a picture to match/i)
+    const inSettings = screen.getByLabelText(/add a picture from this device/i)
+    expect(inComposer).not.toBe(inSettings)
+    expect(inComposer.getAttribute('accept')).toBe(uploadAccept())
+    await user.click(screen.getByRole('button', { name: /hide settings/i }))
+    // The composer's route survives the settings being put away; the other does
+    // not, which is the whole reason the composer has one.
+    expect(screen.getByLabelText(/add a picture to match/i)).toBeTruthy()
+    expect(screen.queryByLabelText(/add a picture from this device/i)).toBeNull()
+  })
+
+  test('every earlier picture carries the two facts that tell it from the others', () => {
+    const made = [
+      { ...MADE[0]!, formatId: 'square', madeAgo: '2 h ago', stampedUrl: null, stampOutcome: null },
+      {
+        ...MADE[1]!,
+        formatId: 'story',
+        madeAgo: '3 days ago',
+        stampedUrl: null,
+        stampOutcome: null,
+      },
+    ]
+    open(LIBRARY, made)
+
+    expect(screen.getByText(/square · 2 h ago/i)).toBeTruthy()
+    expect(screen.getByText(/story · 3 days ago/i)).toBeTruthy()
+  })
+
+  test('a picture whose age would not parse still shows its shape', () => {
+    // `madeAgo` is null when the row's timestamp will not parse. The caption
+    // carries what it has rather than inventing a time.
+    open(LIBRARY, [{ ...MADE[0]!, formatId: 'square', madeAgo: null }])
+    expect(screen.getByText('square')).toBeTruthy()
+  })
+
+  test('the earlier strip shows the stamped version where there is one', () => {
+    open(LIBRARY, [
+      { ...MADE[0]!, stampedUrl: 'https://example.test/stamped.png', stampOutcome: 'stamped' },
+    ])
+    // What they would post is what the thumbnail should show.
+    const thumb = screen.getAllByRole('button', { name: MADE[0]!.prompt })[0]!
+    expect(thumb.querySelector('img')!.getAttribute('src')).toBe('https://example.test/stamped.png')
+  })
+})
+
+describe('control over the logo Sahoda stamps', () => {
+  async function press(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+    await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
+    await user.click(screen.getByRole('button', { name: /make this picture/i }))
+  }
+
+  test("a press with nothing touched sends exactly today's default: on, bottom right, medium", async () => {
+    vi.mocked(queueGeneration).mockResolvedValue({
+      ok: true,
+      generationId: 'g1',
+      balanceAfter: 5,
+      made: 1,
+      asked: 1,
+    })
+    const user = userEvent.setup()
+    open()
+    await press(user)
+
+    expect(queueGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stamp: { enabled: true, anchor: 'bottom-right', sizeStep: 'medium' },
+      }),
+    )
+  })
+
+  test('turning the stamp off is what the next press carries', async () => {
+    vi.mocked(queueGeneration).mockResolvedValue({
+      ok: true,
+      generationId: 'g1',
+      balanceAfter: 5,
+      made: 1,
+      asked: 1,
+    })
+    const user = userEvent.setup()
+    const { container } = open()
+    const logoFieldset = container.querySelector('[data-guide="studio-logo"]') as HTMLElement
+    await user.click(within(logoFieldset).getByRole('button', { name: /leave it off/i }))
+    await press(user)
+
+    expect(queueGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stamp: expect.objectContaining({ enabled: false }),
+      }),
+    )
+  })
+
+  test('picking a corner and a size step is what the next press carries', async () => {
+    vi.mocked(queueGeneration).mockResolvedValue({
+      ok: true,
+      generationId: 'g1',
+      balanceAfter: 5,
+      made: 1,
+      asked: 1,
+    })
+    const user = userEvent.setup()
+    const { container } = open()
+    const corner = container.querySelector('[data-guide="studio-logo-corner"]') as HTMLElement
+    const size = container.querySelector('[data-guide="studio-logo-size"]') as HTMLElement
+    await user.click(within(corner).getByRole('button', { name: /top left/i }))
+    await user.click(within(size).getByRole('button', { name: /large/i }))
+    await press(user)
+
+    expect(queueGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stamp: { enabled: true, anchor: 'top-left', sizeStep: 'large' },
+      }),
+    )
+  })
+
+  test('the corner and size controls are disabled once the stamp is off, not hidden', async () => {
+    const user = userEvent.setup()
+    const { container } = open()
+    const logoFieldset = container.querySelector('[data-guide="studio-logo"]') as HTMLElement
+    const corner = container.querySelector('[data-guide="studio-logo-corner"]') as HTMLElement
+    for (const button of within(corner).getAllByRole('button')) expect(button).toBeEnabled()
+
+    await user.click(within(logoFieldset).getByRole('button', { name: /leave it off/i }))
+    for (const button of within(corner).getAllByRole('button')) expect(button).toBeDisabled()
   })
 })
