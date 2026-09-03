@@ -176,7 +176,7 @@ function StageFilter({
                   'max-narrow:min-h-[44px]',
                   current
                     ? 'bg-ink text-white dark:bg-white dark:text-[var(--canvas)]'
-                    : 'text-muted shadow-[inset_0_0_0_1px_var(--line)] hover:text-ink',
+                    : 'text-muted surface-ring-firm hover:text-ink',
                 )}
               >
                 {option.label}

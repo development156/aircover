@@ -1,5 +1,9 @@
 import { SiteLeadSubmitSchema } from '@sahoda/shared'
 
+import {
+  CHALLENGE_MISSING_ERROR,
+  CHALLENGE_MISSING_MESSAGE,
+} from '@/components/embed/challenge-copy'
 import { fixedWindowAllow } from '@/lib/ops/rate-limit'
 import { submitSiteLead } from '@/lib/ops/service-rpc'
 import { clientIpFrom, verifyTurnstile } from '@/lib/ops/turnstile'
@@ -72,6 +76,17 @@ export async function POST(request: Request): Promise<Response> {
     // database. It is told the same thing as any other invalid submission —
     // naming the trap would teach the next bot to avoid it.
     const fields = [...new Set(parsed.error.issues.map((issue) => issue.path.join('.')))]
+    // ONLY the token missing, every detail fine: the bot check never loaded on
+    // the visitor's side (an ad blocker, a proxy, the challenge host blocked).
+    // MEASURED 2026-09-02: this used to answer "check the details", and there
+    // were no details to check. Any other failure keeps the generic sentence,
+    // including the honeypot, which must never be named.
+    if (fields.length === 1 && fields[0] === 'turnstile_token') {
+      return json(
+        { ok: false, error: CHALLENGE_MISSING_ERROR, fields, message: CHALLENGE_MISSING_MESSAGE },
+        400,
+      )
+    }
     return json(
       { ok: false, error: 'invalid', fields, message: 'Please check the details and try again.' },
       400,

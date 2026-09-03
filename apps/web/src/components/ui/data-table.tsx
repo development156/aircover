@@ -40,8 +40,8 @@ export function DataTable({
   className?: string
 }) {
   return (
-    <div className={cn('overflow-x-auto rounded-card border border-line-soft', className)}>
-      <table className="w-full border-collapse text-[13px]">
+    <div className={cn('surface-ring overflow-x-auto rounded-card', className)}>
+      <table className="w-full border-collapse type-sm">
         <caption className="sr-only">{caption}</caption>
         <thead>
           <tr>

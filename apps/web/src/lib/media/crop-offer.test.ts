@@ -80,14 +80,25 @@ describe('the offer', () => {
     ])
   })
 
-  test("linkedin's row says it declares no rule rather than quoting someone else's", () => {
-    // The brief's "if one has no declared dimension, SAY SO and leave it alone",
-    // as the sentence a person actually reads.
+  test("linkedin's row quotes linkedin's own floor, never another channel's", () => {
+    // RETARGETED 2026-09-03. The claim has not moved: a row states the rule the
+    // Constraint Engine holds for THAT channel and never borrows a neighbour's.
+    // What moved is linkedin, which declared no dimension rule at all until
+    // docs/31 §2.2's 552x276 was added, so the old wording ("States no size or
+    // shape rule") is now false for it.
+    //
+    // Every channel declares a floor today, so `crop-offer.ts`'s rule-less
+    // sentence is unreachable through `targetFor`. It is kept as the honest
+    // answer for a spec that declares nothing, and the day one does, this test
+    // is where the sentence comes back.
     const { offer } = offerFrom(['instagram', 'linkedin'], PHONE)
     if (!offer.offered) throw new Error('expected an offer')
     const linkedin = offer.offer.outcomes.find((o) => o.channel === 'linkedin')
-    expect(linkedin?.note).toContain('States no size or shape rule')
-    expect(linkedin?.note).not.toMatch(/\d/)
+    expect(linkedin?.note).toContain('552')
+    expect(linkedin?.note).toContain('276')
+    // instagram's floor is 320 and its band 0.75-1.91; neither may appear here.
+    expect(linkedin?.note).not.toContain('320')
+    expect(linkedin?.note).not.toContain('1.91')
   })
 
   test('a photo under a floor is refused an offer, not sold an upscale', () => {
@@ -102,39 +113,44 @@ describe('the offer', () => {
   })
 
   test('a channel that cannot be fixed is excluded from the crop, not blocking it', () => {
-    // A 300x400 GIF on instagram + gbp. Both channels object, so this is a real
+    // A 350x450 GIF on instagram + gbp. Both channels object, so this is a real
     // refusal rather than a warning:
-    //   gbp        — MEDIA_TYPE only. Fixable: re-encode it.
-    //   instagram  — MEDIA_TYPE and MEDIA_DIMS (300 is under its 320 floor).
+    //   instagram  — MEDIA_TYPE only (350 clears its 320 floor and 0.78 sits
+    //                inside the 0.75-1.91 band). Fixable: re-encode it.
+    //   gbp        — MEDIA_TYPE and MEDIA_DIMS (350 is under its 400 floor).
     //                Not fixable, because no crop makes a photo wider.
-    // So the fix is cut for gbp, and instagram is told plainly that it still
+    // So the fix is cut for instagram, and gbp is told plainly that it still
     // will not take the file.
     //
-    // Reaching this case at all takes a mime violation. An earlier version of
-    // this test used a narrow strip and expected the opposite pairing, which
-    // TODAY'S SPECS CANNOT PRODUCE: gbp's floor (250) sits below instagram's
-    // (320), so gbp can never be the one that fails on size while instagram
-    // passes.
-    const gif = { mime: 'image/gif', bytes: 300_000, width: 300, height: 400 }
+    // RETARGETED 2026-09-03, roles swapped, claim identical. gbp's floor was
+    // 250, below instagram's 320, so gbp could never be the one failing on size;
+    // docs/31 §2.4 puts it at 400x300, above instagram's, and the pairing this
+    // test needs is now the other way round. Reaching the case at all still
+    // takes a mime violation.
+    const gif = { mime: 'image/gif', bytes: 300_000, width: 350, height: 450 }
     const { decision, offer } = offerFrom(['instagram', 'gbp'], gif)
     expect(decision.ok).toBe(false)
     expect(offer.offered).toBe(true)
     if (!offer.offered) throw new Error('unreachable')
-    expect(offer.offer.targets.map((t) => t.channel)).toEqual(['gbp'])
-    expect(offer.offer.outcomes.find((o) => o.channel === 'gbp')?.fixed).toBe(true)
-    expect(offer.offer.outcomes.find((o) => o.channel === 'instagram')?.fixed).toBe(false)
+    expect(offer.offer.targets.map((t) => t.channel)).toEqual(['instagram'])
+    expect(offer.offer.outcomes.find((o) => o.channel === 'instagram')?.fixed).toBe(true)
+    expect(offer.offer.outcomes.find((o) => o.channel === 'gbp')?.fixed).toBe(false)
     // …and the fix for gbp is the transcode: a gif becomes a png.
     expect(offer.offer.outputMime).toBe('image/png')
   })
 
   test('a photo too small for instagram is a WARNING when another channel takes it', () => {
     // The control for the case above, and the reason it needed a gif. With a
-    // jpeg, gbp raises no objection at all, `decideAttach` returns ok, and the
+    // jpeg, x raises no objection at all, `decideAttach` returns ok, and the
     // file is attached with instagram carried as a warning — there is no refusal
     // to offer a fix for. An offer shown here would be a fix for a problem the
     // person does not have.
+    //
+    // RETARGETED 2026-09-03 from gbp to x, for the same reason as the case
+    // above: gbp's floor is now 400x300 (docs/31 §2.4), so a 300x400 jpeg is no
+    // longer a file it takes without comment. x's floor is 4x4, so it is.
     const strip = { mime: 'image/jpeg', bytes: 300_000, width: 300, height: 400 }
-    const { decision } = offerFrom(['instagram', 'gbp'], strip)
+    const { decision } = offerFrom(['instagram', 'x'], strip)
     expect(decision.ok).toBe(true)
     if (!decision.ok) throw new Error('unreachable')
     expect(decision.warnings.map((w) => w.channel)).toEqual(['instagram'])

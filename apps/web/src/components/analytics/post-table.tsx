@@ -44,20 +44,20 @@ export function PostTable({ rows }: { rows: readonly ComparableRow[] }) {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[520px] border-collapse type-sm">
             <thead>
-              <tr className="border-b border-line text-left">
-                <th scope="col" className="py-2 pr-4 font-semibold text-muted">
+              <tr className="border-b border-line-soft text-left text-muted">
+                <th scope="col" className="type-eyebrow py-2 pr-4">
                   Post
                 </th>
-                <th scope="col" className="py-2 pr-4 font-semibold text-muted">
+                <th scope="col" className="type-eyebrow py-2 pr-4">
                   Channel
                 </th>
-                <th scope="col" className="py-2 pr-4 text-right font-semibold text-muted">
+                <th scope="col" className="type-eyebrow py-2 pr-4 text-right">
                   Impressions
                 </th>
-                <th scope="col" className="py-2 pr-4 text-right font-semibold text-muted">
+                <th scope="col" className="type-eyebrow py-2 pr-4 text-right">
                   Reach
                 </th>
-                <th scope="col" className="py-2 text-right font-semibold text-muted">
+                <th scope="col" className="type-eyebrow py-2 text-right">
                   Engagement
                 </th>
               </tr>
@@ -69,7 +69,7 @@ export function PostTable({ rows }: { rows: readonly ComparableRow[] }) {
                 return (
                   <tr
                     key={`${row.postId}:${row.channel}`}
-                    className="border-b border-line last:border-0"
+                    className="border-b border-line-soft transition-micro last:border-0 hover:bg-s2"
                   >
                     <th
                       scope="row"

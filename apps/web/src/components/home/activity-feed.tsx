@@ -135,7 +135,7 @@ export function ActivityFeed({ entries }: { entries: LedgerEntry[] }) {
           <li key={entry.seq} className="flex items-center gap-3 py-3">
             <span
               aria-hidden
-              className={`grid size-9 shrink-0 place-items-center rounded-full ${tone.pill}`}
+              className={`grid size-9 shrink-0 place-items-center rounded-pill ${tone.pill}`}
             >
               <tone.Glyph size={15} strokeWidth={1.8} />
             </span>

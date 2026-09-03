@@ -79,18 +79,29 @@ export const PUBLISHED_TODAY_SQL = `select count(*)::int as n
        = (now() at time zone coalesce(w.timezone, 'UTC'))::date`
 
 /**
- * The two settings and the dial, in one round trip.
+ * The settings, the budget and the customer's own kill switch, in one round trip.
  *
  * LEFT JOIN on `loop_settings`, because a workspace that never opened the Loop
  * has no row there and the answer for it is "autopilot is off", not an error.
  * The column defaults live in the migration and are NOT repeated here: a
  * default written twice is two defaults, and they drift.
  *
+ * ── `paused` IS THE KILL SWITCH A PERSON CAN REACH ───────────────────────────
+ * `public.loop_kill_switch` sets `loop_settings.paused = true`, reverts the
+ * Loop's posts to draft and writes NO `loop_autopilot_log` row. Until
+ * 2026-09-02 this statement did not read the column, so the only "killed"
+ * input the dispatcher had was a deploy-wide env flag: a customer who pressed
+ * Stop the Loop inside an announcement's window saw the post reverted, and
+ * the next tick found the announcement still pending, re-armed the draft
+ * (`ARM_FOR_PUBLISH_SQL` admits 'draft') and the sweep published it. The tick
+ * now treats a paused Loop as killed, every tick, from this read.
+ *
  * Parameters: $1 workspace_id.
  */
 export const AUTOPILOT_SETTINGS_SQL = `select s.autopilot_daily_cap,
        s.autopilot_cancel_minutes,
-       s.weekly_budget_credits
+       s.weekly_budget_credits,
+       coalesce(s.paused, false) as paused
   from workspaces w
   left join loop_settings s on s.workspace_id = w.id
  where w.id = $1`
@@ -380,7 +391,8 @@ export const ANNOUNCED_FOR_PERSON_SQL = `select a.post_id,
 
 /**
  * Which workspaces autopilot has anything to do for: those with at least one
- * channel armed to level 3.
+ * channel armed to level 3, whose Loop is not paused — or, if it is paused,
+ * that still hold an announcement nobody has closed.
  *
  * ── WHY THE DIAL AND NOT loop_settings ───────────────────────────────────────
  * A workspace can have opened the Loop, set a budget and a cap, and armed
@@ -388,18 +400,43 @@ export const ANNOUNCED_FOR_PERSON_SQL = `select a.post_id,
  * to discover that most of them have no L3 channel — work proportional to the
  * customers who are NOT using the feature.
  *
- * The dial is the fact that decides it, and today `AutonomyLevelSchema` refuses
- * to write a 3 through the application at all, so this returns nothing in every
- * environment. That is stated rather than relied upon: the route is gated by
- * its own flag as well, because "the query happens to return nothing" is a
- * property of today's data and a flag is a decision somebody made.
+ * ── WHY A PAUSED WORKSPACE IS DROPPED, AND WHY NOT ALWAYS ────────────────────
+ * A stopped Loop has nothing to announce, so the fleet tick should do no work
+ * for it. But an announcement made BEFORE the stop is still pending, and a
+ * scan that never visited the workspace again would leave it pending until
+ * the customer resumed — at which point the window would be long closed and
+ * the post would go out on the first tick, which is the exact post they
+ * stopped. So a paused workspace is visited for as long as it holds an open
+ * announcement; the tick writes the cancellation and the next scan drops it.
+ *
+ * `AutonomyLevelSchema` admits 3 and the dial stores it, so this returns rows
+ * wherever a customer has armed a channel. The route is gated by its own flag
+ * as well: "the query happens to return nothing" is a property of the data and
+ * a flag is a decision somebody made.
  *
  * Parameters: $1 row limit.
  */
-export const AUTOPILOT_WORKSPACES_SQL = `select distinct workspace_id
-  from loop_channel_autonomy
- where level = 3
- order by workspace_id
+export const AUTOPILOT_WORKSPACES_SQL = `select distinct d.workspace_id
+  from loop_channel_autonomy d
+  left join loop_settings s on s.workspace_id = d.workspace_id
+ where d.level = 3
+   and (
+     coalesce(s.paused, false) = false
+     or exists (
+       select 1 from loop_autopilot_log a
+        where a.workspace_id = d.workspace_id
+          and a.decision = 'announced'
+          and not exists (
+            select 1 from loop_autopilot_log later
+             where later.workspace_id = a.workspace_id
+               and later.post_id = a.post_id
+               and later.variant_id = a.variant_id
+               and later.decision in ('dispatched', 'cancelled')
+               and later.created_at >= a.created_at
+          )
+     )
+   )
+ order by d.workspace_id
  limit $1`
 
 /**

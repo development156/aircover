@@ -423,7 +423,7 @@ export function CommandPalette() {
                       onKeyDown={onInputKey}
                       placeholder="Go to…"
                       aria-label="Search destinations"
-                      className="h-9 w-full rounded-lg border border-line bg-bg pl-8 pr-3 type-sm text-ink placeholder:text-muted"
+                      className="h-9 w-full rounded-input border border-line bg-bg pl-8 pr-3 type-sm text-ink placeholder:text-muted"
                     />
                   </div>
                 </div>

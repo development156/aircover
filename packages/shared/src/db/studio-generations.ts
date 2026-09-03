@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { StampOutcomeSchema } from '../studio/generation'
+
 import {
   BrandSignalsSchema,
   GenerationModeSchema,
@@ -59,6 +61,16 @@ export const StudioGenerationImageSchema = z.object({
    * generation record and its original survive.
    */
   stamped_asset_id: z.uuid().nullable().default(null),
+  /**
+   * WHY this image does or does not carry the logo, recorded when stamping ran.
+   *
+   * `.default(null)` is load-bearing rather than tidy: the column ships in a
+   * migration a person applies by hand, so a deploy that has the code and not
+   * the column returns rows without this key. That parses to null, which is the
+   * SAME value as "stamping was never attempted" — true of every row written
+   * before this shipped, and true of that deploy. One meaning, not a hole.
+   */
+  stamp_outcome: StampOutcomeSchema.nullable().default(null),
   seed: z.coerce.number().int().nullable().default(null),
   width: z.number().int().positive().nullable().default(null),
   height: z.number().int().positive().nullable().default(null),

@@ -5,8 +5,9 @@ import { auth } from '@clerk/nextjs/server'
 import { createPgLedgerPort, createWithCredits, loadBillingEnv } from '@sahoda/billing'
 import { createMesh, type Mesh } from '@sahoda/mesh'
 import {
+  DEFAULT_STAMP_OPTIONS,
   GenerationModeSchema,
-  MESH_TASK_ACTION,
+  StampOptionsSchema,
   StudioGenerationRowSchema,
   StudioGenerationSchema,
   type BrandSignal,
@@ -23,14 +24,19 @@ import {
   chargeFailureState,
   type ChargeFailureState,
 } from '@/lib/posts/charge-failure'
-import { MEDIA_BUCKET, MEDIA_UPLOAD_CAP_BYTES } from '@/lib/posts/media-constants'
+import { CHANNEL_MEDIA_CAP_BYTES, MEDIA_BUCKET } from '@/lib/posts/media-constants'
 import { assetObjectPath } from '@/lib/posts/media-path'
 import { signMediaPreviews } from '@/lib/posts/media-url'
 import { sniffImage } from '@/lib/posts/sniff-image'
 import { brandSignalsFor } from '@/lib/studio/brand-signals'
 import { formatById } from '@/lib/studio/formats'
 import { MAX_REFERENCES, MAX_TRIES_PER_PRESS, describeModeBlock } from '@/lib/studio/modes'
-import { defaultModelId, describeModelBlock } from '@/lib/studio/models'
+import {
+  defaultModelId,
+  describeModelBlock,
+  imageActionFor,
+  imageTierFor,
+} from '@/lib/studio/models'
 import { ReferenceIdsSchema } from '@/lib/studio/reference-ids'
 import { conditionPrompt } from '@/lib/studio/prompt'
 import { stampGeneratedPicture } from '@/lib/studio/stamp-generated'
@@ -58,8 +64,14 @@ import { workspaceForWrite } from '@/lib/workspaces'
  * `withCredits` reserves the credits, the work runs inside the callback, and a
  * THROW in there releases the hold so nothing is charged. Every refusal below is
  * a throw for exactly that reason. The action string comes from
- * `MESH_TASK_ACTION`, never a literal: the mesh task is `image_generate` and the
- * pricing key is `image_standard`, and hardcoding either is how the two drift.
+ * `imageActionFor(modelId)`, which reads the shared `IMAGE_TIER_ACTION` map,
+ * never a literal: the mesh task is `image_generate` whichever model draws, and
+ * the pricing key is `image_standard` for a draft-tier model and `image_premium`
+ * for a finish-tier one. It was `MESH_TASK_ACTION.image_generate` for every
+ * model until 2026-09-03, so the two the catalogue calls "billed by what it
+ * draws" and "the dearest" were sold at the flat everyday price on every press.
+ * The key is resolved BEFORE the first hold, from the same catalogue the picker
+ * shows the price from, so what the person read is what the ledger records.
  *
  * ── THE BYTES GO THROUGH THE SAME GATE AS AN UPLOAD ─────────────────────────
  * `sniffImage` reads the real format and dimensions from the BYTES rather than
@@ -110,6 +122,17 @@ const GenerateInputSchema = z.object({
    * predates the picker still works and gets the everyday model.
    */
   modelId: z.string().min(1).default(defaultModelId()),
+  /**
+   * Where the logo goes, how big, and whether it happens at all.
+   *
+   * Optional so an old client and any hand-made request stay safe: absent
+   * means `DEFAULT_STAMP_OPTIONS`, which is exactly the picture this product
+   * has always drawn (on, bottom-right, 14% of the shorter edge). Validated
+   * through `@sahoda/shared`'s own schema rather than re-checked here, so a
+   * request that reaches this action and one built by hand can never disagree
+   * about what a valid choice is.
+   */
+  stamp: StampOptionsSchema.optional(),
 })
 
 export type QueueGenerationState =
@@ -158,7 +181,6 @@ const REFUSALS = {
  * at 1, so no row ever claims to have asked for more than was asked for.
  */
 export async function queueGeneration(input: unknown): Promise<QueueGenerationState> {
-  const action = MESH_TASK_ACTION.image_generate
   let workspaceId: string | undefined
 
   try {
@@ -185,6 +207,9 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
       }
     }
 
+    // Absent means exactly today's picture. See the field's own comment above.
+    const stampOptions = parsed.data.stamp ?? DEFAULT_STAMP_OPTIONS
+
     // Through the SAME function the picker uses, so a hand-made request cannot
     // reach a size the screen refused to offer.
     const format = formatById(parsed.data.formatId)
@@ -200,6 +225,18 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
     const modelBlocked = describeModelBlock(parsed.data.modelId)
     if (modelBlocked !== null) {
       return { ok: false, insufficient: false, message: modelBlocked }
+    }
+
+    // ── THE PRICE, FROM THE MODEL, BEFORE ANY HOLD ──────────────────────────
+    // The pricing key is a fact about the chosen model's tier, read through
+    // the shared map. Null is an id the catalogue does not carry, which the
+    // block above already refused, so this arm is unreachable; it refuses
+    // rather than pricing at a guess, because a guessed price is one a
+    // hand-made request would be sold at.
+    const action = imageActionFor(parsed.data.modelId)
+    const imageTier = imageTierFor(parsed.data.modelId)
+    if (action === null || imageTier === null) {
+      return { ok: false, insufficient: false, message: REFUSALS.failed }
     }
 
     // The mode's own rule, asked through the SAME function the screen asks, so
@@ -285,6 +322,10 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
         // its model on success cannot say what a failure was trying to use,
         // which is the case where somebody most wants to know.
         model_id: parsed.data.modelId,
+        // The tier it is CHARGED at, in the column the migration made for it and
+        // nothing had written. Recorded rather than derived from `model_id`,
+        // because the catalogue moves and a row must still say what it cost.
+        image_tier: imageTier,
         reference_asset_ids: parsed.data.referenceAssetIds,
         // Explore legitimately used nothing, and `[]` says that. A null here
         // would mean conditioning never ran, which is a different claim.
@@ -396,7 +437,10 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
           }
 
           const bytes = Uint8Array.from(Buffer.from(result.data.base64, 'base64'))
-          if (bytes.byteLength === 0 || bytes.byteLength > MEDIA_UPLOAD_CAP_BYTES) {
+          // The CHANNEL ceiling, not the upload cap: these bytes came back from
+          // the mesh inside this function and never crossed Vercel's edge, so
+          // the request-body limit that lowered the upload cap does not apply.
+          if (bytes.byteLength === 0 || bytes.byteLength > CHANNEL_MEDIA_CAP_BYTES) {
             failure = FAILURE_REASON.IMAGE_UNREADABLE
             throw new Error('IMAGE_UNUSABLE')
           }
@@ -455,12 +499,28 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
           // callback releases the hold and refuses a picture the customer
           // already has, and one owner of that guarantee is testable where two
           // are not. See `lib/studio/stamp-generated.ts`.
-          const stamped = await stampGeneratedPicture({
-            workspaceId: workspace.id,
-            userId,
-            picture: bytes,
-            supabase,
-          })
+          //
+          // ── UNLESS THE PERSON TURNED IT OFF FOR THIS PRESS ────────────────
+          // `stampOptions.enabled === false` means the function is never
+          // called: no read of the logo file, no compositing, no second asset,
+          // no extra cost. The row records `skipped`, NOT null.
+          //
+          // Null would have been the smaller change and it would have lied. A
+          // row carrying null renders as "made before Sahoda placed logos",
+          // which is false about a picture somebody drew today with the toggle
+          // off. A choice the customer made a minute ago and a fact about when
+          // the product shipped are not the same sentence, so they are not the
+          // same value.
+          const stamped = stampOptions.enabled
+            ? await stampGeneratedPicture({
+                workspaceId: workspace.id,
+                userId,
+                picture: bytes,
+                supabase,
+                anchor: stampOptions.anchor,
+                sizeStep: stampOptions.sizeStep,
+              })
+            : ({ outcome: 'skipped' } as const)
 
           const imageRow = {
             workspace_id: workspace.id,
@@ -479,9 +539,23 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
           // statement could never land. On `42703` (undefined column) the row
           // is written again without it, so a missing column costs the LINK and
           // never the record of a generation somebody paid for.
-          let image = await supabase
-            .from('studio_generation_images')
-            .insert({ ...imageRow, stamped_asset_id: stamped?.assetId ?? null })
+          //
+          // Both fields are ALWAYS present, one shape either way, so the person
+          // turning the stamp off does not create a second row shape to
+          // maintain. When it is off, `stamped` is `null` and both land as
+          // literal `null`: the same bytes on the wire as a row from before
+          // this feature shipped, which is exactly the "never attempted" case
+          // the column's own migration comment names.
+          let image = await supabase.from('studio_generation_images').insert({
+            ...imageRow,
+            stamped_asset_id:
+              stamped !== null && stamped.outcome === 'stamped' ? stamped.assetId : null,
+            // WHY, beside the pointer and in the SAME insert. The pointer's
+            // null is one fact standing in for several situations and the
+            // screen has to tell them apart; the migration's step 5 carries
+            // the reasoning.
+            stamp_outcome: stamped === null ? null : stamped.outcome,
+          })
 
           if (image.error?.code === '42703') {
             image = await supabase.from('studio_generation_images').insert(imageRow)
@@ -510,7 +584,7 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
           // stamped copy must not stop the generation's own from being removed
           // — so they are separate statements rather than one chain.
           if (image.error) {
-            if (stamped !== null) {
+            if (stamped !== null && stamped.outcome === 'stamped') {
               await supabase.from('assets').delete().eq('id', stamped.assetId)
               await supabase.storage.from(MEDIA_BUCKET).remove([stamped.objectPath])
             }

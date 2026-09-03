@@ -160,7 +160,7 @@ export function AssetRow({
           // `pr-9` reserves the space the "..." trigger floats in, the same
           // trick `library-sidebar-row.tsx` uses — text truncates before it,
           // rather than the button and the trigger sharing one pixel.
-          'flex w-full items-center gap-3 py-2 pr-9 pl-3 text-left transition-micro hover:bg-s1',
+          'flex w-full items-center gap-3 py-2 pr-9 pl-3 text-left transition-micro hover:bg-s2',
           selectable && selected ? 'bg-brand-wash' : '',
         )}
       >

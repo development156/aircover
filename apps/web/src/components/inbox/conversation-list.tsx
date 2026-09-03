@@ -96,7 +96,7 @@ export function ConversationList({
               which on a three-surface tab bar also says which one you are on. */}
           <h2 className="type-h3">{title}</h2>
           {unread > 0 ? (
-            <span className="ml-auto grid h-[18px] min-w-[18px] place-items-center rounded-full bg-brand-tint px-[5px] text-[11px] font-bold text-accent tabular-nums">
+            <span className="ml-auto grid h-[18px] min-w-[18px] place-items-center rounded-pill bg-brand-tint px-[5px] text-[11px] font-bold text-accent tabular-nums">
               {unread}
             </span>
           ) : null}
@@ -106,7 +106,7 @@ export function ConversationList({
             box over zero rows is a control that cannot succeed. */}
         {conversations.length > 0 ? (
           <>
-            <div className="surface-ring mb-3 flex h-9 items-center gap-2 rounded-sm bg-s2 px-[10px]">
+            <div className="surface-ring mb-3 flex h-9 items-center gap-2 rounded-sm bg-s2 px-[10px] transition-micro focus-within:shadow-[inset_0_0_0_1.5px_var(--brand)]">
               <Search size={15} className="shrink-0 text-muted" aria-hidden />
               <input
                 value={query}
@@ -126,10 +126,10 @@ export function ConversationList({
                     onClick={() => setChannel(key)}
                     aria-pressed={channel === key}
                     className={cn(
-                      'inline-flex h-7 items-center rounded-full px-[10px] text-[12px] font-[550] transition-micro',
+                      'inline-flex h-7 items-center rounded-pill px-[10px] type-meta font-[550] transition-micro max-narrow:min-h-[44px]',
                       channel === key
                         ? 'bg-ink text-white dark:bg-white dark:text-[var(--canvas)]'
-                        : 'text-muted shadow-[inset_0_0_0_1px_var(--line)] hover:text-ink',
+                        : 'text-muted surface-ring-firm hover:text-ink',
                     )}
                   >
                     {key === 'all' ? 'All' : platformLabel(key as ZernioConversation['platform'])}
@@ -167,7 +167,7 @@ export function ConversationList({
                   >
                     <span
                       aria-hidden
-                      className="grid size-8 shrink-0 place-items-center rounded-full bg-ink text-[11px] font-bold text-white dark:bg-white dark:text-[var(--canvas)]"
+                      className="grid size-8 shrink-0 place-items-center rounded-pill bg-ink text-[11px] font-bold text-white dark:bg-white dark:text-[var(--canvas)]"
                     >
                       {initialsOf(who)}
                     </span>
@@ -185,7 +185,7 @@ export function ConversationList({
                           {conversation.lastMessage ?? 'No message text'}
                         </span>
                         {count > 0 ? (
-                          <span className="grid h-[18px] min-w-[18px] shrink-0 place-items-center rounded-full bg-brand px-[5px] text-[11px] font-bold text-primary-foreground tabular-nums">
+                          <span className="grid h-[18px] min-w-[18px] shrink-0 place-items-center rounded-pill bg-brand px-[5px] text-[11px] font-bold text-primary-foreground tabular-nums">
                             {count}
                           </span>
                         ) : null}

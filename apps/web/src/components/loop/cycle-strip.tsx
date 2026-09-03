@@ -218,7 +218,7 @@ function Stage({
         <Rail filled={enteringFilled} hidden={first} />
         <span
           className={[
-            'flex size-9 shrink-0 items-center justify-center rounded-full transition-micro',
+            'flex size-9 shrink-0 items-center justify-center rounded-pill transition-micro',
             isCurrent
               ? 'bg-primary text-primary-foreground shadow-brand'
               : isDone
@@ -262,7 +262,7 @@ function Stage({
       <span
         aria-hidden
         className={[
-          'mt-auto h-[3px] w-14 shrink-0 rounded-full transition-micro',
+          'mt-auto h-[3px] w-14 shrink-0 rounded-pill transition-micro',
           isCurrent ? 'bg-accent' : 'bg-transparent',
         ].join(' ')}
       />

@@ -1,5 +1,6 @@
 import 'server-only'
 
+import type { StampOutcome } from '@sahoda/shared'
 import {
   StudioGenerationImageSchema,
   StudioGenerationRowSchema,
@@ -48,6 +49,18 @@ export type GenerationPicture = {
    * and a download then carries no extension rather than a wrong one.
    */
   mime: string | null
+  /**
+   * The logo-stamped copy's link, or null when there is no stamped copy — or
+   * when there is one and ITS link would not sign. Same three states `url`
+   * keeps apart one field up, for the same reason.
+   */
+  stampedUrl: string | null
+  /**
+   * WHY this picture does or does not carry the logo. Null means stamping was
+   * never attempted, which is a different answer from every value in the enum
+   * and must never be rendered as a failure.
+   */
+  stampOutcome: StampOutcome | null
 }
 
 export type GenerationCard = {
@@ -152,9 +165,13 @@ async function picturesFor(
     .filter((parsed) => parsed.success)
     .map((parsed) => parsed.data)
 
-  const assetIds = images
-    .map((image) => image.asset_id)
-    .filter((id): id is string => typeof id === 'string')
+  // BOTH the original and its stamped copy, because the screen offers a choice
+  // between them and a choice needs two links. One extra id per stamped image,
+  // through the same two round trips rather than a third.
+  const assetIds = [
+    ...images.map((image) => image.asset_id),
+    ...images.map((image) => image.stamped_asset_id),
+  ].filter((id): id is string => typeof id === 'string')
 
   // One round trip for the paths, one for the signatures.
   const paths = new Map<string, string>()
@@ -192,6 +209,9 @@ async function picturesFor(
       width: image.width,
       height: image.height,
       mime: image.asset_id === null ? null : (mimes.get(image.asset_id) ?? null),
+      stampedUrl:
+        image.stamped_asset_id === null ? null : (urls.get(image.stamped_asset_id) ?? null),
+      stampOutcome: image.stamp_outcome,
     })
     grouped.set(image.generation_id, list)
   }
@@ -207,19 +227,37 @@ export type LibraryPicture = {
 }
 
 /**
+ * The picker's read: the pictures, or which of two reasons there are none.
+ *
+ * The same three answers `GenerationsRead` keeps apart, for the same reason.
+ * `ok` with an empty list is "we asked and there are none", and only that one
+ * has "add a picture" as its natural remedy. `unreadable` is "we asked and
+ * could not get an answer", and a screen that calls it empty is telling
+ * somebody with thirty pictures that they have never added one.
+ */
+export type LibraryRead =
+  | { status: 'ok'; pictures: LibraryPicture[] }
+  | { status: 'no-workspace' }
+  | { status: 'unreadable' }
+
+/**
  * Recent pictures from this workspace, newest first, for the reference picker.
  *
  * Images only, and live only: a trashed file is not something to build a look
  * from, and offering one would let somebody condition a paid generation on a
  * picture they had already decided to throw away.
  *
- * Returns an EMPTY list on a failed read. The picker then says there is nothing
- * to match, which is wrong in a harmless direction: the person can still make a
- * picture. Failing the screen over a picker would be worse.
+ * NON-FATAL, AND HONEST ABOUT IT. A failed read comes back as `unreadable`
+ * rather than throwing: the person can still add a picture from their device
+ * or make one below, so failing the whole screen over a picker would be worse.
+ * It used to come back as `[]`, and the workbench read that as "You have no
+ * pictures yet", a claim that was false on every transient failure. The status
+ * is what lets the screen say what actually happened.
  */
-export async function readLibraryPictures(limit = 12): Promise<LibraryPicture[]> {
+export async function readLibraryPictures(limit = 12): Promise<LibraryRead> {
   const workspace = await activeWorkspaceRead()
-  if (workspace.status !== 'ok') return []
+  if (workspace.status === 'unreadable') return { status: 'unreadable' }
+  if (workspace.status !== 'ok') return { status: 'no-workspace' }
 
   const supabase = createServerSupabase()
   const { data, error } = await supabase
@@ -231,7 +269,7 @@ export async function readLibraryPictures(limit = 12): Promise<LibraryPicture[]>
     .order('created_at', { ascending: false })
     .limit(limit)
 
-  if (error || !data) return []
+  if (error || !data) return { status: 'unreadable' }
 
   const rows = data
     .filter((row) => typeof row.id === 'string' && typeof row.storage_path === 'string')
@@ -243,11 +281,14 @@ export async function readLibraryPictures(limit = 12): Promise<LibraryPicture[]>
   const signed = await signMediaPreviews(rows)
   const urls = new Map(signed.map((one) => [one.id, one.url]))
 
-  return rows.map((row) => ({
-    assetId: row.id,
-    // Null when the link would not sign. The picker shows the card anyway,
-    // because the picture exists and can still be picked.
-    url: urls.get(row.id) ?? null,
-    title: row.title !== null && row.title !== '' ? row.title : null,
-  }))
+  return {
+    status: 'ok',
+    pictures: rows.map((row) => ({
+      assetId: row.id,
+      // Null when the link would not sign. The picker shows the card anyway,
+      // because the picture exists and can still be picked.
+      url: urls.get(row.id) ?? null,
+      title: row.title !== null && row.title !== '' ? row.title : null,
+    })),
+  }
 }

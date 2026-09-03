@@ -126,7 +126,7 @@ function ViewButton({
       aria-label={label}
       title={label}
       className={cn(
-        'grid size-7 place-items-center rounded-pill transition-micro',
+        'grid size-7 place-items-center rounded-pill transition-micro max-narrow:size-11',
         active ? 'bg-primary text-primary-foreground' : 'text-muted hover:text-ink',
       )}
     >

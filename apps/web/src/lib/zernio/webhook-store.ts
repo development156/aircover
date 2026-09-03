@@ -1,6 +1,7 @@
 import 'server-only'
 
 import type { ZernioWebhookRouting } from '@sahoda/publishing'
+import { ChannelSchema, type Channel } from '@sahoda/shared'
 
 /**
  * The shared vocabulary and SQL primitives the webhook projections are built from.
@@ -43,34 +44,47 @@ export type ProjectionOutcome =
   /**
    * Stored, attributable, and the platform it names has no representation here.
    * Zernio's comment events span seven platforms and its DM events five; this
-   * product models four channels. A Reddit comment is a real event we genuinely
-   * cannot file, and saying so is the honest answer — inventing a channel would put
-   * a Reddit thread in the Instagram tab.
+   * product models the channels in `ChannelSchema` and no others. A Reddit
+   * comment is a real event we genuinely cannot file, and saying so is the honest
+   * answer — inventing a channel would put a Reddit thread in the Instagram tab.
    */
   | { kind: 'channel_not_representable'; platform: string }
   /** Stored, attributable, and the row it refers to is not in this database. */
   | { kind: 'referent_absent'; what: string }
 
 /**
- * Zernio's platform names → this product's four channels.
+ * The two names Zernio uses that are not ours. `twitter` is Zernio's spelling
+ * and `x` is ours; `googlebusiness` is theirs and `gbp` is ours. Zernio uses BOTH
+ * spellings depending on the endpoint — its own publish, validate, edit and
+ * unpublish surfaces disagree about the name of the same platform, and this map
+ * is the one place that has to survive all four.
+ */
+const ZERNIO_SPELLINGS: Readonly<Record<string, Channel>> = {
+  twitter: 'x',
+  googlebusiness: 'gbp',
+}
+
+/**
+ * Zernio's platform names → this product's channels.
  *
  * NOT a lookup with a fallback. A fallback is how a Reddit comment becomes an
  * Instagram row. An unmapped platform returns undefined and the caller reports
  * `channel_not_representable`, which is a fact rather than a guess.
  *
- * `twitter` is Zernio's spelling and `x` is ours. Both are listed because Zernio
- * uses BOTH depending on the endpoint — its own publish, validate, edit and
- * unpublish surfaces disagree about the name of the same platform, and this map is
- * the one place that has to survive all four.
+ * ── DERIVED FROM `ChannelSchema`, NEVER LISTED HERE ──────────────────────────
+ * This was a six-key literal typed `'x' | 'gbp' | 'linkedin' | 'instagram'`.
+ * When `facebook` and `telegram` joined the schema on 2026-08-26, and
+ * `inbox_threads.channel` was widened to admit them in the same migration, the
+ * literal kept typechecking and every Facebook DM and comment the receiver stored
+ * came back `channel_not_representable`: in the event log, never in the inbox.
+ * Every channel the schema admits maps to itself; only the spellings above are
+ * written by hand, and `whatsapp`, `sms`, `reddit` and the rest stay absent
+ * because they are absent from the schema.
  */
-export const CHANNEL: Readonly<Record<string, 'x' | 'gbp' | 'linkedin' | 'instagram'>> = {
-  instagram: 'instagram',
-  twitter: 'x',
-  x: 'x',
-  linkedin: 'linkedin',
-  googlebusiness: 'gbp',
-  gbp: 'gbp',
-}
+export const CHANNEL: Readonly<Record<string, Channel>> = Object.freeze({
+  ...Object.fromEntries(ChannelSchema.options.map((channel) => [channel, channel])),
+  ...ZERNIO_SPELLINGS,
+})
 
 /** Read a nested string. Returns null for absent, non-string, or blank. */
 export function str(o: unknown, ...path: string[]): string | null {

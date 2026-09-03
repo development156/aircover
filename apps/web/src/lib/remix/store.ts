@@ -11,6 +11,8 @@ import { isPostFormat } from '@sahoda/publishing/format'
 
 import { createServerSupabase } from '@/lib/supabase/server'
 
+import { RemixReadError } from './read-error'
+
 /**
  * READING AND WRITING A REMIX BATCH, under the caller's own RLS.
  *
@@ -123,12 +125,14 @@ export async function readDerivatives(
   workspaceId: string,
 ): Promise<RemixDerivative[]> {
   const supabase = createServerSupabase()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('remix_derivatives')
     .select('*')
     .eq('batch_id', batchId)
     .eq('workspace_id', workspaceId)
     .order('created_at', { ascending: true })
+  // A refused read is NOT a batch with no drafts. See `listBatches`.
+  if (error) throw new RemixReadError('remix_derivatives')
   return (data ?? []).flatMap((row) => {
     const parsed = parseDerivative(row)
     return parsed ? [parsed] : []
@@ -285,15 +289,27 @@ export function markSkipped(derivativeId: string, workspaceId: string): Promise<
   })
 }
 
-/** The batches this workspace has run, newest first. */
+/**
+ * The batches this workspace has run, newest first.
+ *
+ * ── A REFUSED READ THROWS. IT IS NEVER AN EMPTY LIST ─────────────────────────
+ * This used to destructure `data` alone and return `data ?? []`, so a query the
+ * database refused came back as "no batches", `readCurrentBatch` turned that
+ * into null, and /remix rendered the free planner as though the workspace had
+ * never made anything. "Sahoda could not read your batches" and "you have no
+ * batches" are different claims, and only one of them was true. The throw is
+ * `RemixReadError`, which `read.ts` catches and turns into its own outcome;
+ * `readDerivatives` does the same.
+ */
 export async function listBatches(workspaceId: string, limit: number): Promise<RemixBatch[]> {
   const supabase = createServerSupabase()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('remix_batches')
     .select('*')
     .eq('workspace_id', workspaceId)
     .order('created_at', { ascending: false })
     .limit(limit)
+  if (error) throw new RemixReadError('remix_batches')
   return (data ?? []).flatMap((row) => {
     const parsed = RemixBatchSchema.safeParse(row)
     return parsed.success ? [parsed.data] : []

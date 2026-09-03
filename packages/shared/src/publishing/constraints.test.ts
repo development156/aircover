@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import { ChannelSchema } from '../enums'
-import { CONSTRAINTS, validateVariant, validateMedia, formatForPlatform } from './constraints'
+import {
+  CHANNEL_LABELS,
+  CONSTRAINTS,
+  validateVariant,
+  validateMedia,
+  formatForPlatform,
+} from './constraints'
 
 describe('constraint engine v0', () => {
   it('covers every channel in the schema, and invents none', () => {
@@ -124,5 +130,63 @@ describe('constraint engine v0', () => {
       text: 'Hi',
       media: [],
     })
+  })
+})
+
+/**
+ * ── IMAGE FLOORS THE PLATFORMS ACTUALLY ENFORCE ──────────────────────────────
+ * docs/31 §6.3: gbp's floor was 250×250 where Google's is 400×300, and linkedin
+ * had no floor at all where the vendor's is 552×276. Both showed green on files
+ * the platform refuses at 9am with nobody watching.
+ */
+describe('image dimension floors (docs/31 §2.2, §2.4, §6.3)', () => {
+  const png = (width: number, height: number) => ({ mime: 'image/png', bytes: 1000, width, height })
+  const codesFor = (channel: 'gbp' | 'linkedin', width: number, height: number) =>
+    validateMedia([CONSTRAINTS[channel]], png(width, height))[0]!.violations.map((v) => v.code)
+
+  it('gbp refuses a 300×300 image, which Google refuses at publish', () => {
+    expect(codesFor('gbp', 300, 300)).toContain('MEDIA_DIMS')
+  })
+
+  it('gbp accepts exactly 400×300', () => {
+    expect(codesFor('gbp', 400, 300)).not.toContain('MEDIA_DIMS')
+  })
+
+  it('gbp refuses 400×299 and 399×300 (both edges are floors)', () => {
+    expect(codesFor('gbp', 400, 299)).toContain('MEDIA_DIMS')
+    expect(codesFor('gbp', 399, 300)).toContain('MEDIA_DIMS')
+  })
+
+  it('linkedin refuses a 100×100 image, which used to pass every check', () => {
+    expect(codesFor('linkedin', 100, 100)).toContain('MEDIA_DIMS')
+  })
+
+  it('linkedin accepts exactly 552×276 and refuses one pixel under on either edge', () => {
+    expect(codesFor('linkedin', 552, 276)).not.toContain('MEDIA_DIMS')
+    expect(codesFor('linkedin', 551, 276)).toContain('MEDIA_DIMS')
+    expect(codesFor('linkedin', 552, 275)).toContain('MEDIA_DIMS')
+  })
+
+  it('neither floor is applied when the file has no measured dimensions', () => {
+    const res = validateMedia([CONSTRAINTS.gbp, CONSTRAINTS.linkedin], {
+      mime: 'image/png',
+      bytes: 1000,
+    })
+    for (const r of res) expect(r.violations.map((v) => v.code)).not.toContain('MEDIA_DIMS')
+  })
+})
+
+describe('CHANNEL_LABELS', () => {
+  it('names every channel in the schema with a display name that is not the key', () => {
+    for (const channel of ChannelSchema.options) {
+      const label = CHANNEL_LABELS[channel]
+      expect(typeof label).toBe('string')
+      expect(label.length).toBeGreaterThan(0)
+      expect(label).not.toBe(channel)
+    }
+  })
+
+  it('spells the Google channel out in full', () => {
+    expect(CHANNEL_LABELS.gbp).toBe('Google Business Profile')
   })
 })

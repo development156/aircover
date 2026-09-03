@@ -1,8 +1,10 @@
 'use client'
 
 import { Lock } from 'lucide-react'
+import { creditCost } from '@sahoda/shared'
 
-import { routedModels, unroutedModels, type StudioModel } from '@/lib/studio/models'
+import { creditWord } from '@/lib/credit-words'
+import { imageActionFor, routedModels, unroutedModels, type StudioModel } from '@/lib/studio/models'
 
 /**
  * WHICH MODEL DRAWS THE PICTURE.
@@ -25,6 +27,13 @@ import { routedModels, unroutedModels, type StudioModel } from '@/lib/studio/mod
  * Hiding them would be tidier and would leave somebody wondering whether the
  * product can make a carousel at all. They are listed, visibly not selectable,
  * with the reason. That is the difference between a door and a wall.
+ *
+ * ── AND THE PRICE IS ON THE CARD, BEFORE THE PRESS ──────────────────────────
+ * Two of the three are held at the premium price. A card that said "the
+ * dearest" and never said a number left the person to find out on the wallet
+ * page, after the spend. The figure comes from the pricing file through
+ * `imageActionFor`, the same function the action prices the hold with, so the
+ * card and the ledger entry cannot disagree.
  */
 export function ModelPicker({
   modelId,
@@ -82,12 +91,21 @@ export function ModelPicker({
 }
 
 function Card({ model }: { model: StudioModel }) {
+  // Non-null for every catalogue model; the catalogue is the only source of
+  // cards, so the null arm is the type's, not a state a person reaches.
+  const action = imageActionFor(model.id)
+  const cost = action === null ? null : creditCost(action)
   return (
     <>
       <span className="type-sm font-[550]">{model.label}</span>
       <span className="type-sm">{model.goodAt}</span>
       {model.unlocks === null ? null : <span className="type-sm font-[550]">{model.unlocks}</span>}
       <span className="type-sm">{model.costNote}</span>
+      {cost === null ? null : (
+        <span className="type-sm font-[550]">
+          Costs <span className="num">{cost}</span> {creditWord(cost)} a picture
+        </span>
+      )}
     </>
   )
 }

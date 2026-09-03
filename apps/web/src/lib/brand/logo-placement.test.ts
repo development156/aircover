@@ -101,6 +101,70 @@ describe('size: bound by the shorter edge of the canvas', () => {
   })
 })
 
+describe('size: sizeStep changes how big the mark is, and defaults to medium', () => {
+  it('omitting sizeStep gives the same mark as passing "medium" explicitly', () => {
+    const omitted = placeLogo({ canvas: CANVAS_WIDE, logoAspect: 1.5, anchor: 'bottom-right' })
+    const explicit = placeLogo({
+      canvas: CANVAS_WIDE,
+      logoAspect: 1.5,
+      anchor: 'bottom-right',
+      sizeStep: 'medium',
+    })
+    expect(omitted).toEqual(explicit)
+  })
+
+  it('small is smaller than medium, and large is bigger than medium, for the same canvas', () => {
+    const small = placeLogo({ canvas: CANVAS_WIDE, logoAspect: 1.5, anchor: 'bottom-right', sizeStep: 'small' })
+    const medium = placeLogo({ canvas: CANVAS_WIDE, logoAspect: 1.5, anchor: 'bottom-right', sizeStep: 'medium' })
+    const large = placeLogo({ canvas: CANVAS_WIDE, logoAspect: 1.5, anchor: 'bottom-right', sizeStep: 'large' })
+    expect(small.mark.height).toBeLessThan(medium.mark.height)
+    expect(medium.mark.height).toBeLessThan(large.mark.height)
+  })
+
+  it('every size step keeps its clear rectangle fully inside the canvas', () => {
+    for (const sizeStep of ['small', 'medium', 'large'] as const) {
+      const placement = placeLogo({ canvas: CANVAS_WIDE, logoAspect: 1.5, anchor: 'bottom-right', sizeStep })
+      expect(placement.clear.x, sizeStep).toBeGreaterThanOrEqual(0)
+      expect(placement.clear.y, sizeStep).toBeGreaterThanOrEqual(0)
+      expect(placement.clear.x + placement.clear.width, sizeStep).toBeLessThanOrEqual(CANVAS_WIDE.width)
+      expect(placement.clear.y + placement.clear.height, sizeStep).toBeLessThanOrEqual(CANVAS_WIDE.height)
+    }
+  })
+
+  it('every step\'s exact share, unclamped, on a square canvas where no cap can engage', () => {
+    // A square canvas with a square logo trips neither cap: width and height
+    // caps are both well above the size any of these shares can reach at
+    // 1000px. So the mark's height is the share times the shorter edge,
+    // EXACTLY, and this is the test that would catch a share silently
+    // drifting rather than merely "getting bigger" — a step could double and
+    // the ordering assertion above would still pass.
+    const canvas = { width: 1000, height: 1000 }
+    expect(placeLogo({ canvas, logoAspect: 1, anchor: 'bottom-right', sizeStep: 'small' }).mark.height).toBe(
+      100,
+    )
+    expect(
+      placeLogo({ canvas, logoAspect: 1, anchor: 'bottom-right', sizeStep: 'medium' }).mark.height,
+    ).toBe(140)
+    expect(placeLogo({ canvas, logoAspect: 1, anchor: 'bottom-right', sizeStep: 'large' }).mark.height).toBe(
+      200,
+    )
+  })
+
+  it('the height cap still cannot bind at "large", the biggest step, on a tall canvas', () => {
+    // A tall, narrow canvas is the shape that pushes the starting height
+    // closest to MAX_MARK_HEIGHT_SHARE (0.25), because the shorter edge and
+    // the canvas height are close together. If the height cap were reachable
+    // at any step, this is where it would show up first.
+    const tall = { width: 500, height: 2000 }
+    const placement = placeLogo({ canvas: tall, logoAspect: 1, anchor: 'bottom-right', sizeStep: 'large' })
+    // 0.2 (large's share) * 500 (shorter edge) = 100, well under 0.25 * 2000 = 500.
+    // Exact, not just "less than": an exact match is what the cap NOT
+    // engaging looks like, and a range would pass just as well if the cap
+    // silently kicked in and clamped it to something still under the bound.
+    expect(placement.mark.height).toBe(100)
+  })
+})
+
 describe('size: capped on the long axis so a very wide lockup cannot run across the picture', () => {
   it('mark width grows slower than aspect once the lockup is very wide, because the width cap has kicked in', () => {
     const canvas = { width: 1000, height: 1000 }

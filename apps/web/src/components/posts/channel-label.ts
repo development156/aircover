@@ -5,9 +5,23 @@ import type { Channel, ConnectionPlatform } from '@sahoda/shared'
  * union itself always comes from @sahoda/shared, never from here.
  *
  * Typed as an exhaustive `Record<Channel, …>` on purpose: a channel added to the
- * schema is a COMPILE ERROR here rather than a screen rendering a raw `telegram`
+ * schema is a COMPILE ERROR rather than a screen rendering a raw `telegram`
  * where a name should be. That is what happened when facebook and telegram were
  * added — this file was one of six the compiler handed over as a to-do list.
+ *
+ * ── THERE IS A SECOND COPY, IN `packages/shared`, AND THAT IS DELIBERATE ─────
+ * The publishing adapters build sentences a customer reads and were
+ * interpolating the raw enum key ("gbp allows 1 media items"), so the same names
+ * had to exist inside `packages/shared`, which cannot import from `apps/web`.
+ * Re-exporting the shared map from here is the tidy answer and it costs real
+ * bytes: MEASURED with `next build` either side of that one-line change,
+ * `/(app)/posts` grew **+10.9 kB, over budget**, because the shared barrel
+ * reaches the whole constraint table from one import (see the note in
+ * `packages/shared/package.json`, which records search-tokens.ts doing this to
+ * eleven routes). A presentation string is not worth that on a phone.
+ *
+ * `channel-label.test.ts` is the guard across the seam: the two maps must agree,
+ * name for name, or it goes red.
  */
 export const CHANNEL_LABELS: Readonly<Record<Channel, string>> = {
   x: 'X',

@@ -148,3 +148,89 @@ export const readBrandLogo = cache(async function readBrandLogo(
     return null
   }
 })
+
+/**
+ * The workspace's DARK-background logo variant, or null.
+ *
+ * ── POINTER ONLY, DELIBERATELY ────────────────────────────────────────────────
+ * There is no title-match fallback here, unlike `readBrandLogo` above. That
+ * fallback exists for the light variant because a title convention (`Logo`)
+ * predates the pointer column and needs to keep answering while the pointer's
+ * own migration is unapplied on some deploys. No workspace has ever been asked
+ * for a dark variant before `workspaces.logo_asset_id_dark` existed, so there is
+ * no prior signal to fall back to, and guessing which OTHER asset in the
+ * library might be the dark variant would be exactly the "a customer who titles
+ * some other picture" risk `readBrandLogo`'s own header names.
+ *
+ * ── NULL IS AN ANSWER, NOT A FAILURE ────────────────────────────────────────
+ * No dark variant chosen, a column that does not exist yet (`42703`), a pointer
+ * at a trashed asset, a read that did not answer: every one of them returns
+ * null. A caller that wants a mark for a dark surface and gets null here uses
+ * the light variant instead (see `logo-variant-pick.ts`) or falls back to
+ * whatever it did before this column existed.
+ */
+export const readBrandLogoDark = cache(async function readBrandLogoDark(
+  workspaceId: string,
+): Promise<BrandLogo | null> {
+  try {
+    const supabase = createServerSupabase()
+
+    const workspace = await supabase
+      .from('workspaces')
+      .select('logo_asset_id_dark')
+      .eq('id', workspaceId)
+      .maybeSingle()
+
+    // Any failure, including `42703` (column not applied yet), answers null:
+    // there is no fallback path to fall through to for this variant.
+    if (workspace.error || !workspace.data) return null
+
+    const pointerId = (workspace.data as { logo_asset_id_dark: string | null }).logo_asset_id_dark
+    if (pointerId === null || pointerId === undefined) return null
+
+    const pointed = await supabase
+      .from('assets')
+      .select('id, storage_path, deleted_at')
+      .eq('id', pointerId)
+      .eq('workspace_id', workspaceId)
+      .maybeSingle()
+
+    if (pointed.error || !pointed.data) return null
+
+    const row = pointed.data as { id: string; storage_path: string; deleted_at: string | null }
+    // A pointer at a TRASHED asset is not the logo. Same rule as the light
+    // variant's pointer path.
+    if (row.deleted_at !== null) return null
+
+    return await toBrandLogo(row)
+  } catch {
+    return null
+  }
+})
+
+export interface BrandLogoVariants {
+  /** The light-background variant. Also the ONLY variant for a single-logo workspace. */
+  light: BrandLogo | null
+  /** The dark-background variant. Null for the overwhelming majority of workspaces. */
+  dark: BrandLogo | null
+}
+
+/**
+ * Both logo variants a workspace may hold, read together.
+ *
+ * Added alongside `readBrandLogo` rather than in place of it: every existing
+ * caller (the topbar, the brand panel) wants exactly the one answer
+ * `readBrandLogo` already gives, and changing what that function returns would
+ * be the "one variant only must keep working exactly as today" regression this
+ * column set out to avoid. This is for a caller that genuinely wants both, such
+ * as the stamping pipeline choosing which file fits a given picture.
+ */
+export const readBrandLogoVariants = cache(async function readBrandLogoVariants(
+  workspaceId: string,
+): Promise<BrandLogoVariants> {
+  const [light, dark] = await Promise.all([
+    readBrandLogo(workspaceId),
+    readBrandLogoDark(workspaceId),
+  ])
+  return { light, dark }
+})

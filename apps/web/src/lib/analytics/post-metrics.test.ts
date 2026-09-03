@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { VariantStatusRow } from '@/lib/posts/variant-status'
 
+import {
+  LIVE_READ_CONCURRENCY,
+  LIVE_READ_TTL_MS,
+  resetLiveReadCache,
+} from '@/lib/analytics/read-cache'
+
 /**
  * The ORCHESTRATION, not the classification.
  *
@@ -69,6 +75,9 @@ const row = (over: Partial<VariantStatusRow> = {}): VariantStatusRow => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Live answers are remembered across renders on purpose; a test is a render
+  // that must not inherit the last one's.
+  resetLiveReadCache()
   workspace.getActiveWorkspace.mockResolvedValue(WS)
   scope.profileForWorkspace.mockResolvedValue('6a75cae32853ee463c6419d6')
   supabase.createServerSupabase.mockReturnValue(logsReturning([]))
@@ -130,9 +139,17 @@ describe('nothing here throws, and nothing degrades to a zero', () => {
 })
 
 describe('the call ceiling is honest about itself', () => {
+  /**
+   * Every post carries its OWN platform id here. One platform post is one read
+   * however many rows ask about it, so a fixture that gave every post the same
+   * id would measure the memo rather than the cap.
+   */
   it('stops calling past the cap', async () => {
     const posts = new Map(
-      Array.from({ length: LIST_METRIC_CALLS + 3 }, (_, i) => [`post-${i}`, [row()]] as const),
+      Array.from(
+        { length: LIST_METRIC_CALLS + 3 },
+        (_, i) => [`post-${i}`, [row({ platformPostId: `id-${i}` })]] as const,
+      ),
     )
     await listPostMetrics(posts, NOW)
     expect(reads.postAnalytics).toHaveBeenCalledTimes(LIST_METRIC_CALLS)
@@ -140,7 +157,10 @@ describe('the call ceiling is honest about itself', () => {
 
   it('marks the skipped ones not-loaded, never unreadable or zero', async () => {
     const posts = new Map(
-      Array.from({ length: LIST_METRIC_CALLS + 1 }, (_, i) => [`post-${i}`, [row()]] as const),
+      Array.from(
+        { length: LIST_METRIC_CALLS + 1 },
+        (_, i) => [`post-${i}`, [row({ platformPostId: `id-${i}` })]] as const,
+      ),
     )
     const out = await listPostMetrics(posts, NOW)
     const last = out.get(`post-${LIST_METRIC_CALLS}`)?.[0]?.state
@@ -320,5 +340,157 @@ describe('a simulated row is labelled simulated, not asked about', () => {
   it('still asks about a real publish — the guard is not blanket', async () => {
     await listPostMetrics(new Map([['post-1', [row({ simulated: false })]]]), NOW)
     expect(reads.postAnalytics).toHaveBeenCalled()
+  })
+})
+
+/**
+ * ── ONE ANSWER PER PLATFORM POST PER TEN MINUTES, FOUR IN FLIGHT ─────────────
+ * The page used to ask Zernio afresh on every render, four at a time and in
+ * batches: four calls, wait for all four, the next four. Nothing remembered an
+ * answer across requests, so a refresh or a second teammate repeated every call
+ * against the 60-a-minute budget the inbox shares.
+ *
+ * Driven through a fake client that counts what is in flight, so the claims are
+ * measured on the orchestration and not on the helper's own suite.
+ */
+describe('a live answer is reused for a short while, and reads run bounded', () => {
+  /** A client whose calls resolve only when the test says so, tracking the peak in flight. */
+  function slowClient() {
+    let inFlight = 0
+    let peak = 0
+    const release: (() => void)[] = []
+    reads.postAnalytics.mockImplementation(
+      () =>
+        new Promise((res) => {
+          inFlight += 1
+          peak = Math.max(peak, inFlight)
+          release.push(() => {
+            inFlight -= 1
+            res({
+              status: 200,
+              post: {
+                postId: 'p',
+                analytics: { impressions: 7, lastUpdated: '2026-08-06T09:00:00.000Z' },
+              },
+            })
+          })
+        }),
+    )
+    /** Let everything currently waiting finish, then repeat until nothing is waiting. */
+    const drain = async (expected: number) => {
+      let released = 0
+      while (released < expected) {
+        await new Promise<void>((r) => setTimeout(r, 0))
+        while (released < release.length) {
+          release[released]!()
+          released += 1
+        }
+      }
+    }
+    return { drain, peak: () => peak }
+  }
+
+  const manyPosts = (count: number) =>
+    new Map(
+      Array.from(
+        { length: count },
+        (_, i) => [`post-${i}`, [row({ platformPostId: `id-${i}` })]] as const,
+      ),
+    )
+
+  it('keeps at most the cap in flight and still asks about every target once', async () => {
+    const client = slowClient()
+    const count = LIVE_READ_CONCURRENCY * 3
+    const run = listPostMetrics(manyPosts(count), NOW, count)
+    await client.drain(count)
+    const out = await run
+
+    expect(reads.postAnalytics).toHaveBeenCalledTimes(count)
+    expect(client.peak()).toBe(LIVE_READ_CONCURRENCY)
+    for (let i = 0; i < count; i += 1) {
+      expect(out.get(`post-${i}`)?.[0]?.state).toMatchObject({ kind: 'ready' })
+    }
+  })
+
+  it('makes ZERO calls on a second render inside the TTL, and the same figures come back', async () => {
+    const posts = manyPosts(3)
+    const first = await listPostMetrics(posts, NOW, 10)
+    expect(reads.postAnalytics).toHaveBeenCalledTimes(3)
+
+    reads.postAnalytics.mockClear()
+    const again = new Date(NOW.getTime() + LIVE_READ_TTL_MS - 1000)
+    const second = await listPostMetrics(posts, again, 10)
+
+    expect(reads.postAnalytics).not.toHaveBeenCalled()
+    expect(second.get('post-1')?.[0]?.state).toEqual(first.get('post-1')?.[0]?.state)
+  })
+
+  it('asks again once the TTL has passed', async () => {
+    const posts = manyPosts(2)
+    await listPostMetrics(posts, NOW, 10)
+    reads.postAnalytics.mockClear()
+
+    await listPostMetrics(posts, new Date(NOW.getTime() + LIVE_READ_TTL_MS), 10)
+    expect(reads.postAnalytics).toHaveBeenCalledTimes(2)
+  })
+
+  /**
+   * The key carries the WORKSPACE, not only the platform post id. Two workspaces
+   * that somehow held the same platform id must never be served each other's
+   * numbers, and a key built from the id alone would do exactly that silently.
+   */
+  it('never serves one workspace the answer read for another', async () => {
+    const posts = manyPosts(1)
+    await listPostMetrics(posts, NOW, 10)
+    reads.postAnalytics.mockClear()
+
+    workspace.getActiveWorkspace.mockResolvedValue({ id: 'ws-2' })
+    scope.profileForWorkspace.mockResolvedValue('0000000000000000000000ff')
+    await listPostMetrics(posts, NOW, 10)
+
+    expect(reads.postAnalytics).toHaveBeenCalledTimes(1)
+  })
+
+  /** A failed read is a failed read on THIS render. It is not remembered, and it is not invented. */
+  it('does not remember a failure: the next render asks again and can recover', async () => {
+    const posts = manyPosts(1)
+    reads.postAnalytics.mockRejectedValueOnce(new Error('502'))
+    const failed = await listPostMetrics(posts, NOW, 10)
+    expect(failed.get('post-0')?.[0]?.state).toEqual({ kind: 'unavailable', reason: 'unreadable' })
+
+    const recovered = await listPostMetrics(posts, new Date(NOW.getTime() + 1000), 10)
+    expect(reads.postAnalytics).toHaveBeenCalledTimes(2)
+    expect(recovered.get('post-0')?.[0]?.state).toMatchObject({ kind: 'ready' })
+  })
+
+  /**
+   * The memo holds the platform's ANSWER, and the render still classifies it
+   * against its own clock and publish times. A remembered answer that was inside
+   * Instagram's window at the first render is still judged, not replayed.
+   */
+  it('re-classifies a remembered answer against the render that shows it', async () => {
+    const published = new Date(NOW.getTime() - 6 * 60 * 60 * 1000).toISOString()
+    supabase.createServerSupabase.mockReturnValue(
+      logsReturning([
+        { post_id: 'post-0', channel: 'instagram', status: 'succeeded', published_at: published },
+      ]),
+    )
+    reads.postAnalytics.mockResolvedValue({
+      status: 200,
+      post: {
+        postId: 'p',
+        analytics: { impressions: 0, reach: 0, likes: 0, lastUpdated: '2026-08-08 11:00:00' },
+      },
+    })
+    const posts = manyPosts(1)
+
+    const first = await listPostMetrics(posts, NOW, 10)
+    expect(first.get('post-0')?.[0]?.state).toMatchObject({ kind: 'pending', reason: 'lag' })
+
+    // Same remembered answer, a render five minutes on: still inside the window, still a wait.
+    const later = new Date(NOW.getTime() + 5 * 60 * 1000)
+    const second = await listPostMetrics(posts, later, 10)
+    expect(reads.postAnalytics).toHaveBeenCalledTimes(1)
+    expect(second.get('post-0')?.[0]?.state).toMatchObject({ kind: 'pending', reason: 'lag' })
   })
 })

@@ -148,7 +148,16 @@ export function createPublishStore(opts: PublishStoreOptions) {
    *   · the variant still has work to do — `pending`, `scheduled`, a prior `failed`
    *     (a retry is legitimate), or a `publishing` whose holder is gone. A
    *     `published` variant is never re-claimed, so a duplicate tick cannot post it
-   *     a second time.
+   *     a second time — with ONE exception, stated in the next paragraph.
+   *
+   * ── A FIXTURE "PUBLISH" IS NOT A PUBLISH, SO IT IS STILL WORK TO DO ─────────
+   * `published` + a permalink beginning `fixture://` is a row the fixture rail
+   * marked. Nothing left the building; the permalink is `fixture.ts`'s own. That
+   * row is claimable again, because the alternative was measured: no RPC, no
+   * cron and no button could ever publish it for real, and the publish route
+   * answered "Already live on X" for it. Re-publishing a fixture row cannot post
+   * twice, since the first "post" never existed. A `published` row with a real
+   * permalink, or with none, stays exactly as unclaimable as before.
    *   · nobody holds a live claim, OR the claim is older than the lease and its
    *     holder is therefore presumed dead.
    *   · it belongs to the workspace we were given — the payload's workspace is not
@@ -184,10 +193,16 @@ export function createPublishStore(opts: PublishStoreOptions) {
    * is live with no log row — so `listUnresolvedPublishes` cannot see it either, and
    * the next tick past the lease publishes it again.
    *
-   * The adapter's `requestId` is deterministic (`sahoda:${variantId}:${accountId}`,
-   * or the caller's key) and Zernio collapses a repeat onto one post — but doc 13 §5
-   * puts that window at ~5 minutes and marks it `[DOC]`, never observed. The lease is
-   * ten. A re-claim therefore lands OUTSIDE the window this would rely on.
+   * The adapter's `requestId` is the caller's key, `${postId}:${channel}:${scheduledAt}`,
+   * and Zernio documents collapsing a repeat onto one post — but doc 13 §5 puts that
+   * window at ~5 minutes and marks it `[DOC]`, never observed. The lease is ten. A
+   * re-claim therefore lands OUTSIDE the window this would rely on. And until
+   * 2026-09-02 the two rails did not even mint the same key: the publish route took
+   * `scheduled_at` as the RPC's jsonb text (microseconds, numeric offset) while the
+   * dispatcher took the driver's `Date.toISOString()`, so a manual press and a cron
+   * tick on the same row sent Zernio two different ids. The route now normalises to
+   * the driver's shape (`route.publish.test.ts` asserts equality); nothing here
+   * relies on the collapse either way.
    *
    * Taken deliberately: the old behaviour was a GUARANTEED permanent strand on every
    * crash, and this is a narrow race requiring death inside the gap between one HTTP
@@ -202,7 +217,8 @@ export function createPublishStore(opts: PublishStoreOptions) {
         where id = $1
           and post_id = $2
           and workspace_id = $3
-          and publish_status in ('pending', 'scheduled', 'failed', 'publishing')
+          and (publish_status in ('pending', 'scheduled', 'failed', 'publishing')
+               or (publish_status = 'published' and permalink like 'fixture://%'))
           and (publish_claimed_at is null
                or publish_claimed_at < now() - make_interval(secs => $4::int))`,
       [payload.variantId, payload.postId, payload.workspaceId, leaseSeconds],

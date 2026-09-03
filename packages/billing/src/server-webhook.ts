@@ -60,10 +60,13 @@ export type { ParsedWebhookEvent, PaymentEventType, PaymentMode } from './provid
 // processPaymentEvent → applyPlanGrant → LedgerPort.apply.
 export { createProcessPaymentEvent } from './webhooks/processPaymentEvent'
 export type { ProcessPaymentEventDeps, ProcessResult } from './webhooks/processPaymentEvent'
-export { createApplyPlanGrant } from './webhooks/applyPlanGrant'
+export { createApplyPlanGrant, purchaseGrantKey } from './webhooks/applyPlanGrant'
 export type { PlanGrantResult } from './webhooks/applyPlanGrant'
 export { createPgWebhookEventStore } from './webhooks/pgStore'
 export type { WebhookEventStore } from './webhooks/store'
+// A paid event also activates the `subscriptions` row — the store above carries the writer.
+export { createPgSubscriptionWriter } from './webhooks/pgSubscriptionWriter'
+export type { SubscriptionWriter, ActivateSubscriptionInput } from './webhooks/subscriptionWriter'
 export { createPgLedgerPort, type PgLedgerPort } from './ledger/pg'
 export type { LedgerPort, LedgerApplyResult } from './ledger/port'
 export { loadBillingEnv } from './env'
