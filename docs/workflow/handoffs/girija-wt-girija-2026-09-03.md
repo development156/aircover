@@ -202,3 +202,24 @@ Run at `9d7d9313`, 2026-09-03. MEASURED.
 
 The lint and typecheck leg was forced (`--force`, 0 cached) because a cached
 replay verifies nothing.
+
+### Re-run after `lane-sync` took `wt-core`
+
+`node scripts/lane-sync.mjs push` merged `wt-core` (16 behind, clean) into this
+lane as `c024ba0b` and pushed. That made every figure above stale, so the whole
+gate was run again on the merged head. MEASURED 2026-09-03.
+
+| Leg | Command | Result |
+| --- | --- | --- |
+| full turbo gate | `pnpm -w exec turbo run typecheck lint test --force` | **PASS** — 27 tasks, 27 successful, 0 cached, 6m6s |
+| web unit inside it | | **PASS** — 587 files passed, 3 skipped, 7,748 passed, 13 skipped, 0 failed, 334s |
+| format | `npx prettier --check .` | **PASS** |
+
+**`@sahoda/jobs` is GREEN on the merged head.** The `x-ration.test.ts` failure
+carried in the 2026-09-01 handoff and repeated in item 5 above is **fixed on
+`wt-core`** — MEASURED, `@sahoda/jobs:test` is one of the 27 successful tasks.
+Item 5 is therefore closed and needs nothing from the next session.
+
+`c024ba0b` was **not** pushed to `wt-core`. The gate is green and the push is a
+one-liner (`git push origin HEAD:wt-core`), but pushing outside the lane is not
+this session's to decide.
