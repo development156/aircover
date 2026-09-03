@@ -43,6 +43,14 @@ export const WorkspaceSchema = z.object({
    * title match in both of those cases.
    */
   logo_asset_id: z.uuid().nullable(),
+  /**
+   * Points at the `assets` row that is the DARK-background variant of the
+   * workspace's logo. NULL means either nobody has set a second variant, or the
+   * migration that adds this column has not been applied. `logo_asset_id`
+   * (above) keeps its existing meaning: the light-background, and the only,
+   * variant when this is NULL.
+   */
+  logo_asset_id_dark: z.uuid().nullable(),
 })
 export type Workspace = z.infer<typeof WorkspaceSchema>
 

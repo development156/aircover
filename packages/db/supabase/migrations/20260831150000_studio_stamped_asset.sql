@@ -70,7 +70,7 @@ begin
   alter table studio_generation_images
     add constraint studio_generation_images_stamp_outcome_check
     check (stamp_outcome is null or stamp_outcome in
-      ('stamped', 'no_logo', 'logo_unreadable', 'failed'));
+      ('stamped', 'no_logo', 'logo_unreadable', 'failed', 'skipped'));
 exception
   when duplicate_object then null;
 end
@@ -78,7 +78,9 @@ $$;
 
 comment on column studio_generation_images.stamp_outcome is
   'Why this image does or does not carry the workspace logo, recorded when the '
-  'stamping ran: stamped, no_logo, logo_unreadable, failed. NULL means stamping '
+  'stamping ran: stamped, no_logo, logo_unreadable, failed, skipped. skipped is '
+  'the customer turning the stamp off for that press, which is a choice they '
+  'made and not the same fact as NULL. NULL means stamping '
   'was never attempted, which is every row written before this shipped. Kept '
   'because the pointer beside it cannot answer the question: its NULL is one '
   'fact standing in for several situations, each a different sentence on a '

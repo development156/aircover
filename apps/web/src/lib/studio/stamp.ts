@@ -5,7 +5,10 @@ import 'server-only'
 // same import shape `derive.ts` settled on, for the same reason.
 import sharp, { type OverlayOptions, type Sharp } from 'sharp'
 
+import type { StampSizeStep } from '@sahoda/shared'
+
 import type { InkPolarity, LogoFacts } from '../brand/logo-facts'
+import { pickLogoVariant } from '@/lib/brand/logo-variant-pick'
 import {
   needsPlate,
   placeLogo,
@@ -94,8 +97,29 @@ export interface StampInput {
   /** What stage 2 measured about the logo file. */
   facts: LogoFacts
   anchor: Anchor
+  /** How big the mark is drawn. Optional; `placeLogo` defaults it to `'medium'`, today's fixed share. */
+  sizeStep?: StampSizeStep
   /** The plate colour when one is needed, as #rrggbb. Optional. */
   plate?: string
+  /**
+   * The OTHER logo variant, when the workspace supplied two.
+   *
+   * ── WHY THE CHOICE IS MADE HERE AND NOWHERE ELSE ──────────────────────────
+   * Picking between a light-background and a dark-background mark needs the
+   * luminance of the picture UNDER the mark, and that number exists in exactly
+   * one place: after `placeLogo` has said where the mark goes and `meanLuminance`
+   * has sampled it. A caller cannot make this decision without redoing both.
+   *
+   * When both variants have ink, `pickLogoVariant` chooses and this function
+   * re-runs once with the winner. `alt` is cleared on that second pass, so the
+   * recursion is exactly one level deep and cannot loop: the guard is the
+   * absence of the field, not a counter somebody has to keep right.
+   *
+   * A workspace with ONE logo passes nothing here and takes the path it always
+   * did, plate and all. Swapping the mark is better than plating behind it, but
+   * plating is what there is when there is only one mark.
+   */
+  alt?: { bytes: Uint8Array; facts: LogoFacts }
 }
 
 export type StampResult =
@@ -231,6 +255,7 @@ export async function stampLogo(input: StampInput): Promise<StampResult> {
       // shape from its own mark, and the slot is sized for the mark.
       logoAspect: trim.width / trim.height,
       anchor: input.anchor,
+      sizeStep: input.sizeStep,
     })
   } catch {
     return refuse('The logo could not be placed on this canvas.')
@@ -266,6 +291,19 @@ export async function stampLogo(input: StampInput): Promise<StampResult> {
       'The picture region under the mark could not be read, so no plate decision is possible.',
     )
   }
+  // ── THE VARIANT CHOICE, AT THE ONE POINT THE BACKDROP IS KNOWN ────────────
+  // Before any plate is considered: a plate is the fallback for having one mark,
+  // and reaching for it while a better mark is sitting unused would be drawing
+  // a rectangle to fix a problem the customer already solved by uploading a
+  // second file.
+  if (input.alt !== undefined) {
+    const chosen = pickLogoVariant({ light: input.facts, dark: input.alt.facts }, luminance)
+    if (chosen.ok && chosen.kind === 'dark') {
+      // One level, and `alt: undefined` is what makes that true.
+      return stampLogo({ ...input, logo: input.alt.bytes, facts: input.alt.facts, alt: undefined })
+    }
+  }
+
   const plated = needsPlate(luminance, input.facts.inkPolarity)
 
   const layers: OverlayOptions[] = []

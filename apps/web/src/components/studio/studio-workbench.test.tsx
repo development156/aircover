@@ -1015,3 +1015,84 @@ describe('the rest of the composer the design asked for', () => {
     expect(thumb.querySelector('img')!.getAttribute('src')).toBe('https://example.test/stamped.png')
   })
 })
+
+describe('control over the logo Sahoda stamps', () => {
+  async function press(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+    await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
+    await user.click(screen.getByRole('button', { name: /make this picture/i }))
+  }
+
+  test("a press with nothing touched sends exactly today's default: on, bottom right, medium", async () => {
+    vi.mocked(queueGeneration).mockResolvedValue({
+      ok: true,
+      generationId: 'g1',
+      balanceAfter: 5,
+      made: 1,
+      asked: 1,
+    })
+    const user = userEvent.setup()
+    open()
+    await press(user)
+
+    expect(queueGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stamp: { enabled: true, anchor: 'bottom-right', sizeStep: 'medium' },
+      }),
+    )
+  })
+
+  test('turning the stamp off is what the next press carries', async () => {
+    vi.mocked(queueGeneration).mockResolvedValue({
+      ok: true,
+      generationId: 'g1',
+      balanceAfter: 5,
+      made: 1,
+      asked: 1,
+    })
+    const user = userEvent.setup()
+    const { container } = open()
+    const logoFieldset = container.querySelector('[data-guide="studio-logo"]') as HTMLElement
+    await user.click(within(logoFieldset).getByRole('button', { name: /leave it off/i }))
+    await press(user)
+
+    expect(queueGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stamp: expect.objectContaining({ enabled: false }),
+      }),
+    )
+  })
+
+  test('picking a corner and a size step is what the next press carries', async () => {
+    vi.mocked(queueGeneration).mockResolvedValue({
+      ok: true,
+      generationId: 'g1',
+      balanceAfter: 5,
+      made: 1,
+      asked: 1,
+    })
+    const user = userEvent.setup()
+    const { container } = open()
+    const corner = container.querySelector('[data-guide="studio-logo-corner"]') as HTMLElement
+    const size = container.querySelector('[data-guide="studio-logo-size"]') as HTMLElement
+    await user.click(within(corner).getByRole('button', { name: /top left/i }))
+    await user.click(within(size).getByRole('button', { name: /large/i }))
+    await press(user)
+
+    expect(queueGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stamp: { enabled: true, anchor: 'top-left', sizeStep: 'large' },
+      }),
+    )
+  })
+
+  test('the corner and size controls are disabled once the stamp is off, not hidden', async () => {
+    const user = userEvent.setup()
+    const { container } = open()
+    const logoFieldset = container.querySelector('[data-guide="studio-logo"]') as HTMLElement
+    const corner = container.querySelector('[data-guide="studio-logo-corner"]') as HTMLElement
+    for (const button of within(corner).getAllByRole('button')) expect(button).toBeEnabled()
+
+    await user.click(within(logoFieldset).getByRole('button', { name: /leave it off/i }))
+    for (const button of within(corner).getAllByRole('button')) expect(button).toBeDisabled()
+  })
+})

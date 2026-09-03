@@ -388,6 +388,32 @@ describe('stampLogo: the plate is decided from the backdrop under the mark', () 
   })
 })
 
+describe('stampLogo: sizeStep changes the mark size, and threads through to placement', () => {
+  it('a "large" sizeStep produces a bigger mark than the default, on the same picture', async () => {
+    const picture = await makePicture(LIGHT_BASE)
+    const logo = await makeLogo()
+
+    const defaultResult = await stampLogo({
+      picture,
+      logo,
+      facts: DARK_INK_FACTS,
+      anchor: 'bottom-right',
+    })
+    const largeResult = await stampLogo({
+      picture,
+      logo,
+      facts: DARK_INK_FACTS,
+      anchor: 'bottom-right',
+      sizeStep: 'large',
+    })
+    expect(defaultResult.ok, defaultResult.ok ? '' : defaultResult.reason).toBe(true)
+    expect(largeResult.ok, largeResult.ok ? '' : largeResult.reason).toBe(true)
+    if (!defaultResult.ok || !largeResult.ok) return
+
+    expect(largeResult.placement.mark.height).toBeGreaterThan(defaultResult.placement.mark.height)
+  })
+})
+
 describe('stampLogo: what it returns and what it refuses', () => {
   it('returns PNG bytes even when the picture came in as JPEG', async () => {
     const light = await makePicture(LIGHT_BASE)
@@ -478,5 +504,71 @@ describe('stampLogo: what it returns and what it refuses', () => {
     })
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.reason).toMatch(/six hex digits/i)
+  })
+})
+
+describe('stampLogo: two marks, and swapping beats plating', () => {
+  const LIGHT_INK_FACTS: LogoFacts = { ...DARK_INK_FACTS, inkPolarity: 'light' }
+
+  /**
+   * ── WHY THIS IS THE TEST THAT MATTERS ─────────────────────────────────────
+   * Plating is what a product does when it has ONE mark: it paints a rectangle
+   * so the mark it has can be seen. Swapping is what a designer does when there
+   * are two. A workspace that uploaded a second file and still got a rectangle
+   * drawn behind the first would have paid attention for nothing.
+   *
+   * A dark picture with a DARK-ink primary is exactly the case that plated
+   * before this existed, so it is the case that must stop plating now.
+   */
+  it('uses the other mark on a dark picture instead of drawing a plate', async () => {
+    const picture = await makePicture(DARK_BASE)
+    const result = await stampLogo({
+      picture,
+      logo: await makeLogo(),
+      facts: DARK_INK_FACTS,
+      alt: { bytes: await makeLogo(), facts: LIGHT_INK_FACTS },
+      anchor: 'bottom-right',
+      plate: PLATE,
+    })
+    expect(result.ok, result.ok ? '' : result.reason).toBe(true)
+    if (!result.ok) return
+
+    // The mark that reads was chosen, so no rectangle was needed.
+    expect(result.plated).toBe(false)
+  })
+
+  it('still plates when there is only one mark, because there is nothing to swap to', async () => {
+    // The SAME picture and the SAME primary. The only difference is the absence
+    // of a second file, which is what makes the assertion above meaningful.
+    const picture = await makePicture(DARK_BASE)
+    const result = await stampLogo({
+      picture,
+      logo: await makeLogo(),
+      facts: DARK_INK_FACTS,
+      anchor: 'bottom-right',
+      plate: PLATE,
+    })
+    expect(result.ok, result.ok ? '' : result.reason).toBe(true)
+    if (!result.ok) return
+
+    expect(result.plated).toBe(true)
+  })
+
+  it('keeps the primary on a light picture, where it already reads', async () => {
+    const picture = await makePicture(LIGHT_BASE)
+    const result = await stampLogo({
+      picture,
+      logo: await makeLogo(),
+      facts: DARK_INK_FACTS,
+      alt: { bytes: await makeLogo(), facts: LIGHT_INK_FACTS },
+      anchor: 'bottom-right',
+      plate: PLATE,
+    })
+    expect(result.ok, result.ok ? '' : result.reason).toBe(true)
+    if (!result.ok) return
+
+    // Swapping here would put light ink on a light picture: a swap for its own
+    // sake is as wrong as never swapping.
+    expect(result.plated).toBe(false)
   })
 })
