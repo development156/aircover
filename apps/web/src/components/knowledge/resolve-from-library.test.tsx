@@ -111,3 +111,47 @@ describe('ResolveFromLibrary', () => {
     expect(document.body.textContent ?? '').toMatch(/already in this visit/i)
   })
 })
+
+/**
+ * WHERE THE 50 CREDITS ACTUALLY LAND.
+ *
+ * ── THE DEFECT ───────────────────────────────────────────────────────────────
+ * "Read my library" charges `brand_extract` and writes its suggestions as
+ * pending `memory_events` rows. The sentence beside the button sent the payer to
+ * `/brain/resolve`, which renders exclusively from `brand_memory` and has never
+ * queried `memory_events`. So the one paid action in this area named a screen
+ * that structurally cannot show what the money bought: pay, follow the link,
+ * find the same queue that was there before.
+ *
+ * The suggestions are real and decidable. They live on `/loop`, under the
+ * heading "What Sahoda noticed", which reads exactly the pending rows this
+ * action writes. This is the "never offer a remedy that cannot work" rule broken
+ * by a LINK: the remedy named exists, it is simply not where the thing lives.
+ */
+describe('the paid button names the screen that holds the result', () => {
+  it('links to the screen that reads what this action writes', () => {
+    render(<ResolveFromLibrary cost={COST} waiting={null} />)
+
+    expect(screen.getByRole('link', { name: /what sahoda noticed/i })).toHaveAttribute(
+      'href',
+      '/loop',
+    )
+  })
+
+  it('never sends the payer to the console that cannot show it', () => {
+    const { container } = render(<ResolveFromLibrary cost={COST} waiting={null} />)
+
+    expect(container.querySelector('a[href="/brain/resolve"]')).toBeNull()
+  })
+
+  // The re-spend warning, which only appears once the button has been pressed.
+  it('says where the waiting ones are, using the same name', async () => {
+    render(<ResolveFromLibrary cost={COST} waiting={3} />)
+
+    await userEvent.click(screen.getByRole('button', { name: /read my library/i }))
+
+    const said = document.body.textContent ?? ''
+    expect(said).toMatch(/3 suggestions waiting under What Sahoda noticed/i)
+    expect(said).not.toMatch(/resolution console/i)
+  })
+})
