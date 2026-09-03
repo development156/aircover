@@ -8,6 +8,12 @@ import { APPROVABLE_FROM } from '@/lib/planner/transitions'
 import type { BulkApproveState } from '@/lib/approvals/state'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { workspaceForWrite } from '@/lib/workspaces'
+import {
+  APPROVE_ROLE_REFUSAL,
+  APPROVE_ROLE_UNKNOWN,
+  canApproveAsRole,
+  getWorkspaceRole,
+} from '@/lib/workspace-role'
 
 /**
  * How many posts one bulk approve may touch.
@@ -61,6 +67,13 @@ export async function approvePosts(postIds: readonly string[]): Promise<BulkAppr
     const ws = await workspaceForWrite()
     if (!ws.ok) return { ok: false, message: ws.message }
     workspaceId = ws.workspace.id
+
+    // The same gate `approvePost` applies, for the same reason: `posts` carries the
+    // plain tenant policy, so RLS lets any member write and this is the only wall.
+    // Bulk needs it MORE, not less — one click here moves up to `MAX_BULK` posts.
+    const role = await getWorkspaceRole(ws.workspace.id)
+    if (role === null) return { ok: false, message: APPROVE_ROLE_UNKNOWN }
+    if (!canApproveAsRole(role)) return { ok: false, message: APPROVE_ROLE_REFUSAL }
 
     const supabase = createServerSupabase()
     const { data, error } = await supabase
