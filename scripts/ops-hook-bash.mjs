@@ -64,14 +64,31 @@ function sync() {
   }
 }
 
-/** The card an auto run belongs to: whatever is in progress right now. */
-function currentTaskCode() {
-  const board = readState('board')
-  const inProgress = (board.tasks ?? []).find(
-    (t) => t?.board_column === 'in_progress' && !t?.archived,
-  )
-  return inProgress?.code ?? null
-}
+/**
+ * AN AUTO RUN IS ATTRIBUTED TO NOTHING, BECAUSE NOTHING HERE KNOWS THE CARD.
+ *
+ * This used to return "whatever is in progress right now" — the first card in
+ * the in_progress column. That is not an inference, it is a coincidence, and it
+ * wrote FALSE AUDIT RECORDS: every gate run any session made was stamped
+ * `SL-054`, the card recording that production was down for 22 hours 40 minutes,
+ * as `pass` and as `fail` alike (REQUESTS §18, observed twice — 2026-08-24 and
+ * 2026-08-26).
+ *
+ * `scripts/lib/ops-cards.mjs` already carries the ruling this violates: **infer
+ * only what cannot be recorded, and say so where it shows.** A gate run records
+ * which SUITE ran and what it returned. Which card it belongs to is not recorded
+ * anywhere, is not derivable from the command, and a session can have many cards
+ * open or none — so the honest value is null.
+ *
+ * Null is a rendered state, not a gap: `qa-run-row.tsx` prints "no card" for it,
+ * and its own comment says why — "a run attached to nothing is a real state, and
+ * saying so is what stops it being read as attached to whatever is above". The
+ * `OpsQaRunSchema.task_code` field is `nullish()` for the same reason.
+ *
+ * The commit path is untouched and stays: `markCommitted` reads SL-### codes out
+ * of the commit MESSAGE, which is a link a person actually wrote down.
+ */
+const AUTO_RUN_TASK_CODE = null
 
 /**
  * Append auto runs to the outbox.
@@ -84,7 +101,7 @@ function currentTaskCode() {
 function recordQaRuns(entries) {
   const queued = readPending('qa')
   const now = new Date().toISOString()
-  const task_code = currentTaskCode()
+  const task_code = AUTO_RUN_TASK_CODE
 
   const arriving = entries.map((entry) => ({
     client_id: clientId('qa'),
