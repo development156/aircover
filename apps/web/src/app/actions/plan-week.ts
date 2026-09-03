@@ -31,7 +31,7 @@ import { normalizeSlot } from '@/lib/planner/slots'
 import type { PlanWeekState } from '@/lib/planner/state'
 import { chargeFailureState, FAILURE_REASON } from '@/lib/posts/charge-failure'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
+import { workspaceForWrite } from '@/lib/workspaces'
 
 /** Goals are model input — cap what one click can stuff into a paid prompt. */
 const GOALS_MAX_CHARS = 500

@@ -166,6 +166,18 @@ function price(action: string): number {
 }
 
 /**
+ * NOT WIRED YET, AND DELIBERATELY NOT DELETED.
+ *
+ * `price()` reads `pricing.config.json` and throws on a missing key, so the
+ * ALLOWED table below could name its credit figures by ACTION rather than as
+ * literals that drift the moment a price changes. Nothing calls it today.
+ * Rewiring the table is a real change to what this spec asserts, and the smoke
+ * leg has no working environment here to watch it fail in, so it is recorded
+ * rather than done half way.
+ */
+void price
+
+/**
  * route → every number that may legitimately appear in `#main`.
  *
  * Ordinals are listed explicitly rather than as a range, so adding an eighth

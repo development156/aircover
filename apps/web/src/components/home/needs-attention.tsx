@@ -2,6 +2,7 @@ import Link from 'next/link'
 import type { Route } from 'next'
 
 import { Badge } from '@/components/ui/badge'
+import { HomeSection } from '@/components/home/section'
 import { CHANNEL_SHORT } from '@/components/posts/channel-label'
 import { needsAPerson } from '@/lib/approvals/queue'
 import { STATUS_WORD } from '@/lib/posts/status-word'
@@ -35,61 +36,73 @@ import type { DisplayPost } from '@/lib/posts/display-post'
  * the body you are approving — is the wrong place to put it. The row opens the
  * post; the decision happens where the content is.
  */
+/**
+ * ── ONE FULL ROW, WHATEVER THE COUNT ─────────────────────────────────────────
+ * The queue shows at most four, and the column count IS the number shown, so
+ * the row always fills exactly. Three columns holding four items leaves one
+ * card alone above two empty cells — MEASURED on this layout at 1440 before the
+ * fix, an orphan at y=452 with 828px of nothing beside it, which is the same
+ * "card that failed to finish" the old `wide:grid-cols-2` produced with one
+ * item, one size up.
+ *
+ * Indexed by count, and the impossible index (0) never reaches a class because
+ * an empty queue renders the sentence instead.
+ */
+const COLUMNS = [
+  '',
+  '',
+  'narrow:grid-cols-2',
+  'narrow:grid-cols-2 wide:grid-cols-3',
+  'narrow:grid-cols-2 wide:grid-cols-4',
+] as const
+
 export function NeedsAttention({ posts }: { posts: DisplayPost[] }) {
   // `intent` — NOT `status`. `DisplayPost` seals `status` behind an
   // uninhabitable type precisely so a summary screen cannot read it and claim
   // an outcome the variant rows never reported (see display-post.ts).
   const waiting = posts.filter((post) => needsAPerson(post.intent))
+  const shown = waiting.slice(0, 4)
 
   return (
-    <section
-      aria-labelledby="home-attention"
-      className="surface-ring rounded-card bg-surface"
-      data-guide="home.attention"
+    <HomeSection
+      id="home-attention"
+      title="Needs your attention"
+      count={waiting.length}
+      guide="home.attention"
+      /* /approvals, not /posts. This card is a preview of the QUEUE — same
+         collection, same count — and sending "View all" to the full post list
+         would answer a different question with a different number. */
+      action={{ href: '/approvals', label: 'View all' }}
     >
-      <header className="flex min-h-[46px] items-center gap-3 border-b border-line-soft px-4 py-3">
-        <h2 id="home-attention" className="type-h3">
-          Needs your attention
-        </h2>
-        {waiting.length > 0 ? (
-          <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-brand-tint px-[5px] type-meta font-bold text-accent tabular-nums">
-            {waiting.length}
-          </span>
-        ) : null}
-        {/* /approvals, not /posts. This card is a preview of the QUEUE — same
-            collection, same count — and sending "View all" to the full post
-            list would answer a different question with a different number. */}
-        <Link
-          href="/approvals"
-          className="card-link ml-auto type-meta font-[550] text-muted hover:text-accent"
-        >
-          View all
-        </Link>
-      </header>
-
       {waiting.length === 0 ? (
-        // Honest, and specific about WHY it is empty. "Nothing needs you" is a
-        // real and good answer; it must not read like a failure to load.
-        <p className="px-4 py-6 text-center type-sm text-muted">
+        /* Honest, and specific about WHY it is empty. "Nothing needs you" is a
+           real and good answer; it must not read like a failure to load — so it
+           is left-aligned in the body's own padding rather than centred in a
+           box, which is the shape `ChartSparse` exists to stop. */
+        <p className="max-w-[var(--measure-prose)] type-sm text-muted">
           Nothing is waiting on you. Anything sent for review, or that fails to go out, shows up
           here.
         </p>
       ) : (
-        /* `wide:grid-cols-2` UNCONDITIONALLY put a single waiting post in
-           column one of two and left the other half of an 870px card empty —
-           visible on `page-dash-after__populated__home__full__1440__light` as a
-           430px row in an 870px box, which reads as a card that failed to
-           finish rather than as a queue with one thing in it. Two columns need
-           two items. */
-        <ul className={`grid gap-3 p-4${waiting.length > 1 ? ' wide:grid-cols-2' : ''}`}>
-          {waiting.slice(0, 4).map((post) => (
+        /* See COLUMNS above. Its ancestor was a `wide:grid-cols-2` that put a
+           single waiting post in column one of two and left the other half of
+           an 870px card empty — a card that reads as unfinished rather than as
+           a queue with one thing in it. */
+        <ul className={`grid gap-3 ${COLUMNS[shown.length]}`}>
+          {shown.map((post) => (
             <li key={post.id}>
               <Link
                 href={`/posts/${post.id}` as Route}
                 className="surface-ring block rounded-[8px] p-3 transition-micro hover:shadow-[inset_0_0_0_1px_var(--line-firm)]"
               >
                 <div className="flex items-start gap-2">
-                  <span className="min-w-0 flex-1 truncate type-sm font-[550] text-ink">
+                  {/* `line-clamp-2`, not `truncate`. At four columns a card is
+                      ~300px and a real title does not fit on one line — MEASURED,
+                      "Tuesday roast is back on the counter" cut to "…back on
+                      the…", which loses the half of the sentence that says what
+                      the post is. Two lines hold it, and the grid equalises the
+                      row's height anyway. */}
+                  <span className="type-sm line-clamp-2 min-w-0 flex-1 font-[550] text-ink">
                     {post.title?.trim() || 'Untitled post'}
                   </span>
                   <Badge rung="urgent">{STATUS_WORD[post.intent]}</Badge>
@@ -111,6 +124,6 @@ export function NeedsAttention({ posts }: { posts: DisplayPost[] }) {
           ))}
         </ul>
       )}
-    </section>
+    </HomeSection>
   )
 }

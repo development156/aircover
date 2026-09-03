@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { FileText, Globe, Plus, Type } from 'lucide-react'
 
 import { addPdfDocument, addTypedDocument, addUrlDocument } from '@/app/actions/knowledge'
-import type { KnowledgeActionState } from '@/app/actions/knowledge'
+import type { KnowledgeActionState } from '@/lib/knowledge/ingest'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'

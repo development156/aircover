@@ -101,6 +101,11 @@ export async function simulatePublish(postId: string): Promise<PublishState> {
         hashtags: extras.hashtags,
         hasLink: hasLink(variant.body),
         mediaCount: media.length,
+        // The writer's brackets choice, which this draft omitted while the
+        // meter beside it honoured the choice. A dry run that measures a
+        // different caption from the one on screen is the thing a dry run
+        // exists to rule out.
+        keywordBrackets: extras.keywordBrackets,
       }
 
       // The real gate. Must run BEFORE the fixture, which accepts anything.

@@ -62,7 +62,7 @@
  * because the way to check a claim like this is to go and read the file it names,
  * and doing that here produces "no such file" rather than "no such guard".
  */
-export type CronJob = 'sweeps' | 'metrics' | 'loop' | 'playbooks' | 'radar' | 'brain'
+export type CronJob = 'sweeps' | 'metrics' | 'loop' | 'playbooks' | 'radar' | 'brain' | 'autopilot'
 
 export interface CronSchedule {
   /** How often the job is scheduled, in ms. From the cron expression, not a guess. */
@@ -118,6 +118,19 @@ export const CRON_SCHEDULES: Record<CronJob, CronSchedule> = {
   // no delivery-hiccup tolerance to spend, because for seven days a hiccup and
   // an outage look identical.
   brain: { periodMs: 7 * 24 * HOUR, missesBeforeStopped: 1, label: 'Weekly Marketing Brain pass' },
+  // Every ten minutes.
+  //
+  // The period is set by the CANCEL WINDOW, not by how often there is work. A
+  // customer is promised minutes to change their mind, and a tick that ran
+  // hourly would let a post sit past a five-minute window for fifty-five
+  // minutes and then send it — the promise broken by the schedule rather than
+  // by any code. Ten minutes is the coarsest tick that keeps a short window
+  // roughly honest while staying well clear of the publishing sweep's five.
+  //
+  // `missesBeforeStopped: 2`, like the other frequent jobs: a single skipped
+  // tick is within Vercel's documented delivery behaviour, and this job's work
+  // is idempotent — an announcement missed by one tick is announced by the next.
+  autopilot: { periodMs: 10 * MINUTE, missesBeforeStopped: 2, label: 'Autopilot tick' },
 }
 
 export type HeartbeatState = 'beating' | 'late' | 'stopped' | 'unknown'

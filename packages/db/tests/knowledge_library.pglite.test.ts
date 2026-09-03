@@ -123,11 +123,11 @@ beforeAll(async () => {
 
   await db.exec(`
     insert into workspaces (id, name, slug, created_by) values
-      ('11111111-1111-1111-1111-111111111111', 'Alpha', 'alpha', 'user_alpha'),
-      ('22222222-2222-2222-2222-222222222222', 'Beta',  'beta',  'user_beta');
+      ('${WS_A}', 'Alpha', 'alpha', '${USER_A}'),
+      ('${WS_B}', 'Beta',  'beta',  '${USER_B}');
     insert into workspace_members (workspace_id, user_id, role) values
-      ('11111111-1111-1111-1111-111111111111', 'user_alpha', 'owner'),
-      ('22222222-2222-2222-2222-222222222222', 'user_beta', 'owner');
+      ('${WS_A}', '${USER_A}', 'owner'),
+      ('${WS_B}', '${USER_B}', 'owner');
   `)
 
   // Seeded through the FUNCTION rather than with an insert, because the function

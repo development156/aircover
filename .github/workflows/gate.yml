@@ -199,19 +199,56 @@ jobs:
       # Refuses before installing a browser or starting a server, so a run with
       # nothing configured costs seconds and says exactly what is missing rather
       # than dying inside `global-setup.ts` with a stack trace.
+      # ── IT SAYS WHICH TAB, BECAUSE "ADD THEM" WAS NOT ENOUGH ────────────────
+      # MEASURED twice, 2026-08-29 run 981 and 2026-08-30 run 1061: the founder
+      # added all three and the job still refused with the identical message,
+      # naming the identical three. "Repository secrets are not configured" is
+      # true and useless, because the page it points at has THREE tabs that all
+      # store a name and a value:
+      #
+      #   Secrets   → Repository secrets   `secrets.X`   what this job reads
+      #   Secrets   → Dependabot           invisible to Actions entirely
+      #   Variables → Repository variables `vars.X`      a different namespace
+      #
+      # and Settings → Environments is a fourth place, invisible unless the job
+      # declares `environment:`, which this one deliberately does not.
+      #
+      # So the guard now LOOKS in the other places before it complains. It
+      # prints only whether each name is set, never a value: `vars` are not
+      # masked in logs, so echoing one would publish it.
       - name: Refuse without the keys the suite needs
         env:
           CLERK_PUBLISHABLE: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET: ${{ secrets.CLERK_SECRET_KEY }}
           SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          VAR_CLERK_PUBLISHABLE: ${{ vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          VAR_CLERK_SECRET: ${{ vars.CLERK_SECRET_KEY }}
+          VAR_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
         run: |
           missing=""
           [ -z "$CLERK_PUBLISHABLE" ] && missing="$missing NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
           [ -z "$CLERK_SECRET" ] && missing="$missing CLERK_SECRET_KEY"
           [ -z "$SUPABASE_URL" ] && missing="$missing NEXT_PUBLIC_SUPABASE_URL"
+
           if [ -n "$missing" ]; then
-            echo "::error::Repository secrets are not configured:$missing"
-            echo "Add them under Settings → Secrets and variables → Actions."
+            # Where they ARE, if anywhere. Presence only — never the value.
+            found_as_vars=""
+            [ -n "$VAR_CLERK_PUBLISHABLE" ] && found_as_vars="$found_as_vars NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
+            [ -n "$VAR_CLERK_SECRET" ] && found_as_vars="$found_as_vars CLERK_SECRET_KEY"
+            [ -n "$VAR_SUPABASE_URL" ] && found_as_vars="$found_as_vars NEXT_PUBLIC_SUPABASE_URL"
+
+            echo "::error::Not readable as repository secrets:$missing"
+            if [ -n "$found_as_vars" ]; then
+              echo "::error::FOUND UNDER THE VARIABLES TAB INSTEAD:$found_as_vars"
+              echo "A variable is a different namespace from a secret, is not masked in logs,"
+              echo "and this job reads secrets. Delete them from Variables and re-add them under"
+              echo "Settings → Secrets and variables → Actions → Secrets → Repository secrets."
+            else
+              echo "Add them under Settings → Secrets and variables → Actions, on the SECRETS tab,"
+              echo "as REPOSITORY secrets. Three other places store a name and a value and none of"
+              echo "them reaches this job: the Variables tab, the Dependabot tab, and"
+              echo "Settings → Environments (this job declares no environment, by design)."
+            fi
             exit 1
           fi
 

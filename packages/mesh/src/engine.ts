@@ -112,7 +112,10 @@ export interface MeshRunnerDeps {
    * is not configured, and `runImage` then fails honestly rather than reaching for
    * a text model that would return a paragraph describing a picture.
    */
-  planImage?: (tier: ModelTier) => { provider: Provider; model: string } | undefined
+  planImage?: (
+    tier: ModelTier,
+    requested?: string,
+  ) => { provider: Provider; model: string } | undefined
 }
 
 export type MeshResult<O> = (
@@ -498,8 +501,8 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
     def: MeshTaskDef<unknown, unknown>,
     req: Omit<ImageRequest, 'model'>,
     ctx: MeshContext,
-  ): Promise<MeshResult<{ base64: string; mime: string }>> {
-    const planned = deps.planImage?.(def.tier)
+  ): Promise<MeshResult<{ base64: string; mime: string; providerCostUsd?: number }>> {
+    const planned = deps.planImage?.(def.tier, req.modelId)
     if (!planned?.provider.image) {
       await writeLog(toLogRow(def, ctx, undefined, 'error', 'NO_IMAGE_PROVIDER', false))
       return {
@@ -513,13 +516,26 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
       const result = await planned.provider.image({ ...req, model: planned.model })
       const usage: MeshUsage = {
         ...result.usage,
-        costUsd: deps.price(result.usage),
+        // THE PROVIDER'S OWN FIGURE WINS. `deps.price` applies CHAT token rates,
+        // and an image model billed per image produces a number nobody quoted
+        // (docs/43 §1). The estimate stays as the fallback for a provider that
+        // reports nothing, because a rough figure beats a blank telemetry row,
+        // but it is never preferred over a real one.
+        costUsd: result.costUsd ?? deps.price(result.usage),
         latencyMs: deps.now() - started,
       }
       // Images are bytes, never zod-parsed, so this path has no repair to record
       // and never will. FALSE here is permanent, not a placeholder.
       await writeLog(toLogRow(def, ctx, usage, 'ok', null, false))
-      return { ok: true, data: { base64: result.base64, mime: result.mime }, usage }
+      return {
+        ok: true,
+        // Handed back SEPARATELY from `usage.costUsd`, and undefined when the
+        // provider said nothing. A caller storing a cost for a customer to read
+        // must be able to tell a reported figure from an estimate, and one field
+        // holding either cannot say which it is.
+        data: { base64: result.base64, mime: result.mime, providerCostUsd: result.costUsd },
+        usage,
+      }
     } catch (e) {
       const status = e instanceof ProviderCallError ? e.status : null
       await writeLog(

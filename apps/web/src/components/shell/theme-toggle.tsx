@@ -65,7 +65,7 @@ export function ThemeToggle() {
       }
       // flex-none for the same reason as the two chips beside it: a topbar item
       // that can shrink is a topbar item that wraps.
-      className="grid size-8 flex-none place-items-center rounded-sm text-muted transition-micro hover:bg-s2 hover:text-ink active:scale-[.97] max-narrow:size-11"
+      className="grid size-control flex-none place-items-center rounded-input text-muted transition-micro hover:bg-s2 hover:text-ink active:scale-[.97] max-narrow:size-11"
     >
       {mounted && isDark ? (
         <Sun size={17} strokeWidth={1.7} aria-hidden />

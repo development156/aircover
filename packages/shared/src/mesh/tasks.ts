@@ -361,6 +361,53 @@ export const ImageGenerateInputSchema = z.object({
   prompt: z.string().min(3).max(1000),
   /** Square by default — see IMAGE_SIZES. */
   size: z.enum(['square', 'portrait', 'landscape']).default('square'),
+  /**
+   * AN EXACT CANVAS, WHEN THE CALLER HAS ONE, AND WHY THIS EXISTS.
+   *
+   * The three named sizes cover three aspect ratios: 1.0, 0.8 and 1.25. The
+   * Studio's own canvases (`studio/presets.ts`) need six, and three of those
+   * six have no named size that matches: a story is 0.5625, a wide post is
+   * 1.78, a link card is 1.91. Asking for `landscape` and calling the answer a
+   * story returns a picture of the wrong shape with nothing saying so, which is
+   * exactly the class of silent substitution this codebase refuses elsewhere.
+   *
+   * Optional and additive: every existing caller passes `size` and is
+   * unaffected. When `dims` is present it WINS, and `size` is ignored.
+   *
+   * The bounds are the provider's, not a product rule. The floor is above
+   * instagram's 320×320 `imageDims` minimum so a generated file cannot fail
+   * publishing for being too small; the ceiling is what image endpoints
+   * generally accept.
+   */
+  dims: z
+    .object({
+      width: z.number().int().min(512).max(2048),
+      height: z.number().int().min(512).max(2048),
+    })
+    .optional(),
+  /**
+   * PICTURES TO CONDITION ON, as links or data URLs.
+   *
+   * OpenRouter's Images API takes these as `input_references` and states they
+   * may be HTTP(S) URLs or base64 (docs/43 §2). This is what "make more like
+   * this one" is built on.
+   *
+   * The ceiling is the MODEL's, not a product rule: the capability endpoint
+   * reports 3 on `gemini-2.5-flash-image` and 14 on Seedream 4.5. Bounded at 14
+   * here so a malformed request cannot send a hundred, and bounded lower by
+   * `MAX_REFERENCES` where the product knows which model it routes to.
+   */
+  references: z.array(z.string().min(1)).max(16).optional(),
+  /**
+   * WHICH MODEL DRAWS IT, when the caller has let somebody choose.
+   *
+   * Optional: a caller that does not care gets the tier's default. The string is
+   * NOT trusted here, and the mesh checks it against `ALLOWED_IMAGE_MODELS`
+   * before it reaches a provider. Validating the shape in this schema and the
+   * VALUE at the router is deliberate: a schema cannot know what this account is
+   * willing to be billed for.
+   */
+  modelId: z.string().min(1).optional(),
 })
 export type ImageGenerateInput = z.infer<typeof ImageGenerateInputSchema>
 
@@ -375,5 +422,16 @@ export const ImageGenerateOutputSchema = z.object({
   /** Raw base64, no data-URL prefix. */
   base64: z.string().min(1),
   mime: z.string(),
+  /**
+   * WHAT THE PROVIDER SAID THE GENERATION COST, in US dollars.
+   *
+   * Optional and additive. ABSENT when the provider reported nothing, and that
+   * absence must never be rendered as zero: the mesh's own `estimateCostUsd`
+   * applies CHAT token rates, which for a model billed per image produces a
+   * figure nobody quoted (docs/43 §1). This field is kept apart from
+   * `MeshUsage.costUsd` for exactly that reason, so a caller storing a price a
+   * customer will read can tell a reported figure from an estimate.
+   */
+  providerCostUsd: z.number().nonnegative().optional(),
 })
 export type ImageGenerateOutput = z.infer<typeof ImageGenerateOutputSchema>

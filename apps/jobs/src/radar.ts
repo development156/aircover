@@ -1,5 +1,5 @@
 import { createRadarPgDb } from './radar/pg'
-import { runRadarPass, type RadarPassOptions, type RadarPassReport } from './radar/run'
+import { runRadarPass, type RadarPassOptions } from './radar/run'
 import { getRuntime } from './runtime'
 
 /**
