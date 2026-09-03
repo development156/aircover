@@ -37,6 +37,15 @@ export interface AutopilotTickDeps {
   write(row: DecisionRow): Promise<string>
   /** Hand one post to the publish path. Throwing is expected and is caught. */
   publish(post: AnnouncedPost): Promise<void>
+  /**
+   * Record a cancellation as the PERSON's, not Sahoda's, when the kill was
+   * theirs: `loop_settings.paused` is set by the Stop button and nothing else.
+   * The row's actor is what decides whether the history reads "You stopped
+   * this" or "Sahoda stopped this", and a customer who pressed stop must not
+   * be told Sahoda did. Absent, a cancellation is written with the default
+   * actor, which is right for the deploy-wide env flag.
+   */
+  cancelAsPerson?(post: AnnouncedPost): Promise<void>
 }
 
 export interface AutopilotTickReport {
@@ -131,9 +140,12 @@ export async function runAutopilotTick(deps: AutopilotTickDeps): Promise<Autopil
     if (decision.kind === 'cancel') {
       // A cancellation row, not a refusal. No `refusalReason`: the log's CHECK
       // only demands one for `refused`, and a cancellation's explanation is
-      // the ACTOR column — which defaults to 'autopilot' here and is what stops
-      // the screen telling a customer they pressed a button they never saw.
-      await deps.write({ ...base, decision: 'cancelled' })
+      // the ACTOR column — 'person' when the customer's own stop is the reason
+      // and the default 'autopilot' otherwise, which is what stops the screen
+      // telling a customer they pressed a button they never saw, or that
+      // Sahoda pressed one they did.
+      if (deps.cancelAsPerson) await deps.cancelAsPerson(post)
+      else await deps.write({ ...base, decision: 'cancelled' })
       report.cancelled += 1
       continue
     }

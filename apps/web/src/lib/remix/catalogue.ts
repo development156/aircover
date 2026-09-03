@@ -143,52 +143,79 @@ export interface MissingKind {
   /** What the roadmap drawing promised. Kept verbatim so nothing quietly vanishes. */
   readonly label: string
   /**
-   * The ONE thing that has to exist first, named. A mesh task name where a task
-   * is what is missing; otherwise the plain fact.
+   * What the customer reads, after the page's "Needs ". A capability that has
+   * to exist first, in their words: no task names, no file names, no dashes.
+   * `catalogue.test.ts` scans every one for all three.
    */
   readonly needs: string
+  /**
+   * INTERNAL. The mesh task that would have to exist first, named as the mesh
+   * would name it, or null where what is missing is not a task. Never rendered:
+   * it is here so the "a missing entry naming a task the mesh already has"
+   * guard has something exact to read.
+   */
+  readonly meshTask: string | null
 }
 
 /**
  * WHAT REMIX STILL CANNOT MAKE, and the one thing each one needs.
  *
  * Every entry here was on the roadmap screen as a card. None of them is dropped
- * — a promise that disappears is worse than one that is still outstanding — and
- * none of them is a button.
+ * — a promise that disappears is worse than one that is still outstanding —
+ * and none of them is a button.
+ *
+ * ── THE ENGINEERING FACTS, KEPT OUT OF THE CUSTOMER'S SENTENCE ───────────────
+ *   carousel  needs a mesh task `carousel_outline` (none returns slides), and
+ *             the carousel format needs two or more photos to publish.
+ *   reel      needs a mesh task `video_script`; `pricing.config.json` already
+ *             prices it. No channel in the Constraint Engine declares a video
+ *             mime, so nothing could publish the result either.
+ *   quote     `image_generate` exists and writes one picture for one post;
+ *             binding it to a derivative inside a batch is the work.
+ *   email     no channel. `ChannelSchema` is x | gbp | linkedin | instagram.
+ *   blog      needs a mesh task `seo_article`; priced, not written. And there
+ *             is no surface to publish an article to.
+ *   whatsapp  no channel, same enum.
  */
 export const MISSING_KINDS: readonly MissingKind[] = [
   {
     label: 'A carousel outline',
     needs:
-      'a mesh task named carousel_outline. There is no task that returns slides, and the ' +
-      'carousel format needs two or more photos before it can publish, so an outline in ' +
-      'words could not go out as a carousel even once it was written.',
+      'Sahoda to learn how to write slides, which it cannot do yet. A carousel also needs two ' +
+      'or more photos before it can be published, so an outline in words could not go out as ' +
+      'one even once it was written.',
+    meshTask: 'carousel_outline',
   },
   {
     label: 'A reel script',
     needs:
-      'a mesh task named video_script — the price already exists in pricing.config.json and ' +
-      'the task does not. No channel declares a video mime either, so nothing could publish ' +
-      'the result yet.',
+      'Sahoda to learn how to write for video. The price of a reel script is already set and ' +
+      'the writing is not built yet. Sahoda also cannot publish a video to any of its four ' +
+      'channels, so nothing could carry the result.',
+    meshTask: 'video_script',
   },
   {
     label: 'A quote card',
     needs:
-      'the picture pipeline bound to a derivative. image_generate exists and writes one ' +
-      'picture for one post; making it part of a batch is the work.',
+      'the picture maker joined to a batch. Sahoda can already make one picture for one post. ' +
+      'Making pictures as part of a batch is the work still to do.',
+    meshTask: null,
   },
   {
     label: 'An email',
     needs: 'somewhere to send it. Sahoda publishes to four channels and email is not one.',
+    meshTask: null,
   },
   {
     label: 'A blog outline',
     needs:
-      'a mesh task named seo_article — priced in pricing.config.json, not written — and a ' +
-      'place to put the result.',
+      'Sahoda to learn how to write a long article, and somewhere to put it. The price of one ' +
+      'is already set, the writing is not built yet, and Sahoda has no blog to publish to.',
+    meshTask: 'seo_article',
   },
   {
     label: 'A WhatsApp broadcast',
     needs: 'WhatsApp as a channel. It is not one of the four.',
+    meshTask: null,
   },
 ]

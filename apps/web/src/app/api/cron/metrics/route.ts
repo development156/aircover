@@ -84,7 +84,29 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   try {
-    const report = await runMetricCapture(metricCaptureDeps({ limit: BATCH }))
+    const report = await runMetricCapture({
+      ...metricCaptureDeps({ limit: BATCH }),
+      // The pass counts a failed read and carries on, so without this the cause was
+      // dropped where it was caught. A rotated Zernio key makes every target throw the
+      // same error, and the pass folds those into one event before they arrive here.
+      onFailure: (event) => reportServerError(event.error, { action: 'cron.metrics.read' }),
+    })
+
+    // ── A NIGHT WHERE NOTHING WAS READ IS NOT A GOOD NIGHT ────────────────────
+    // Every read failing used to answer 200 `ok: true` with `unreadable: 120`, because
+    // the per-target catch inside the pass means `runMetricCapture` itself does not
+    // throw. The counters were right and the verdict was missing, so the cron
+    // dashboard, the heartbeat and every 5xx filter all showed a healthy run while the
+    // history stopped growing for good. A degraded night stays a 200: most of it
+    // landed, and a route that cries outage over one flaky target is a route people
+    // learn to ignore.
+    if (report.outcome === 'failed') {
+      return Response.json(
+        { ok: false, error: 'METRIC_CAPTURE_FAILED', ...report },
+        { status: 500 },
+      )
+    }
+
     // Counts and one timestamp. No post id, no workspace id, no customer text —
     // this body is returned on a public URL to whoever holds the cron secret, and
     // the same rule the sweeps route follows applies here.

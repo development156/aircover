@@ -1865,8 +1865,11 @@ gains: *" — showing the most recent 200. Older files are not in this list."*
 
 #### Uploading
 **Add photos** opens the file picker and accepts several at once. Beside it:
-*"Photos only, up to 8 MB each. Adding a photo spends no credits."* — and **the 8
-is computed** as the largest media cap across the four channels, not typed in.
+*"Photos only, up to 4 MB each. Adding a photo spends no credits."* — and **the 4
+is computed**, not typed in. It was the largest media cap across the channels (8);
+since 2026-09-03 it is the smaller of that and what an upload can actually carry,
+because Vercel refuses a function request over 4.5 MB and a file between the two
+failed in production while passing every local check.
 
 The server reads each file's **actual bytes** to establish its type, size and pixel
 dimensions rather than trusting what the browser claimed.
@@ -1878,7 +1881,7 @@ These channels will not use it:"* followed by a per-channel list.
 Per-refused-file reasons, verbatim: *"Upload a JPEG, PNG, WebP or GIF — this file
 is not an image type the channels accept."* · *"Re-upload this file to check it —
 it looks incomplete, so it cannot be checked against the channel limits."* · *"That
-file is larger than 8 MB, which no channel accepts."* · *"Could not store that file
+file is larger than 4 MB, which is the most an upload can carry."* · *"Could not store that file
 — try again."*
 
 #### One tile

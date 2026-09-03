@@ -95,10 +95,71 @@ export interface MetricCaptureDeps {
     inserted: number
     storage: SnapshotStorage
   }>
+  /**
+   * Where the real cause of a failed read goes.
+   *
+   * The report is returned on a public URL and may only carry counts, so without
+   * this hook the error has nowhere to live: the catch below discarded it, and a
+   * rotated Zernio key was a night of silent zeroes with nothing in Sentry to say
+   * why. Optional, the same way the reconcile sweep's hook is: a caller that does
+   * not log loses the detail and is no worse off than before this existed.
+   *
+   * It is handed the untouched error, so it must only be given to a logger that is
+   * allowed to see a message. It is NOT called for a target the platform answered
+   * about, however unhelpfully: an orphaned post is a state on their side, and there
+   * is no cause to report.
+   */
+  onFailure?(event: MetricCaptureFailure): void
   now?: Date
 }
 
+/** What `onFailure` is handed. The only place the real error survives. */
+export interface MetricCaptureFailure {
+  /** The untouched cause, for a logger that is allowed to see it. */
+  error: unknown
+  /**
+   * Which channel the read was for, and deliberately nothing else.
+   *
+   * No post id, no workspace id, no profile id. This event is built on the same path
+   * as a body that crosses a public URL, and Sentry is not the place for a customer's
+   * row identifiers either. The channel is enough to tell an Instagram outage from a
+   * LinkedIn one, which is the question anyone reading it will have.
+   */
+  channel: Channel
+}
+
+/**
+ * How the whole night went, in one word.
+ *
+ * `clean` covers a night that found nothing to ask about as well as one where every
+ * answer landed, and a night the platform answered with "not yet" throughout: pending
+ * is the ordinary wait, not a fault. `failed` is the case this exists for. Until it
+ * did, a pass where every read threw was indistinguishable from a quiet success, because
+ * the counters it left behind were the counters of an idle night plus one number
+ * nobody was reading.
+ */
+export type MetricCaptureOutcome = 'clean' | 'degraded' | 'failed'
+
+/**
+ * How many DISTINCT causes one night is willing to forward.
+ *
+ * A dead key makes all 120 targets throw the same error, and 120 identical Sentry
+ * events say nothing the first one did not. Identical causes are folded into one, and
+ * a night that somehow produces many different failures forwards the first few rather
+ * than all of them: past a handful, the value is in the counts the report already
+ * carries, not in another event.
+ */
+const MAX_FORWARDED_CAUSES = 5
+
 export interface MetricCaptureReport {
+  /**
+   * Whether the night went well, judged rather than left to be derived.
+   *
+   * Every consumer that had to work this out from `unreadable` and `targets` got it
+   * wrong the same way: the cron route answered 200 `ok: true` on a night where all
+   * 120 reads failed, because nothing in the counts said so out loud.
+   */
+  outcome: MetricCaptureOutcome
   /** Channels that could be asked about at all. */
   targets: number
   /** Of those, how many returned a real measurement. */
@@ -158,6 +219,23 @@ function usable(value: PostMetrics[CapturedMetric]): value is number {
   return typeof value === 'number' && Number.isFinite(value)
 }
 
+/**
+ * Nothing failed, some of it failed, or all of it did.
+ *
+ * The `clean` test comes FIRST and has to: a night with nothing to ask about has
+ * `unreadable === targets === 0`, and asking the `failed` question first would report
+ * an idle night as an outage.
+ *
+ * `unreadable >= targets` can only hold when every target failed, since a target is
+ * counted once and can end in exactly one of the four buckets. `unresolved` is on the
+ * answered side of that line on purpose: the platform replied and said it cannot tie
+ * the post to an account, which is a state on their side and not an outage on ours.
+ */
+function outcomeOf(targets: number, unreadable: number): MetricCaptureOutcome {
+  if (unreadable === 0) return 'clean'
+  return unreadable >= targets ? 'failed' : 'degraded'
+}
+
 function snapshotsFor(target: MetricTarget, metrics: PostMetrics): MetricSnapshot[] {
   const rows: MetricSnapshot[] = []
   for (const metric of CAPTURED_METRICS) {
@@ -187,14 +265,35 @@ export async function runMetricCapture(deps: MetricCaptureDeps): Promise<MetricC
   let unresolved = 0
   const rows: MetricSnapshot[] = []
 
+  // Causes already sent on, keyed by what makes two of them the same failure. A
+  // message is the only thing that separates "no API key" from "timeout" here, and
+  // the set is bounded by the batch size the caller chose.
+  const seenCauses = new Set<string>()
+  let forwarded = 0
+  const forward = (error: unknown, channel: Channel): void => {
+    const key = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+    if (seenCauses.has(key)) return
+    seenCauses.add(key)
+    if (forwarded >= MAX_FORWARDED_CAUSES) return
+    forwarded += 1
+    try {
+      deps.onFailure?.({ error, channel })
+    } catch {
+      // The reporter is not allowed to take the night down with it. A Sentry client
+      // that throws would otherwise turn one unreadable target into a lost pass, and
+      // the whole point of this hook is to make a bad night MORE visible, not fatal.
+    }
+  }
+
   for (const target of targets) {
     let answer: ZernioPostAnalyticsResult
     try {
       answer = await deps.readPostAnalytics(target.profileId, target.platformPostId)
-    } catch {
+    } catch (error) {
       // A thrown call is "we could not read it", never "there is nothing". The
       // difference is the whole point of counting these separately.
       unreadable += 1
+      forward(error, target.channel)
       continue
     }
 
@@ -246,6 +345,7 @@ export async function runMetricCapture(deps: MetricCaptureDeps): Promise<MetricC
   const days = new Set(stamps.map((at) => at.slice(0, 10)))
 
   return {
+    outcome: outcomeOf(targets.length, unreadable),
     targets: targets.length,
     measured,
     pending,

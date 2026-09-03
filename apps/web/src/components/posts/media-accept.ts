@@ -1,6 +1,8 @@
 import { CONSTRAINTS, ChannelSchema } from '@sahoda/shared'
 import type { Channel } from '@sahoda/shared'
 
+import { MEDIA_UPLOAD_CAP_MB } from '@/lib/posts/media-constants'
+
 /**
  * The `accept` list for the attach input, DERIVED from the Constraint Engine.
  * The mime types are never restated here, so a spec change in
@@ -65,7 +67,18 @@ export function acceptForChannels(channels: readonly Channel[]): string {
  * and linkedin all stop at 5 MB while instagram reaches 8, so a gbp-only post
  * told "up to 8 MB" sends the writer off to export a 7 MB file the server will
  * refuse. Derived from `CONSTRAINTS`, never restated, so it tracks the engine.
+ *
+ * ── AND CLAMPED TO WHAT AN UPLOAD CAN ACTUALLY CARRY ────────────────────────
+ * A channel's own limit is only half the answer. `MEDIA_UPLOAD_CAP_MB` is the
+ * lower of that and what the hosting platform will accept in one request, and it
+ * is the number the server enforces. Quoting Instagram's 8 to a writer whose
+ * upload stops at 4 is the same defect in the other direction: an export nobody
+ * can attach. `media-constants.test.ts` walks every channel and fails if this
+ * hint ever exceeds the cap again.
  */
 export function capMbForChannels(channels: readonly Channel[]): number {
-  return Math.max(...scopeFor(channels).map((channel) => CONSTRAINTS[channel].maxMediaMB))
+  return Math.min(
+    MEDIA_UPLOAD_CAP_MB,
+    Math.max(...scopeFor(channels).map((channel) => CONSTRAINTS[channel].maxMediaMB)),
+  )
 }

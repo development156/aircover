@@ -1,7 +1,8 @@
 import type { ChatRequest, FetchLike, ImageRequest, ImageResponse, Provider } from './types'
 import type { ChatMessage } from './types'
 import { ProviderCallError } from './types'
-import { createOpenAiCompatibleProvider } from './openai-compatible'
+import { createOpenAiCompatibleProvider, isTimeoutAbort } from './openai-compatible'
+import { IMAGE_TIMEOUT_MS } from '../timeouts'
 
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1'
 
@@ -135,6 +136,9 @@ export function createOpenRouterProvider(apiKey: string, fetchImpl?: FetchLike):
       }))
     }
 
+    // The ceiling, for the same reason the chat client has one: a generation
+    // that never answers must fail inside the wall so the hold is released.
+    const timeoutMs = req.timeoutMs ?? IMAGE_TIMEOUT_MS
     let res: Response
     try {
       res = await doFetch(`${OPENROUTER_BASE}/images`, {
@@ -146,8 +150,17 @@ export function createOpenRouterProvider(apiKey: string, fetchImpl?: FetchLike):
           'x-title': 'SAHODA LABS',
         },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(timeoutMs),
       })
     } catch (e) {
+      if (isTimeoutAbort(e)) {
+        throw new ProviderCallError(
+          'openrouter',
+          null,
+          `provider did not answer within ${timeoutMs} ms`,
+          true,
+        )
+      }
       throw new ProviderCallError(
         'openrouter',
         null,

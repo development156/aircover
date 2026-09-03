@@ -140,6 +140,26 @@ const MB = 1024 * 1024
 const X_LINK_WEIGHT = 23
 const SCHEDULE_MIN_LEAD_MINUTES = 5
 
+/**
+ * Display names for every `Channel`, for the sentences a customer reads.
+ *
+ * `${channel}` is the lowercase enum key, and it reached the publish button
+ * verbatim: "gbp allows 1 media items". A count is a numeral and a key is a key;
+ * neither is a word. Exhaustive `Record<Channel, string>` on purpose, so a
+ * channel added to the schema is a compile error here rather than a screen that
+ * prints `telegram` where a name belongs. `apps/web/src/components/posts/
+ * channel-label.ts` carries the same six values for the screens; the two must
+ * agree until that file imports this one.
+ */
+export const CHANNEL_LABELS: Readonly<Record<Channel, string>> = {
+  x: 'X',
+  gbp: 'Google Business Profile',
+  linkedin: 'LinkedIn',
+  instagram: 'Instagram',
+  facebook: 'Facebook Pages',
+  telegram: 'Telegram',
+}
+
 /** The single declarative source consumed by editor validation AND adapter formatting. */
 export const CONSTRAINTS: Record<Channel, PlatformSpec> = {
   x: {
@@ -162,7 +182,14 @@ export const CONSTRAINTS: Record<Channel, PlatformSpec> = {
     mediaTypes: ['image/jpeg', 'image/png'],
     maxMediaMB: 5,
     maxMediaCount: 1,
-    imageDims: { minW: 250, minH: 250 },
+    // 400×300, not the 250×250 this carried until 2026-09-03. docs/31 §2.4
+    // records Google's floor for a post photo as "min 400×300" [DOC], and §6.3
+    // lists the old value as one of two rows in the WRONG direction: a 300×300
+    // logo passed every check here and failed at publish as PLATFORM_REJECTED.
+    // Neither platform has been probed at the boundary (Zernio's validator never
+    // fetches media for googlebusiness, docs/32); tighten again only on a
+    // measurement, never loosen without one.
+    imageDims: { minW: 400, minH: 300 },
     gbp: { ctaTypes: GBP_CTA_TYPES, supportsOffer: true },
     perDayCap: 10,
     scheduleMinLeadMinutes: SCHEDULE_MIN_LEAD_MINUTES,
@@ -175,6 +202,12 @@ export const CONSTRAINTS: Record<Channel, PlatformSpec> = {
     mediaTypes: ['image/jpeg', 'image/png'],
     maxMediaMB: 5,
     maxMediaCount: 9,
+    // Absent until 2026-09-03, so a 100×100 image passed and LinkedIn refused it
+    // (docs/31 §6.3). 552×276 is the image floor in docs/31 §2.2, read from
+    // Zernio's guide [SPEC], not from LinkedIn's own contract and not measured:
+    // the validator never fetches media for linkedin (docs/32). Same rule as
+    // gbp above: move it only on a measurement.
+    imageDims: { minW: 552, minH: 276 },
     perDayCap: 10,
     scheduleMinLeadMinutes: SCHEDULE_MIN_LEAD_MINUTES,
   },

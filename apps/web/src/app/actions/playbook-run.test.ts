@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { creditCost } from '@sahoda/shared'
+import { creditCost, DISPATCHABLE_STATUSES } from '@sahoda/shared'
+
+import { APPROVABLE_FROM } from '@/lib/planner/transitions'
 
 /**
  * THE EXECUTOR'S GATE, AND THE TWO BRANCHES ONLY IT DECIDES.
@@ -214,20 +216,34 @@ describe('executeRun', () => {
     expect(out.spent).toBe(RUN + DRAFT)
   })
 
-  it('schedules an L2 draft as approved — and STILL does not publish', async () => {
+  it('at L2 writes a post a PERSON must approve: on the queue, approvable, outside the sweep', async () => {
     LEVEL = 2
     h.store.readApprovedRunForExecute.mockResolvedValue(APPROVED_RUN)
 
     await executeRun('run-1')
 
     const row = h.insert.mock.calls[0]![0]
-    // `approved` is where the dispatcher would pick it up, and the dispatcher is
-    // behind its own flag. There is no L3 branch anywhere in this function,
-    // because L3 cannot be stored — and that absence is what makes an unattended
-    // publish unreachable from here.
-    expect(row.status).toBe('approved')
+    // MEASURED 2026-09-02: this asserted `status === 'approved'`, which is
+    // inside DISPATCHABLE_STATUSES and outside APPROVABLE_FROM, so the suite
+    // was pinning a post the sweep would send and nobody could approve. The
+    // claim sold is "publishes each post once you approve it"; asserted here
+    // against the real lists rather than a string.
+    expect(DISPATCHABLE_STATUSES as readonly string[]).not.toContain(row.status)
+    expect(APPROVABLE_FROM as readonly string[]).toContain(row.status)
     expect(row.scheduled_at).toBe('2026-01-25T00:00:00.000Z')
     expect(h.store.linkItemToPost).toHaveBeenCalledWith('i1', WS, POST, 'awaiting_approval')
+  })
+
+  it('at L3 writes a plain draft with no time on it, so only the autopilot dispatcher can schedule it', async () => {
+    LEVEL = 3
+    h.store.readApprovedRunForExecute.mockResolvedValue(APPROVED_RUN)
+
+    await executeRun('run-1')
+
+    const row = h.insert.mock.calls[0]![0]
+    expect(row.status).toBe('draft')
+    expect(row.scheduled_at).toBeNull()
+    expect(h.store.linkItemToPost).toHaveBeenCalledWith('i1', WS, POST, 'drafted')
   })
 
   it('marks an item failed and charges nothing for it when the model call fails', async () => {

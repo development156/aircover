@@ -204,6 +204,19 @@ const MOCK_PLATFORMS = ['instagram', 'linkedin', 'x']
 vi.mock('@sahoda/shared', () => ({
   ZERNIO_PLATFORMS: MOCK_PLATFORMS,
   isZernioPlatform: (value: unknown) => MOCK_PLATFORMS.includes(value as string),
+  // Added 2026-09-03. `components/posts/channel-label.ts` re-exports the shared
+  // map instead of keeping a second copy of the same six names, so anything
+  // reached from this route now pulls it through here. A factory mock replaces
+  // the WHOLE module, so a name it omits is undefined at import time rather than
+  // falling back — which is why this list has to grow with the imports.
+  CHANNEL_LABELS: {
+    x: 'X',
+    gbp: 'Google Business Profile',
+    linkedin: 'LinkedIn',
+    instagram: 'Instagram',
+    facebook: 'Facebook Pages',
+    telegram: 'Telegram',
+  },
 }))
 
 // The connection count and the plan verdict are mocked as SEAMS, not simulated
@@ -253,6 +266,17 @@ const { GET } = await import('./route')
 
 const call = () =>
   GET(new Request('https://app.sahodalabs.com/api/oauth/zernio/return?connected=1'))
+
+/**
+ * THE PER-PRESS NONCE, AS THE START ROUTE MINTS IT.
+ *
+ * Twenty-two base64url characters in an httpOnly cookie and the same value on
+ * the return URL. A trip that carries both is one this browser's own press
+ * started; anything else is a replay or a link somebody else built.
+ */
+const NONCE = 'AbCdEfGhIjKlMnOpQrStUv'
+const OTHER_NONCE = 'zYxWvUtSrQpOnMlKjIhGfE'
+const nonceCookie = (value: string = NONCE) => ({ cookie: `sahoda_connect_nonce=${value}` })
 
 beforeEach(() => {
   state.userId = 'user_1'
@@ -956,10 +980,23 @@ describe('the route asks Zernio in Zernio’s own vocabulary', () => {
   })
 })
 
+/**
+ * ── AND SINCE THE NONCE: THE URL HAS TO PROVE ITSELF TO CREATE ───────────────
+ * `mode` still steers presentation on the URL alone. `platform` may still
+ * scope a CREATE from the URL when the pending-connect cookie is gone, but
+ * only when the URL's nonce matches the nonce cookie the same press set. A URL
+ * with neither cookie is a replay or somebody else's link, and it refreshes
+ * what we already hold and creates nothing, which is what a replay always did.
+ */
 describe('the intent survives a lost cookie, because it also rides in the URL', () => {
   const IG_ID = '6a75caf7d0fe733d1afcc1f4'
-  const withParams = (query: string) =>
-    GET(new Request(`https://app.sahodalabs.com/api/oauth/zernio/return?${query}`))
+  const withParams = (query: string, cookie: string | null = null) =>
+    GET(
+      new Request(
+        `https://app.sahodalabs.com/api/oauth/zernio/return?${query}`,
+        cookie === null ? {} : { headers: nonceCookie(cookie) },
+      ),
+    )
 
   it('closes the popup on the URL alone', async () => {
     state.pending = null
@@ -972,11 +1009,45 @@ describe('the intent survives a lost cookie, because it also rides in the URL', 
     expect(await res.text()).toContain('BroadcastChannel')
   })
 
-  it('authorises the create on the URL alone', async () => {
+  it('authorises the create on the URL when its nonce matches the nonce cookie', async () => {
     // The louder half. Without this the customer presses Connect, approves at the
-    // platform, and nothing lands in our table at all.
+    // platform, and nothing lands in our table at all. The pending-connect
+    // cookie is gone; the nonce cookie, set on the same response, is what
+    // proves the URL is this press's.
     state.pending = null
     state.slots = { count: 0, keys: new Set() }
+
+    await withParams(`connected=1&platform=instagram&nonce=${NONCE}`, NONCE)
+
+    expect(state.rpcCalls).toEqual([`instagram:${IG_ID}`])
+  })
+
+  it('creates NOTHING from a URL that carries no nonce', async () => {
+    // MUTATION WITNESS for the create half. Let `platform` authorise a create on
+    // its own again and a link somebody else built resurrects a channel the
+    // customer disconnected, with their own session.
+    state.pending = null
+    state.slots = { count: 0, keys: new Set() }
+
+    await withParams('connected=1&platform=instagram')
+
+    expect(state.rpcCalls).toEqual([])
+  })
+
+  it('creates NOTHING from a URL whose nonce does not match the cookie', async () => {
+    state.pending = null
+    state.slots = { count: 0, keys: new Set() }
+
+    await withParams(`connected=1&platform=instagram&nonce=${OTHER_NONCE}`, NONCE)
+
+    expect(state.rpcCalls).toEqual([])
+  })
+
+  it('still REFRESHES what we already hold on a URL with no nonce', async () => {
+    // A replay does what a replay always did: a row we already hold is
+    // refreshed, and nothing is created.
+    state.pending = null
+    state.slots = { count: 1, keys: new Set([`instagram:${IG_ID}`]) }
 
     await withParams('connected=1&platform=instagram')
 
@@ -990,7 +1061,7 @@ describe('the intent survives a lost cookie, because it also rides in the URL', 
     state.pending = null
     state.slots = { count: 0, keys: new Set() }
 
-    await withParams('connected=1&platform=instagram')
+    await withParams(`connected=1&platform=instagram&nonce=${NONCE}`, NONCE)
 
     expect(state.rpcCalls.some((c) => c.startsWith('linkedin:'))).toBe(false)
   })
@@ -1113,7 +1184,12 @@ describe('a broken workspace read is not a missing workspace', () => {
 describe('a connect that still needs a choice renders a picker, not a verdict', () => {
   /** Exactly the shape Zernio's headless redirect carries. `EAA…` is a real token prefix. */
   const TEMP_TOKEN = 'EAAKxxxxLIVEFACEBOOKUSERTOKENxxxx'
-  const selectTrip = (over: Record<string, string> = {}) => {
+  /**
+   * A genuine trip carries the nonce both ways. `cookie` is the jar the browser
+   * sends back; `null` is a browser that dropped it, or a browser that never had
+   * it because the press happened somewhere else.
+   */
+  const selectTrip = (over: Record<string, string> = {}, cookie: string | null = NONCE) => {
     const url = new URL('https://app.sahodalabs.com/api/oauth/zernio/return')
     const params: Record<string, string> = {
       step: 'select_page',
@@ -1121,10 +1197,11 @@ describe('a connect that still needs a choice renders a picker, not a verdict', 
       profileId: '6a75cae32853ee463c6419d6',
       tempToken: TEMP_TOKEN,
       mode: 'popup',
+      nonce: NONCE,
       ...over,
     }
     for (const [k, v] of Object.entries(params)) if (v !== '') url.searchParams.set(k, v)
-    return GET(new Request(url.toString()))
+    return GET(new Request(url.toString(), cookie === null ? {} : { headers: nonceCookie(cookie) }))
   }
 
   it('asks which Page, instead of reporting nothing was found', async () => {
@@ -1169,6 +1246,79 @@ describe('a connect that still needs a choice renders a picker, not a verdict', 
     const res = await selectTrip({ profileId: 'ffffffffffffffffffffffff' })
     expect(res.status).toBe(403)
     expect(state.rpcCalls).toEqual([])
+  })
+
+  /**
+   * ── THE PICKER THAT SOMEBODY ELSE'S LINK COULD OPEN ──────────────────────
+   * The profile check above was the ONLY binding, and a profile id is on every
+   * return URL this browser ever visited. So a top-level GET carrying the
+   * victim's profile id and an attacker's `tempToken` rendered a normal picker,
+   * and one click committed the attacker's Page under the victim's profile.
+   * The nonce the start route minted is what a link built elsewhere cannot
+   * carry.
+   */
+  it('refuses the picker when no nonce cookie came back, and says which fact that is', async () => {
+    // MUTATION WITNESS. Remove the nonce check and this renders a picker from
+    // the URL's token for a press this browser never made.
+    const res = await selectTrip({}, null)
+    const body = await res.text()
+
+    expect(res.status).toBe(403)
+    expect(body).toContain(
+      'Sahoda could not confirm this connect started from your Connections page',
+    )
+    expect(body).toContain('The record of your press did not reach Sahoda')
+    expect(body).toContain('nothing was connected and no account was chosen')
+    expect(body).toContain('press Connect again')
+    expect(body).not.toContain('Choose a Facebook Page')
+    // No pick cookie: the URL's token is never carried into anything.
+    expect(res.headers.get('set-cookie') ?? '').not.toContain('sahoda_connect_pick=ey')
+    expect(body).not.toContain(TEMP_TOKEN)
+    expect(state.rpcCalls).toEqual([])
+  })
+
+  it('refuses a nonce that belongs to a different attempt, with the other sentence', async () => {
+    // An old return URL replayed, or one built by somebody who read a nonce off
+    // a log: well-formed, real once, and not the value the latest press wrote.
+    const res = await selectTrip({}, OTHER_NONCE)
+    const body = await res.text()
+
+    expect(res.status).toBe(403)
+    expect(body).toContain('This link belongs to a different connect attempt')
+    expect(body).not.toContain('did not reach Sahoda')
+    expect(body).not.toContain('Choose a Facebook Page')
+    expect(res.headers.get('set-cookie') ?? '').not.toContain('sahoda_connect_pick=ey')
+  })
+
+  it('refuses a URL with the nonce stripped even when the cookie is there', async () => {
+    const res = await selectTrip({ nonce: '' })
+    expect(res.status).toBe(403)
+    expect(await res.text()).not.toContain('Choose a Facebook Page')
+  })
+
+  it('checks the nonce BEFORE it compares the profile, so a forged trip learns nothing', async () => {
+    // With no nonce, a wrong profile id and a right one get the same answer: the
+    // refusal must not double as an oracle for which profile id is ours.
+    const wrong = await selectTrip({ profileId: 'ffffffffffffffffffffffff' }, null)
+    const right = await selectTrip({}, null)
+    expect(wrong.status).toBe(403)
+    expect(await wrong.text()).toBe(await right.text())
+  })
+
+  it('spends both press cookies on the refusal', async () => {
+    const res = await selectTrip({}, OTHER_NONCE)
+    const cleared = res.headers.getSetCookie().filter((c) => c.includes('Max-Age=0'))
+    expect(cleared.some((c) => c.startsWith('sahoda_connect='))).toBe(true)
+    expect(cleared.some((c) => c.startsWith('sahoda_connect_nonce='))).toBe(true)
+  })
+
+  it('renders the picker when the cookie and the URL agree', async () => {
+    // The whole of the honest path, stated once beside its refusals.
+    state.accounts = []
+    const res = await selectTrip()
+    expect(res.status).toBe(200)
+    expect(await res.text()).toContain('Choose a Facebook Page')
+    expect(res.headers.get('set-cookie') ?? '').toContain('sahoda_connect_pick=')
   })
 
   it('leaves every other platform on the flow that already works', async () => {
@@ -1271,7 +1421,9 @@ describe('a pick that never reached us is not the same as an empty account list'
   const fbTrip = (query: Record<string, string>) => {
     const url = new URL('https://app.sahodalabs.com/api/oauth/zernio/return')
     for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v)
-    return GET(new Request(url.toString()))
+    // A genuine trip: the press's nonce came back both ways.
+    url.searchParams.set('nonce', NONCE)
+    return GET(new Request(url.toString(), { headers: nonceCookie() }))
   }
 
   it('renders the picker even when the step is spelled differently than the spec said', () => {

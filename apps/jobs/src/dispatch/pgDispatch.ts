@@ -32,7 +32,18 @@ interface CandidateRow extends Record<string, unknown> {
   channel: string | null
   publish_status: string | null
   published_mode: string | null
+  claimed_at: string | Date | null
+  /** `error ->> 'code'` and `platform_post_id` of the variant's LATEST log row, any status. */
+  last_error_code: string | null
+  last_platform_post_id: string | null
 }
+
+/**
+ * The adapter's code for "the platform accepted this and has not finished". The log row
+ * carrying it also carries the provider's post id, which is what the reconcile pass
+ * asks about; a STILL_PROCESSING row WITHOUT an id is unaddressable and is not a wait.
+ */
+const STILL_PROCESSING = 'STILL_PROCESSING'
 
 /**
  * The database side of the scheduled-publish dispatcher, over the same direct `pg` pool the
@@ -55,6 +66,12 @@ export function createDispatchStore(opts: DispatchStoreOptions) {
    * join would cut a post's variants in half and hand the classifier a post that looks
    * like it has fewer channels than it does — which is how a partial gets misread as a
    * full publish.
+   *
+   * Two lateral reads per variant, on purpose distinct. `l` is the latest SUCCEEDED log
+   * (the proven mode). `last` is the latest log of ANY status: a STILL_PROCESSING row
+   * there, with a provider id and nothing after it, means the platform accepted the
+   * post and the reconcile pass has not yet said how it ended. The classifier holds
+   * that variant instead of sending it again.
    */
   async function listCandidates(): Promise<DispatchCandidate[]> {
     const r = await pool.query<CandidateRow>(
@@ -74,7 +91,10 @@ export function createDispatchStore(opts: DispatchStoreOptions) {
               v.id            as variant_id,
               v.channel       as channel,
               v.publish_status as publish_status,
-              l.mode          as published_mode
+              v.publish_claimed_at as claimed_at,
+              l.mode          as published_mode,
+              last.error ->> 'code'  as last_error_code,
+              last.platform_post_id  as last_platform_post_id
          from due d
          left join post_variants v
                 on v.post_id = d.id
@@ -87,6 +107,13 @@ export function createDispatchStore(opts: DispatchStoreOptions) {
                order by pl.created_at desc
                limit 1
             ) l on true
+         left join lateral (
+              select pl.error, pl.platform_post_id
+                from post_publish_logs pl
+               where pl.variant_id = v.id
+               order by pl.created_at desc
+               limit 1
+            ) last on true
         order by d.scheduled_at, d.id, v.created_at, v.id`,
       [gate, limit],
     )
@@ -186,5 +213,17 @@ function toVariant(row: CandidateRow): CandidateVariant {
       row.published_mode === 'live' || row.published_mode === 'fixture'
         ? (row.published_mode as PublishMode)
         : null,
+    // Same normalisation as scheduled_at: pg returns timestamptz as a Date and the
+    // classifier parses ISO.
+    claimedAt:
+      row.claimed_at === null || row.claimed_at === undefined
+        ? null
+        : row.claimed_at instanceof Date
+          ? row.claimed_at.toISOString()
+          : String(row.claimed_at),
+    awaitingPlatform:
+      row.last_error_code === STILL_PROCESSING &&
+      typeof row.last_platform_post_id === 'string' &&
+      row.last_platform_post_id.length > 0,
   }
 }

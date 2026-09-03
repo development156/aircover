@@ -362,16 +362,59 @@ export async function readApprovedCycleForCreate(
   return r.rows[0] ?? null
 }
 
+/**
+ * Record what the create stage did with one brief.
+ *
+ * ── `post_id is null` IS THE IDEMPOTENCY BOUNDARY ────────────────────────────
+ * A brief that already carries a post is never re-linked. The create stage can
+ * be entered twice for one approved cycle (two tabs at the halt screen, or a
+ * replayed action call: `loop_approve_cost` answers `replayed: true` before its
+ * status check once `cost_approved_at` is set), and `withCredits` replays the
+ * DEBIT without re-charging but still RUNS the wrapped function. The stage
+ * filters briefs on this column before it charges anything, and this clause is
+ * the second guard for the row that slipped between the read and the write:
+ * an overwrite here would orphan the first post, which the kill switch can no
+ * longer find because it scopes through `loop_briefs.post_id`.
+ *
+ * Returns whether a row moved, so a caller can tell a link from a refused one.
+ */
 export async function linkBriefToPost(
   briefId: string,
   workspaceId: string,
   postId: string | null,
   outcome: string,
-): Promise<void> {
-  await getPool().query(
-    `update loop_briefs set post_id = $3, stage_outcome = $4 where id = $1 and workspace_id = $2`,
+): Promise<boolean> {
+  const r = await getPool().query(
+    `update loop_briefs set post_id = $3, stage_outcome = $4
+      where id = $1 and workspace_id = $2 and post_id is null`,
     [briefId, workspaceId, postId, outcome],
   )
+  return (r.rowCount ?? 0) > 0
+}
+
+/**
+ * The per-channel bodies a brief was charged for, one row per channel.
+ *
+ * The same statement `lib/playbooks/store.ts` uses, because the two paths
+ * charge the same `post_variants` price and must deliver the same thing. The
+ * Loop had no writer at all: it charged per brief and inserted one post with
+ * one body across every channel, and the dispatcher expired each one for
+ * having no variants. `generated_body` takes the same `$4` as `body` (draft
+ * capture, REQUESTS.md §22): every row here is model output.
+ */
+export async function writeVariants(
+  workspaceId: string,
+  postId: string,
+  variants: readonly { channel: string; body: string; extras?: unknown }[],
+): Promise<void> {
+  const pool = getPool()
+  for (const v of variants) {
+    await pool.query(
+      `insert into post_variants (workspace_id, post_id, channel, body, generated_body, extras, char_count)
+       values ($1, $2, $3, $4, $4, $5::jsonb, $6)`,
+      [workspaceId, postId, v.channel, v.body, JSON.stringify(v.extras ?? null), v.body.length],
+    )
+  }
 }
 
 /** Add to the cycle's running spend. Additive, so two concurrent charges both count. */

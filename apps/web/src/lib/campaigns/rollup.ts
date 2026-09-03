@@ -1,4 +1,10 @@
-import type { Campaign, Channel, ChannelSet, Post } from '@sahoda/shared'
+import {
+  ChannelSchema,
+  type Campaign,
+  type Channel,
+  type ChannelSet,
+  type Post,
+} from '@sahoda/shared'
 
 /**
  * WHAT A CAMPAIGN MAY HONESTLY REPORT.
@@ -31,8 +37,27 @@ import type { Campaign, Channel, ChannelSet, Post } from '@sahoda/shared'
  * Pure: no React, no I/O, no clock.
  */
 
-/** The channel order every campaign surface renders in. Stable, so two cards agree. */
-export const CHANNEL_ORDER: readonly Channel[] = ['instagram', 'linkedin', 'x', 'gbp']
+/**
+ * The four channels the product launched with, in the order every campaign
+ * surface has always rendered them. A DISPLAY preference, not a vocabulary.
+ */
+const PREFERRED_ORDER: readonly Channel[] = ['instagram', 'linkedin', 'x', 'gbp']
+
+/**
+ * The channel order every campaign surface renders in. Stable, so two cards agree.
+ *
+ * ── DERIVED FROM THE SCHEMA, NEVER LISTED ────────────────────────────────────
+ * This was the four-item literal above, and `orderChannels` FILTERS by it. When
+ * `facebook` and `telegram` joined `ChannelSchema` on 2026-08-26 the literal
+ * kept typechecking and silently dropped both: a campaign of six Facebook posts
+ * rendered a grid with a post column, no channel columns and "0 of 0 live". The
+ * preferred four come first; every other channel the schema admits follows in
+ * schema order, so a seventh channel appears here the day it is added.
+ */
+export const CHANNEL_ORDER: readonly Channel[] = [
+  ...PREFERRED_ORDER,
+  ...ChannelSchema.options.filter((channel) => !PREFERRED_ORDER.includes(channel)),
+]
 
 export interface CampaignRollup {
   campaign: Campaign

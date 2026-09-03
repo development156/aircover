@@ -7,6 +7,7 @@ import type {
   Provider,
 } from './types'
 import { ProviderCallError } from './types'
+import { DEFAULT_CHAT_TIMEOUT_MS } from '../timeouts'
 
 /** Shape of the OpenAI-compatible /chat/completions response we depend on. */
 interface OpenAiChatCompletion {
@@ -67,6 +68,10 @@ const defaultEncode = (m: ChatMessage): unknown => {
 
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
+/** What `fetch` rejects with when the signal from `AbortSignal.timeout` fires. */
+export const isTimeoutAbort = (e: unknown): boolean =>
+  e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError')
+
 /**
  * A minimal, dependency-free client for any OpenAI-compatible chat-completions
  * endpoint (OpenRouter, OpenAI). Throws ProviderCallError on any failure so the
@@ -125,6 +130,10 @@ export function createOpenAiCompatibleProvider(opts: OpenAiCompatibleOptions): P
         )
       }
 
+      // THE CEILING. Without a signal a stalled socket ran until the platform
+      // killed the function, and a killed function never releases the credit
+      // hold it took. See timeouts.ts.
+      const timeoutMs = req.timeoutMs ?? DEFAULT_CHAT_TIMEOUT_MS
       let res: Response
       try {
         res = await fetchImpl(`${opts.baseUrl}/chat/completions`, {
@@ -135,8 +144,17 @@ export function createOpenAiCompatibleProvider(opts: OpenAiCompatibleOptions): P
             ...opts.headers,
           },
           body: JSON.stringify(body),
+          signal: AbortSignal.timeout(timeoutMs),
         })
       } catch (e) {
+        if (isTimeoutAbort(e)) {
+          throw new ProviderCallError(
+            opts.name,
+            null,
+            `provider did not answer within ${timeoutMs} ms`,
+            true,
+          )
+        }
         throw new ProviderCallError(opts.name, null, `network error: ${errText(e)}`)
       }
 

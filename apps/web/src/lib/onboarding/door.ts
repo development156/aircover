@@ -28,13 +28,23 @@ export type DoorChoice =
   | { kind: 'none'; ignored: [] }
 
 /**
- * A PDF larger than this is rejected BEFORE its bytes are read into memory.
+ * A PDF larger than this is rejected BEFORE its bytes are copied out of the
+ * request and BEFORE they are base64-encoded.
+ *
+ * Said exactly, because the previous sentence here ("before its bytes are read
+ * into memory") was not true: the route awaited `file.arrayBuffer()` and only
+ * then compared the size. Two guards now hold it. The route compares
+ * `content-length` to `MAX_DOOR_BODY_BYTES` (`door-request.ts`) before calling
+ * `request.formData()`, which is the call that buffers the multipart body; and
+ * `read-door.ts` compares `size` to this cap before calling `read()`, which is
+ * the copy. A body that lies about its length still gets buffered once by the
+ * platform, and that copy is not ours to skip.
  *
  * `openUploadDoor` has its own `MAX_UPLOAD_BYTES` (8MB) but can only check it
  * after the file has been buffered AND base64-encoded — which is exactly the
  * work worth not doing. This is the earlier, cheaper guard, and deliberately the
- * tighter of the two: 6MB of PDF is already ~25k input tokens on a path we do
- * not charge for.
+ * tighter of the two: 6MB of PDF is already ~25k input tokens, held against the
+ * workspace's credits on the PDF arm.
  *
  * It lives here rather than in `onboarding-door.ts` because that module is
  * `'use server'`, where every export is a callable endpoint and only async

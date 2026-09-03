@@ -153,6 +153,7 @@ describe('processPaymentEvent — no internal detail crosses the Result boundary
         },
         markProcessed: async () => {},
         markFailed: async () => {},
+        activate: async () => {},
       },
       applyPlanGrant: async () => {
         throw new Error('unused')
@@ -178,6 +179,7 @@ describe('processPaymentEvent — no internal detail crosses the Result boundary
         },
         markProcessed: async () => {},
         markFailed: async () => {},
+        activate: async () => {},
       },
       applyPlanGrant: async () => {
         throw new Error('unused')

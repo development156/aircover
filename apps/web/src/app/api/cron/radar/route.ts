@@ -60,8 +60,12 @@ export const maxDuration = 300
  * A WALL, NOT A TARGET, and a wall-clock budget as much as a cost one: the pass
  * is sequential, a bought fetch is seconds, and everything has to finish inside
  * `maxDuration` above. Whatever does not fit is reported in `refused` rather than
- * dropped, and the next pass takes it first — NULL `last_seen_at` sorts ahead of
- * every real timestamp, so the sources that waited longest go first.
+ * dropped, and the next pass takes it first: the queue is ordered by the last
+ * ATTEMPT, so whoever has waited longest since anyone last tried them goes first.
+ *
+ * It used to be ordered by the last SIGHTING, which is a different question. A
+ * source that never loads is never seen, so it sorted first for ever and held
+ * the whole weekly batch of 100 against everybody else.
  *
  * Stated HERE, next to the wall clock it has to fit inside, rather than left to
  * the deps default — the same reason the metrics route states its own.

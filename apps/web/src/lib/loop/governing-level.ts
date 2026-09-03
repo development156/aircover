@@ -1,4 +1,4 @@
-import type { AutonomyLevel, Channel } from '@sahoda/shared'
+import { AUTONOMY_LEVELS, type AutonomyLevel, type Channel } from '@sahoda/shared'
 
 /**
  * The level governing a brief: the LOWEST of its channels' levels.
@@ -21,7 +21,21 @@ import type { AutonomyLevel, Channel } from '@sahoda/shared'
  * It belongs here anyway. It is a pure decision about two data structures with
  * no I/O, no auth and no database, and a rule this important should be readable
  * without a server action around it.
+ *
+ * ── THE SEED IS THE HIGHEST STORABLE RUNG, READ OFF THE LADDER ──────────────
+ * The reduce walks DOWN from its seed, so the seed is the highest answer this
+ * function can give. It was a literal `2`, written when L3 could not be stored,
+ * and it stayed `2` after `AutonomyLevelSchema` admitted 3: a dial at
+ * {instagram: 3} came back as 2, the create stage took the L2 branch, and an
+ * autopilot post was written approved-with-a-slot for the ordinary sweep to send
+ * at the slot with no cancel window. Deriving the seed from `AUTONOMY_LEVELS`
+ * means the ladder cannot grow a rung this function cannot return.
  */
+const MAX_STORABLE_LEVEL = AUTONOMY_LEVELS.filter((l) => l.storable).reduce<AutonomyLevel>(
+  (max, l) => (l.level > max ? l.level : max),
+  0,
+)
+
 export function governingLevel(
   channels: readonly Channel[],
   dial: Map<Channel, AutonomyLevel>,
@@ -31,5 +45,5 @@ export function governingLevel(
   return channels.reduce<AutonomyLevel>((lowest, channel) => {
     const level = dial.get(channel) ?? fallback
     return level < lowest ? level : lowest
-  }, 2 as AutonomyLevel)
+  }, MAX_STORABLE_LEVEL)
 }

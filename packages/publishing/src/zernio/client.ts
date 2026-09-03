@@ -1,3 +1,5 @@
+import { z } from 'zod'
+
 import type { Transport, TransportResponse } from '../transport'
 
 /**
@@ -39,6 +41,14 @@ export class ZernioError extends Error {
   readonly code: string
   readonly type: string
   readonly rateLimit: ZernioRateLimit
+  /**
+   * The Zernio id of the post a 409 says already exists (docs/31 §6.4, [SPEC]:
+   * "the 409 body carries `existingPostId`"). Only a 24-hex id is carried; any
+   * other value is dropped, so this can never hold free text from a response.
+   * Null on every other error.
+   */
+  readonly existingPostId: string | null
+  readonly #classification: 'transient' | 'permanent' | null
 
   constructor(args: {
     message: string
@@ -46,6 +56,13 @@ export class ZernioError extends Error {
     code: string
     type: string
     rateLimit: ZernioRateLimit
+    existingPostId?: string | null
+    /**
+     * Only for errors whose status does not say what they mean. BAD_SHAPE on a
+     * 200 is the case: the request went out, the post may be live, and "failed"
+     * would be a claim nothing here can make. Absent, the status decides.
+     */
+    classification?: 'transient' | 'permanent'
   }) {
     super(args.message)
     this.name = 'ZernioError'
@@ -53,14 +70,29 @@ export class ZernioError extends Error {
     this.code = args.code
     this.type = args.type
     this.rateLimit = args.rateLimit
+    this.existingPostId = args.existingPostId ?? null
+    this.#classification = args.classification ?? null
   }
 
   /** 429 and 5xx are worth retrying; 4xx means the request itself is wrong. */
   get classification(): 'transient' | 'permanent' {
+    if (this.#classification) return this.#classification
     if (this.status === 429 || this.status >= 500) return 'transient'
     return 'permanent'
   }
 }
+
+/**
+ * Zernio's documented error envelope, `{ error, type, code }`, plus the one
+ * extra field a 409 carries. Loose, because an unknown extra key on an error is
+ * not a reason to lose the code that came with it.
+ */
+const ZernioErrorEnvelopeSchema = z.looseObject({
+  error: z.string().optional(),
+  type: z.string().optional(),
+  code: z.string().optional(),
+  existingPostId: z.string().optional(),
+})
 
 function readRateLimit(headers: Record<string, string>): ZernioRateLimit {
   const lower: Record<string, string> = {}
@@ -133,17 +165,52 @@ function parse<T>(res: TransportResponse, what: string): ZernioResult<T> {
   }
 
   if (res.status >= 400) {
-    const env = body as { error?: string; type?: string; code?: string }
+    const parsed = ZernioErrorEnvelopeSchema.safeParse(body)
+    const env = parsed.success ? parsed.data : {}
+    const existingPostId =
+      env.existingPostId !== undefined && ZERNIO_ID_RE.test(env.existingPostId)
+        ? env.existingPostId
+        : null
     throw new ZernioError({
       message: `${what}: ${env.error ?? `HTTP ${res.status}`}`,
       status: res.status,
       code: env.code ?? 'UNKNOWN',
       type: env.type ?? 'unknown_error',
       rateLimit,
+      existingPostId,
     })
   }
 
   return { status: res.status, data: body as T, rateLimit }
+}
+
+/**
+ * The boundary that decides "published" is zod-parsed, not cast.
+ *
+ * `parse()` above hands back `body as T`, which is a promise about shape that
+ * nothing checks. For most endpoints the caller reads one named field and the
+ * cost of being wrong is a thrown MISSING_FIELDS. For `createPost` and `getPost`
+ * the cost is different: `platformPostUrl` is what flips a post_variants row to
+ * `published`, and a truthy non-string there (`true`, `{ url, expiresAt }`)
+ * would have been stored as the permalink and shown to a customer as live.
+ *
+ * BAD_SHAPE is TRANSIENT by declaration and not by status: the request went out
+ * and the post may be live, so "unknown" is the honest reading and "failed" is
+ * a claim this code cannot make.
+ */
+function shaped<S extends z.ZodType>(what: string, schema: S, data: unknown): z.output<S> {
+  const parsed = schema.safeParse(data)
+  if (parsed.success) return parsed.data
+  const first = parsed.error.issues[0]
+  const where = first ? first.path.map(String).join('.') || '<root>' : '<root>'
+  throw new ZernioError({
+    message: `${what}: response was not in the shape the contract declares (at ${where}).`,
+    status: 200,
+    code: 'BAD_SHAPE',
+    type: 'contract_error',
+    rateLimit: { limit: null, remaining: null, reset: null },
+    classification: 'transient',
+  })
 }
 
 export interface ZernioAccount {
@@ -166,31 +233,46 @@ export interface ZernioPresign {
   expiresIn: number
 }
 
-export interface ZernioPlatformResult {
-  platform: string
-  status: string
-  platformPostId?: string | null
-  platformPostUrl?: string | null
-  accountId?: string | { _id: string }
-  error?: string
-  errorMessage?: string
-}
+/**
+ * One platform leg of a post, as Zernio returns it.
+ *
+ * Strict on exactly the fields that decide something downstream: `platform`
+ * (which leg is ours), `status` (`failed` ends the settle loop), and the two
+ * that must be strings or absent because one becomes a permalink and the other
+ * an analytics key. Loose on everything else, so a new field Zernio adds is not
+ * a refused post.
+ */
+export const ZernioPlatformResultSchema = z.looseObject({
+  platform: z.string(),
+  status: z.string(),
+  platformPostId: z.string().nullable().optional(),
+  platformPostUrl: z.string().nullable().optional(),
+  accountId: z.union([z.string(), z.looseObject({ _id: z.string() })]).optional(),
+  error: z.string().nullable().optional(),
+  errorMessage: z.string().nullable().optional(),
+})
+export type ZernioPlatformResult = z.output<typeof ZernioPlatformResultSchema>
 
-export interface ZernioPost {
-  _id: string
-  status: string
-  content?: string
-  platforms?: ZernioPlatformResult[]
-  mediaItems?: { url: string; type: string }[]
-}
+export const ZernioPostSchema = z.looseObject({
+  _id: z.string(),
+  status: z.string(),
+  content: z.string().nullable().optional(),
+  platforms: z.array(ZernioPlatformResultSchema).optional(),
+  mediaItems: z.array(z.looseObject({ url: z.string(), type: z.string() })).optional(),
+})
+export type ZernioPost = z.output<typeof ZernioPostSchema>
 
 /** `existingPost` appears when their 5-minute x-request-id window collapses a retry. */
-export interface ZernioCreatePostResponse {
-  post?: ZernioPost
-  existingPost?: ZernioPost
-  existingPostId?: string
-  message?: string
-}
+export const ZernioCreatePostResponseSchema = z.looseObject({
+  post: ZernioPostSchema.optional(),
+  existingPost: ZernioPostSchema.optional(),
+  existingPostId: z.string().optional(),
+  message: z.string().optional(),
+})
+export type ZernioCreatePostResponse = z.output<typeof ZernioCreatePostResponseSchema>
+
+/** `GET /posts/{id}` has answered both wrapped and bare; both are accepted. */
+const ZernioWrappedPostSchema = z.looseObject({ post: ZernioPostSchema })
 
 export interface ZernioMediaItemInput {
   type: 'image' | 'video' | 'gif' | 'document'
@@ -916,23 +998,21 @@ export function createZernioClient(deps: ZernioClientDeps): ZernioClient {
      * them rather than double-posting.
      */
     async createPost(input, requestId) {
-      const { data } = await json<ZernioCreatePostResponse>(
+      const { data } = await json<unknown>(
         'POST',
         '/posts',
         'createPost',
         input,
         requestId ? { 'x-request-id': requestId } : {},
       )
-      return data
+      return shaped('createPost', ZernioCreatePostResponseSchema, data)
     },
 
     async getPost(postId) {
-      const { data } = await json<{ post?: ZernioPost } & ZernioPost>(
-        'GET',
-        `/posts/${encodeURIComponent(postId)}`,
-        'getPost',
-      )
-      return data.post ?? (data as ZernioPost)
+      const { data } = await json<unknown>('GET', `/posts/${encodeURIComponent(postId)}`, 'getPost')
+      const wrapped = ZernioWrappedPostSchema.safeParse(data)
+      if (wrapped.success) return wrapped.data.post
+      return shaped('getPost', ZernioPostSchema, data)
     },
   }
 }

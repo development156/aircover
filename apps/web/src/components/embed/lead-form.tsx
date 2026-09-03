@@ -1,6 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+
+import { CHALLENGE_MISSING_MESSAGE } from './challenge-copy'
+import { useTurnstile } from './use-turnstile'
 
 /**
  * THE EMBEDDABLE CONTACT FORM — door one into `leads`, reachable today.
@@ -26,7 +29,23 @@ import { useEffect, useState } from 'react'
  * WITHOUT A SITE KEY IT DOES NOT PRETEND. The submit is disabled and says why,
  * because the endpoint fails closed on a missing captcha and a form that submits
  * into a guaranteed rejection is a control that does nothing.
+ *
+ * AND WHEN THE CHECK CANNOT LOAD IT SAYS THAT, NOT "CHECK THE DETAILS". MEASURED
+ * 2026-09-02 in a browser: with Cloudflare's widget blocked the form rendered no
+ * notice, left Send enabled, posted an empty token and the visitor was told to
+ * re-check details that were right. `useTurnstile` names every way the widget
+ * can fail; here that is one sentence and a button that waits for a token.
+ *
+ * A BLANK FIELD IS OMITTED FROM THE BODY, NOT POSTED AS `''`. The schema treats
+ * a blank as absent too, so this is belt and braces for the same phone-only
+ * enquiry that used to be refused as an invalid email.
  */
+
+/** A visitor's blank optional field is nothing, not an empty string. */
+function blankIsAbsent(value: FormDataEntryValue | null): string | undefined {
+  const text = String(value ?? '').trim()
+  return text === '' ? undefined : text
+}
 
 type Status =
   | { kind: 'idle' }
@@ -60,21 +79,13 @@ export interface LeadFormProps {
 export function LeadForm({ siteSlug, siteKey, source }: LeadFormProps) {
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
   const [invalid, setInvalid] = useState<string[]>([])
-
-  useEffect(() => {
-    if (!siteKey) return
-    // Cloudflare's script renders any .cf-turnstile it finds and writes the
-    // token into a hidden input named cf-turnstile-response.
-    const script = document.createElement('script')
-    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js'
-    script.async = true
-    script.defer = true
-    document.head.appendChild(script)
-    return () => script.remove()
-  }, [siteKey])
+  const challenge = useTurnstile(siteKey)
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    // The button is disabled until a token is held, but a form can be submitted
+    // by other means, and an empty token is a guaranteed refusal.
+    if (challenge.state !== 'ready') return
     const form = event.currentTarget
     const data = new FormData(form)
 
@@ -89,13 +100,15 @@ export function LeadForm({ siteSlug, siteKey, source }: LeadFormProps) {
           // The SLUG, never a workspace id. Nothing a visitor can edit decides
           // which shop this enquiry lands in — see the migration header.
           site_slug: siteSlug,
-          name: String(data.get('name') ?? ''),
-          email: String(data.get('email') ?? ''),
-          phone: String(data.get('phone') ?? ''),
-          message: String(data.get('message') ?? ''),
+          name: blankIsAbsent(data.get('name')),
+          email: blankIsAbsent(data.get('email')),
+          phone: blankIsAbsent(data.get('phone')),
+          message: blankIsAbsent(data.get('message')),
+          // The honeypot travels as `''` on purpose: the schema wants it present
+          // and empty, and a bot is what fills it.
           website: String(data.get('website') ?? ''),
           source_url: source ?? undefined,
-          turnstile_token: String(data.get('cf-turnstile-response') ?? ''),
+          turnstile_token: challenge.token,
         }),
       })
 
@@ -119,6 +132,9 @@ export function LeadForm({ siteSlug, siteKey, source }: LeadFormProps) {
         message: 'We could not send that just now. Nothing was saved. Please try again.',
       })
     }
+    // A token is single-use at Cloudflare. Whatever refused the send, the next
+    // attempt needs a fresh one, and Send stays disabled until it arrives.
+    challenge.reset()
   }
 
   if (status.kind === 'sent') {
@@ -130,6 +146,15 @@ export function LeadForm({ siteSlug, siteKey, source }: LeadFormProps) {
   }
 
   const sending = status.kind === 'sending'
+
+  // One notice at a time. A check that cannot load outranks a refused send:
+  // nothing more can be sent until it loads, whatever the last answer was.
+  const notice =
+    challenge.state === 'failed'
+      ? CHALLENGE_MISSING_MESSAGE
+      : status.kind === 'error'
+        ? status.message
+        : null
 
   return (
     <form onSubmit={submit} noValidate className="surface-ring rounded-card bg-surface p-4">
@@ -207,22 +232,24 @@ export function LeadForm({ siteSlug, siteKey, source }: LeadFormProps) {
       </div>
 
       {siteKey ? (
-        <div className="cf-turnstile mt-4" data-sitekey={siteKey} data-theme="light" />
+        // Turnstile renders into this box explicitly (see the hook), so the
+        // widget's own failure callbacks reach the form instead of the console.
+        <div ref={challenge.containerRef} className="mt-4" />
       ) : (
         <p className="type-body mt-4 rounded-input bg-warn-bg px-3 py-2 text-warn">
           This form is not finished being set up yet, so it cannot take enquiries.
         </p>
       )}
 
-      {status.kind === 'error' ? (
+      {notice ? (
         <p role="alert" className="type-body mt-3 rounded-input bg-danger-bg px-3 py-2 text-danger">
-          {status.message}
+          {notice}
         </p>
       ) : null}
 
       <button
         type="submit"
-        disabled={sending || !siteKey}
+        disabled={sending || challenge.state !== 'ready'}
         className="mt-4 h-10 w-full rounded-sm bg-primary type-h3 font-[550] text-primary-foreground transition-micro hover:bg-ink dark:hover:bg-white dark:hover:text-[var(--canvas)] disabled:pointer-events-none disabled:bg-line disabled:text-white"
       >
         {sending ? 'Sending…' : 'Send enquiry'}

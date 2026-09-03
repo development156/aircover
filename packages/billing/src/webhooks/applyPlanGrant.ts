@@ -13,6 +13,24 @@ import { isPeriod } from '../period'
 import type { ParsedWebhookEvent } from '../providers/types'
 
 /**
+ * Idempotency key for a plain (non-plan-change) purchase: the monthly key, then the PAYMENT.
+ *
+ * `monthlyGrantKey` alone is (plan, period, workspace), and a plain purchase was keyed on it
+ * until 2026-09-02. That made every second real payment for the same plan in the same month a
+ * REPLAY: Cashfree took the money, the ledger returned the first grant, and the customer got
+ * nothing (billing-ledger-4). The provider's event id names one payment — Cashfree's is
+ * `PAYMENT_SUCCESS_WEBHOOK:<cf_payment_id>` — so a second payment is a second key and a
+ * redelivery of the same payment is still the same key.
+ *
+ * The monthly key stays as the prefix so a ledger row still reads as (plan, period, workspace)
+ * to a human, and so the recurring path, when one exists, can go on keying on the month.
+ */
+export const purchaseGrantKey = (
+  event: Pick<ParsedWebhookEvent, 'planId' | 'period' | 'workspaceId' | 'provider' | 'eventId'>,
+): string =>
+  `${monthlyGrantKey(event.planId, event.period, event.workspaceId)}:${event.provider}:${event.eventId}`
+
+/**
  * The grant that STANDS for this (workspace, plan, period) — not necessarily one applied by
  * this delivery. Owner ruling: on a replay this describes the ORIGINAL grant, not a second one.
  * Never read `granted`/`balanceAfter` without `replayed`: `granted: 1500, replayed: true` means
@@ -23,10 +41,10 @@ import type { ParsedWebhookEvent } from '../providers/types'
  *     replay it is the balance as of the ORIGINAL grant and may be arbitrarily stale — later
  *     DEBITs are not reflected. Pinned by an intervening-DEBIT case in the integration tests.
  *   - `granted` is re-read from `PLAN_CATALOG` on THIS call, not recovered from the original
- *     entry. `monthlyGrantKey` is (plan, period, workspace) with no amount in it, so if a plan's
- *     `monthlyCredits` changes mid-period the key still replays while `granted` reports today's
- *     catalog value against a ledger row holding the old one. Treat it as "what this plan grants
- *     for this period now", never as an audit of what was actually credited — for that, read the
+ *     entry. The key carries no amount, so if a plan's `monthlyCredits` changes between a
+ *     payment and its redelivery the key still replays while `granted` reports today's catalog
+ *     value against a ledger row holding the old one. Treat it as "what this plan grants for
+ *     this period now", never as an audit of what was actually credited — for that, read the
  *     ledger.
  */
 export interface PlanGrantResult {
@@ -41,9 +59,11 @@ export interface PlanGrantResult {
    */
   balanceAfter: number | null
   /**
-   * True when the ledger replayed this grant — a redelivery, or a genuinely distinct second
-   * payment for the same plan+period. The latter means real money produced no credits, which
-   * the route MUST surface for refund/support (REQUESTS.md §6), not pass off as a success.
+   * True when the ledger replayed this grant: the same payment driven again (a redelivery
+   * whose audit row was left 'received' by a crash, or the same change id twice). A DISTINCT
+   * payment never replays — its key names the payment — so `replayed` no longer means "real
+   * money produced no credits"; it means "this delivery added nothing because an earlier one
+   * for the same payment already did".
    */
   replayed: boolean
 }
@@ -53,15 +73,12 @@ export interface ApplyPlanGrantDeps {
 }
 
 /**
- * Apply the monthly plan grant for a verified "paid" event: GRANT the plan's
- * monthly_credits (from PLAN_CATALOG — NOT action pricing) via apply_ledger_entry,
- * keyed by monthlyGrantKey so a replayed webhook never double-grants.
+ * Apply the plan grant for a verified "paid" event: GRANT the plan's monthly_credits (from
+ * PLAN_CATALOG — NOT action pricing) via apply_ledger_entry, keyed by `purchaseGrantKey` so a
+ * redelivered webhook never double-grants and a second real payment always grants again.
  *
- * Deferred (owner ruling #1): the billing_webhook_events (provider, event_id) row is
- * NOT written here — it depends on the provider-enum widening ('fixture'/'cashfree')
- * landing from wt-db. It is flagged, never faked. Until it lands, replay-safety rests
- * on the ledger's monthlyGrantKey, which alone prevents a double-grant; the events
- * table adds provider-level dedup + an audit trail on top.
+ * The billing_webhook_events (provider, event_id) row is written by `processPaymentEvent`,
+ * not here; that table is provider-level dedup + an audit trail on top of the ledger key.
  */
 export function createApplyPlanGrant(
   port: LedgerPort,
@@ -85,8 +102,8 @@ export function createApplyPlanGrant(
     }
 
     // The period format contract is enforced HERE, not only at the providers: this is where
-    // monthlyGrantKey is built, so an unpadded '2026-7' reaching this point would mint a
-    // second idempotency key for a month already granted — a double-grant. Reject first.
+    // the grant key is built, and the period is also what bounds the subscription row an
+    // unpadded '2026-7' would stamp wrongly. Reject first.
     if (!isPeriod(event.period)) {
       return err(
         appError(
@@ -108,18 +125,19 @@ export function createApplyPlanGrant(
     }
 
     /**
-     * A mid-period PLAN CHANGE grants the prorated difference and is keyed on the CHANGE.
+     * A mid-period PLAN CHANGE grants the prorated difference and is keyed on the CHANGE; a
+     * plain purchase grants the full month and is keyed on the PAYMENT (`purchaseGrantKey`).
      *
-     * Keying it on `monthlyGrantKey` would be the obvious thing and it is a money bug: that
-     * key is (plan, period, workspace) with no change in it, so upgrading to a plan already
-     * granted this month would REPLAY — the ledger would return `replayed: true`, grant
-     * nothing, and the route would report success for a payment that produced no credits.
-     * Two upgrades in one month is not an exotic case; it is what a growing customer does.
+     * Neither is keyed on the bare month. That key is (plan, period, workspace) with no change
+     * and no payment in it, so a second upgrade, or a second purchase of the same plan in one
+     * month, would REPLAY — the ledger would return `replayed: true`, grant nothing, and the
+     * route would report success for a payment that produced no credits. Buying twice in one
+     * month is not exotic; it is what a customer does when the first month's credits run out.
      */
     const amount = event.planChange ? event.planChange.credits : plan.monthlyCredits
     const key = event.planChange
       ? planChangeGrantKey(event.planChange.changeId)
-      : monthlyGrantKey(event.planId, event.period, event.workspaceId)
+      : purchaseGrantKey(event)
 
     // A zero-credit change is a real event (an upgrade in the last minutes of a period, where
     // the prorated difference rounds to nothing) and `apply_ledger_entry` rejects a zero

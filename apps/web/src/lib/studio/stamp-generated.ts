@@ -8,7 +8,7 @@ import type { InkPolarity } from '@/lib/brand/logo-facts'
 import type { Anchor } from '@/lib/brand/logo-placement'
 import { oklchToRgb, parseOklch, relativeLuminance, type Rgb } from '@/lib/brand/oklch'
 import { activeThemeTokens } from '@/lib/brand/read-theme'
-import { MEDIA_BUCKET, MEDIA_UPLOAD_CAP_BYTES } from '@/lib/posts/media-constants'
+import { CHANNEL_MEDIA_CAP_BYTES, MEDIA_BUCKET } from '@/lib/posts/media-constants'
 import { assetObjectPath } from '@/lib/posts/media-path'
 import { sniffImage } from '@/lib/posts/sniff-image'
 import type { createServerSupabase } from '@/lib/supabase/server'
@@ -186,7 +186,10 @@ export async function stampGeneratedPicture(
     })
     if (!stamped.ok) return null
 
-    if (stamped.png.byteLength === 0 || stamped.png.byteLength > MEDIA_UPLOAD_CAP_BYTES) {
+    // The CHANNEL ceiling, not the upload cap. This PNG was produced by sharp
+    // in this process, so the 4.5 MB request-body limit is irrelevant to it, and
+    // the generation it stamps has already been charged for.
+    if (stamped.png.byteLength === 0 || stamped.png.byteLength > CHANNEL_MEDIA_CAP_BYTES) {
       return null
     }
 
