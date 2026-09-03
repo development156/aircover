@@ -175,7 +175,9 @@ export function logoFactsFromRaw(
   channels: 3 | 4,
 ): LogoFacts {
   if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) {
-    throw new RangeError(`logoFactsFromRaw: width and height must be positive integers, got ${width}x${height}`)
+    throw new RangeError(
+      `logoFactsFromRaw: width and height must be positive integers, got ${width}x${height}`,
+    )
   }
   const expected = width * height * channels
   if (raw.length !== expected) {
@@ -230,9 +232,7 @@ export function logoFactsFromRaw(
   }
 
   const trim: TrimBox | null =
-    inkPixels === 0
-      ? null
-      : { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 }
+    inkPixels === 0 ? null : { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 }
 
   return {
     hasAlpha,

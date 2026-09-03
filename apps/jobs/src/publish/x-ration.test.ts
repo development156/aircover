@@ -32,25 +32,54 @@ import {
 const ctx: PublishJobContext = { attempt: 1, jobRunId: 'run_ration' }
 
 /**
- * WHICH OF THE TWO READS THIS IS — by call order, not by the date it asks for.
+/**
+ * BOTH HALVES OF THIS FIX ARE KEPT, AND THEY GUARD DIFFERENT THINGS.
  *
- * ── THE DISCRIMINATOR WAS AMBIGUOUS ONE DAY A MONTH ─────────────────────────
- * This used to be `since.getUTCDate() === 1 && since.getUTCHours() === 0`, on
- * the reasoning that "the monthly window always starts on the 1st". True, and
- * not sufficient: the PER-DAY window is today at UTC midnight, so on the 1st the
- * two windows are the SAME INSTANT and nothing about `since` can separate them.
+ * Two lanes found the same defect on the same morning and fixed it two ways.
+ * `wt-divas` pinned the clock; this lane replaced the discriminator. Neither
+ * subsumes the other, so the merge takes both and adds the case that only
+ * becomes testable once you have them together.
  *
- * MEASURED 2026-09-01, on an unmodified `wt-core`: the per-day read runs first,
+ * ── THE DEFECT ───────────────────────────────────────────────────────────────
+ * `runPublishPost` asks `countLiveSends` TWICE on X — once for the Constraint
+ * Engine's per-day cap and once for the monthly ration — and a test that wants
+ * to fail only one of them has to tell them apart. The old discriminator was
+ * `since.getUTCDate() === 1 && since.getUTCHours() === 0`, on the reasoning
+ * that the monthly window always starts on the 1st. True, and not sufficient:
+ * the PER-DAY window is today at UTC midnight, so on the 1st of a month the two
+ * windows are the SAME INSTANT and nothing about `since` can separate them.
+ *
+ * MEASURED 2026-09-01 on an unmodified `wt-core`: the per-day read runs first,
  * matched a month-only predicate, threw, and the suite reported
- * `PER_DAY_CAP_UNREADABLE` where it expected `X_MONTHLY_RATION_UNREADABLE`. It
- * had been failing every 1st of the month and passing the other thirty days,
- * and turbo's cache hid it — a `FULL TURBO` run reports the last green result.
+ * `PER_DAY_CAP_UNREADABLE` where it expected `X_MONTHLY_RATION_UNREADABLE`.
+ * It passed in CI on 2026-08-31 (9 tests, 28ms) and failed the next morning
+ * with no code change in between. A test whose result depends on the calendar
+ * is a guard for thirty days out of thirty-one.
  *
- * Call order is the one fact that is true on all thirty-one days.
- * `asserts the order` below is what keeps it true: if `runPublishPost` ever
- * swaps the two reads, that test fails rather than these silently testing the
- * wrong one.
+ * ── HALF ONE: THE CLOCK IS PINNED (from wt-divas) ────────────────────────────
+ * `runPublishPost` already takes `now` (`PublishPostDeps.now`, defaulting to
+ * `new Date()`), so pinning it costs nothing and makes the WHOLE file
+ * deterministic rather than just this discriminator. That value is worth having
+ * on its own: any other date-dependent assertion added here later is safe too.
+ *
+ * ── HALF TWO: THE DISCRIMINATOR IS THE READ'S ORDINAL (this lane) ────────────
+ * A pinned clock fixes the symptom by never visiting the day the bug lives on.
+ * The ordinal is true on all thirty-one days, so it holds even if a future test
+ * un-pins the clock, or if `runPublishPost` stops honouring `deps.now`. The
+ * `asserts the order` test below is what keeps the ordinal honest: swap the two
+ * reads and it fails, rather than these silently testing the wrong one.
+ *
+ * ── AND THE CASE NEITHER LANE COULD WRITE ALONE ──────────────────────────────
+ * With the clock pinnable, `on the first of the month` below runs the whole
+ * thing AT the coincidence — the exact instant that broke it. A pinned clock
+ * alone cannot test that day; an ordinal alone cannot choose the day. Together
+ * they can.
  */
+const NOW = new Date('2026-08-17T09:30:00.000Z')
+
+/** The instant the two windows coincide: the per-day window IS the monthly one. */
+const FIRST_OF_MONTH = new Date('2026-09-01T09:30:00.000Z')
+
 const PER_DAY_READ = 1
 const X_RATION_READ = 2
 
@@ -97,6 +126,8 @@ function harness(
     nth: number
   }) => Promise<number>,
   channel: PublishPostPayload['channel'] = 'x',
+  /** The pinned instant. Overridden only by the first-of-the-month test. */
+  now: Date = NOW,
 ) {
   let reads = 0
   const spend: Spend = {
@@ -133,6 +164,7 @@ function harness(
 
   const deps: PublishPostDeps = {
     mode: 'fixture',
+    now: () => now,
     gate,
     countLiveSends: async (args) => {
       spend.countedFor.push(args)
@@ -297,6 +329,43 @@ describe('the X monthly ration, on the publish path', () => {
     expect(asked.getTime()).toBe(
       Date.UTC(asked.getUTCFullYear(), asked.getUTCMonth(), asked.getUTCDate()),
     )
+  })
+
+  it('tells the two reads apart ON the first of the month, where the windows coincide', async () => {
+    // ── THE DAY THE OLD DISCRIMINATOR DIED ──────────────────────────────────
+    // Neither lane's fix alone could write this. Pinning the clock fixes the
+    // symptom by never visiting this day; an ordinal discriminator is calendar
+    // independent but cannot choose a day to prove it on. Together they run the
+    // whole thing AT the coincidence.
+    //
+    // On 1 September the per-day window (today at UTC midnight) IS the monthly
+    // window (the 1st at UTC midnight). A date-based discriminator answers
+    // `true` for BOTH reads, the per-day read throws first, and the assertion
+    // below sees PER_DAY_CAP_UNREADABLE instead. The ordinal does not care.
+    const { deps, spend } = harness(
+      async ({ nth }) => {
+        if (nth === X_RATION_READ) throw new Error('pool is gone')
+        return 0
+      },
+      'x',
+      FIRST_OF_MONTH,
+    )
+
+    await expect(runPublishPost(payloadFor('x'), ctx, deps)).rejects.toThrow()
+
+    // The two windows really are the same instant on this day — that is the
+    // premise, asserted rather than assumed.
+    expect(spend.countedFor).toHaveLength(2)
+    expect(spend.countedFor[PER_DAY_READ - 1]!.since.getTime()).toBe(
+      spend.countedFor[X_RATION_READ - 1]!.since.getTime(),
+    )
+
+    // And the right one was still refused.
+    expect(spend.adapterCalls).toBe(0)
+    expect(spend.logs[0]!.error).toMatchObject({
+      code: X_RATION_UNREADABLE_CODE,
+      classification: 'transient',
+    })
   })
 
   it('asserts the order the two reads happen in, because everything else assumes it', async () => {

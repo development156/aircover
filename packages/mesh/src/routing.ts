@@ -141,3 +141,24 @@ export function isAllowedImageModel(id: string): boolean {
 export function imageModelForTier(tier: ModelTier): string | undefined {
   return IMAGE_ROUTES[tier]
 }
+
+/**
+ * The model an image call will actually use.
+ *
+ * ── THE REQUESTED ID IS VETTED, NEVER PASSED THROUGH ────────────────────────
+ * A model id now arrives from a request, because the Studio lets somebody
+ * choose one. Handing that string to the provider would let any caller bill
+ * this account against any model on OpenRouter, including ones far dearer than
+ * anything this product prices. An id that is not on the list is IGNORED and
+ * the tier's own model is used, because the screen has already refused it with
+ * a sentence and this layer's job is to make the wrong thing impossible rather
+ * than to explain it twice.
+ *
+ * Lives here, exported and pure, rather than inside `createMesh`: a closure
+ * nobody can call is a boundary nobody can prove.
+ */
+export function chooseImageModel(tier: ModelTier, requested?: string): string | undefined {
+  return requested !== undefined && isAllowedImageModel(requested)
+    ? requested
+    : imageModelForTier(tier)
+}
