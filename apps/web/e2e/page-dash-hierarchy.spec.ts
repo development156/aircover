@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { measureAccentSpend } from './helpers/accent-spend'
-import { bootstrapWorkspace } from './fixtures/compose'
+import { bootstrapWorkspace, dismissPlanOffer } from './fixtures/compose'
 import { adminClient, expect, test } from './fixtures/seeded-user'
 import { parkPointer } from './helpers/ux-shot'
 
@@ -196,6 +196,10 @@ test.describe('hierarchy on the two screens people judge this product on @smoke'
       for (const { width, height } of WIDTHS) {
         await page.setViewportSize({ width, height })
         await page.goto(route)
+        // The plan offer opens over /home for a workspace on Free. Closed it is
+        // unmounted, so the counts below see the page alone; open it would add
+        // three `type-hero-num` prices and a fourth solid fill.
+        await dismissPlanOffer(page)
         await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 30_000 })
         // The harness parks Playwright's pointer at (836,406) otherwise, and
         // `hover:bg-ink` turns the primary BLACK — which is how three separate
@@ -330,6 +334,7 @@ test.describe('hierarchy on the two screens people judge this product on @smoke'
     for (const { width, height } of WIDTHS) {
       await page.setViewportSize({ width, height })
       await page.goto('/home')
+      await dismissPlanOffer(page)
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 30_000 })
       await parkPointer(page)
 

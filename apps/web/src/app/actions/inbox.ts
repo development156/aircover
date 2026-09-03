@@ -6,7 +6,7 @@ import { InboxDraftReplySchema, InboxStatusSchema } from '@sahoda/shared'
 
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
+import { workspaceForWrite } from '@/lib/workspaces'
 
 /**
  * Inbox actions: draft a reply, and move a thread through open/snoozed/resolved.

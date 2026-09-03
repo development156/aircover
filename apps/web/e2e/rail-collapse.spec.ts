@@ -1,6 +1,7 @@
 import { expect, test } from './fixtures/seeded-user'
 import { useTheme, type Theme } from './helpers/ux-shot'
 import type { Page } from '@playwright/test'
+import { dismissPlanOffer } from './fixtures/compose'
 
 /**
  * THE RAIL COLLAPSES, IT OPENS COLLAPSED, AND NOTHING LOSES ITS NAME EITHER WAY.
@@ -247,6 +248,7 @@ test.describe('the rail collapses @smoke', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await bootstrap(page)
     await page.goto('/home', { waitUntil: 'domcontentloaded' })
+    await dismissPlanOffer(page)
     await page.waitForTimeout(600)
 
     // ── 1 · IT OPENS COLLAPSED, and the assertion is on the rendered width.
@@ -326,6 +328,7 @@ test.describe('the rail collapses @smoke', () => {
       await useTheme(page, theme)
       for (const state of ['collapsed', 'expanded'] as const) {
         await page.goto('/home', { waitUntil: 'domcontentloaded' })
+        await dismissPlanOffer(page)
         await page.waitForTimeout(500)
         const isExpanded = await page.getByTestId('rail-toggle').getAttribute('aria-expanded')
         if ((isExpanded === 'true') !== (state === 'expanded')) {

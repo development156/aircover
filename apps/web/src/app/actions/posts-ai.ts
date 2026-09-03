@@ -33,7 +33,7 @@ import { getPost } from '@/lib/posts/read'
 import { filterVariants } from '@/lib/posts/filter-variants'
 import { newCaptionRewriteRef, newVariantsObjectRef } from '@/lib/posts/object-ref'
 import type { GenerateState, GeneratedVariant, RewriteState } from '@/lib/posts/state'
-import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
+import { workspaceForWrite } from '@/lib/workspaces'
 
 // 'use server' modules may export only async functions — these singletons stay
 // module-private. Built lazily so a missing key surfaces as a typed error inside

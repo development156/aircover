@@ -3,6 +3,7 @@ import { leaveOnboarding } from './fixtures/compose'
 import { adminClient } from './fixtures/seeded-user'
 import { mkdirSync } from 'node:fs'
 import { expect, type Page } from '@playwright/test'
+import { dismissPlanOffer } from './fixtures/compose'
 
 /**
  * The design audit's camera.
@@ -323,6 +324,10 @@ test.describe('design audit', () => {
             await shot.goto(route.path, { waitUntil: 'domcontentloaded', timeout: 45_000 })
             // Let the route settle; many screens fetch after mount.
             await shot.waitForTimeout(1800)
+            // Every context here is fresh, so /home opens the plan offer every
+            // time and every /home frame would be a photograph of a dialog over
+            // a scrim rather than of the dashboard.
+            await dismissPlanOffer(shot)
             // A composer frame that names a part goes to it first. Tolerated
             // rather than asserted: this harness photographs, it does not judge,
             // and a missing rail must not take the other frames down with it.

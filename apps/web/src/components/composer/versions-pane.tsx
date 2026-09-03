@@ -1,7 +1,6 @@
 'use client'
 
 import type { Channel, ChannelSet, PostMedia } from '@sahoda/shared'
-import type { PostFormat } from '@sahoda/publishing/format'
 
 import { GeneratePanel } from '@/components/posts/generate-panel'
 import type { GeneratedVariant } from '@/lib/posts/state'
