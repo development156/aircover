@@ -41,7 +41,9 @@ test.describe('composer screenshots', () => {
     await expect(page.locator('[data-version-card="x"]')).toBeVisible()
 
     await page.getByLabel('Name this post').fill('Monsoon hours')
-    await page.getByLabel('Your post').fill('We are open till nine all week, rain or not.')
+    await page
+      .getByLabel('Your post', { exact: true })
+      .fill('We are open till nine all week, rain or not.')
     await versionBox(page, 'X').fill('Open till 9 all week. Rain or not. ☔')
     await page.locator('[data-hashtags="x"]').fill('#chai #pune')
     await page.locator('[data-variant-format="x"]').selectOption('text')

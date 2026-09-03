@@ -32,7 +32,12 @@ import { hexOf, type Paint } from './paint'
  *
  * So the narrow true claim is: THE LAYOUT CANNOT DRIFT, AND THE GLYPHS CAN. That
  * is only safe while the caller both bakes its line breaks and ships the font it
- * names to both sides. Neither of those is enforced by this module, and until a
+ * names to both sides. As of 2026-08-29 apps/web DOES ship it to both sides for
+ * the two families `TEMPLATE_FONT` names: `apps/web/public/fonts` holds the
+ * files, `lib/studio/fonts.ts` points the rasteriser at them and `globals.css`
+ * serves the same files to the browser, with a guard on the two halves agreeing.
+ * That closes the gap for those families and closes it for no others, which is
+ * why this paragraph stays. Neither condition is enforced by this module, and until a
  * fingerprint test pins the shipped font's real ink, this is the feature's
  * largest unproven assumption.
  *

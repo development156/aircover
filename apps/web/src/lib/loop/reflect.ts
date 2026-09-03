@@ -1,5 +1,7 @@
 import type { Channel } from '@sahoda/shared'
 
+import { compareGroups, type NoLearningReason } from '@/lib/analytics/grouped-lift'
+
 /**
  * REFLECT — turning last week's numbers into a learning, or honestly declining to.
  *
@@ -38,56 +40,27 @@ import type { Channel } from '@sahoda/shared'
  */
 
 /**
- * Observations per arm of a comparison. Two posts cannot distinguish a channel's
- * performance from one unusual afternoon, and the first arrangement of the live
- * data that would have shipped a false learning had an arm of exactly one.
+ * THE FIVE GATES NOW LIVE IN `lib/analytics/grouped-lift.ts`, AND SO DOES THE
+ * ARITHMETIC THIS FILE USED TO HOLD.
+ *
+ * The analytics report needs the identical comparison over the DAY OF THE WEEK a
+ * post went out rather than over its channel. Copying the gates would have meant
+ * two sets of thresholds drifting apart, and the one that drifted looser would be
+ * the one that published a false claim. So the comparison was generalised over its
+ * grouping and this file passes the channel as the group.
+ *
+ * They are re-exported here because every argument for their VALUES is written
+ * beside them, and because `reflect`'s own tests and the cycle store import them
+ * from this path.
  */
-export const MIN_POSTS_PER_GROUP = 3
-
-/** Below this there is no comparison to make, only a single group. */
-export const MIN_GROUPS = 2
-
-/**
- * How much the leader must beat the runner-up by, as a proportion.
- *
- * A margin under a quarter is inside the noise of platform reporting at the
- * sample sizes an SMB actually has, and a learning is written into the Brand
- * Brain and then shapes every future post — so the cost of a wrong one is paid
- * repeatedly, not once.
- */
-export const MIN_LIFT = 0.25
-
-/**
- * Distinct days the window must span before a comparison is worth making.
- *
- * ── THE GATE THE OTHER FOUR CANNOT COVER ─────────────────────────────────────
- * Three posts per arm, two arms, a leader mean over ten and a lift over a
- * quarter can ALL be satisfied by measurements taken on a single day. That is
- * one afternoon: a post that happened to go out when somebody's audience was
- * awake, a platform's reporting still settling, one share by one person with a
- * large following. Every gate above counts POSTS, and none of them can tell six
- * posts across six days from six posts across one.
- *
- * Three is the same floor the rest of the product already uses for the same
- * reason: below three measured days there is no chart, because two points are a
- * straight line between them and say nothing the number does not.
- *
- * `measured_on` is the day, so this counts distinct calendar days rather than
- * rows: a post measured hourly for a day is one day of evidence, not
- * twenty-four.
- */
-export const MIN_MEASURED_DAYS = 3
-
-/**
- * The leader's own mean must reach this before a ratio between means means
- * anything.
- *
- * Without it, 3 impressions against 1 is a "three-fold lift" and it is nothing
- * of the kind — it is two very small numbers, either of which moves by one when
- * a person opens their own post. This is the gate the live Instagram data fails,
- * and it should.
- */
-export const MIN_LEADER_MEAN = 10
+export {
+  MIN_GROUPS,
+  MIN_LEADER_MEAN,
+  MIN_LIFT,
+  MIN_MEASURED_DAYS,
+  MIN_POSTS_PER_GROUP,
+} from '@/lib/analytics/grouped-lift'
+export type { NoLearningReason }
 
 /** One measurement, as `post_metric_snapshots` stores it. */
 export interface MetricObservation {
@@ -97,21 +70,6 @@ export interface MetricObservation {
   value: number
   measured_on: string
 }
-
-/** Why a window produced no learning. Each is a different sentence to the reader. */
-export type NoLearningReason =
-  /** Nothing has ever been measured for this workspace. */
-  | 'no_history'
-  /** Measurements exist, but not enough of them to compare anything. */
-  | 'too_few_posts'
-  /** Enough posts, but they are all on one channel — there is no comparison. */
-  | 'single_group'
-  /** Enough posts, but they were all measured inside too short a window. */
-  | 'too_few_days'
-  /** A comparison was possible and the gap was not big enough to be worth saying. */
-  | 'difference_too_small'
-  /** The numbers involved are too small for a ratio between them to mean anything. */
-  | 'numbers_too_small'
 
 export interface ChannelLearning {
   metric: string
@@ -134,18 +92,6 @@ export interface ReflectResult {
   skippedNoHistory: boolean
 }
 
-/** Mean, rounded to one decimal so a report never prints sixteen digits. */
-function mean(values: readonly number[]): number {
-  if (values.length === 0) return 0
-  return Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10
-}
-
-/** Distinct calendar days the observations span, inclusive of both ends. */
-function windowDays(observations: readonly MetricObservation[]): number {
-  const days = new Set(observations.map((o) => o.measured_on))
-  return Math.max(1, days.size)
-}
-
 /**
  * What last week's numbers support, for one metric.
  *
@@ -157,105 +103,62 @@ export function reflect(
   observations: readonly MetricObservation[],
   metric = 'impressions',
 ): ReflectResult {
-  // ── GATE 0: nothing was ever measured ──────────────────────────────────────
-  // Checked against the WHOLE input, before filtering by metric, so a workspace
-  // that has snapshots of some other metric is not told it has no history.
-  if (observations.length === 0) {
-    return { learnings: [], reason: 'no_history', skippedNoHistory: true }
+  // Every gate this function used to hold is now `compareGroups`, called here
+  // with the CHANNEL as the arm.
+  //
+  // ── ONE BEHAVIOUR DID CHANGE, AND IT IS WRITTEN DOWN RATHER THAN GLOSSED ───
+  // I first claimed this refactor changed nothing. An audit disproved it. The
+  // old sort was `b.mean - a.mean` with NO tie-break, so two arms with equal
+  // means came out in Map insertion order, which is the order the rows happened
+  // to arrive in. `compareGroups` breaks that tie on the arm's name.
+  //
+  // MEASURED against the pre-refactor code: instagram x3 at 100, linkedin x3 at
+  // 50, facebook x4 at 50 gives the same leader and the same lift either way,
+  // but the RUNNER-UP changes from linkedin to facebook, and `sampleSize` from 6
+  // to 7. The lift is unaffected because the tie is at position two.
+  //
+  // Kept rather than reverted, because a learning is written into the Brand
+  // Brain and the old behaviour made which one depended on row order: the same
+  // week's data could produce two different stored learnings on two runs. This
+  // is the deterministic version. `grouped-lift.test.ts` pins it.
+  const comparison = compareGroups(
+    observations.map((o) => ({
+      postId: o.post_id,
+      group: o.channel,
+      metric: o.metric,
+      value: o.value,
+      measuredOn: o.measured_on,
+    })),
+    metric,
+  )
+
+  if (comparison.kind === 'none') {
+    // `skippedNoHistory` is the column the cycle stores and it means one thing
+    // only: nothing was ever measured. Every other reason is a comparison that
+    // was attempted and declined, which is a different fact about the workspace.
+    return {
+      learnings: [],
+      reason: comparison.reason,
+      skippedNoHistory: comparison.reason === 'no_history',
+    }
   }
 
-  const relevant = observations.filter((o) => o.metric === metric)
-  if (relevant.length === 0) {
-    return { learnings: [], reason: 'too_few_posts', skippedNoHistory: false }
-  }
-
-  // One value per post per channel — a post measured on three days is ONE post,
-  // not three. Averaging its dailies first is what stops a post that happens to
-  // have been measured more often from counting more.
-  const perPost = new Map<string, { channel: Channel; postId: string; values: number[] }>()
-  for (const o of relevant) {
-    const key = `${o.channel}:${o.post_id}`
-    const found = perPost.get(key)
-    if (found) found.values.push(o.value)
-    else perPost.set(key, { channel: o.channel, postId: o.post_id, values: [o.value] })
-  }
-
-  const byChannel = new Map<Channel, { postIds: string[]; means: number[] }>()
-  for (const entry of perPost.values()) {
-    const group = byChannel.get(entry.channel) ?? { postIds: [], means: [] }
-    group.postIds.push(entry.postId)
-    group.means.push(mean(entry.values))
-    byChannel.set(entry.channel, group)
-  }
-
-  // ── GATE 1: each arm needs enough posts ────────────────────────────────────
-  // Applied BEFORE counting groups, so a channel with one post is not an arm.
-  const eligible = [...byChannel.entries()]
-    .filter(([, g]) => g.postIds.length >= MIN_POSTS_PER_GROUP)
-    .map(([channel, g]) => ({
-      channel,
-      postIds: g.postIds,
-      mean: mean(g.means),
-      n: g.postIds.length,
-    }))
-    .sort((a, b) => b.mean - a.mean)
-
-  if (eligible.length === 0) {
-    return { learnings: [], reason: 'too_few_posts', skippedNoHistory: false }
-  }
-
-  // ── GATE 2: a comparison needs two arms ────────────────────────────────────
-  if (eligible.length < MIN_GROUPS) {
-    return { learnings: [], reason: 'single_group', skippedNoHistory: false }
-  }
-
-  // ── GATE 2b: the window must be wide enough to be a week, not an afternoon ─
-  // AFTER the post gates, deliberately. With too few posts the binding
-  // constraint is that the customer has not published enough, and telling them
-  // to wait would be the wrong instruction; with enough posts across one day,
-  // waiting is exactly the remedy. Same doctrine as the eligibility reasons:
-  // report the thing that has to be fixed first.
-  const days = windowDays(relevant)
-  if (days < MIN_MEASURED_DAYS) {
-    return { learnings: [], reason: 'too_few_days', skippedNoHistory: false }
-  }
-
-  const leader = eligible[0]
-  const runnerUp = eligible[1]
-  // `noUncheckedIndexedAccess` is on, and it is right to insist: the length
-  // check above is a separate statement from these reads, and a future edit that
-  // moved one without the other would index past the end silently.
-  if (!leader || !runnerUp) {
-    return { learnings: [], reason: 'single_group', skippedNoHistory: false }
-  }
-
-  // ── GATE 3: the numbers must be big enough for a ratio to mean anything ────
-  // Before the lift check, because 3-against-1 clears any lift threshold and is
-  // still not a finding.
-  if (leader.mean < MIN_LEADER_MEAN) {
-    return { learnings: [], reason: 'numbers_too_small', skippedNoHistory: false }
-  }
-
-  // ── GATE 4: the gap must be worth saying ───────────────────────────────────
-  // A zero runner-up would make the ratio infinite, so the lift is measured
-  // against the leader's own scale in that case rather than dividing by zero.
-  const lift = runnerUp.mean === 0 ? 1 : leader.mean / runnerUp.mean
-  if (lift - 1 < MIN_LIFT) {
-    return { learnings: [], reason: 'difference_too_small', skippedNoHistory: false }
-  }
-
+  const lift = comparison.lift
   return {
     learnings: [
       {
-        metric,
-        leader: leader.channel,
-        runnerUp: runnerUp.channel,
-        leaderMean: leader.mean,
-        runnerUpMean: runnerUp.mean,
-        lift: Math.round(lift * 10) / 10,
-        postIds: [...leader.postIds, ...runnerUp.postIds],
-        sampleSize: leader.n + runnerUp.n,
-        windowDays: days,
+        metric: lift.metric,
+        // The arms came from `o.channel`, so they are channels coming back out.
+        // The cast is the one place that knowledge lives, and it is directly
+        // above the map that put them in.
+        leader: lift.leader as Channel,
+        runnerUp: lift.runnerUp as Channel,
+        leaderMean: lift.leaderMean,
+        runnerUpMean: lift.runnerUpMean,
+        lift: lift.lift,
+        postIds: lift.postIds,
+        sampleSize: lift.sampleSize,
+        windowDays: lift.windowDays,
       },
     ],
     reason: null,

@@ -56,7 +56,6 @@ function Figure({
   label,
   note,
   href,
-  destination,
   lead = false,
 }: {
   Icon: typeof FileText
@@ -95,7 +94,15 @@ function Figure({
   )
 }
 
-export function PlannerSummary({ posts, now }: { posts: readonly DisplayPost[]; now: Date }) {
+export function PlannerSummary({
+  posts,
+  now,
+  zone,
+}: {
+  posts: readonly DisplayPost[]
+  now: Date
+  zone?: string | null
+}) {
   const scheduled = posts.filter((p) => p.intent === 'scheduled').length
   const awaiting = posts.filter((p) => needsAPerson(p.intent)).length
   const drafts = posts.filter((p) => p.intent === 'draft').length
@@ -166,7 +173,7 @@ export function PlannerSummary({ posts, now }: { posts: readonly DisplayPost[]; 
               {next.title?.trim() || 'Untitled post'}
             </span>
             <span className="block truncate type-meta text-muted tabular-nums">
-              {formatScheduledAt(next.scheduled_at)}
+              {formatScheduledAt(next.scheduled_at, zone)}
             </span>
           </span>
           <ChevronRight

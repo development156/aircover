@@ -50,7 +50,13 @@ export {
 export type { BrandContext, BrandContextProvider } from './brand-context'
 
 // Routing tables (typed Alpha stand-in for ai_model_routes).
-export { TASK_TIER, TIER_ROUTES, routeForTier } from './routing'
+export {
+  ALLOWED_IMAGE_MODELS,
+  TASK_TIER,
+  TIER_ROUTES,
+  isAllowedImageModel,
+  routeForTier,
+} from './routing'
 export type { TierRoute } from './routing'
 
 // Server-only guard for callers that want to assert context explicitly.

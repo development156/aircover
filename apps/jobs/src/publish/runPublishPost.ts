@@ -80,6 +80,21 @@ export interface PublishVariant {
    */
   format?: PostFormat | null
   /**
+   * Whether the keyword tail publishes bracketed, from `post_variants.extras`.
+   *
+   * ── WHY THIS HAD TO TRAVEL, AND WHAT IT COST WHILE IT DID NOT ───────────────
+   * `VariantDraft` — in the frozen contract — HAS declared `keywordBrackets`
+   * since the box shipped, and `formatForPlatform` reads it as
+   * `keywordBrackets ?? true`. So the field existed at both ends and nothing
+   * carried it across: `loadVariant` did not read the column and this type had
+   * nowhere to put it, which made an absent flag indistinguishable from a
+   * deliberate `true` on every real send.
+   *
+   * `undefined` means the variant states no choice and the default stands. That
+   * is not the same as `false`, and the two must not be collapsed here.
+   */
+  keywordBrackets?: boolean
+  /**
    * The Google Business call-to-action button, from `post_variants.extras`.
    *
    * ── WHY THIS TRAVELS SEPARATELY FROM THE BODY ───────────────────────────────
@@ -381,6 +396,11 @@ export async function runPublishPost(
     hashtags: variant.hashtags,
     hasLink: variant.hasLink,
     mediaCount: variant.media.length,
+    // The composer's meter has always counted the tail the writer chose; this
+    // literal did not carry the choice, so the publisher formatted and MEASURED
+    // a different caption from the one on screen. Exactly the drift this
+    // hoisting comment warns about, one field further along.
+    keywordBrackets: variant.keywordBrackets,
   }
 
   // ── A THREAD IS MEASURED PER POST, AND EVERYTHING ELSE IS MEASURED AS BEFORE ─

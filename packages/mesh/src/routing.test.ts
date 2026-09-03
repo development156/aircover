@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import { MeshTaskNameSchema, ModelTierSchema } from '@sahoda/shared'
-import { TIER_ROUTES, TASK_TIER, routeForTier, imageModelForTier } from './routing'
+import {
+  TIER_ROUTES,
+  TASK_TIER,
+  routeForTier,
+  imageModelForTier,
+  ALLOWED_IMAGE_MODELS,
+  isAllowedImageModel,
+  chooseImageModel,
+} from './routing'
 import { keyClassForTier } from './config'
 
 describe('tier routing', () => {
@@ -67,5 +75,74 @@ describe('task → tier map', () => {
     // from the image class, so image spend stays isolated from text spend.
     expect(TASK_TIER.image_generate).toBe('standard')
     expect(imageModelForTier(TASK_TIER.image_generate)).toBeTruthy()
+  })
+})
+
+/**
+ * THE IMAGE ALLOW-LIST, WHICH IS A SPENDING BOUNDARY.
+ *
+ * The Studio lets somebody choose which model draws their picture, so a model
+ * id now arrives from a request. If that string reached the provider unchecked,
+ * any caller could bill this account against any model on OpenRouter — including
+ * ones many times dearer than anything this product prices, and ones whose
+ * output no schema here can parse. These are the tests that make that
+ * impossible rather than merely unlikely.
+ */
+describe('which image model a request may ask for', () => {
+  it('accepts only an id this product has deliberately listed', () => {
+    for (const id of ALLOWED_IMAGE_MODELS) {
+      expect(isAllowedImageModel(id), id).toBe(true)
+    }
+  })
+
+  it('refuses an id nobody allow-listed, however plausible it looks', () => {
+    for (const id of [
+      'openai/gpt-image-2',
+      'google/gemini-3-pro-image ',
+      'GOOGLE/GEMINI-3-PRO-IMAGE',
+      'anthropic/claude-opus-4-8',
+      '',
+    ]) {
+      expect(isAllowedImageModel(id), id).toBe(false)
+    }
+  })
+
+  /**
+   * THE ONE THAT MATTERS. A requested id off the list must not reach the
+   * provider, and must not take the call down either: the tier's own model is
+   * what runs, because the screen has already refused the choice with a
+   * sentence and a second refusal here would only cost somebody their press.
+   */
+  it('silently uses the tier’s own model when the request asks for one we do not allow', () => {
+    expect(chooseImageModel('standard', 'openai/gpt-image-2')).toBe(imageModelForTier('standard'))
+    expect(chooseImageModel('standard', 'openai/gpt-image-2')).not.toBe('openai/gpt-image-2')
+  })
+
+  it('uses the requested model when it is one we allow', () => {
+    for (const id of ALLOWED_IMAGE_MODELS) {
+      expect(chooseImageModel('standard', id), id).toBe(id)
+    }
+  })
+
+  it('falls back to the tier’s model when nothing was requested', () => {
+    expect(chooseImageModel('standard')).toBe(imageModelForTier('standard'))
+  })
+
+  /**
+   * A tier with no image model has to stay undefined even when an ALLOWED id is
+   * requested — otherwise a task routed to a tier we never priced for images
+   * would start drawing, billed against a budget that does not exist for it.
+   */
+  it('a tier with no image model stays refusable', () => {
+    for (const tier of ModelTierSchema.options) {
+      if (imageModelForTier(tier) !== undefined) continue
+      expect(chooseImageModel(tier), tier).toBeUndefined()
+    }
+  })
+
+  it('every allowed id is one the mesh could actually address', () => {
+    for (const id of ALLOWED_IMAGE_MODELS) {
+      expect(id, id).toMatch(/^[a-z0-9-]+\/[a-z0-9.-]+$/)
+    }
   })
 })

@@ -1,9 +1,13 @@
 import type { Metadata } from 'next'
 
+import { PageTitle } from '@/components/page-title'
 import { requireOpsAdmin } from '@/lib/ops/guard'
 import { readMarketingObservations } from '@/lib/ops/read'
 
 export const metadata: Metadata = { title: 'Marketing Brain' }
+
+const BRAIN_SUB =
+  'Every observation the weekly pass has written, newest first. Customers never see this list; they see individual observations on their report. Nothing here was phrased by a model.'
 
 /**
  * `/admin/brain` — what the Marketing Brain has actually written.
@@ -32,7 +36,12 @@ export default async function MarketingBrainPage() {
   if (read.status !== 'ok') {
     return (
       <div className="space-y-grid">
-        <h1 className="type-h2 font-extrabold">Marketing Brain</h1>
+        {/* NO `sub` HERE. The description names what the list holds, and on
+            this branch there is no list — the read failed. Saying "every
+            observation the weekly pass has written, newest first" above an
+            alert that says we could not read them describes something that is
+            not on the screen. */}
+        <PageTitle>Marketing Brain</PageTitle>
         <div
           role="alert"
           className="rounded-input border border-danger-bg bg-danger-bg px-3 py-2.5 type-sm text-danger"
@@ -49,14 +58,7 @@ export default async function MarketingBrainPage() {
 
   return (
     <div className="space-y-grid">
-      <div>
-        <h1 className="type-h2 font-extrabold">Marketing Brain</h1>
-        <p className="type-sm mt-1 max-w-[70ch] text-muted">
-          Every observation the weekly pass has written, newest first. Customers never see this
-          list; they see individual observations on their report. Nothing here was phrased by a
-          model.
-        </p>
-      </div>
+      <PageTitle sub={BRAIN_SUB}>Marketing Brain</PageTitle>
 
       {read.data.length === 0 ? (
         <p className="surface-ring rounded-card bg-surface p-4 type-body text-muted">
@@ -77,7 +79,7 @@ export default async function MarketingBrainPage() {
                 <span>ws {row.workspace_id.slice(0, 8)}</span>
               </p>
               <p className="type-body mt-1.5 max-w-[70ch] text-ink">{row.claim}</p>
-              <pre className="mt-2 overflow-x-auto rounded-input bg-subtle p-2.5 font-mono type-chip text-muted">
+              <pre className="mt-2 overflow-x-auto rounded-input bg-surface-2 p-2.5 font-mono type-chip text-muted">
                 {JSON.stringify(row.evidence, null, 2)}
               </pre>
             </li>

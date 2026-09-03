@@ -106,6 +106,59 @@ export const IMAGE_ROUTES: Partial<Record<ModelTier, string>> = {
   premium: 'openai/gpt-image-1',
 }
 
+/**
+ * EVERY IMAGE MODEL THIS PRODUCT WILL ADDRESS.
+ *
+ * ── WHY AN ALLOW-LIST AND NOT JUST A DEFAULT ────────────────────────────────
+ * The Studio lets a person choose which model draws their picture, so a model id
+ * now arrives from a REQUEST. Passing that string through to the provider would
+ * let anybody bill this account against any model on OpenRouter, including ones
+ * far dearer than anything we price, and would put an unpriced id in the
+ * `model_id` column as though we had chosen it.
+ *
+ * So the id is checked against this list and a stranger is refused. The list is
+ * the contract: adding a model here is the deliberate act, and everything else
+ * (the picker, the price, the rules) reads from it.
+ *
+ * MEASURED on OpenRouter's own model pages, 2026-08-31, each id fetched and its
+ * figures compared against docs/43 §3:
+ *
+ *   google/gemini-3-pro-image      $2/M in, $120/M image out, 14 references
+ *   openai/gpt-image-1             $5/M text in, $40/M image out, 10 per request, 16 references
+ *   bytedance-seed/seedream-5-0-lite  $0.035 flat per image, 4 per request, 14 references
+ */
+export const ALLOWED_IMAGE_MODELS: readonly string[] = [
+  'google/gemini-3-pro-image',
+  'openai/gpt-image-1',
+  'bytedance-seed/seedream-5-0-lite',
+]
+
+/** True only for an id this product has deliberately priced and listed. */
+export function isAllowedImageModel(id: string): boolean {
+  return ALLOWED_IMAGE_MODELS.includes(id)
+}
+
 export function imageModelForTier(tier: ModelTier): string | undefined {
   return IMAGE_ROUTES[tier]
+}
+
+/**
+ * The model an image call will actually use.
+ *
+ * ── THE REQUESTED ID IS VETTED, NEVER PASSED THROUGH ────────────────────────
+ * A model id now arrives from a request, because the Studio lets somebody
+ * choose one. Handing that string to the provider would let any caller bill
+ * this account against any model on OpenRouter, including ones far dearer than
+ * anything this product prices. An id that is not on the list is IGNORED and
+ * the tier's own model is used, because the screen has already refused it with
+ * a sentence and this layer's job is to make the wrong thing impossible rather
+ * than to explain it twice.
+ *
+ * Lives here, exported and pure, rather than inside `createMesh`: a closure
+ * nobody can call is a boundary nobody can prove.
+ */
+export function chooseImageModel(tier: ModelTier, requested?: string): string | undefined {
+  return requested !== undefined && isAllowedImageModel(requested)
+    ? requested
+    : imageModelForTier(tier)
 }

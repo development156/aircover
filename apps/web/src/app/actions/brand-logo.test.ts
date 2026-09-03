@@ -32,7 +32,16 @@ const state = vi.hoisted(() => ({
   /** What the adoption lookup actually filtered on. The old mock threw this away. */
   filters: [] as [string, unknown][],
   demoted: [] as Record<string, unknown>[],
-  uploadResult: { ok: true } as { ok: boolean; message?: string },
+  uploadResult: { ok: true, asset: { id: 'asset-new' } } as {
+    ok: boolean
+    message?: string
+    asset?: { id: string }
+  },
+  /** What was written to `workspaces.logo_asset_id`, and what it filtered on. */
+  pointerUpdates: [] as Record<string, unknown>[],
+  pointerFilters: [] as [string, unknown][],
+  /** The error the pointer write fails with, or null for success. */
+  pointerError: null as { code: string } | null,
 }))
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
@@ -56,7 +65,7 @@ vi.mock('./assets', () => ({
  * …)` from the action — a cross-tenant read — would have left the suite green.
  */
 vi.mock('@/lib/supabase/server', () => {
-  const record = (bucket: [string, unknown][]) => {
+  const record = (bucket: [string, unknown][], errorRef: () => unknown = () => null) => {
     const chain: Record<string, unknown> = {
       eq: (column: string, value: unknown) => {
         bucket.push([column, value])
@@ -69,24 +78,37 @@ vi.mock('@/lib/supabase/server', () => {
       order: () => chain,
       limit: () => chain,
       maybeSingle: () => Promise.resolve({ data: state.match, error: state.lookupError }),
-      then: (resolve: (v: unknown) => unknown) => resolve({ error: null }),
+      then: (resolve: (v: unknown) => unknown) => resolve({ error: errorRef() }),
     }
     return chain
   }
 
   return {
     createServerSupabase: () => ({
-      from: (table: string) => ({
-        select: () => {
-          expect(table).toBe('assets')
-          return record(state.filters)
-        },
-        update: (patch: Record<string, unknown>) => {
-          if (patch.title === 'Logo (previous)') state.demoted.push(patch)
-          else state.updates.push(patch)
-          return record(state.filters)
-        },
-      }),
+      from: (table: string) => {
+        // ── THE POINTER WRITE, A DIFFERENT TABLE ────────────────────────────
+        // `setBrandLogo` now also writes `workspaces.logo_asset_id`. Routed
+        // separately so its own filters and its own failure mode (`42703`,
+        // the migration not applied yet) can be pinned without disturbing the
+        // `assets` assertions below.
+        if (table === 'workspaces') {
+          return {
+            update: (patch: Record<string, unknown>) => {
+              state.pointerUpdates.push(patch)
+              return record(state.pointerFilters, () => state.pointerError)
+            },
+          }
+        }
+        expect(table).toBe('assets')
+        return {
+          select: () => record(state.filters),
+          update: (patch: Record<string, unknown>) => {
+            if (patch.title === 'Logo (previous)') state.demoted.push(patch)
+            else state.updates.push(patch)
+            return record(state.filters)
+          },
+        }
+      },
     }),
   }
 })
@@ -117,7 +139,10 @@ beforeEach(() => {
   state.uploaded = null
   state.filters = []
   state.demoted = []
-  state.uploadResult = { ok: true }
+  state.uploadResult = { ok: true, asset: { id: 'asset-new' } }
+  state.pointerUpdates = []
+  state.pointerFilters = []
+  state.pointerError = null
 })
 
 describe('setBrandLogo', () => {
@@ -273,5 +298,42 @@ describe('setBrandLogo', () => {
     empty.set('file', new File([], 'logo.png', { type: 'image/png' }))
 
     expect((await setBrandLogo(empty)).ok).toBe(false)
+  })
+
+  /**
+   * ── THE POINTER, ON THE ADOPT PATH ─────────────────────────────────────────
+   * Title alone used to be the whole answer. Now `setBrandLogo` also names the
+   * exact row, on the workspace it belongs to.
+   */
+  it('points the workspace at the adopted asset', async () => {
+    state.match = { id: 'asset-1', deleted_at: null }
+
+    const result = await setBrandLogo(form())
+
+    expect(result).toEqual({ ok: true, adopted: true, converted: false })
+    expect(state.pointerUpdates).toContainEqual({ logo_asset_id: 'asset-1' })
+    expect(state.pointerFilters).toContainEqual(['id', WORKSPACE])
+  })
+
+  /** And on a fresh upload, the id `uploadAsset` handed back is what gets pointed at. */
+  it('points the workspace at a freshly uploaded asset', async () => {
+    const result = await setBrandLogo(form())
+
+    expect(result).toEqual({ ok: true, adopted: false, converted: false })
+    expect(state.pointerUpdates).toContainEqual({ logo_asset_id: 'asset-new' })
+  })
+
+  /**
+   * ── THE POINTER WRITE IS BEST EFFORT, LIKE `demoteOtherLogos` ─────────────
+   * `42703` means the migration has not landed on this deploy. Setting the
+   * logo must not start failing for a reason no customer caused, so the title
+   * write still stands and the action still reports success.
+   */
+  it('still reports success when the pointer write fails with 42703', async () => {
+    state.pointerError = { code: '42703' }
+
+    const result = await setBrandLogo(form())
+
+    expect(result).toEqual({ ok: true, adopted: false, converted: false })
   })
 })
