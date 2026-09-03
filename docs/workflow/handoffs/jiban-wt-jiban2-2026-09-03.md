@@ -210,6 +210,35 @@ The four "failures" reported alongside it in that run were the one real task plu
 dependents. The `PROVIDER_ERROR` and `socket hang up` lines in the log are test fixtures
 asserting failure paths, not failures.
 
+## The gate that actually cleared this lane into `wt-core`
+
+`wt-core` moved 17 commits while the previous gate ran, so that gate no longer described the
+tree being pushed and was re-run from scratch on the re-merged one. MEASURED 2026-09-03, every
+leg forced, `0 cached, 27 total`, 9m25.849s.
+
+| leg | result |
+| --- | --- |
+| `pnpm exec turbo run typecheck lint test --force` | **PASS** — `27 successful, 27 total` |
+| ↳ `@sahoda/web` | `8052 passed \| 13 skipped (8065)` |
+| ↳ `@sahoda/db` | `958 passed \| 198 skipped (1156)` |
+| ↳ `@sahoda/sites` | `1566 passed (1566)` |
+| ↳ `@sahoda/publishing` | `510 passed (510)` |
+| ↳ `@sahoda/shared` | `480 passed (480)` |
+| ↳ `@sahoda/jobs` | `472 passed (472)` |
+| ↳ `@sahoda/billing` | `417 passed \| 13 skipped (430)` |
+| ↳ `@sahoda/mesh` | `235 passed (235)` |
+| ↳ `@sahoda/research` | `195 passed (195)` |
+| `pnpm vitest run --root .` | **PASS** — `240 passed (240)` |
+| `pnpm exec prettier --check .` | **PASS** |
+
+### And a mistake of mine, recorded because the next person will make it
+
+I amended the merge commit `lane-sync` had **already pushed**, which rewrote published history
+and made the lane diverge from its own remote. The push was rejected, correctly. The fix was to
+merge `origin/wt-jiban2` back in, NOT to force-push — the two commits carried identical trees,
+so the merge was trivial. **Never amend after `lane-sync push` has run.** Commit the correction
+on top instead.
+
 ## Working tree
 
 `ops/state/qa.pending.json` was modified by the session-start ops sync on every startup. It is
