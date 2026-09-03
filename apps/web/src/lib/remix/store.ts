@@ -183,6 +183,40 @@ export async function approveBatch(input: {
   return !error && (data ?? []).length === 1
 }
 
+/**
+ * CLAIM THIS BATCH FOR A RUN, OR LOSE THE RACE. Returns whether we won.
+ *
+ * ── THE READ-THEN-WRITE GAP THIS CLOSES ──────────────────────────────────────
+ * `runRemixBatch` read `batch.status`, refused `running` and `done`, and then
+ * wrote `running` through `setBatchStatus` — which carries no status predicate,
+ * returns void and drops the error. Two tabs, or one double-click, both passed
+ * the read before either wrote, and both went on to spend: the customer paid for
+ * the same batch twice.
+ *
+ * `withCredits` cannot back-stop it, because `object-ref.ts` mints a fresh
+ * `randomUUID` per run, so the exactly-once key never matches between the two.
+ *
+ * The proof that this was an omission rather than a design is thirty lines up:
+ * `approveBatch` guards the identical transition with `.eq('status','planned')`
+ * AND checks the returned row count. This is that, for the run.
+ *
+ * `not in (running, done)` rather than `eq(approved)` on purpose: a batch that
+ * FAILED may legitimately be run again, and that is the existing behaviour —
+ * the gate above this call is what decides, and this only has to make the
+ * decision atomic.
+ */
+export async function startBatchRun(batchId: string, workspaceId: string): Promise<boolean> {
+  const supabase = createServerSupabase()
+  const { data, error } = await supabase
+    .from('remix_batches')
+    .update({ status: 'running' })
+    .eq('id', batchId)
+    .eq('workspace_id', workspaceId)
+    .not('status', 'in', '("running","done")')
+    .select('id')
+  return !error && (data ?? []).length === 1
+}
+
 export async function setBatchStatus(
   batchId: string,
   workspaceId: string,

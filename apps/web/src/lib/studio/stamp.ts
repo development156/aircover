@@ -66,6 +66,20 @@ const LUMA_B = 0.0722
 
 const MAX_CHANNEL = 255
 
+/**
+ * One sRGB byte to its linear-light value, the sRGB electro-optical transfer
+ * function exactly as WCAG 2.1 defines it for relative luminance.
+ *
+ * The same curve `lib/brand/oklch.ts` already applies in this tree. It is here
+ * rather than imported from there because that module is about colour SPACES
+ * and this one needs a single scalar; the constants are the specification's,
+ * not either module's, so the two cannot drift into disagreeing.
+ */
+function linearise(byte: number): number {
+  const c = byte / MAX_CHANNEL
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+}
+
 interface Rgb {
   r: number
   g: number
@@ -136,11 +150,36 @@ function fitsInside(inner: Rect, outer: { width: number; height: number }): bool
 }
 
 /**
- * Mean relative luminance of one region of the picture, normalised 0 to 1.
+ * Mean RELATIVE luminance of one region of the picture, normalised 0 to 1.
  *
  * Forced to sRGB with alpha so the read is the same three bytes per pixel
  * whatever the source was: a greyscale PNG decodes to one channel and a CMYK
  * JPEG to four, and indexing those as RGB gives a wrong verdict, not an error.
+ *
+ * ── EACH CHANNEL IS LINEARISED FIRST, AND THAT IS THE WHOLE POINT ───────────
+ * This used to weight the raw sRGB BYTES and divide by 255. That is a gamma
+ * encoded value, and the thresholds it feeds — `DARK_INK_MIN_BACKDROP` and
+ * `LIGHT_INK_MAX_BACKDROP` in `logo-placement.ts` — are solved from WCAG's
+ * `(L1 + 0.05) / (L2 + 0.05)`, which is defined over LINEAR relative luminance.
+ * Comparing one against the other is comparing two different quantities.
+ *
+ * MEASURED, black ink on flat grey backdrops:
+ *
+ *   backdrop   old read   true L   real contrast   old verdict
+ *   RGB  60      0.235     0.045      1.90:1        no plate
+ *   RGB  80      0.314     0.080      2.60:1        no plate
+ *   RGB 100      0.392     0.127      3.55:1        no plate
+ *
+ * Every one of those is below the 4.5:1 this module exists to guarantee, and
+ * every one was passed without a plate. The band runs roughly RGB 45 to 130,
+ * which is an ordinary photographic mid-shadow rather than an exotic input.
+ *
+ * The suite could not see it: its two backdrops are RGB 18 and RGB 235, and
+ * both fall on the SAME side of the threshold in either space. A fixture in the
+ * band is what makes this fail, and `stamp.test.ts` now carries one.
+ *
+ * The transfer function is per CHANNEL and per PIXEL. Applying it to the mean
+ * afterwards is a different number again, because it is not linear.
  */
 async function meanLuminance(picture: Uint8Array, region: Rect): Promise<number | null> {
   try {
@@ -155,11 +194,32 @@ async function meanLuminance(picture: Uint8Array, region: Rect): Promise<number 
     const pixels = data.length / channels
     if (pixels < 1) return null
 
+    // ── A TRANSPARENT PIXEL IS NOT A BLACK ONE ──────────────────────────────
+    // `ensureAlpha()` adds the channel and this loop read only 0-2, so a
+    // generated PNG with a transparent region under the mark measured its
+    // zeroed RGB as pitch black — plating dark ink that needed no plate, and
+    // refusing to plate light ink over what will composite as white. Weighting
+    // by coverage is what makes the answer the one a reader will see; a fully
+    // transparent region contributes nothing and falls back to white below,
+    // because that is what a transparent PNG composites over in every surface
+    // this product puts a picture on.
+    const alphaAt = channels > 3 ? 3 : -1
     let total = 0
+    let covered = 0
     for (let at = 0; at < data.length; at += channels) {
-      total += LUMA_R * data[at]! + LUMA_G * data[at + 1]! + LUMA_B * data[at + 2]!
+      const alpha = alphaAt === -1 ? 1 : data[at + alphaAt]! / MAX_CHANNEL
+      if (alpha === 0) continue
+      total +=
+        alpha *
+        (LUMA_R * linearise(data[at]!) +
+          LUMA_G * linearise(data[at + 1]!) +
+          LUMA_B * linearise(data[at + 2]!))
+      covered += alpha
     }
-    return total / pixels / MAX_CHANNEL
+    // Nothing under the mark at all: the picture is transparent there and will
+    // composite over white, which is what the caller is really placing ink on.
+    if (covered === 0) return 1
+    return total / covered
   } catch {
     return null
   }
@@ -186,7 +246,9 @@ export async function stampLogo(input: StampInput): Promise<StampResult> {
   if (input.plate !== undefined) {
     plateColour = parsePlate(input.plate)
     if (plateColour === null) {
-      return refuse(`The plate colour must be six hex digits such as #ffffff. Got ${input.plate}.`)
+      return refuse(
+        `The plate colour must be a hash followed by six hex digits. Got ${input.plate}.`,
+      )
     }
   }
 
@@ -255,7 +317,14 @@ export async function stampLogo(input: StampInput): Promise<StampResult> {
       .png()
       .toBuffer()
   } catch {
-    return refuse('The logo bytes do not decode as an image.')
+    // NOT the decode message above: by this point the bytes have already
+    // decoded, so a failure here is the extract or the resize, not the file. A
+    // caller reading `reason` could not tell a corrupt upload from a
+    // compositor fault, which is what this file's "a reason a developer can
+    // act on" exists to prevent.
+    return refuse(
+      `The logo could not be cut to ${placement.mark.width}x${placement.mark.height} from its ${trim.width}x${trim.height} trim box.`,
+    )
   }
 
   const luminance = await meanLuminance(input.picture, placement.mark)

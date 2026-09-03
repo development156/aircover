@@ -6,8 +6,6 @@ import {
   median,
   normalFor,
   COMPARE_AGE_DAYS,
-  MIN_BASELINE_POSTS,
-  MIN_BASELINE_VALUE,
   MIN_MOVE,
   type AgedPost,
 } from './like-age'

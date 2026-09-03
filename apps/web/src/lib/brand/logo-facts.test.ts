@@ -12,10 +12,17 @@ import { logoFactsFromRaw } from './logo-facts'
  * No file read, no child process, no directory walk: every fixture is a small
  * image built in memory with `sharp`, decoded back to raw bytes with
  * `.raw().toBuffer({resolveWithObject:true})`, and fed straight to the function
- * under test. `scripts/lib/scanner-registry.mjs` only flags a test file that
- * calls `readFileSync`, `readdirSync`, `globSync`, `execFileSync` or `execSync`
- * — this one calls none of them, so it is not a scanner and carries no
- * declaration.
+ * under test. So it is not a scanner in the sense
+ * `scripts/lib/scanner-registry.mjs` means, and carries no declaration.
+ *
+ * That paragraph used to NAME the five reader functions that registry looks
+ * for, and naming them is what made it match: the registry scans source TEXT,
+ * so a sentence saying "this file never calls X" contains X and is
+ * indistinguishable from a call to it. MEASURED, it failed the gate that way on
+ * 2026-08-31. The names are gone and the claim is unchanged, which is the fix:
+ * the file genuinely reads nothing, and now says so without tripping the
+ * detector it is describing. A blind-spot declaration here would have silenced
+ * the failure by asserting something false.
  *
  * ── THE DECISION THIS FILE PINS FOR NON-ALPHA TRIM ───────────────────────────
  * `trim` is defined unambiguously for a buffer with meaningful alpha: the tight
@@ -76,7 +83,12 @@ async function build(
       channels,
       background:
         channels === 4
-          ? { r: background.r, g: background.g, b: background.b, alpha: (background.alpha ?? 255) / 255 }
+          ? {
+              r: background.r,
+              g: background.g,
+              b: background.b,
+              alpha: (background.alpha ?? 255) / 255,
+            }
           : { r: background.r, g: background.g, b: background.b },
     },
   })

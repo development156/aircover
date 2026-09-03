@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { MAX_REFERENCES, MODE_RULES, describeModeBlock, readyModes, ruleFor } from './modes'
+import { MODE_RULES, describeModeBlock, readyModes, ruleFor } from './modes'
 import { defaultModelId, modelById } from './models'
 
 /**

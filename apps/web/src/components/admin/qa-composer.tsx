@@ -234,7 +234,7 @@ export function QaComposer({ openDraft, restoredThumbs, taskCodes }: QaComposerP
           type="button"
           onClick={seal}
           disabled={sealing}
-          className="rounded-pill bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-micro hover:bg-primary-strong hover:text-white disabled:pointer-events-none disabled:opacity-45"
+          className="rounded-pill bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-micro hover:bg-primary-strong hover:text-primary-strong-foreground disabled:pointer-events-none disabled:opacity-45"
         >
           {sealing ? 'Recording…' : 'Record run'}
         </button>

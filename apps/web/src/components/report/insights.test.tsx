@@ -62,6 +62,33 @@ describe('what the glance card will and will not say', () => {
     expect(screen.getByText(/Posts measured has not been measured yet/)).toBeTruthy()
   })
 
+  it('says WHICH nothing it is, when the figure knows', () => {
+    // ── THE SEVENTH KIND OF NOTHING, IN THE ONE PLACE IT WAS MISSED ─────────
+    // Every null announced "<label> has not been measured yet". That is right
+    // for Reach before anything has published and wrong for `Approved`: a null
+    // there means no spending was ever put to the customer, which is not a
+    // reading anybody failed to take.
+    render(
+      <AtAGlanceCard
+        figures={[
+          {
+            label: 'Approved',
+            value: null,
+            unit: 'cr',
+            absent: 'Nothing has been put to you for approval in this cycle',
+          },
+        ]}
+        note="n"
+      />,
+    )
+
+    expect(screen.getByText(/Nothing has been put to you for approval/)).toBeTruthy()
+    // The wrong claim must be gone, not merely joined by a right one.
+    expect(screen.queryByText(/Approved has not been measured yet/)).toBeNull()
+    // And it is still an absence, never a zero in a costume.
+    expect(screen.queryByText('0')).toBeNull()
+  })
+
   it('still prints a real zero, because a measured nothing is knowledge', () => {
     render(<AtAGlanceCard figures={[{ label: 'Written this week', value: 0 }]} note="n" />)
     expect(screen.getByText('0')).toBeTruthy()

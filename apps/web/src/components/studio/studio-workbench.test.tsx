@@ -46,7 +46,7 @@ const LIBRARY = [
   { assetId: 'a2', url: 'https://example.test/2.png', title: null },
   { assetId: 'a3', url: null, title: 'No preview' },
   { assetId: 'a4', url: 'https://example.test/4.png', title: null },
-  ...Array.from({ length: 13 }, (unused, i) => ({
+  ...Array.from({ length: 13 }, (_unused, i) => ({
     assetId: `b${i}`,
     url: `https://example.test/b${i}.png`,
     title: null,

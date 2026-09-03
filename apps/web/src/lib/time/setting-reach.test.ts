@@ -47,6 +47,36 @@ describe('the time zone setting’s reach', () => {
     // picker follows the device, so a customer whose device disagrees with this
     // setting needs to know before they schedule something.
     expect(settings).toMatch(/device clock/i)
+
+    // ── THE CARVE-OUT, WHICH THIS GUARD USED TO MISS ────────────────────────
+    // "Posts and Planner" on its own read as the whole Planner, and the week
+    // grid is not in it: `week-window.ts` places every card by
+    // PLANNER_GRID_ZONE, so a card's column and row are IST facts whatever the
+    // workspace set. This assertion is what stops "the Planner" quietly meaning
+    // "all of the Planner" again.
+    expect(settings).toMatch(/week grid is\s+still laid out in IST/i)
+  })
+
+  it('is not claimed by a screen that still hardcodes the zone', () => {
+    // The claim is only as good as the wiring, in the other direction too.
+    // `PlannerUpcoming` sat on the same screen with its own `Asia/Kolkata`
+    // formatters and a literal "IST", so a Dubai workspace read two different
+    // times for one post, side by side, under a setting claiming both.
+    const upcoming = read('components/planner/planner-upcoming.tsx')
+    expect(upcoming).not.toMatch(/timeZone: 'Asia\/Kolkata'/)
+    expect(upcoming).toMatch(/resolveDisplayZone/)
+
+    // And the week grid's caption must read in the zone it is DRAWN in, or the
+    // card contradicts itself. The CLAIM is "same zone as the placement", not a
+    // particular function: the chips now print the clock alone and the grid
+    // states its zone once on the rail, because repeating the suffix truncated
+    // the certainty word out of a 100px column.
+    const timeline = read('components/planner/week-timeline.tsx')
+    expect(timeline).toMatch(/format\w+\(post\.scheduled_at, PLANNER_GRID_ZONE\)/)
+    // The zone is still SAID, once, rather than quietly dropped.
+    expect(timeline).toMatch(/zoneLabel\(PLANNER_GRID_ZONE/)
+    // And never in the workspace's zone, which is the contradiction itself.
+    expect(timeline).not.toMatch(/format\w+\(post\.scheduled_at, zone\)/)
   })
 
   it('is not described as doing nothing, now that it does something', () => {

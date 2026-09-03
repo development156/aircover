@@ -9,7 +9,7 @@ import { ThemeToggle } from '@/components/shell/theme-toggle'
 import { creditWord } from '@/lib/credit-words'
 
 import { BootVideo } from './boot-video'
-import { doorColors, doorText, type DoorOutcome } from './door-outcome'
+import { type DoorOutcome } from './door-outcome'
 import { OrbColumn } from './orb-column'
 import { useBootVideo } from './use-boot-video'
 import { ProcessingOverlay } from './processing-overlay'
@@ -25,7 +25,6 @@ import {
   DEFAULT_DATA,
   energyOf,
   loadState,
-  NUMBERED,
   ORDER,
   saveState,
   signalCount,
@@ -435,7 +434,6 @@ export function OnboardingStage({
 
   /* ─────────────────────────────────────────────────────────────── render ── */
 
-  const numbered = NUMBERED.includes(step)
   const showRail = step !== 'intro' && step !== 'result'
   const showBack = step !== 'intro' && step !== 'result' && step !== '1'
 
