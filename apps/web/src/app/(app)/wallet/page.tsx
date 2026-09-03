@@ -131,7 +131,7 @@ export default async function WalletPage() {
                 missing-workspace case returned above, so the reload works. */}
             <div
               role="alert"
-              className="rounded-input border border-danger-bg bg-danger-bg px-3 py-2.5 text-[13px] text-danger"
+              className="rounded-input border border-danger-bg bg-danger-bg px-3 py-2.5 type-sm text-danger"
             >
               Sahoda could not read your credit activity just now. Reload to try again. Nothing has
               been charged and your credits are unaffected.
