@@ -1,6 +1,6 @@
 # Handoff — karunesh — wt-karunesh — 2026-09-03
 
-**Branch** `wt-karunesh` at `abd50d3d`. Lane `wt-karunesh`. Pushed: yes, local and
+**Branch** `wt-karunesh` at `5f962f96`. Lane `wt-karunesh`. Pushed: yes, local and
 `origin/wt-karunesh` match. PR [#22](https://github.com/development156/sahodalabs/pull/22), draft.
 
 **This is a SHORT handoff and it is short on purpose.** The seven screens this
@@ -18,8 +18,9 @@ suspect one of them was guessed. Neither was — both came from `date +%F`.
 
 | Change | SHA | Covered by |
 | --- | --- | --- |
-| `wt-core` taken into the lane before handover — 61 commits, no conflicts | `4f4ff0e9` | the full forced gate below, on the merged tree |
+| `wt-core` taken into the lane — 61 commits, no conflicts | `4f4ff0e9` | superseded by the `5f962f96` gate below |
 | The changelog and QA queues drained, as the session-start sync left them | `abd50d3d` | CI run 1216, green on this exact SHA |
+| `wt-core` taken again at handover time — **197 further commits**, no conflicts | `5f962f96` | the forced gate below, re-run on this tree |
 
 **`abd50d3d` is not this lane's content and the commit message says so.** The
 SessionStart hook synced one changelog entry — "Autopilot, ready and switched
@@ -70,10 +71,10 @@ different act on the same file.
 
 ## Shared surfaces touched
 
-**None in these two commits.** No component, type, fixture, token or config that
-another lane consumes changed between `8bc2e39e` and `abd50d3d`; the only files
+**None in this handoff's three commits.** No component, type, fixture, token or config that
+another lane consumes changed between `8bc2e39e` and `5f962f96` from THIS lane; the only files
 are the two `ops/state/*.pending.json` queues, which are data the ops console
-owns and no code imports.
+owns and no code imports. The two `wt-core` merges of course bring other lanes' surfaces with them, but those are theirs to declare, not mine.
 
 The shared surfaces this LANE carries — `channel-mark.tsx` rewritten as an
 adapter over `ChannelLogo`, `post-card.tsx`'s two optional props, `modal.tsx`'s
@@ -85,13 +86,13 @@ one.**
 ## Contract, migration or money
 
 **None.** No `packages/shared` change, no migration, no price, no ledger call in
-either commit. The `radar` origin above is the one thing that WOULD be a
+any of them. The `radar` origin above is the one thing that WOULD be a
 contract change and it is deliberately not made.
 
 ## Guards written, and the mutation that proved each
 
-**None written in this handoff's two commits**, and that is the honest answer:
-one is a merge and one is a data drain. **Neither is guardable and neither
+**None written in this handoff's three commits**, and that is the honest answer:
+two are merges and one is a data drain. **None is guardable and none
 should pretend to be.**
 
 The twenty mutations this lane applied and watched go red are tabulated in the
@@ -128,24 +129,44 @@ repository scope, and no environment can supply them.**
 
 ## Gate
 
+All at `5f962f96`, the pushed head, **after** `lane-sync push` brought 197 more
+trunk commits in. Every leg below was re-run on that tree; nothing here is
+carried over from the pre-merge run.
+
 | leg | result |
 | --- | --- |
-| `CI=1 turbo run typecheck lint test --force --concurrency=1`, at `4f4ff0e9` | **PASS** — 27 successful / 27 total, **0 cached**, 9m52s. `@sahoda/web` 6788 passed / 13 skipped in 222.5s |
-| `prettier --check .`, at `abd50d3d` | **PASS** — all matched files |
-| CI `typecheck · lint · test · format`, run **1216** on `abd50d3d` | **PASS** — the current head, gated on a clean runner |
+| `CI=1 turbo run typecheck lint test --force --concurrency=1` | **PASS** — 27 successful / 27 total, **0 cached**, 7m34s. `@sahoda/web` 7669 passed / 13 skipped in 197.5s |
+| `prettier --check .` | **PASS** — all matched files |
+| `next build` + `js-budget.mjs` | **PASS** — 82 routes within budget |
+| CI `typecheck · lint · test · format`, run **1216** on `abd50d3d` | **PASS** — a clean runner, one commit behind this head |
 | CI `Playwright @smoke`, run 1133 on `2a9f3a98` | **FAIL at its own guard, 20s. UNRUN, not passed** |
-| `next build` + `js-budget.mjs` | **PASS at `2a9f3a98`** — 82 routes within budget. **NOT re-run at `abd50d3d`**, whose only delta is two JSON data files no route imports |
 
-**The turbo leg is recorded at `4f4ff0e9`, not at HEAD, and the reason is
-stated rather than glossed:** `git diff 4f4ff0e9 abd50d3d` is exactly the two
-`ops/state` queues. CI run 1216 then gated `abd50d3d` itself and passed, so the
-head is covered by a real runner even though my local forced run predates it by
-one commit.
+### The typecheck failed first, and the reason is a trap this repo has hit before
 
-Every claim above is **MEASURED** unless it says otherwise. The one INFERRED
-statement in this file is that the two drained JSON files cannot affect a build
-— no route imports them, but I did not re-run the build to prove it, and CI run
-1216 is what actually stands behind that head.
+**MEASURED.** The first forced run on `5f962f96` failed `@sahoda/web#typecheck`
+with three errors, all of one shape:
+
+```
+.next/types/app/(app)/studio/[id]/page.ts(2,24): error TS2307:
+  Cannot find module '../../../../../../src/app/(app)/studio/[id]/page.js'
+```
+
+**Not a real error, and proven so rather than assumed.** `apps/web/src/app/(app)/studio/`
+holds `page.tsx` and nothing else — the trunk removed `studio/[id]` in the 197
+commits just merged. Next generates route types into `.next/types/**`, which is
+gitignored (`.gitignore:22`), so my local copy still described a route the source
+no longer has. **A rebuild regenerated them and `tsc --noEmit` exits 0.**
+
+This is the third time this shape has cost a session time — my own 08-28 handoff
+records it, and `divas/wt-divas` recorded it again on 09-01 and left it
+unverified. **A session that trusted that output would have "fixed" someone
+else's working code.** The tell is the path: an error inside `.next/` is build
+output, never source.
+
+Every claim above is **MEASURED**. There is one INFERRED statement left in this
+file — that the two drained `ops/state` JSON files cannot affect a build, since
+no route imports them. CI run 1216 and the clean `next build` on this head are
+what actually stand behind it.
 
 ## In plain terms
 
