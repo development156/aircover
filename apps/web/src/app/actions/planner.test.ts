@@ -28,6 +28,12 @@ const APPROVED_ROW = {
 
 const state = vi.hoisted(() => ({
   userId: 'user_abc' as string | null,
+  /**
+   * The caller's role. `owner` by default so every pre-existing test in this file
+   * still exercises what it was written to exercise — the gate is new, and a test
+   * about the SQL allowlist should not start failing for a reason it never named.
+   */
+  role: 'owner' as 'owner' | 'editor' | 'approver' | 'viewer' | null,
   result: { data: null as Record<string, unknown> | null, error: null as { code: string } | null },
   calls: {
     patch: null as Record<string, unknown> | null,
@@ -52,6 +58,16 @@ vi.mock('@/lib/workspaces', () => ({
     const w = await Promise.resolve({ id: WS_ID })
     return w ? { ok: true, workspace: w } : { ok: false, message: 'Create a workspace first.' }
   },
+}))
+
+/**
+ * Only the READ is mocked. `canApproveAsRole` and both refusal sentences come from
+ * the real module, so these tests assert the sentence a customer actually gets — a
+ * mocked predicate would let the allowlist rot and still pass.
+ */
+vi.mock('@/lib/workspace-role', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/workspace-role')>()),
+  getWorkspaceRole: () => Promise.resolve(state.role),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -80,8 +96,64 @@ const { approvePost } = await import('./planner')
 
 beforeEach(() => {
   state.userId = 'user_abc'
+  state.role = 'owner'
   state.result = { data: null, error: null }
   state.calls = { patch: null, eq: [], in: null }
+})
+
+/**
+ * WHO MAY APPROVE, WHICH NOTHING CHECKED.
+ *
+ * Measured 2026-09-03: this action read no role, and the database does not close it
+ * — `posts` carries `app.apply_tenant_policies`, which grants full CRUD to every
+ * member regardless of role. So a VIEWER, the role that exists to read, could put a
+ * post into the state publishing sends from. The workspace even has an `approver`
+ * role, which meant nothing.
+ *
+ * Each test asserts `state.calls.patch` is null, not merely that the result was a
+ * refusal. A gate placed after the update would return the right sentence and still
+ * have written the row, and only the patch assertion can tell those apart.
+ */
+describe('approvePost · who may approve', () => {
+  test('refuses a viewer, names the roles that may, and never issues the update', async () => {
+    state.role = 'viewer'
+    state.result = { data: { ...APPROVED_ROW }, error: null }
+
+    const result = await approvePost(POST_ID)
+
+    expect(result).toEqual({
+      ok: false,
+      message: 'Only an owner, editor or approver can approve a post.',
+    })
+    expect(state.calls.patch).toBeNull()
+  })
+
+  test('an unestablished role is a DIFFERENT sentence, and also writes nothing', async () => {
+    // "We could not confirm your role" and "you may not" are different claims: one
+    // says try again, the other says ask for access. `getWorkspaceRole` returns null
+    // on any doubt, so this is the path a transient read failure takes.
+    state.role = null
+    state.result = { data: { ...APPROVED_ROW }, error: null }
+
+    const result = await approvePost(POST_ID)
+
+    expect(result).toEqual({
+      ok: false,
+      message:
+        'Sahoda could not confirm your role in this workspace, so nothing was approved. Try again in a moment.',
+    })
+    expect(state.calls.patch).toBeNull()
+  })
+
+  test.each(['owner', 'editor', 'approver'] as const)('lets a %s through', async (role) => {
+    state.role = role
+    state.result = { data: { ...APPROVED_ROW }, error: null }
+
+    const result = await approvePost(POST_ID)
+
+    expect(result).toEqual({ ok: true, status: 'approved' })
+    expect(state.calls.patch).toEqual({ status: 'approved' })
+  })
 })
 
 describe('approvePost', () => {

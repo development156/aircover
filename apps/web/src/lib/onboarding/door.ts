@@ -43,14 +43,34 @@ export type DoorChoice =
  * `openUploadDoor` has its own `MAX_UPLOAD_BYTES` (8MB) but can only check it
  * after the file has been buffered AND base64-encoded — which is exactly the
  * work worth not doing. This is the earlier, cheaper guard, and deliberately the
- * tighter of the two: 6MB of PDF is already ~25k input tokens, held against the
+ * tighter of the two: 4MB of PDF is already ~17k input tokens, held against the
  * workspace's credits on the PDF arm.
  *
  * It lives here rather than in `onboarding-door.ts` because that module is
  * `'use server'`, where every export is a callable endpoint and only async
  * functions are legal.
+ *
+ * ── 6 MB WAS A NUMBER THE PLATFORM NEVER LET US KEEP ─────────────────────────
+ * MEASURED 2026-09-03. This route is `runtime = 'nodejs'`, so Vercel's ~4.5 MB
+ * request ceiling applies to it exactly as it does to a server action — the
+ * request is refused at the edge before this module runs, which is why every
+ * local test passed. `PLATFORM_REQUEST_CAP_BYTES` in `lib/posts/media-constants.ts`
+ * is the same limit, found the same way when media uploads between 4.5 and 8 MB
+ * failed only in production; `bodySizeLimit` in `next.config.ts` fixed that path
+ * and could not reach this one, because this is a route handler and not an action.
+ *
+ * So a 5 MB PDF was refused by the platform while the screen said 6 MB was fine.
+ * The customer was not stranded — `door-transport-failure.ts` maps the 413 to a
+ * true sentence with a working remedy — but the ceiling we PRINTED was a promise
+ * we could not keep, and `PDF_TOO_LARGE_MESSAGE` was unreachable copy for
+ * everything between 4.5 and 6 MB.
+ *
+ * 4 MB is under the platform cap once the multipart envelope is added, and the
+ * refusal sentence interpolates this constant, so it now reads "over 4MB" with no
+ * copy edit. Raising it again needs a direct-to-storage upload, not a bigger
+ * number: `door-request.test.ts` asserts the whole body stays under the cap.
  */
-export const MAX_PDF_BYTES = 6_000_000
+export const MAX_PDF_BYTES = 4_000_000
 
 /** A sentence shorter than this is not a description, it is a placeholder. */
 export const MIN_SENTENCE_CHARS = 12
