@@ -470,7 +470,7 @@ export function StudioWorkbench({
                           className="size-full object-cover object-top"
                         />
                       )}
-                      <span className="absolute bottom-0 left-0 flex size-[16px] items-center justify-center rounded-full bg-primary type-sm text-primary-foreground">
+                      <span className="absolute bottom-0 left-0 flex size-[16px] items-center justify-center rounded-pill bg-primary type-sm text-primary-foreground">
                         <span className="num">{at + 1}</span>
                       </span>
                     </button>

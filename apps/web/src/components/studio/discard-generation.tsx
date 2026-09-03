@@ -54,13 +54,13 @@ export function DiscardGeneration({
         onClose={() => setAsking(false)}
         title="Remove this request?"
         description="This removes the record of what you asked for and what it cost. Any picture it made stays in your library, and anything you have already posted is untouched."
-      >
-        <div className="flex flex-col gap-3">
-          <p className="type-sm text-muted">
-            You asked for: <span className="text-ink">{prompt}</span>
-          </p>
-
-          <div className="flex flex-wrap items-center gap-2">
+        footer={
+          <>
+            {/* A real secondary control, not an underlined word: in a footer
+                beside a filled button, a bare text link reads as a caption. */}
+            <Button variant="ghost" onClick={() => setAsking(false)} disabled={busy}>
+              Keep it
+            </Button>
             <Button
               onClick={() =>
                 start(async () => {
@@ -76,14 +76,13 @@ export function DiscardGeneration({
             >
               Remove the request
             </Button>
-            <button
-              type="button"
-              onClick={() => setAsking(false)}
-              className="type-sm text-muted underline underline-offset-2 transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            >
-              Keep it
-            </button>
-          </div>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3">
+          <p className="type-sm text-muted">
+            You asked for: <span className="text-ink">{prompt}</span>
+          </p>
 
           {note === null ? null : (
             <p role="alert" className="type-sm text-ink">

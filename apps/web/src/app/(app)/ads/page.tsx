@@ -100,7 +100,7 @@ export default function AdsPage() {
             <li key={area.href}>
               <Link
                 href={area.href}
-                className="surface-ring flex h-full items-start gap-3 rounded-card bg-surface p-4 transition-micro hover:bg-s1"
+                className="surface-ring flex h-full items-start gap-3 rounded-card bg-surface p-4 transition-micro hover:bg-s2"
               >
                 <span className="grid size-9 shrink-0 place-items-center rounded-md bg-brand-wash text-accent shadow-[inset_0_0_0_1px_var(--brand-lift)] dark:bg-s2">
                   <area.icon size={17} strokeWidth={1.8} aria-hidden />

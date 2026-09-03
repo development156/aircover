@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import { X } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -23,6 +23,7 @@ export function Drawer({
   onClose,
   title,
   children,
+  footer,
   side = 'right',
   className,
 }: {
@@ -30,10 +31,17 @@ export function Drawer({
   onClose: () => void
   title: string
   children: React.ReactNode
+  /** Actions, pinned under the scrolling body — the same slot `Modal` has. */
+  footer?: React.ReactNode
   side?: 'right' | 'bottom'
   className?: string
 }) {
   const ref = useRef<HTMLDialogElement>(null)
+  // `useId`, not a literal. `modal.tsx` documents why: two drawers in one tree
+  // (assets renders a folders sheet and a detail pane side by side) both wrote
+  // `id="drawer-title"`, so `aria-labelledby` resolved to whichever came first
+  // and the detail drawer announced itself as "Folders".
+  const titleId = useId()
 
   useEffect(() => {
     const el = ref.current
@@ -53,7 +61,7 @@ export function Drawer({
   return (
     <dialog
       ref={ref}
-      aria-labelledby="drawer-title"
+      aria-labelledby={titleId}
       onClick={(e) => {
         if (e.target === ref.current) onClose()
       }}
@@ -87,16 +95,18 @@ export function Drawer({
         // and first two groups were off the top of the screen. It is now
         // per-side: the right drawer is a full-height panel, the bottom one is
         // capped and scrolls inside itself.
-        'max-w-none border border-line bg-surface p-0 text-left text-ink shadow-lg backdrop:bg-[var(--scrim)]',
+        // An inset ring rather than a border, and `--r-xl`: docs/37 §5 puts
+        // modals, drawers and the rail on the 28px rung, one above cards.
+        'surface-ring max-w-none bg-surface p-0 text-left text-ink shadow-lg backdrop:bg-[var(--scrim)]',
         side === 'right'
-          ? 'mr-0 ml-auto h-dvh max-h-none w-[min(420px,calc(100vw-48px))] rounded-l-card'
-          : 'mt-auto mb-0 max-h-[80dvh] w-full rounded-t-card',
+          ? 'mr-0 ml-auto h-dvh max-h-none w-[min(420px,calc(100vw-48px))] rounded-l-xl'
+          : 'mt-auto mb-0 max-h-[80dvh] w-full rounded-t-xl',
         className,
       )}
     >
       <div onClick={(e) => e.stopPropagation()} className="flex h-full flex-col">
-        <div className="flex flex-none items-center gap-3 border-b border-line-soft p-4">
-          <h2 id="drawer-title" className="type-h3 min-w-0 flex-1">
+        <div className="flex flex-none items-center gap-3 border-b border-line-soft p-5">
+          <h2 id={titleId} className="type-h3 min-w-0 flex-1">
             {title}
           </h2>
           <button
@@ -108,7 +118,12 @@ export function Drawer({
             <X size={16} aria-hidden />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">{children}</div>
+        {footer ? (
+          <div className="flex flex-none justify-end gap-2 border-t border-line-soft p-5">
+            {footer}
+          </div>
+        ) : null}
       </div>
     </dialog>
   )

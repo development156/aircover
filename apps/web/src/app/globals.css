@@ -512,19 +512,38 @@
   }
 }
 
-/* v3 type scale as utilities, so components never hand-write a font shorthand. */
+/* v3 type scale as utilities, so components never hand-write a font shorthand.
+
+   ── A WEIGHT UTILITY BESIDE A TYPE STEP WAS SILENTLY IGNORED ─────────────────
+   MEASURED 2026-08-31, rendered in Chromium against the compiled stylesheet:
+   `type-sm font-semibold` computed to font-weight **400**, in EITHER order.
+   Tailwind emits these custom utilities AFTER its own `font-*` utilities in the
+   same layer, and `font:` is a shorthand, so the step's weight overwrote the
+   modifier every time. 82 call sites in the app write exactly that pair and
+   every one of them was rendering at the step's resting weight — a label its
+   author set to 600 was 400, and nothing but a ruler could tell.
+
+   The fix is one longhand after each shorthand: `font-weight` reads
+   `--tw-font-weight`, the variable Tailwind's own `font-*` utilities set, and
+   falls back to the step's resting weight when no modifier is present. The
+   fallback duplicates the weight inside the token, deliberately: it is the one
+   number that has to be readable here, and `pnpm test` grades that the two
+   agree (type-step-weights.test.ts). */
 @utility type-display {
   font: var(--t-display);
+  font-weight: var(--tw-font-weight, 700);
   letter-spacing: var(--ls-display);
   word-spacing: var(--ws-word);
 }
 @utility type-h1 {
   font: var(--t-h1);
+  font-weight: var(--tw-font-weight, 650);
   letter-spacing: var(--ls-display);
   word-spacing: var(--ws-word);
 }
 @utility type-h2 {
   font: var(--t-h2);
+  font-weight: var(--tw-font-weight, 650);
   letter-spacing: var(--ls-heading);
   word-spacing: var(--ws-word);
 }
@@ -533,6 +552,7 @@
    headings drifted between routes. */
 @utility type-h3 {
   font: var(--t-h3);
+  font-weight: var(--tw-font-weight, 650);
   letter-spacing: var(--ls-heading);
   word-spacing: var(--ws-word);
 }
@@ -540,16 +560,19 @@
    reflows its digits as it changes reads as unstable. */
 @utility type-hero-num {
   font: var(--t-hero-num);
+  font-weight: var(--tw-font-weight, 650);
   letter-spacing: var(--ls-hero-num);
   font-variant-numeric: tabular-nums;
   word-spacing: var(--ws-word);
 }
 @utility type-body {
   font: var(--t-body);
+  font-weight: var(--tw-font-weight, 400);
   word-spacing: var(--ws-word);
 }
 @utility type-sm {
   font: var(--t-sm);
+  font-weight: var(--tw-font-weight, 400);
   word-spacing: var(--ws-word);
 }
 /* v5 · THE META RUNG — table cells, captions, timestamps, helper text.
@@ -559,6 +582,7 @@
    single largest block of off-scale type in the app. This is that rung. */
 @utility type-meta {
   font: var(--t-xs);
+  font-weight: var(--tw-font-weight, 400);
   word-spacing: var(--ws-word);
 }
 /* The chip step — 11px/600, NOT uppercase.
@@ -570,6 +594,7 @@
    a chip whose label is a sentence fragment ("Not proven live"). */
 @utility type-chip {
   font: var(--t-chip);
+  font-weight: var(--tw-font-weight, 600);
   word-spacing: var(--ws-word);
 }
 /* The embed field step — see `--t-input-embed` in tokens.css for why 16px is a
@@ -579,10 +604,12 @@
    same drift `type-h3` and `type-chip` were added to stop. */
 @utility type-input-embed {
   font: var(--t-input-embed);
+  font-weight: var(--tw-font-weight, 400);
   word-spacing: var(--ws-word);
 }
 @utility type-eyebrow {
   font: var(--t-eyebrow);
+  font-weight: var(--tw-font-weight, 600);
   letter-spacing: var(--t-eyebrow-ls);
   text-transform: uppercase;
   word-spacing: var(--ws-word);

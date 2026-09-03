@@ -142,9 +142,9 @@ export function PlannerMiniCalendar({
                   a dot on top of a digit costs the digit its legibility, and the
                   date is the thing the reader is actually looking for. */}
               <span aria-hidden className="absolute inset-x-0 bottom-1 flex justify-center gap-1">
-                {scheduled > 0 ? <span className="size-1 rounded-full bg-brand" /> : null}
+                {scheduled > 0 ? <span className="size-1 rounded-pill bg-brand" /> : null}
                 {other > 0 ? (
-                  <span className="size-1 rounded-full bg-transparent shadow-[inset_0_0_0_1px_var(--line-firm)]" />
+                  <span className="size-1 rounded-pill bg-transparent shadow-[inset_0_0_0_1px_var(--line-firm)]" />
                 ) : null}
               </span>
             </Link>
@@ -154,13 +154,13 @@ export function PlannerMiniCalendar({
 
       <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 type-meta text-muted">
         <span className="flex items-center gap-1.5">
-          <span aria-hidden className="size-1.5 rounded-full bg-brand" />
+          <span aria-hidden className="size-1.5 rounded-pill bg-brand" />
           Scheduled
         </span>
         <span className="flex items-center gap-1.5">
           <span
             aria-hidden
-            className="size-1.5 rounded-full shadow-[inset_0_0_0_1px_var(--line-firm)]"
+            className="size-1.5 rounded-pill shadow-[inset_0_0_0_1px_var(--line-firm)]"
           />
           Not scheduled
         </span>

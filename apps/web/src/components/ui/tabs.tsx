@@ -33,7 +33,7 @@ export function Tabs({ label, items }: { label: string; items: readonly TabItem[
               href={item.href as Route}
               aria-current={item.current ? 'page' : undefined}
               className={cn(
-                'inline-flex h-control items-center border-b-2 px-3 text-[13px] transition-micro',
+                'inline-flex h-control items-center border-b-2 px-3 type-sm transition-micro',
                 'max-narrow:min-h-[44px]',
                 item.current
                   ? 'border-brand font-semibold text-ink'

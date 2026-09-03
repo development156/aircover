@@ -242,7 +242,7 @@ export function SpendTrend({
               top: `${((py(active!.value as number) / H) * 100).toFixed(2)}%`,
             }}
           >
-            <span className="absolute -translate-x-1/2 -translate-y-1/2 block size-2 rounded-full bg-brand ring-2 ring-surface" />
+            <span className="absolute -translate-x-1/2 -translate-y-1/2 block size-2 rounded-pill bg-brand ring-2 ring-surface" />
             <span
               data-tip
               className="absolute bottom-3 -translate-x-1/2 rounded-sm bg-ink px-2 py-1 type-chip whitespace-nowrap text-white"

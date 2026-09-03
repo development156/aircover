@@ -141,7 +141,7 @@ export function AddDocument() {
                   'focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--brand)]',
                   door === entry.id
                     ? 'bg-brand-wash shadow-[inset_0_0_0_1.5px_var(--brand-lift)]'
-                    : 'surface-ring hover:bg-s1',
+                    : 'surface-ring hover:bg-s2',
                 )}
               >
                 <input

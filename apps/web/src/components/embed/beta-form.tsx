@@ -51,7 +51,7 @@ type Status =
 // text size is already deliberate (anything smaller makes iOS Safari zoom on
 // focus); this adds the height to match.
 const FIELD =
-  'h-input max-narrow:min-h-[44px] w-full rounded-sm bg-surface px-[11px] text-[16px] text-ink shadow-[inset_0_0_0_1px_var(--line)] transition-micro focus-visible:shadow-[inset_0_0_0_1px_var(--brand),0_0_0_3px_var(--t50)] focus-visible:outline-none aria-invalid:shadow-[inset_0_0_0_1.5px_var(--danger)]'
+  'h-input max-narrow:min-h-[44px] w-full rounded-sm bg-surface px-[11px] text-[16px] text-ink surface-ring-firm transition-micro focus-visible:shadow-[inset_0_0_0_1px_var(--brand),0_0_0_3px_var(--t50)] focus-visible:outline-none aria-invalid:shadow-[inset_0_0_0_1.5px_var(--danger)]'
 
 const LABEL = 'mb-[6px] block text-[12px] font-[550] text-muted'
 

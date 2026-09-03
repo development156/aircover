@@ -284,7 +284,7 @@ export function BrandPanel({
           <img
             src={logoUrl}
             alt="Your logo"
-            className="surface-ring h-7 w-auto max-w-[72px] shrink-0 rounded-control bg-s2 object-contain px-1"
+            className="surface-ring h-7 w-auto max-w-[72px] shrink-0 rounded-sm bg-s2 object-contain px-1"
           />
         ) : null}
         <p className="type-sm text-ink">Your brand colours</p>
@@ -300,7 +300,7 @@ export function BrandPanel({
           claim, and rule 1 is about claims rather than words. What went is the
           mechanism ("the colour it saw most of"), which is our arithmetic and
           not the reader's situation. */}
-      <p className="type-xs mt-1 text-muted">
+      <p className="type-meta mt-1 text-muted">
         Picked from your logo. Buttons and links follow the one you choose.
       </p>
 
@@ -332,8 +332,8 @@ export function BrandPanel({
                  an outline on the page behind it needs none. */
               className={
                 index === inUse
-                  ? 'size-8 rounded-control outline-2 outline-offset-2 outline-ink'
-                  : 'surface-ring size-8 rounded-control'
+                  ? 'size-8 rounded-sm outline-2 outline-offset-2 outline-ink'
+                  : 'surface-ring size-8 rounded-sm'
               }
               style={{ background: color }}
             />
@@ -348,11 +348,11 @@ export function BrandPanel({
           honest answer; five grey decoys was not. */}
       {monochrome ? (
         <div className="mt-3">
-          <p className="type-xs text-muted">
+          <p className="type-meta text-muted">
             Your logo is greys and blacks. Pick a colour and everything follows it.
           </p>
-          <label className="surface-ring mt-2 flex items-center justify-between gap-2 rounded-control p-2">
-            <span className="type-xs text-ink">Pick a colour</span>
+          <label className="surface-ring mt-2 flex items-center justify-between gap-2 rounded-sm p-2">
+            <span className="type-meta text-ink">Pick a colour</span>
             <input
               type="color"
               disabled={busy}
@@ -363,7 +363,7 @@ export function BrandPanel({
                  fires only on a real choice, so nothing is saved until the
                  person picks. */
               onChange={(e) => pick(e.target.value)}
-              className="size-8 cursor-pointer rounded-control border-0 bg-transparent p-0"
+              className="size-8 cursor-pointer rounded-sm border-0 bg-transparent p-0"
             />
           </label>
         </div>
@@ -386,7 +386,7 @@ export function BrandPanel({
           whose they are. */}
       {hasTheme ? (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
-          <span className="type-xs text-ink">
+          <span className="type-meta text-ink">
             {skinOn ? 'Brand colours are on' : 'Sahoda colours are on'}
           </span>
           <Button variant="secondary" disabled={busy} onClick={onToggleSkin}>
@@ -396,7 +396,7 @@ export function BrandPanel({
       ) : null}
 
       {failed ? (
-        <p className="type-xs mt-3 text-danger" role="alert">
+        <p className="type-meta mt-3 text-danger" role="alert">
           {failed}
         </p>
       ) : null}
@@ -405,11 +405,13 @@ export function BrandPanel({
           uploaded a vector should not have to discover from the media library
           that Sahoda holds a picture of it. */}
       {converted ? (
-        <p className="type-xs mt-3 text-muted">Sahoda saved your SVG as a high-resolution image.</p>
+        <p className="type-meta mt-3 text-muted">
+          Sahoda saved your SVG as a high-resolution image.
+        </p>
       ) : null}
 
       {unreadable ? (
-        <p className="type-xs mt-3 text-muted">
+        <p className="type-meta mt-3 text-muted">
           Sahoda could not read the colours from your logo. Replace it below and it will try again.
         </p>
       ) : null}

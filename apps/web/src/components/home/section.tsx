@@ -82,7 +82,7 @@ export function HomeSection({
              4pt ladder and `design-lint` refuses it in a new file. 6 is the
              rung, and a chip holding one or two digits is 18px wide either
              way. */
-          <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-brand-tint px-1.5 type-meta font-bold text-accent tabular-nums">
+          <span className="grid h-[18px] min-w-[18px] place-items-center rounded-pill bg-brand-tint px-1.5 type-meta font-bold text-accent tabular-nums">
             {count}
           </span>
         ) : null}

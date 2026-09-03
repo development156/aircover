@@ -90,27 +90,26 @@ export function ChannelTable({ rows }: { rows: readonly ComparableRow[] }) {
       <div className="overflow-x-auto max-narrow:hidden">
         <table className="w-full min-w-[420px] border-collapse type-sm">
           <thead>
-            <tr className="border-b border-line text-left">
-              <th scope="col" className="py-2 pr-4 font-semibold text-muted">
+            <tr className="border-b border-line-soft text-left text-muted">
+              <th scope="col" className="type-eyebrow py-2 pr-4">
                 Channel
               </th>
               {METRICS.map((metric) => (
-                <th
-                  key={metric.key}
-                  scope="col"
-                  className="py-2 pr-4 text-right font-semibold text-muted"
-                >
+                <th key={metric.key} scope="col" className="type-eyebrow py-2 pr-4 text-right">
                   {metric.label}
                 </th>
               ))}
-              <th scope="col" className="py-2 text-right font-semibold text-muted">
+              <th scope="col" className="type-eyebrow py-2 text-right">
                 Posts
               </th>
             </tr>
           </thead>
           <tbody>
             {rollups.map((rollup) => (
-              <tr key={rollup.channel} className="border-b border-line last:border-0">
+              <tr
+                key={rollup.channel}
+                className="border-b border-line-soft transition-micro last:border-0 hover:bg-s2"
+              >
                 <th scope="row" className="py-2 pr-4 text-left font-medium text-ink">
                   {CHANNEL_LABELS[rollup.channel]}
                 </th>

@@ -196,7 +196,7 @@ export async function RailFoot() {
       >
         <span
           aria-hidden
-          className="grid size-[26px] flex-none place-items-center rounded-full bg-brand-wash text-[11px] font-bold text-accent"
+          className="grid size-[26px] flex-none place-items-center rounded-pill bg-brand-wash text-[11px] font-bold text-accent"
         >
           {initials(name)}
         </span>
@@ -246,7 +246,7 @@ export function RailFootSkeleton() {
         <CreditsFootRow />
       </div>
       <div className="flex items-center gap-2 px-3 py-2.5 rail-min:justify-center rail-min:px-0">
-        <span aria-hidden className="size-[26px] flex-none rounded-full bg-s2" />
+        <span aria-hidden className="size-[26px] flex-none rounded-pill bg-s2" />
         <span className="min-w-0 flex-1 rail-min:hidden">
           <SkeletonBar className="h-[13px] w-24" />
           <SkeletonBar className="mt-1 h-[11px] w-16" />

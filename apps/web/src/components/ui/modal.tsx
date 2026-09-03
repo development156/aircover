@@ -122,7 +122,7 @@ export function Modal({
         // measured on /campaigns, `getComputedStyle(panel).textAlign === 'center'`
         // with no `text-center` anywhere in this file. An overlay's alignment must
         // come from the overlay, never from its mount point.
-        'm-auto w-[min(560px,calc(100vw-32px))] rounded-card border border-line bg-surface p-0 text-left text-ink shadow-lg',
+        'surface-ring m-auto w-[min(560px,calc(100vw-32px))] rounded-xl bg-surface p-0 text-left text-ink shadow-lg',
         // ── A FOOTER THAT FALLS OFF THE SCREEN IS A DIALOG THAT CANNOT BE
         //    ANSWERED ────────────────────────────────────────────────────────
         // MEASURED in Chromium at 1440x1100 with the crop offer inside: the
@@ -158,7 +158,7 @@ export function Modal({
         onClick={(e) => e.stopPropagation()}
         className="flex max-h-[calc(100dvh_-_2rem)] flex-col"
       >
-        <div className="flex flex-none items-start gap-3 border-b border-line-soft p-4">
+        <div className="flex flex-none items-start gap-3 border-b border-line-soft p-5">
           <div className="min-w-0 flex-1">
             <h2 id={titleId} className="type-h3">
               {title}
@@ -175,9 +175,9 @@ export function Modal({
             <X size={16} aria-hidden />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">{children}</div>
         {footer ? (
-          <div className="flex flex-none justify-end gap-2 border-t border-line-soft p-4">
+          <div className="flex flex-none justify-end gap-2 border-t border-line-soft p-5">
             {footer}
           </div>
         ) : null}

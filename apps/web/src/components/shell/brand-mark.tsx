@@ -172,7 +172,7 @@ export function BrandMark({
         ) : (
           <span
             aria-hidden
-            className="size-4 rounded-full"
+            className="size-4 rounded-pill"
             style={{ background: primary ?? 'var(--p)' }}
           />
         )}
