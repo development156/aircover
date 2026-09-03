@@ -1,6 +1,12 @@
 # Handoff — jiban — wt-jiban3 — 2026-09-03
 
-**Branch** `wt-jiban3` at `88425ae9`. Lane `wt-jiban3`. Pushed: yes.
+**Branch** `wt-jiban3` at `36771f12`. Lane `wt-jiban3`. Pushed: yes.
+
+> **Re-measured after `lane-sync push` took 32 more commits from `wt-core`.**
+> The two blockers this handoff first named as the next session's work are
+> GONE, and the figures below were rewritten in the same commit that moved
+> them rather than left standing. The first draft is wrong about them and
+> this is the correction.
 
 **This lane is already on the trunk.** PR #32 was merged into `wt-core` at
 `b7cd861d` on 2026-08-31 12:40 UTC, and `88425ae9` is `wt-core`'s own head, so
@@ -152,60 +158,72 @@ to save 14,100.
 
 ## What the next session in THIS lane should pick up
 
-**Start from the trunk.** `wt-jiban3` carries nothing unmerged; `git fetch` then
-`git checkout -B wt-jiban3 origin/wt-core`.
+**Start from the trunk.** `wt-jiban3` at `36771f12` is `wt-core` plus one
+handoff commit; there is nothing else of this lane's unmerged.
 
-**The trunk cannot deploy, and that is the thing worth picking up.** MEASURED on
-`88425ae9`, cold:
+**The trunk builds again.** MEASURED cold on `36771f12`:
+`js-budget ok: 82 routes within budget`, and the root `vitest` leg that was red
+on `logo-facts.test.ts` is green — `wt-girija`'s `9aec56a9` landed, and its
+finding is worth reading: the file's own header NAMED the reader functions in
+order to explain why it is not a scanner, and the registry scans source TEXT,
+so the explanation of why the file was not a scanner is what made it one.
 
-| Route | Measured | Budget | Over | Whose |
+**But look at HOW `/loop` and `/assets` went green, because it was not by
+trimming.** `afb4a3ef fix(perf): accept the two routes that outgrew their JS
+budget` raised both entries:
+
+| Route | Budget was | Budget now | Measured | Margin left |
 | --- | --- | --- | --- | --- |
-| `/(app)/loop` | 757,364 | 745,422 | +11,942 | another lane's Loop redesign |
-| `/(app)/assets` | Vercel: 811.2 kB | 802.8 kB | +8.4 kB | another lane |
+| `/(app)/loop` | 745,422 | 757,341 | 757,648 | 7,885 of 8,192 |
+| `/(app)/assets` | 802,776 | 830,104 | 830,092 | 8,204 |
+| `/(app)/connections` | 700,313 | unchanged | 707,822 | **683** |
 
-`/loop` was measured at +11,625 on `wt-core` with **no** lane work present, in a
-separate worktree at `fda34a21`. `/assets` fails on Vercel and passes here by a
-few hundred bytes — the same knife-edge as `/connections`, so trust Vercel over
-this machine. `89b3d7c6` already trimmed 19.5 kB of channel logos from `/loop`
-and it is still over, so the gap belongs to the redesign rather than a stray
-import.
+MEASURED. Three lanes, this one included, refused to re-baseline those entries;
+a fourth did it deliberately and said so in the subject line, which is the
+sanctioned route. Worth knowing rather than re-litigating.
 
-`scripts/lib/scanner-registry.test.mjs` is also red on
-`apps/web/src/lib/brand/logo-facts.test.ts`. **Do not fix it here** —
-`wt-girija` already has a fix in flight (`9aec56a9`), and its finding is worth
-reading: the file's own header NAMED the reader functions in order to explain
-why it is not a scanner, and the registry scans source text, so the explanation
-of why the file is not a scanner is what made it one.
+**`/connections` is the one still on a knife edge.** It sits 7,509 over with
+**683 bytes** of slack left, and Vercel measures this repository roughly 615
+bytes higher than this machine, so it can fail there while passing here. It has
+done exactly that before. **A local green is not evidence for that route.**
 
-**Do not re-baseline any budget entry to clear these.** Three lanes have now
-independently refused that, correctly.
+**Nothing carrying the new favicon has ever been published.** Every Vercel build
+on `wt-core`, `wt-web` and this lane failed through 2026-08-31, and the state of
+the first build on a green trunk was not observed from this session. The first
+job for whoever picks this up: check that a deployment succeeded, open the
+lane preview, and look at the tab icon. That is the one thing about this work
+nobody has yet seen with their own eyes.
 
 The two questions the founder has not answered:
 
-- Whether this session should fix `/loop` and `/assets`, or leave them to the
-  lanes that own those screens. Asked twice, unanswered; the stakes rose from
-  "my preview" to "the trunk and production cannot publish".
+- Whether a session should chase `/connections` down from its 683-byte margin,
+  or leave it. Asked twice while it was blocking; it is no longer blocking, so
+  this is now a question about debt rather than an outage.
 - Whether to build annual pricing so the plan offer can carry a Monthly/Annual
   toggle. `PLAN_CATALOG` holds one `priceInr` per plan; a toggle needs a second
   price and a "Save XX%" figure and both would have to be invented.
 
 ## Gate
 
-Run on `88425ae9`, 2026-09-03. `turbo` forced with `--force`, so no cache
-replay; the cold build had `apps/web/.next` moved aside first.
+Run on `36771f12`, 2026-09-03, after `lane-sync push` merged `wt-core`.
+`turbo` forced with `--force`, so no cache replay; the cold build had
+`apps/web/.next` moved aside first.
 
 | Leg | Result |
 | --- | --- |
 | `turbo run typecheck lint test --force` | **PASS** — 27 of 27 tasks |
-| ↳ `@sahoda/web:test` | **PASS** — 576 files, **7,592 tests**, 13 skipped |
-| ↳ `@sahoda/db:test` | **PASS** — 44 files, 12 skipped |
-| ↳ all other packages | **PASS** — research 13, shared 30, publishing 27, mesh 28, sites 53, billing 30, jobs 36 |
+| ↳ `@sahoda/web:test` | **PASS** — 583 files, 3 skipped |
+| ↳ `@sahoda/db:test` | **PASS** — 45 files, 12 skipped |
+| ↳ all other packages | **PASS** — research 13, shared 30, publishing 27, mesh 29, sites 53, billing 30, jobs 36 |
 | `prettier --check .` | **PASS** |
-| root `vitest run` | **FAIL** — 2 of 231. `scanner-registry` on `logo-facts.test.ts`, another lane's, fix in flight |
+| root `vitest run` | **PASS** — 231 of 231 |
 | cold `next build` | **PASS** — exit 0 |
-| `js-budget` | **FAIL** — `/(app)/loop` 739.6 kB > 728.0 kB +8 kB slack (+11.7 kB). Vercel additionally fails `/(app)/assets` at +8.4 kB |
+| `js-budget` | **PASS** — `82 routes within budget` |
 | Playwright `@smoke` | **UNRUN** — Chromium here cannot complete an outbound HTTPS request and every spec signs in through Clerk. Not passed |
-| Vercel preview | **FAIL** — `dpl_FfQpkVXm2iXELJEeqAGx9K7zyc3Q`, the two budget routes above. Production's own last build (`dpl_7b1sg73M8ouWGAWK4ESRs1LLsZoV`, `wt-web` at `ed15a04b`) also ERROR |
+| Vercel | **UNVERIFIED on this head.** Every build through 2026-08-31 failed on the two budget routes now fixed, including production's own (`dpl_7b1sg73M8ouWGAWK4ESRs1LLsZoV`, `wt-web` at `ed15a04b`). Whether the first build on a green trunk succeeds was not observed |
 
-Neither failing leg is this lane's, and both were proven so by building
-`origin/wt-core` alone in a separate worktree with no lane work present.
+The earlier run on `88425ae9` failed two legs — root `vitest` on another lane's
+`logo-facts.test.ts`, and `js-budget` on `/(app)/loop` at +11.7 kB. Both were
+proven not this lane's by building `origin/wt-core` alone in a separate
+worktree at `fda34a21` with no lane work present, and both are now fixed on the
+trunk.
