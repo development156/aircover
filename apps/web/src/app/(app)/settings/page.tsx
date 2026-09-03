@@ -25,10 +25,12 @@ export const metadata = { title: 'Settings' }
  * offer and none is rendered. A disabled input there would imply an edit that
  * is not coming (docs/26 §10.2).
  *
- * The time zone row carries a disclosure saying the setting is recorded and
- * does not change any time on any screen yet, because nothing reads the column
- * so far. That sentence is load-bearing and goes in the change that makes the
- * screens read it, not before.
+ * The time zone row's disclosure used to say the setting was recorded and
+ * changed nothing, because nothing read the column. That stopped being true when
+ * Posts and the Planner began rendering scheduled times in it, and the sentence
+ * was rewritten in that same change rather than left to rot. What it says now is
+ * narrower and still exact: those two screens follow this zone, the time PICKER
+ * does not, and the timestamps on other screens do not.
  *
  * The pane's width cap lives in `layout.tsx` — see docs/26 §6.1 for why a form
  * this short looked unfinished at 1440 without one.
@@ -77,16 +79,26 @@ export default async function SettingsPage() {
           >
             {/*
               THE HONEST DISCLOSURE, AND WHY IT IS NOT OPTIONAL.
-              Nothing in the product reads this column yet: every time on every
-              screen is rendered in IST, from 38 hardcoded sites. A setting that
-              silently changes nothing is the same defect as a figure no query
-              produced, so the row says what it does and what it does not do.
-              Delete this line in the change that makes the screens read it,
-              not before.
+              This setting now reaches two screens and not the rest: Posts and
+              the Planner render scheduled times in it, the picker still builds
+              times on the reader's own device clock, and the other files that
+              name a zone still name IST. A setting that silently does less than
+              a reader would assume is the same defect as one that does nothing,
+              so the row states its reach rather than implying all of it. Narrow
+              this line as the remaining screens are moved, never widen it first.
+
+              THE WEEK GRID IS NAMED SEPARATELY because it is the one part of the
+              Planner this does not reach. `week-window.ts` places every card by
+              `PLANNER_GRID_ZONE`, so a card's column and row are IST facts; its
+              caption was briefly rendered in the workspace zone instead, which
+              drew a New York post in the wrong column under the right time. The
+              caption now matches the grid, and this sentence says so rather than
+              letting "the Planner" imply the grid moved too.
             */}
             <p className="type-meta text-muted">
-              Sahoda still shows and schedules every time in IST. This setting is recorded and does
-              not change them yet.
+              Posts and Planner show your scheduled times in this zone. The Planner's week grid is
+              still laid out in IST, choosing a time still follows your own device clock, and other
+              timestamps in Sahoda are shown in IST.
             </p>
           </SettingRow>
         </SettingCard>

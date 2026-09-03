@@ -5,7 +5,8 @@ import { creditCost, toChannelSet } from '@sahoda/shared'
 
 import { GeneratePanel } from './generate-panel'
 import { InlineRewrite } from './inline-rewrite'
-import { GenerateImage } from './generate-image'
+import { StudioWorkbench } from '@/components/studio/studio-workbench'
+import { generatableFormats } from '@/lib/studio/formats'
 
 /**
  * WHAT EVERY PAID CONTROL SAYS WHEN THE WALLET IS EMPTY.
@@ -35,6 +36,10 @@ const insufficient = (required: number) => ({
   required,
   available: 0,
 })
+
+vi.mock('@/app/actions/studio', () => ({
+  queueGeneration: vi.fn(async () => insufficient(6)),
+}))
 
 vi.mock('@/app/actions/posts-ai', () => ({
   generateVariants: vi.fn(async () => insufficient(3)),
@@ -104,22 +109,47 @@ describe('rewriting a selection — 1 credit', () => {
   })
 })
 
-describe('making an image — 6 credits', () => {
-  test('names the price before the click, and picks the CHEAPER tier', () => {
-    render(<GenerateImage postId="p1" />)
+describe('making a picture, which now lives in the Studio', () => {
+  /**
+   * RETARGETED, NOT DELETED. This block used to drive the composer's own
+   * `GenerateImage`, which was the only paid image control in the product. The
+   * Studio replaced it, and the guard follows the control rather than dying with
+   * it: what is being protected is the REFUSAL, and the refusal moved.
+   */
+  test('names the price before the press, and picks the CHEAPER tier', () => {
+    render(
+      <StudioWorkbench
+        formats={generatableFormats()}
+        cost={creditCost('image_standard')}
+        library={[]}
+        pictures={[]}
+      />,
+    )
     // `MESH_TASK_ACTION.image_generate` maps to `image_standard` (6), not
-    // `image_premium` (12): a customer who asked for "an image" and was charged
+    // `image_premium` (12): a customer who asked for "a picture" and was charged
     // for a tier they never chose has been overcharged, and the reverse never
     // happens.
     expect(creditCost('image_standard')).toBe(6)
     expect(document.body.textContent).toMatch(/6\s*credits/)
   })
 
-  test('refuses with both numbers', async () => {
-    render(<GenerateImage postId="p1" />)
-    await userEvent.type(screen.getByPlaceholderText(/describe the picture/i), 'a cup of chai')
-    await userEvent.click(screen.getByRole('button', { name: /make an image/i }))
-    await screen.findByText(/needs/i)
-    expectsShortfall(6)
+  test('refuses with both numbers, and says nothing was charged', async () => {
+    render(
+      <StudioWorkbench
+        formats={generatableFormats()}
+        cost={creditCost('image_standard')}
+        library={[]}
+        pictures={[]}
+      />,
+    )
+    await userEvent.type(screen.getByPlaceholderText(/plate of fresh samosas/i), 'a cup of chai')
+    await userEvent.click(screen.getByRole('button', { name: /make this picture/i }))
+    // Scoped to the ALERT, not to the whole document. `/needs/i` used to be
+    // unique on this screen and stopped being so when the model picker landed:
+    // one model's description ends "this is what a carousel needs". The claim
+    // was always about the refusal, so the query now asks the refusal.
+    const refusal = await screen.findByRole('alert')
+    expect(refusal.textContent).toMatch(/needs\s*6\s*credits and you have\s*0\s*credits/)
+    expect(refusal.textContent).toMatch(/nothing was charged/i)
   })
 })

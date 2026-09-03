@@ -90,7 +90,7 @@ export function BrainRing({ brain }: { brain: BrainRead }) {
   // two chips were the only ones without it. The palette, sized
   // `w-[min(420px,100%)]`, is the item meant to absorb the shrink.
   const shell =
-    'group relative flex flex-none items-center gap-2 rounded-pill border border-line bg-bg px-2 py-1 font-semibold whitespace-nowrap transition-micro hover:bg-tint-50 active:scale-[.97] max-narrow:hidden dark:hover:bg-s2'
+    'group relative flex h-control flex-none items-center gap-2 rounded-pill border border-line bg-bg px-2 font-semibold whitespace-nowrap transition-micro hover:bg-tint-50 active:scale-[.97] max-narrow:hidden dark:hover:bg-s2'
 
   if (brain.status === 'no-brain') {
     return (

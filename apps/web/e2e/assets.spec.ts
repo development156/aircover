@@ -53,6 +53,8 @@ test.describe('media library', () => {
     page,
     signedIn,
   }) => {
+    // Destructured to activate the fixture; `void` because the value itself is unused.
+    void signedIn
     test.setTimeout(180_000)
 
     await bootstrapWorkspace(page)
@@ -258,6 +260,8 @@ test.describe('media library · widths and themes', () => {
   ] as const) {
     for (const theme of ['light', 'dark'] as const) {
       test(`renders at ${label} · ${theme}`, async ({ page, signedIn }) => {
+        // Destructured to activate the fixture; `void` because the value itself is unused.
+        void signedIn
         test.setTimeout(120_000)
         await page.setViewportSize({ width, height })
         await bootstrapWorkspace(page)

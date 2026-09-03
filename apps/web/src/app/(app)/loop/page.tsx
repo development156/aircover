@@ -7,15 +7,20 @@ import {
 } from '@sahoda/shared'
 
 import { AutonomyDial } from '@/components/loop/autonomy-dial'
+import { AutopilotLimits } from '@/components/loop/autopilot-limits'
 import { CostPreview } from '@/components/loop/cost-preview'
 import { CycleStrip } from '@/components/loop/cycle-strip'
+import { GoingOut } from '@/components/loop/going-out'
 import { KillSwitch } from '@/components/loop/kill-switch'
 import { PendingLearnings } from '@/components/loop/learnings'
 import { LoopControls } from '@/components/loop/controls'
 import { LoopStatus } from '@/components/loop/loop-status'
 import { PageTitle } from '@/components/page-title'
+import { loopCronEnabled } from '@/lib/cron/loop-enabled'
 import { explain, remedy } from '@/lib/loop/eligibility'
 import { readLoop, type LoopSnapshot } from '@/lib/loop/read'
+import { readGoingOut } from '@/lib/loop/autopilot/going-out'
+import { GOING_OUT_UNREADABLE } from '@/lib/loop/autopilot/going-out-copy'
 import { reflectSentence } from '@/lib/loop/reflect'
 import {
   LOOP_SCHEDULE_SENTENCE,
@@ -54,7 +59,11 @@ export const metadata = { title: 'The Loop' }
  * deployment runs, pinned by `lib/loop/schedule.test.ts`.
  */
 export default async function LoopPage() {
-  const read = await readLoop()
+  // Read alongside the Loop, not inside it. `readLoop`'s dial is typed with
+  // `AutonomyLevel`, which admits only 0-2, so an armed channel is invisible
+  // through it; `readGoingOut` reads the stored integer. Its own failures
+  // resolve to a state rather than throwing, so this cannot take the page down.
+  const [read, goingOut] = await Promise.all([readLoop(), readGoingOut()])
 
   // Two answers, two sentences, two remedies. `getActiveWorkspace()` collapsed
   // them into one null and this page said "Finish setting up your workspace" to
@@ -87,8 +96,18 @@ export default async function LoopPage() {
   // The same `assess()` the Sunday cron uses, so the screen and the schedule
   // cannot disagree. An eligible workspace gets no notice here — the button is
   // enabled and its own line already says where the cycle stops.
+  //
+  // The verdict answers "would the Loop plan for this business". It cannot
+  // answer "is anything going to ask it on Sunday", and for as long as nothing
+  // here consulted the switch, this screen promised a weekly plan to workspaces
+  // in an environment where the Sunday job returns before reading anything. The
+  // switch defaults OFF because that job spends 20 credits per workspace.
+  const autoSchedule = loopCronEnabled() ? ('armed' as const) : ('off' as const)
   const verdict = loopVerdict(snapshot, new Date())
-  const refusal = verdict.eligible ? null : { sentence: explain(verdict), remedy: remedy(verdict) }
+  const refusal =
+    verdict.eligible && autoSchedule === 'armed'
+      ? null
+      : { sentence: explain(verdict, { autoSchedule }), remedy: remedy(verdict) }
 
   return (
     <div className="space-y-grid">
@@ -119,8 +138,20 @@ export default async function LoopPage() {
         hasChannels={snapshot.connected.length > 0}
         cycleRunning={running}
         refusal={refusal}
-        scheduleSentence={LOOP_SCHEDULE_SENTENCE}
-        nextRunAt={formatRunMoment(nextLoopRun(new Date()))}
+        /* ── THE FACET HAD TO MOVE WITH THE SENTENCE ──────────────────────
+           These were passed unconditionally, so with the cron off the same card
+           read "Sahoda is not planning weeks automatically at the moment" in one
+           column and "Schedule: Every Sunday / Next run 7 Sept 2026" in the
+           next. The fix reached the refusal sentence and left the facet making
+           the same promise, more concretely.
+
+           The facet STAYS rather than disappearing: "when does this run" is a
+           question the reader still has, and a missing row answers it with
+           nothing. There is no next run to name, so none is claimed. */
+        scheduleSentence={
+          autoSchedule === 'armed' ? LOOP_SCHEDULE_SENTENCE : 'Not running automatically'
+        }
+        nextRunAt={autoSchedule === 'armed' ? formatRunMoment(nextLoopRun(new Date())) : undefined}
         run={
           cycle
             ? {
@@ -145,6 +176,28 @@ export default async function LoopPage() {
         chosen={chosen}
         defaultLevel={DEFAULT_AUTONOMY_LEVEL}
       />
+
+      {/* Directly under the dial, because these two numbers only mean anything
+          once a channel is set to L3, and a reader who has just chosen that
+          needs to see them before anything else. Shown whether or not one is
+          armed: they are what WOULD hold, and a limit nobody can see before
+          they need it is a limit set on their behalf. */}
+      <AutopilotLimits
+        dailyCap={snapshot.autopilotDailyCap}
+        cancelMinutes={snapshot.autopilotCancelMinutes}
+        armed={[...snapshot.dial.values()].some((level) => level === 3)}
+      />
+
+      {/* Between the dial that grants the permission and the switch that
+          revokes everything: what that permission means right now. A reader who
+          has armed nothing learns the setting exists; a reader who has armed
+          something sees exactly what is in the window. */}
+      {goingOut.status === 'no-workspace' ? null : (
+        <GoingOut
+          view={goingOut.status === 'ready' ? goingOut.view : GOING_OUT_UNREADABLE}
+          waiting={goingOut.status === 'ready' ? goingOut.waiting : []}
+        />
+      )}
 
       <KillSwitch />
     </div>

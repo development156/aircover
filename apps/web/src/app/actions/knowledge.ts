@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { auth } from '@clerk/nextjs/server'
 import { revalidatePath } from 'next/cache'
 import { createPgLedgerPort, createWithCredits, loadBillingEnv } from '@sahoda/billing'
-import { creditCost, MESH_TASK_ACTION } from '@sahoda/shared'
+import { MESH_TASK_ACTION } from '@sahoda/shared'
 import {
   DEPLOYMENT_CONFIG_MESSAGE,
   isDeploymentConfigCause,
@@ -12,18 +12,16 @@ import {
 } from '@/lib/actions/paid-failure'
 import { revalidateBalance } from '@/lib/actions/revalidate-balance'
 import { chargeFailureState, FAILURE_REASON } from '@/lib/posts/charge-failure'
-import { buildEvidenceSet, chunkForIngestion, MAX_CHUNKS_PER_DOCUMENT } from '@sahoda/research'
 
 import { describeImpact } from '@/lib/knowledge/delete-impact'
 import { createThenIndex, indexFromSource, type KnowledgeActionState } from '@/lib/knowledge/ingest'
-import { knowledgeFailure, type KnowledgeFailureCode } from '@/lib/knowledge/failure-copy'
+import { knowledgeFailure } from '@/lib/knowledge/failure-copy'
 import {
   MAX_UPLOAD_BYTES,
   readPdfSource,
   readTypedSource,
   readUrlSource,
 } from '@/lib/knowledge/read-source'
-import type { SourceRead } from '@/lib/knowledge/read-source'
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { proposeFromLibrary } from '@/lib/knowledge/propose'
@@ -78,7 +76,25 @@ import { credits as creditsPhrase } from '@/lib/credit-words'
 /** The bucket `assets` already uses, and whose tenant policies already cover us. */
 const BUCKET = 'media'
 
-export type { KnowledgeActionState } from '@/lib/knowledge/ingest'
+/**
+ * ── THE TYPE IS IMPORTED, NEVER RE-EXPORTED ──────────────────────────────────
+ * This line was `export type { KnowledgeActionState } from '@/lib/knowledge/ingest'`
+ * and it made the DEV SERVER return 500 on /onboarding: Next allows a
+ * `'use server'` module to export async functions and nothing else, and it
+ * counts a type re-export as an export. MEASURED, `next dev`:
+ * "Only async functions are allowed to be exported in a 'use server' file",
+ * traced through `onboarding-stage.tsx`, so every browser test that bootstraps a
+ * workspace was blocked.
+ *
+ * `tsc` and `next build` both pass on it, which is why it reached the lane: the
+ * type is erased before either of them looks, and only the dev compiler enforces
+ * the rule.
+ *
+ * Nothing replaces it here — line 18 already imports the same type for this
+ * file's own use — and the one consumer that read it through this module,
+ * `components/knowledge/add-document.tsx`, now imports it from the module that
+ * declares it.
+ */
 
 const SIGNED_OUT: KnowledgeActionState = { ok: false, message: 'Sign in to add to your library.' }
 
@@ -486,7 +502,7 @@ export async function resolveFromLibrary(): Promise<LibraryResolveState> {
 
     const credits = await getWithCredits()(
       { workspaceId: ws.workspace.id, action, objectRef: newLibraryResolveRef(ws.workspace.id) },
-      async (ctx) => {
+      async (_ctx) => {
         const outcome = await proposeFromLibrary({
           passages: passages.passages,
           workspaceId: ws.workspace.id,

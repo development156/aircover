@@ -141,6 +141,26 @@ describe('LoopControls — what the run facts may claim', () => {
     expect(screen.getByText(/Spent this cycle/)).toBeTruthy()
   })
 
+  it('draws NO bar for a budget of ZERO, which is a choice and not a scale', () => {
+    // ── A REAL STORED VALUE THAT IS NOT A PROPORTION ────────────────────────
+    // The gate was `budgetCredits !== null`, so a budget of 0 rendered a bar
+    // with `aria-valuemax=0` under `aria-valuenow=85` and the sentence "Used 85
+    // of 0 credits" — while the fill drew EMPTY, because `share` divides by the
+    // budget. Every part of that is wrong in a different way, and `CreditsCard`
+    // beside it already guarded `budget > 0`.
+    render(
+      <LoopControls
+        {...BASE}
+        run={{ spentCredits: 85, budgetCredits: 0, startedAt: null, duration: null }}
+      />,
+    )
+    expect(screen.queryByRole('progressbar')).toBeNull()
+    expect(screen.queryByText(/of 0 credits/)).toBeNull()
+    // The spend still has to be reported. Removing the bar must not remove the fact.
+    expect(screen.getByText(/Spent this cycle/)).toBeTruthy()
+    expect(screen.getByText('85')).toBeTruthy()
+  })
+
   it('keeps an overspent bar inside its track while the figures still say so', () => {
     const { container } = render(
       <LoopControls

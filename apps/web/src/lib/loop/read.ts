@@ -2,6 +2,8 @@ import 'server-only'
 
 import {
   DEFAULT_AUTONOMY_LEVEL,
+  DEFAULT_AUTOPILOT_CANCEL_MINUTES,
+  DEFAULT_AUTOPILOT_DAILY_CAP,
   DEFAULT_WEEKLY_BUDGET_CREDITS,
   toChannelSet,
   type AutonomyLevel,
@@ -83,6 +85,18 @@ export interface LoopSnapshot {
   enabled: boolean
   paused: boolean
   weeklyBudgetCredits: number
+  /**
+   * The two promises autopilot makes, as the customer set them.
+   *
+   * Read rather than defaulted at the screen, and NEVER null: both columns are
+   * `not null` with defaults of 3 and 30, so a workspace that has a settings
+   * row always has real figures. The `??` below covers only the workspace with
+   * NO row at all, which is one that has never opened the Loop — and showing it
+   * the column defaults is honest, because those are exactly what it would run
+   * at the moment it did.
+   */
+  autopilotDailyCap: number
+  autopilotCancelMinutes: number
   /**
    * Credits this workspace can actually spend — total minus held.
    *
@@ -172,6 +186,8 @@ export const UNSET_SNAPSHOT: Omit<LoopSnapshot, 'dial' | 'connected' | 'lapsed'>
   brain: { resolved: false, confirmed: 0, total: RING_DENOMINATOR },
   paused: false,
   weeklyBudgetCredits: DEFAULT_WEEKLY_BUDGET_CREDITS,
+  autopilotDailyCap: DEFAULT_AUTOPILOT_DAILY_CAP,
+  autopilotCancelMinutes: DEFAULT_AUTOPILOT_CANCEL_MINUTES,
   cycle: null,
   briefs: [],
   learnings: [],
@@ -220,7 +236,7 @@ export async function readLoopSnapshot(workspaceId: string): Promise<LoopSnapsho
     await Promise.all([
       supabase
         .from('loop_settings')
-        .select('paused, weekly_budget_credits')
+        .select('paused, weekly_budget_credits, autopilot_daily_cap, autopilot_cancel_minutes')
         .eq('workspace_id', workspaceId)
         .maybeSingle(),
       supabase
@@ -391,6 +407,11 @@ export async function readLoopSnapshot(workspaceId: string): Promise<LoopSnapsho
     weeklyBudgetCredits:
       (settingsRes.data?.weekly_budget_credits as number | undefined) ??
       DEFAULT_WEEKLY_BUDGET_CREDITS,
+    autopilotDailyCap:
+      (settingsRes.data?.autopilot_daily_cap as number | undefined) ?? DEFAULT_AUTOPILOT_DAILY_CAP,
+    autopilotCancelMinutes:
+      (settingsRes.data?.autopilot_cancel_minutes as number | undefined) ??
+      DEFAULT_AUTOPILOT_CANCEL_MINUTES,
     dial,
     connected,
     lapsed,
