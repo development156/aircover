@@ -46,30 +46,50 @@ function group(
 
 describe('Reflect', () => {
   // ── THE STRUCTURAL GUARANTEE ─────────────────────────────────────────────
-  it('CANNOT call a model — the module imports no mesh and holds no port', () => {
+  it('CANNOT call a model — neither this module nor the arithmetic it delegates to', () => {
     // Read as source rather than asserted through a stub. A stub proves the
     // path not taken on ONE input; this proves there is no path at all, on
     // every input, including ones nobody thought to write a case for.
-    const src = readFileSync(resolve(import.meta.dirname, 'reflect.ts'), 'utf8')
-    const imports = [...src.matchAll(/^import .*?from '([^']+)'/gm)].map((m) => m[1])
-    expect(imports).toEqual(['@sahoda/shared'])
+    //
+    // ── THE GUARD FOLLOWED THE CODE ────────────────────────────────────────
+    // The five gates moved to `lib/analytics/grouped-lift.ts` so the analytics
+    // report could run the same comparison over the DAY OF THE WEEK a post went
+    // out. This guard is the reason that move is safe: a guarantee that stopped
+    // at this file's own imports would have been satisfied the moment the
+    // arithmetic left it, while proving nothing about where the arithmetic went.
+    // So the allow-list names the one sibling, and the forbidden scan runs over
+    // BOTH files. Adding a third import fails here on purpose.
+    const here = resolve(import.meta.dirname, 'reflect.ts')
+    const delegate = resolve(import.meta.dirname, '../analytics/grouped-lift.ts')
 
-    // COMMENTS STRIPPED FIRST. The prose above explains at length that this
-    // module reaches no model, so it contains every word a naive scan would
-    // flag — and the first version of this test failed on its own explanation.
-    // A guard that reads documentation instead of code is checking the one part
-    // of a file that cannot execute.
-    const code = src
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .replace(/^\s*\/\/.*$/gm, '')
-      .toLowerCase()
-    // BOTH SIDES LOWERCASED. The first version folded the haystack only and
-    // compared it against 'runTask', so 'runtask'.includes('runTask') was false
-    // for every input and the check could never fire — a guard carrying the
-    // same class of flaw as the thing it guards. A mutation that injected a
-    // real runTask call walked straight through it.
-    for (const forbidden of ['mesh', 'runtask', 'fetch(', 'openai', 'anthropic']) {
-      expect(code.includes(forbidden)).toBe(false)
+    const src = readFileSync(here, 'utf8')
+    const imports = [...src.matchAll(/^import .*?from '([^']+)'/gm)].map((m) => m[1])
+    expect(imports).toEqual(['@sahoda/shared', '@/lib/analytics/grouped-lift'])
+
+    // The delegate is a LEAF. It imports nothing at all, which is what makes the
+    // two-file scan below a complete account of the reachable graph rather than
+    // the first two steps of one.
+    const delegateSrc = readFileSync(delegate, 'utf8')
+    expect([...delegateSrc.matchAll(/^import .*?from '([^']+)'/gm)].map((m) => m[1])).toEqual([])
+
+    // COMMENTS STRIPPED FIRST. The prose in both files explains at length that
+    // they reach no model, so they contain every word a naive scan would flag —
+    // and the first version of this test failed on its own explanation. A guard
+    // that reads documentation instead of code is checking the one part of a
+    // file that cannot execute.
+    for (const text of [src, delegateSrc]) {
+      const code = text
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/^\s*\/\/.*$/gm, '')
+        .toLowerCase()
+      // BOTH SIDES LOWERCASED. The first version folded the haystack only and
+      // compared it against 'runTask', so 'runtask'.includes('runTask') was false
+      // for every input and the check could never fire — a guard carrying the
+      // same class of flaw as the thing it guards. A mutation that injected a
+      // real runTask call walked straight through it.
+      for (const forbidden of ['mesh', 'runtask', 'fetch(', 'openai', 'anthropic']) {
+        expect(code.includes(forbidden)).toBe(false)
+      }
     }
   })
 

@@ -1,7 +1,7 @@
 import { ChartSparse, Panel, PanelHead } from '@/components/charts/panel'
 import { TrendArea, type TrendPoint } from '@/components/charts/trend-area'
 import { METRIC_LABELS, type MetricKey } from '@/lib/analytics/compare'
-import { MIN_SERIES_DAYS, type MetricSeries, type SeriesPoint } from '@/lib/analytics/series'
+import { MIN_SERIES_DAYS, type MetricSeries } from '@/lib/analytics/series'
 
 /**
  * Performance over time — the trend, once there is one.

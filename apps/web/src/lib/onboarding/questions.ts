@@ -1,4 +1,4 @@
-import type { BusinessModel, Locale, Regime } from './intake'
+import type { BusinessModel, Locale } from './intake'
 
 /**
  * The catalogue for screen 3. Data only — `question.ts` owns the lookup.

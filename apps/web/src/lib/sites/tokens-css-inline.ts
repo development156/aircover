@@ -88,6 +88,18 @@ export const TOKENS_CSS = `/* ==================================================
   --pstrong: #000000; /* primary hovers to BLACK: orange is the resting state,
                          black is the commitment. */
 
+  /* THE HOVER'S OWN FOREGROUND, WHICH USED TO BE HARDCODED IN NINE COMPONENTS.
+     \`--pfg\` is #000000 and stays #000000 in every theme, so it cannot label the
+     hover fill on LIGHT: black on black. Every call site solved that the same
+     way, by writing \`hover:text-white\` beside \`hover:bg-primary-strong\` — nine
+     of them, in eight files, all correct and all light-only.
+     That is docs/37 §19's warning exactly ("guards that grade TOKENS cannot see
+     what COMPONENTS write"), and it is what made the dark fix below more than a
+     one-line change: lightening \`--pstrong\` in dark while nine components still
+     force white would have put white on #ff893e at 2.57:1. Now the pair moves
+     together, per theme, and no component decides a colour. */
+  --pstrong-fg: #ffffff; /* 21.0:1 on the black light-theme hover fill */
+
   /* Accent TEXT — links, and any orange word on a light surface.
 
      ── FOUNDER'S RULING, 2026-08-26: BRAND BRIGHTNESS OVER THE AA FLOOR ──────
@@ -175,6 +187,20 @@ export const TOKENS_CSS = `/* ==================================================
   --canvas: #fafafa; /* the page ground — NO LONGER white */
   --surface: #ffffff; /* cards, panels, sheets */
   --surface-2: #f2f2f3; /* a well INSIDE a card — inputs, code, table heads */
+
+  /* ── INK DRAWN ON A CUSTOMER'S PHOTOGRAPH ──────────────────────────────────
+     Not app chrome. These are the marks somebody draws ON their own picture in
+     the Studio, and they are DELIBERATELY THEME-INDEPENDENT: a photograph does
+     not follow our light and dark modes, so ink that flipped with the interface
+     would vanish on half of everybody's pictures. A brand accent is worse still,
+     since an orange arrow on a photograph of a sunset is invisible.
+
+     Two of them, always drawn as a pair: the light stroke carries the edge
+     behind it, so the mark reads on a night sky and on a white wall alike. They
+     live here rather than as literals in the renderer because a colour anywhere
+     in this product is a token, including one that lands on a canvas. */
+  --photo-ink: #ffffff;
+  --photo-ink-edge: #111111;
   --surface-3: #e9e9eb; /* hover / pressed */
   /* Hairlines. Softer than v4's #dcdcdc because they are no longer doing the
      structural work — the fill is. A line at v4's weight over the new fill
@@ -578,6 +604,43 @@ export const TOKENS_CSS = `/* ==================================================
      --acc returns to the brand value. It is NOT re-pointed at a tint: a
      24%-alpha focus ring is invisible. */
   --acc: #ff6600;
+
+  /* ── AND NEITHER DOES THE PRIMARY. ITS HOVER DID, AND POINTED AT THE PAGE ──
+     \`--p\` and \`--pfg\` are deliberately absent from this block: orange is the
+     fixed point above, and ink on it is 7.15:1 in both themes. \`--pstrong\` was
+     absent too, and that was not the same decision — it was an omission. It
+     inherited \`:root\`'s #000000, which on this theme's own \`--surface\` #171717
+     measures 1.23:1, so every primary button in dark mode became a hole in its
+     card at the moment somebody reached for it.
+
+     \`brand-theme.ts\` states the rule beside the line implementing it: "The
+     hover step moves AWAY from the page, in whichever direction that is.
+     Darkening a dark-theme button on hover moved it towards its own background,
+     so the loudest control in the product got quieter when you reached for it."
+     Every CUSTOMER theme has followed it since the 2026-08-30 rail ruling. This
+     one did not, which is the own-medicine defect in the theme most people use.
+
+     SOLVED, NOT PICKED — \`brandSkinVars([], 'dark')['--pstrong']\`, the product's
+     own solver asked about Sahoda orange on a dark ground:
+     \`oklch(0.8008 0.2043 43.5)\`, which is L + (0.03 x 3.5) from \`--p\`.
+
+       fill on --surface #171717   7.60:1   (was 1.23:1)
+       fill on --canvas  #0d0d0d   8.24:1
+       resting --p on #171717      6.11:1 -> 7.60:1 on hover
+
+     The foreground flips WITH it. White cannot label this fill (2.57:1), and no
+     fill white can label is brighter than the resting orange — which would make
+     the button quieter on hover and reintroduce the defect from the other side.
+     So dark's hover keeps INK, at 8.90:1, better than the resting 7.15:1.
+
+     \`--brand-deep\` is NOT re-declared here, and that asymmetry with
+     \`[data-surface='inverse']\` is the point: this selector matches <html>, the
+     same element \`:root\` declares the alias on, so the var() substitution picks
+     up the value below. Only a scope on a DESCENDANT needs the alias repeated.
+     See the six-alias paragraph in that scope. */
+  --pstrong: #ff893e;
+  --pstrong-fg: #000000; /* 8.90:1 on the fill above */
+
   --channel-x: #ffffff; /* the X glyph is invisible on dark otherwise */
 
   --ok: #ffffff;
@@ -656,12 +719,54 @@ export const TOKENS_CSS = `/* ==================================================
   --ink-mute: #979797;
   --ink-faint: #6f6f6f;
   --acc: #ff6600;
+
+  /* ── THE PRIMARY'S HOVER, WHICH POINTED AT THE GROUND ─────────────────────
+     \`:root\` sets \`--pstrong: #000000\` and says why: "orange is the resting
+     state, black is the commitment." That is right on a white page and exactly
+     backwards here. Black on this scope's \`#171717\` measures **1.23:1** — the
+     loudest control in the product becomes a hole in the panel at the moment
+     somebody reaches for it. \`--p\` and \`--pfg\` are unaffected: orange is the
+     one fixed point in the palette and \`--pfg\` is already ink.
+
+     THE RULE IS NOT NEW AND NOT MINE. \`brand-theme.ts\` states it beside the
+     line that implements it: "The hover step moves AWAY from the page, in
+     whichever direction that is. Darkening a dark-theme button on hover moved
+     it towards its own background, so the loudest control in the product got
+     quieter when you reached for it." Every CUSTOMER theme has had this since
+     the 2026-08-30 rail ruling — \`skin-css.ts\` builds this very scope from
+     \`brandSkinVars(colors, 'dark')\`, which carries a lightened \`--pstrong\`.
+     A workspace with no Brand Skin fell through to \`:root\` and got the black.
+     So the app applied the rule to every tenant and not to itself, which is
+     the defect \`own-medicine.test.ts\` exists for, in a scope it did not read.
+
+     SOLVED, NOT PICKED. This is \`brandSkinVars([], 'dark')['--pstrong']\` — the
+     product's own solver, asked about Sahoda orange on a dark ground:
+     \`oklch(0.8008 0.2043 43.5)\`, which is L + (0.03 x 3.5) from \`--p\`.
+     Flattened to hex like \`--ink-faint\`, because the Readability Guard mirrors
+     these as decimal RGB and parses 6-digit hex only.
+
+       fill on --surface #171717   7.60:1   (was 1.23:1)
+       fill on --canvas  #0d0d0d   8.24:1
+       --pfg #000000 on the fill   8.90:1   (resting orange is 7.15:1)
+       resting --p on #171717      6.11:1 → 7.60:1 on hover
+
+     The control gets LOUDER when reached for, and its own label gets more
+     readable, not less. Graded by \`own-medicine.test.ts\`.
+
+     STILL OPEN, deliberately out of this change: \`[data-theme='dark']\`
+     declares none of \`--p\`, \`--pfg\` or \`--pstrong\`, so full dark mode inherits
+     the same \`#000000\` on its own \`#171717\` cards. Same defect, wider blast
+     radius, and it changes shipping pixels for real users. Reported, not
+     silently fixed here. */
+  --pstrong: #ff893e;
+  --pstrong-fg: #000000; /* 8.90:1 on the fill above, the same pair dark uses */
+
   --ok: #ffffff;
   --info: #979797;
   --hatch: rgba(255, 255, 255, 0.2);
   --channel-x: #ffffff;
 
-  /* ── THE FIVE ALIASES, RE-DECLARED — AND THIS IS NOT TIDINESS ──────────────
+  /* ── THE SIX ALIASES, RE-DECLARED — AND THIS IS NOT TIDINESS ───────────────
      MEASURED 2026-08-23 by \`rail-collapse.spec.ts\`, in a browser, on the
      rendered colours: every label in the rail read **#57575a on #171717 —
      2.49:1** in LIGHT. That is the app's primary navigation, at every width,
@@ -691,17 +796,28 @@ export const TOKENS_CSS = `/* ==================================================
      \`tonal-ladder.test.ts\` grades this scope and passes, because every token it
      reads IS correct. The rendered guard is in \`rail-collapse.spec.ts\`.
 
-     All five are listed, not just the one that was measured failing. \`--s2\` is
+     All six are listed, not just the one that was measured failing. \`--s2\` is
      the rail foot's hover fill and would have painted the LIGHT #f4f4f5 inside
      a dark panel; \`--s1\` is \`--canvas\`; \`--bg\` is \`--surface\`; \`--faint\` is
      \`--ink-faint\`. Every alias in L3 whose source this scope re-declares is
      re-declared here, because the next one to be reached for is the one nobody
-     measured. */
+     measured.
+
+     \`--brand-deep\` is the sixth, added with \`--pstrong\` above and for exactly
+     the reason this comment already gives: it is declared as
+     \`--brand-deep: var(--pstrong)\` on \`:root\`, so it was substituted there and
+     froze at #000000 before this scope existed. Re-declaring \`--pstrong\` alone
+     would have fixed \`bg-primary-strong\` — \`@theme inline\` in
+     \`apps/web/globals.css\` inlines the value, so that utility resolves here —
+     and left \`bg-brand-deep\` black, which is the SAME bug in half the call
+     sites. That is the "next one to be reached for" this paragraph warns
+     about, caught on the paragraph that warns about it. */
   --bg: var(--surface);
   --s1: var(--canvas);
   --s2: var(--surface-2);
   --muted: var(--ink-mute);
   --faint: var(--ink-faint);
+  --brand-deep: var(--pstrong);
 
   color: var(--ink-body);
 }

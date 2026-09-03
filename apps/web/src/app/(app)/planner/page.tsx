@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { getActiveWorkspace } from '@/lib/workspaces'
 import type { Channel } from '@sahoda/shared'
 import { CalendarDays } from 'lucide-react'
 
@@ -92,15 +93,21 @@ export default async function PlannerPage({
   // never one per row. `readCampaignsByPost` returns null on a failed read, and
   // `PlannerRow` renders nothing for `undefined` rather than claiming a post is
   // in no campaign.
-  const [variantStates, connected, campaignsByPost] = await Promise.all([
+  const [variantStates, connected, campaignsByPost, workspace] = await Promise.all([
     listVariantStates(postIds),
     readConnectedChannels(),
     readCampaignsByPost(postIds),
+    // Alongside the others: `read-waterfall.test.ts` counts sequential reads per
+    // route, and it caught this one being awaited on its own line.
+    getActiveWorkspace(),
   ])
   // One instant for the whole screen: the week buckets and the past-due notes
   // must not be computed against two different clocks.
   const autoPublish = autoPublishEnabled()
   const now = new Date()
+  // The clock every time on this page is rendered in: the workspace's own when
+  // it has one, the shipped default when it does not.
+  const zone = workspace?.timezone ?? null
 
   // The Monday-anchored window this view is looking at. `bucketWeek` starts at
   // TODAY, which cannot be navigated: "previous week" would move by a
@@ -251,7 +258,7 @@ export default async function PlannerPage({
             which was false the moment a search existed. */}
         {posts.length > 0 ? (
           <div className="enter-step" style={{ '--i': 1 } as React.CSSProperties}>
-            <PlannerSummary posts={shown} now={now} />
+            <PlannerSummary posts={shown} now={now} zone={zone} />
           </div>
         ) : null}
 
@@ -350,6 +357,10 @@ export default async function PlannerPage({
                         ...(filter.dateKey === null ? {} : { date: filter.dateKey }),
                       }}
                     />
+                    {/* No `zone`: the grid places every card by
+                        PLANNER_GRID_ZONE, and its caption reads the same zone.
+                        Passing the workspace's would only let the two drift
+                        apart again. */}
                     <WeekTimeline
                       days={view === 'day' ? window.days.filter(isToday) : window.days}
                       posts={visible}
@@ -384,6 +395,7 @@ export default async function PlannerPage({
                   until the rail went live. It is also what `PlannerReschedule`
                   needs before it can warn about an unconnected channel. */}
                         <PlannerRow
+                          zone={zone}
                           post={post}
                           now={now}
                           connected={connectedChannels}
@@ -423,7 +435,7 @@ export default async function PlannerPage({
                 query={filter.query}
                 week={weekParam}
               />
-              {next.length > 0 ? <PlannerUpcoming posts={next} /> : null}
+              {next.length > 0 ? <PlannerUpcoming posts={next} zone={zone} /> : null}
             </aside>
           ) : null}
         </div>

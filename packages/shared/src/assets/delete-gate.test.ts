@@ -4,7 +4,6 @@ import { PostStatusSchema, VariantPublishStatusSchema } from '../enums'
 import type { PostStatus, VariantPublishStatus } from '../enums'
 import {
   LOCKING_POST_STATUSES,
-  LOCKING_VARIANT_STATUSES,
   decideAssetDelete,
   isLockedSite,
   nameOfPost,

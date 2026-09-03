@@ -15,7 +15,7 @@ import { getPost, readMedia, readVariantFormatsStrict } from '@/lib/posts/read'
 import { sniffImage } from '@/lib/posts/sniff-image'
 import type { AttachMediaState, DetachMediaState } from '@/lib/posts/media-state'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
+import { workspaceForWrite } from '@/lib/workspaces'
 
 /**
  * Attach a file to a post.
@@ -74,8 +74,13 @@ export async function attachMedia(postId: string, formData: FormData): Promise<A
     // numbers below are gates, and a read that returned `[]` / `{}` because it
     // FAILED switches them off rather than tightening them. Nothing is uploaded
     // against limits we could not check.
-    const existing = await readMedia(postId)
-    const formats = await readVariantFormatsStrict(postId)
+    // Both take only `postId` and neither reads the other, so they go together.
+    // Serially this cost the customer two database round trips before the first
+    // byte of their photo was judged.
+    const [existing, formats] = await Promise.all([
+      readMedia(postId),
+      readVariantFormatsStrict(postId),
+    ])
     if (existing === null || formats === null) {
       return {
         ok: false,

@@ -2,7 +2,6 @@ import { Badge, type Rung } from '@/components/ui/badge'
 import type { BrandMemoryPayload } from '@sahoda/shared'
 
 import { BrandCard, type RegenerateCost } from '@/components/onboarding/brand-card'
-import { cn } from '@/lib/utils'
 
 export interface SignalLockCardProps {
   value: BrandMemoryPayload['alignment']

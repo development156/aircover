@@ -443,7 +443,7 @@ describe('POST /api/webhooks/cashfree — delivery contract', () => {
   it('reports a grant that replayed instead of silently returning success', async () => {
     const { pool } = recordingPool()
     const replayingPool = {
-      query: async (text: string, values: unknown[] = []) => {
+      query: async (text: string, _values: unknown[] = []) => {
         if (text.includes('insert into billing_webhook_events')) return { rows: [{ id: 'wh_2' }] }
         if (text.includes('apply_ledger_entry')) {
           return {

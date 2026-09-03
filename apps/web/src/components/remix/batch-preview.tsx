@@ -138,7 +138,7 @@ export function BatchPreview({ batch }: BatchPreviewProps) {
           if (mine.length === 0) return null
           const line = cost.lines.find((l) => l.kind === spec.kind)
           return (
-            <li key={spec.kind} className="rounded-input bg-subtle p-3">
+            <li key={spec.kind} className="rounded-input bg-surface-2 p-3">
               <div className="flex flex-wrap items-baseline justify-between gap-x-4">
                 <span className="type-h3 text-ink">{spec.label}</span>
                 <span className="type-sm num text-muted">
@@ -227,7 +227,7 @@ export function BatchPreview({ batch }: BatchPreviewProps) {
  */
 function NotEnough({ required, available }: { required: number; available: number }) {
   return (
-    <p role="alert" className="mt-3 rounded-input bg-warn-subtle p-3 type-sm text-ink">
+    <p role="alert" className="mt-3 rounded-input bg-warn-bg p-3 type-sm text-ink">
       This batch needs <span className="num">{required}</span>{' '}
       {required === 1 ? 'credit' : 'credits'} and you have <span className="num">{available}</span>.
       Nothing was written and nothing was charged.{' '}
