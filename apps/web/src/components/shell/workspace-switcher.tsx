@@ -111,7 +111,7 @@ export function WorkspaceSwitcher({
         /* Collapsed to its badge on a phone by 2f9fca1, which left it 40px across —
            the height cleared the floor and the width did not. `min-w` finishes what
            that fix started; the badge itself stays 22px and centres. */
-        className="flex min-w-0 items-center gap-2 rounded-input border border-line bg-bg px-3 py-[7px] font-semibold transition-micro hover:bg-s1 max-narrow:min-h-[44px] max-narrow:min-w-[44px] max-narrow:justify-center max-narrow:px-2"
+        className="flex h-control min-w-0 items-center gap-2 rounded-input border border-line bg-bg px-3 font-semibold transition-micro hover:bg-s1 max-narrow:h-11 max-narrow:min-w-[44px] max-narrow:justify-center max-narrow:px-2"
       >
         <WorkspaceBadge name={active.name} />
         {/* ── THE NAME STEPS ASIDE ON A PHONE, IT DOES NOT SHRINK ────────────

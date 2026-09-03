@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -20,10 +20,12 @@ import { BrandPanel } from './brand-panel'
 
 const saveWorkspaceTheme = vi.hoisted(() => vi.fn())
 const uploadAsset = vi.hoisted(() => vi.fn())
+const setBrandLogo = vi.hoisted(() => vi.fn())
 const extractPalette = vi.hoisted(() => vi.fn())
 
 vi.mock('@/app/actions/theme', () => ({ saveWorkspaceTheme }))
 vi.mock('@/app/actions/assets', () => ({ uploadAsset }))
+vi.mock('@/app/actions/brand-logo', () => ({ setBrandLogo }))
 /* Loaded with `await import` inside the component, not at the top: it renders in
    the shell, so a top-level import is 9.8 kB on every page. `vi.mock` covers a
    dynamic import of the same specifier. */
@@ -42,6 +44,7 @@ function panel(props: Partial<React.ComponentProps<typeof BrandPanel>> = {}) {
   return (
     <BrandPanel
       logoUrl="https://example.test/logo.png"
+      current={null}
       skinOn={false}
       hasTheme
       onToggleSkin={onToggleSkin}
@@ -52,14 +55,18 @@ function panel(props: Partial<React.ComponentProps<typeof BrandPanel>> = {}) {
   )
 }
 
+/** Chroma 0.01, below the derivation's floor. It must never be OFFERED. */
 const GREY = 'oklch(0.8 0.01 250)'
 const BLUE = 'oklch(0.5 0.18 250)'
+const TEAL = 'oklch(0.55 0.12 195)'
 
 beforeEach(() => {
   vi.clearAllMocks()
   saveWorkspaceTheme.mockResolvedValue({ ok: true })
   uploadAsset.mockResolvedValue({ ok: true })
-  extractPalette.mockReturnValue([GREY, BLUE])
+  setBrandLogo.mockResolvedValue({ ok: true, adopted: false, converted: false })
+  // A real extraction: one colour the brand cannot use, two it can.
+  extractPalette.mockReturnValue([GREY, BLUE, TEAL])
   // jsdom never fires load on an <img>, so the decode is resolved here.
   Object.defineProperty(globalThis.Image.prototype, 'src', {
     configurable: true,
@@ -84,11 +91,12 @@ describe('the brand mark', () => {
     render(panel())
 
     const swatches = await screen.findAllByRole('button', { name: /use this colour/i })
+    // TWO, not three: the grey is below the chroma floor and is not offered.
     expect(swatches).toHaveLength(2)
     await userEvent.click(swatches[1]!)
 
     expect(saveWorkspaceTheme).toHaveBeenCalledTimes(1)
-    expect(saveWorkspaceTheme.mock.calls[0]![0][0]).toBe(BLUE)
+    expect(saveWorkspaceTheme.mock.calls[0]![0][0]).toBe(TEAL)
   })
 
   /** The colours it did not pick stay available, in order, behind the new one. */
@@ -98,7 +106,7 @@ describe('the brand mark', () => {
     const swatches = await screen.findAllByRole('button', { name: /use this colour/i })
     await userEvent.click(swatches[1]!)
 
-    expect(saveWorkspaceTheme.mock.calls[0]![0]).toEqual([BLUE, GREY])
+    expect(saveWorkspaceTheme.mock.calls[0]![0]).toEqual([TEAL, BLUE])
   })
 
   /**
@@ -129,7 +137,7 @@ describe('the brand mark', () => {
   it('says which colours are on and offers the other', async () => {
     render(panel({ skinOn: true }))
 
-    expect(screen.getByText(/your brand colours are on/i)).toBeInTheDocument()
+    expect(screen.getByText(/brand colours are on/i)).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /use sahoda colours/i }))
     expect(onToggleSkin).toHaveBeenCalledTimes(1)
   })
@@ -161,11 +169,310 @@ describe('the brand mark', () => {
     expect(onUseBrand).toHaveBeenCalledTimes(1)
   })
 
+  /**
+   * ── THE SILENT FAILURE, WHICH IS WHY THIS BLOCK EXISTS ────────────────────
+   * `replace()` was `await uploadAsset(form)` with the result discarded.
+   * `uploadAsset` refuses a duplicate, an oversized file, unreadable bytes, a
+   * storage failure and a missing workspace, and every one of those closed the
+   * panel and refreshed as though it had worked.
+   *
+   * MEASURED on the founder's workspace: "Replace logo" appeared to do nothing,
+   * repeatedly. The file was refused as a DUPLICATE against the copy already in
+   * the library, and the refusal was thrown away here. A control whose whole job
+   * is to change something visible must never fail quietly.
+   */
+  it('shows why the upload was refused, and does not close', async () => {
+    const onClose = vi.fn()
+    setBrandLogo.mockResolvedValue({
+      ok: false,
+      message: 'Sahoda could not check your library. Try again.',
+    })
+    render(panel({ onClose }))
+
+    // The input is `sr-only` and carries no label on purpose: the visible
+    // control is the button that clicks it. So it is addressed by type.
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')
+    const file = new File([new Uint8Array([1, 2, 3])], 'logo.png', { type: 'image/png' })
+    await userEvent.upload(input!, file)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/could not check your library/i)
+    expect(onClose, 'a refused upload must not look like a success').not.toHaveBeenCalled()
+  })
+
+  /** The same discipline on the other write in this panel. */
+  it('shows why saving a colour was refused', async () => {
+    const onClose = vi.fn()
+    saveWorkspaceTheme.mockResolvedValue({ ok: false, message: 'That palette could not be read.' })
+    render(panel({ onClose }))
+
+    const swatches = await screen.findAllByRole('button', { name: /use this colour/i })
+    await userEvent.click(swatches[0]!)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/could not be read/i)
+    expect(onClose).not.toHaveBeenCalled()
+    expect(onUseBrand, 'nothing was saved, so nothing may be applied').not.toHaveBeenCalled()
+  })
+
+  /**
+   * ── THE FIVE DECOYS ───────────────────────────────────────────────────────
+   * MEASURED on the founder's logo: five extracted swatches, every one chroma
+   * 0.0000, every one falling back to Sahoda orange. Five choices that could not
+   * do anything, which is what `no-impossible-remedy.spec.ts` exists to forbid.
+   */
+  it('never offers a colour the brand cannot use', async () => {
+    render(panel())
+    const swatches = await screen.findAllByRole('button', { name: /use this colour/i })
+
+    for (const swatch of swatches) {
+      expect(swatch.getAttribute('style'), 'an unusable colour was offered').not.toContain(GREY)
+    }
+  })
+
+  /**
+   * A LOGO WITH NO COLOUR IN IT. Founder's ruling, 2026-08-30: pick-a-colour.
+   * His own logo is grey, white and black, so the extractor was right and there
+   * was nothing to offer. Say so, and hand over a picker.
+   */
+  it('offers a picker when the logo is monochrome', async () => {
+    extractPalette.mockReturnValue([GREY, 'oklch(0.2 0.001 250)'])
+    render(panel())
+
+    expect(await screen.findByText(/greys and blacks/i)).toBeInTheDocument()
+    expect(screen.queryAllByRole('button', { name: /use this colour/i })).toHaveLength(0)
+
+    const picker = document.querySelector<HTMLInputElement>('input[type="color"]')
+    expect(picker, 'a monochrome logo must still let a brand colour be chosen').not.toBeNull()
+  })
+
+  /** And the picked colour is saved as the primary, like any swatch. */
+  it('saves the colour picked by hand', async () => {
+    extractPalette.mockReturnValue([GREY])
+    render(panel())
+    await screen.findByText(/greys and blacks/i)
+
+    const picker = document.querySelector<HTMLInputElement>('input[type="color"]')!
+    // Assembled from channels rather than written as a literal: the design lint
+    // forbids a raw hex anywhere under `apps/web/src`, including in a test, and
+    // it is right to. This is a mid blue, hue ~250.
+    const blue = `#${[30, 111, 217].map((n) => n.toString(16).padStart(2, '0')).join('')}`
+    fireEvent.change(picker, { target: { value: blue } })
+
+    await vi.waitFor(() => expect(saveWorkspaceTheme).toHaveBeenCalledTimes(1))
+    // 250-ish is the blue hue of #1e6fd9. The guard may move its lightness; it
+    // must never repaint the hue the person chose.
+    expect(saveWorkspaceTheme.mock.calls[0]![0][0]).toMatch(/oklch\([^)]*2[45][0-9]/)
+  })
+
+  /** With colour in the logo there is nothing to pick by hand. */
+  it('offers no picker when the logo has usable colour', async () => {
+    render(panel())
+    await screen.findAllByRole('button', { name: /use this colour/i })
+
+    expect(document.querySelector('input[type="color"]')).toBeNull()
+  })
+
+  /**
+   * ── THE SAME FILE, TWICE ──────────────────────────────────────────────────
+   * A file input fires `change` only when its VALUE changes, so choosing the
+   * same file again fired NOTHING — no handler, no request, no error. The
+   * founder was re-choosing the same logo to test, so every attempt after the
+   * first was a press on a control that had gone inert.
+   *
+   * This is the guard for the clear. Without it the second upload never
+   * happens, and the test is the only place that would notice, because the
+   * browser reports nothing at all.
+   */
+  it('accepts the same file twice, which is how anyone retries', async () => {
+    render(panel())
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!
+    const file = new File([new Uint8Array([1, 2, 3])], 'logo.png', { type: 'image/png' })
+
+    await userEvent.upload(input, file)
+    await vi.waitFor(() => expect(setBrandLogo).toHaveBeenCalledTimes(1))
+    expect(input.value, 'the value must be cleared or `change` cannot fire again').toBe('')
+
+    await userEvent.upload(input, file)
+    await vi.waitFor(() => expect(setBrandLogo).toHaveBeenCalledTimes(2))
+  })
+
+  /**
+   * THE LIBRARY'S DUPLICATE RULE MUST NOT REACH THIS CONTROL. `uploadAsset`
+   * refuses bytes it already holds, which is right for a media library and
+   * fatal for "this is my logo": the founder's logo was already in his library
+   * under its file name, so the one action that could make it findable was the
+   * one guaranteed to fail.
+   */
+  it('goes through setBrandLogo, which adopts bytes already in the library', async () => {
+    render(panel())
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!
+    await userEvent.upload(
+      input,
+      new File([new Uint8Array([9])], 'logo.png', { type: 'image/png' }),
+    )
+
+    await vi.waitFor(() => expect(setBrandLogo).toHaveBeenCalledTimes(1))
+    expect(
+      uploadAsset,
+      'the library action refuses duplicates and must not be it',
+    ).not.toHaveBeenCalled()
+  })
+
+  /**
+   * ── THE SYMPTOM ITSELF ────────────────────────────────────────────────────
+   * The founder's logo is an SVG. Without `image/svg+xml` in `accept`, the file
+   * dialog greys it out — he cannot select it, no event fires, and the button
+   * presents as doing nothing at all. That was the third of three separate
+   * "Replace logo is not working" reports.
+   *
+   * MUTATION FOUND THIS GAP: removing the type from the attribute left all 51
+   * tests green while restoring the exact defect. The user-visible symptom lived
+   * in one HTML attribute that nothing asserted.
+   */
+  it('lets an SVG be selected at all', () => {
+    render(panel())
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!
+
+    expect(input.accept, 'a greyed-out file reads as a broken button').toContain('image/svg+xml')
+  })
+
+  /**
+   * ── A NOTICE NO TEST COULD SEE ────────────────────────────────────────────
+   * Found by review: every `setBrandLogo` mock omitted `converted`, so
+   * `stored.converted` was undefined in all 19 panel tests and the SVG notice
+   * could be deleted silently. It was doubly unreachable — the panel also used
+   * to close in the same transition that set the flag.
+   */
+  it('says so when an SVG was saved as an image', async () => {
+    setBrandLogo.mockResolvedValue({ ok: true, adopted: false, converted: true })
+    render(panel())
+
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!
+    await userEvent.upload(
+      input,
+      new File([new Uint8Array([1])], 'brand.svg', { type: 'image/svg+xml' }),
+    )
+
+    expect(
+      await screen.findByText(/saved your svg as a high-resolution image/i),
+    ).toBeInTheDocument()
+  })
+
+  it('says nothing about conversion when a raster was uploaded', async () => {
+    setBrandLogo.mockResolvedValue({ ok: true, adopted: false, converted: false })
+    render(panel())
+
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!
+    await userEvent.upload(
+      input,
+      new File([new Uint8Array([1])], 'logo.png', { type: 'image/png' }),
+    )
+
+    await vi.waitFor(() => expect(setBrandLogo).toHaveBeenCalled())
+    expect(screen.queryByText(/saved your svg/i)).toBeNull()
+  })
+
+  /**
+   * ── THE UPLOAD MUST NOT BE GATED ON A CANVAS READ ─────────────────────────
+   * MEASURED by review: the palette was read BEFORE the server call, inside the
+   * same try. A browser that will not decode the file — an SVG with no `xmlns`,
+   * common in hand-edited markup — rejected in `load()`, the catch fired, and
+   * `setBrandLogo` was never called. No request, no row, and a message telling
+   * the person to try a PNG for a file the server would have accepted.
+   */
+  it('stores the file even when its colours cannot be read', async () => {
+    extractPalette.mockImplementation(() => {
+      throw new Error('the browser refused to decode this')
+    })
+    render(panel())
+
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!
+    await userEvent.upload(
+      input,
+      new File([new Uint8Array([1])], 'logo.svg', { type: 'image/svg+xml' }),
+    )
+
+    await vi.waitFor(() => expect(setBrandLogo).toHaveBeenCalledTimes(1))
+    expect(screen.queryByRole('alert'), 'a stored file is not a failure').toBeNull()
+  })
+
+  /**
+   * ── FOUR BUTTONS WITH ONE NAME ────────────────────────────────────────────
+   * Every swatch carried the identical `aria-label="Use this colour"`, so the
+   * row was announced as four indistinguishable controls and the only thing
+   * separating them was the colour itself, which is also the signal a
+   * colour-blind reader does not get.
+   */
+  it('gives every swatch a name of its own', async () => {
+    render(panel())
+    const swatches = await screen.findAllByRole('button', { name: /use this colour/i })
+
+    const names = swatches.map((s) => s.getAttribute('aria-label'))
+    expect(new Set(names).size, 'two swatches are announced identically').toBe(names.length)
+  })
+
+  /**
+   * ── WHICH ONE IS ON ───────────────────────────────────────────────────────
+   * The panel said "your brand colours are on" and marked none of the swatches,
+   * so it named a state without ever saying which colour was in it.
+   */
+  it('says which colour is the one in use', async () => {
+    // The stored primary is the guard's output, not the extracted string, so the
+    // match is by hue. A teal at a different lightness is the same swatch.
+    render(panel({ skinOn: true, current: 'oklch(0.62 0.11 195)' }))
+
+    const marked = await screen.findAllByRole('button', { name: /in use now/i })
+    expect(marked).toHaveLength(1)
+    expect(marked[0]!.getAttribute('style')).toContain(TEAL)
+  })
+
+  /** Sahoda's colours are on, so no brand swatch may claim to be in use. */
+  it('marks nothing while the brand is switched off', async () => {
+    render(panel({ skinOn: false, current: 'oklch(0.62 0.11 195)' }))
+    await screen.findAllByRole('button', { name: /use this colour/i })
+
+    expect(screen.queryAllByRole('button', { name: /in use now/i })).toHaveLength(0)
+  })
+
+  /**
+   * ── FOUR SHADES OF ONE BLUE ───────────────────────────────────────────────
+   * MEASURED on the founder's screenshot: the chroma filter left four swatches
+   * that were all the same blue. Four choices, one outcome.
+   */
+  it('offers one blue rather than four shades of it', async () => {
+    extractPalette.mockReturnValue([
+      'oklch(0.5 0.18 250)',
+      'oklch(0.52 0.18 251)',
+      'oklch(0.49 0.17 249)',
+      TEAL,
+    ])
+    render(panel())
+
+    const swatches = await screen.findAllByRole('button', { name: /use this colour/i })
+    expect(swatches, 'three shades of one blue were offered as three choices').toHaveLength(2)
+  })
+
+  /**
+   * The panel replaces the logo and never showed the logo. On a workspace whose
+   * mark is wrong or somebody else's, the person had to close this and look at
+   * the topbar to find out what they were about to replace.
+   */
+  it('shows the logo it is offering to replace', () => {
+    render(panel())
+
+    expect(screen.getByAltText(/your logo/i)).toBeInTheDocument()
+  })
+
+  it('shows no logo when there is none', () => {
+    render(panel({ logoUrl: null, hasTheme: false }))
+
+    expect(screen.queryByAltText(/your logo/i)).toBeNull()
+  })
+
   it('spends nothing and writes nothing just by being opened', async () => {
     render(panel())
     await screen.findAllByRole('button', { name: /use this colour/i })
 
     expect(saveWorkspaceTheme).not.toHaveBeenCalled()
-    expect(uploadAsset).not.toHaveBeenCalled()
+    expect(setBrandLogo).not.toHaveBeenCalled()
   })
 })

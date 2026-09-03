@@ -336,7 +336,7 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
       {isPending ? (
         <div className="rounded-card border border-line bg-s1 p-4" role="status">
           <p className="text-[13px] font-semibold text-ink">
-            {stages.at(-1)?.detail ?? 'Starting'}…{' '}
+            {stages.at(-1)?.detail ?? stage}…{' '}
             <span className="num font-normal text-muted">{elapsed}s</span>
           </p>
           {/* Everything already finished, newest last. These are server events,

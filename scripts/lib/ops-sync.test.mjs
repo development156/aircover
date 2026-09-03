@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { QUEUE_CEILING, WIRE_BATCH_MAX } from './ops-queue.mjs'
+import { pendingView, PENDING_OVERLAY_FILE } from './ops-state.mjs'
 
 /**
  * The real sync script, both paths (SL-084).
@@ -42,8 +43,27 @@ const seed = (runs) => {
   writeFileSync(resolve(root, 'ops/state/roadmap.json'), JSON.stringify({ version: 1, items: [] }))
 }
 
-const queue = () =>
-  JSON.parse(readFileSync(resolve(root, 'ops/state/qa.pending.json'), 'utf8')).runs
+/**
+ * What is still UNSENT — which is what every assertion below has always meant.
+ *
+ * It is no longer the contents of the tracked file. The sync leaves that file
+ * byte-identical and records what the server acknowledged in an untracked
+ * overlay beside it, so the queue is the baseline minus that prefix. `pendingView`
+ * is the same pure function the scripts use, called here on files this test has
+ * read for itself rather than through the module's cached repo root.
+ */
+const queue = () => {
+  const baseline = JSON.parse(readFileSync(resolve(root, 'ops/state/qa.pending.json'), 'utf8')).runs
+  let overlay = {}
+  try {
+    overlay = JSON.parse(readFileSync(resolve(root, PENDING_OVERLAY_FILE), 'utf8'))
+  } catch {
+    /* no sync has acknowledged anything yet */
+  }
+  return pendingView(baseline, overlay?.queues?.qa)
+}
+
+const trackedBytes = () => readFileSync(resolve(root, 'ops/state/qa.pending.json'), 'utf8')
 
 /** Run the real sync with the stub standing in for the ingest endpoint. */
 function runSyncAcknowledged(args = []) {
@@ -108,6 +128,37 @@ describe('syncing a backed-up queue', () => {
 
     expect(queue()).toEqual([])
     expect(output).not.toContain('still queued')
+  })
+
+  /**
+   * ── THE WORKING TREE IS NOT THE SYNC'S SCRATCH SPACE ─────────────────────
+   *
+   * `ops/state/qa.pending.json` is TRACKED, and `.githooks/pre-commit` refuses
+   * by name any commit that stages it. A drain that rewrote it therefore left
+   * every checkout whose HEAD held queued runs permanently modified with a
+   * change nobody was allowed to commit: 2,121 deleted lines that could not be
+   * committed and would not go away.
+   *
+   * This is the guard. Put `dropSent` back on the tracked file and it goes red.
+   */
+  it('leaves the tracked pending file byte-identical', () => {
+    seed(rows(3))
+    const before = trackedBytes()
+
+    runSyncAcknowledged()
+
+    expect(trackedBytes()).toBe(before)
+    // Not vacuously true: the sync really did drain, it just did it elsewhere.
+    expect(queue()).toEqual([])
+  })
+
+  it('does not re-send what a previous sync already had acknowledged', () => {
+    // The other half of the same claim. Leaving the file alone must not mean
+    // posting the same rows for ever.
+    seed(rows(3))
+    runSyncAcknowledged()
+
+    expect(runSyncAcknowledged().sent.qa).toEqual([])
   })
 
   it('keeps the queue when the endpoint refuses the payload', () => {

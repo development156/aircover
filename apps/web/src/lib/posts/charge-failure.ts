@@ -35,6 +35,18 @@ export const FAILURE_REASON = {
   SAVE_FAILED: 'The plan could not be saved.',
   NO_SITE: 'The model returned no usable site.',
   SITE_SAVE_FAILED: 'The site could not be saved.',
+  // ── THE STUDIO'S TWO, AND WHY THEY LIVE HERE RATHER THAN BESIDE THE ACTION ──
+  // `actions/studio.ts` had its own `REFUSALS.unusable` and `REFUSALS.stored`
+  // and handed them to `chargeFailureState` as the reason. Neither was in this
+  // object, so `isVettedReason` rejected both and every unreadable-image,
+  // unsupported-mime and storage failure rendered the GENERIC line instead. The
+  // three specific sentences somebody wrote were unreachable from the product.
+  //
+  // They are phrased WITHOUT a charge claim on purpose. `chargeFailureState`
+  // appends `NOT_CHARGED` itself, and the old strings carried their own
+  // "Nothing was charged", which would have read twice in one message.
+  IMAGE_UNREADABLE: 'The model returned something Sahoda could not read as a picture.',
+  IMAGE_NOT_STORED: 'The image was made but could not be saved to your library.',
 } as const
 
 export type FailureReason = (typeof FAILURE_REASON)[keyof typeof FAILURE_REASON]

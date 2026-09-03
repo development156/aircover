@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { QUEUE_CEILING } from './ops-queue.mjs'
+import { pendingView, PENDING_OVERLAY_FILE } from './ops-state.mjs'
 
 /**
  * The QA hook, run for real, against a throwaway repo root (SL-084).
@@ -34,7 +35,25 @@ const seed = (runs) => {
   writeFileSync(stateFile('board.json'), JSON.stringify({ version: 1, tasks: [] }))
 }
 
-const readQueue = () => JSON.parse(readFileSync(stateFile('qa.pending.json'), 'utf8')).runs
+/**
+ * The unsent queue, which is what every assertion here has always meant.
+ *
+ * A recorded run no longer lands in the tracked file: that file is TRACKED and
+ * `.githooks/pre-commit` refuses any commit that stages it, so writing a
+ * session's scratch runs there left a working tree that could never be made
+ * clean. The runs go to an untracked overlay beside it and the queue is the two
+ * read together, through the same pure function the scripts use.
+ */
+const readQueue = () => {
+  const baseline = JSON.parse(readFileSync(stateFile('qa.pending.json'), 'utf8')).runs
+  let overlay = {}
+  try {
+    overlay = JSON.parse(readFileSync(resolve(root, PENDING_OVERLAY_FILE), 'utf8'))
+  } catch {
+    /* nothing recorded yet */
+  }
+  return pendingView(baseline, overlay?.queues?.qa)
+}
 
 /** A green unit run — classifyBashRuns turns this into exactly one QA row. */
 const GREEN_RUN = JSON.stringify({
@@ -77,6 +96,19 @@ describe('the QA hook writing to a full queue', () => {
       suite: 'unit',
       status: 'pass',
     })
+  })
+
+  it('records the run without touching the tracked file', () => {
+    // The whole point of the overlay. `.githooks/pre-commit` refuses a commit
+    // that stages ops/state/qa.pending.json, so a hook that writes it dirties a
+    // tree that cannot then be cleaned by committing.
+    seed([{ client_id: 'qa-committed-0', suite: 'unit', status: 'pass' }])
+    const before = readFileSync(stateFile('qa.pending.json'), 'utf8')
+
+    runHook(GREEN_RUN)
+
+    expect(readFileSync(stateFile('qa.pending.json'), 'utf8')).toBe(before)
+    expect(readQueue()).toHaveLength(2)
   })
 
   it('does not evict a single unsent run when the queue is full', () => {

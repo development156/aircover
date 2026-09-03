@@ -170,19 +170,18 @@ export default async function AssetsPage() {
 function Shell({ children, action = false }: { children: React.ReactNode; action?: boolean }) {
   return (
     <div className="space-y-grid">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <PageTitle>Assets</PageTitle>
-          <p className="mt-1 text-[13px] text-muted">
-            Every photo you have added, and which posts are using it.
-          </p>
-        </div>
-        {action ? (
-          <div className="max-narrow:w-full">
-            <AssetUpload />
-          </div>
-        ) : null}
-      </div>
+      <PageTitle
+        sub="Every photo you have added, and which posts are using it."
+        actions={
+          action ? (
+            <div className="max-narrow:w-full">
+              <AssetUpload />
+            </div>
+          ) : null
+        }
+      >
+        Assets
+      </PageTitle>
 
       {children}
     </div>

@@ -54,7 +54,6 @@ export function displayNameFor(connection: Connection): string {
 }
 
 export function ChannelAccounts({
-  channel,
   platform,
   label,
   connections,

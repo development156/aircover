@@ -270,10 +270,16 @@ if command -v pnpm >/dev/null 2>&1; then
 fi
 
 # ── THE REPO'S GIT GUARDS ────────────────────────────────────────────────────
-# `.githooks/pre-commit` refuses a commit that stages `ops/state/qa.pending.json`,
-# which every gate run rewrites. Pointed at here rather than left to each person
-# to remember, because the rule was broken twice in three commits by `git add -A`
-# on 2026-08-25 — once immediately after being fixed for the same reason.
+# `.githooks/pre-commit` refuses a commit that stages `ops/state/qa.pending.json`.
+# Pointed at here rather than left to each person to remember, because the rule
+# was broken twice in three commits by `git add -A` on 2026-08-25, once
+# immediately after being fixed for the same reason.
+#
+# Since 2026-08-31 the ops scripts no longer rewrite that file at all: a gate run
+# records its QA rows in `ops/state/.pending.local.json`, which is gitignored, and
+# the sync drains them there. So the hook now guards against a person staging it,
+# not against a tool churning it every few minutes. See the block above
+# `PENDING_OVERLAY_FILE` in scripts/lib/ops-state.mjs.
 #
 # `.githooks/pre-push` refuses a push to wt-core, wt-web or main from the lane
 # owned by `karunesh`, which may read every branch and write only to its own.

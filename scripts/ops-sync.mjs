@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process'
 import { loadEnv, warn } from './lib/ops-env.mjs'
-import { readState, dropSent, STATE_DIR } from './lib/ops-state.mjs'
+import { readState, readPending, dropSent, STATE_DIR } from './lib/ops-state.mjs'
 import { planSync, WIRE_BATCH_MAX } from './lib/ops-queue.mjs'
 import { ingestVerdict, formatPermanent } from './lib/ops-ingest-verdict.mjs'
 
@@ -101,9 +101,13 @@ function sessionIdFrom(hookJson) {
  * instead of the record. `backlog` is what is left over, and it is reported.
  */
 function pendingBatches() {
+  // `readPending` and not `readState`: the tracked file is a BASELINE that this
+  // script must leave byte-identical, and what is still UNSENT is that baseline
+  // minus the acknowledged prefix, plus whatever this checkout appended. See the
+  // block above `PENDING_OVERLAY_FILE` in lib/ops-state.mjs for why.
   return planSync({
-    changelog: readState('changelog').entries,
-    qa: readState('qa').runs,
+    changelog: readPending('changelog'),
+    qa: readPending('qa'),
   })
 }
 

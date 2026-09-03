@@ -70,9 +70,9 @@ export function ConfidenceCard({ provenance }: { provenance: Provenance }) {
         </ul>
 
         <p className="mt-3 text-[12px] text-muted">
-          Every caption, campaign and reply is written from these fields. A guess Sahoda got wrong
-          is wrong in everything it writes until someone corrects it, and correcting one costs
-          nothing.
+          Every caption Sahoda writes, every weekly plan and the website it builds come from these
+          fields. A guess Sahoda got wrong is wrong in everything it writes until someone corrects
+          it, and correcting one costs nothing.
         </p>
       </div>
     </section>
