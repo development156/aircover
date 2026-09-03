@@ -16,33 +16,6 @@ import { toChannelSet } from '@sahoda/shared'
  * on the prop changing would eat keystrokes.
  */
 
-const input = () => screen.getByLabelText(/schedule/i) as HTMLInputElement
-
-/**
- * Reach the exact `datetime-local`, which is now behind a disclosure.
- *
- * ── THIS IS A CHANGE OF ROUTE, NOT A LOOSENED GUARD ──────────────────────────
- * Four assertions in this file used to reach the native input directly, because
- * it was the only control the field had — and that was the defect: `docs/34` §1
- * found the journey's stated goal, a scheduled post, unreachable by looking,
- * because a `dd/mm/yyyy` mask is not a control the reader can be assumed to
- * operate. The input is now one click behind "Pick an exact time".
- *
- * EVERY GUARANTEE THOSE FOUR ASSERTED IS UNCHANGED and still asserted below —
- * the wall-clock rendering, the re-sync on a replaced value, the clear, and the
- * keystroke that must not be eaten. What moved is how the test gets there,
- * which is a property of the screen rather than of the promise. Nothing was
- * weakened to let the new field pass; the named-time path added its own guards
- * rather than replacing these.
- *
- * With a stored value the disclosure is already open (a time nobody's shortcut
- * produced has to be visible), so this is only needed from an empty field.
- */
-async function openExact(user: ReturnType<typeof userEvent.setup>): Promise<void> {
-  const opener = screen.queryByText(/pick an exact time/i)
-  if (opener) await user.click(opener)
-}
-
 // Far enough ahead to clear every channel's 5-minute minimum lead.
 const future = (offsetMs: number) => new Date(Date.now() + offsetMs).toISOString()
 

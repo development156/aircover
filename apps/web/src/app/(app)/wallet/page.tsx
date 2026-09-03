@@ -4,11 +4,18 @@ import { PageTitle } from '@/components/page-title'
 import { EmptyState } from '@/components/empty-state'
 import { CardLabel } from '@/components/ui/card'
 import { BalanceHero } from '@/components/wallet/balance-hero'
-import { LedgerTable, SkippedNote } from '@/components/wallet/ledger-table'
+import { CreditActivity } from '@/components/wallet/credit-activity'
+import { SkippedNote } from '@/components/wallet/ledger-table'
 import { TopUpPanel } from '@/components/wallet/top-up-panel'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
 import { holdReaperFromEnv, staleHoldNote } from '@/lib/wallet/balance'
-import { HISTORY_LIMIT, readBalance, readLedger, readOpenHolds } from '@/lib/wallet/read'
+import {
+  HISTORY_LIMIT,
+  countLedger,
+  readBalance,
+  readLedger,
+  readOpenHolds,
+} from '@/lib/wallet/read'
 import { readBillingProfile } from '@/lib/billing/read'
 import { detectedCountry, pickDisplayCountry } from '@/lib/billing/display-country'
 import { getFxRates } from '@/lib/billing/fx-store'
@@ -37,9 +44,13 @@ export default async function WalletPage() {
    * buys back a serial round trip on the money screen. The waste is real and it
    * is the cheaper side of the trade.
    */
-  const [balance, ledger, openHolds, profile, detected, fx] = await Promise.all([
+  const [balance, ledger, ledgerTotal, openHolds, profile, detected, fx] = await Promise.all([
     readBalance(),
     readLedger(),
+    // The seventh read, in the same round trip for the reason the note above
+    // gives. It fetches no rows — `head: true` — and answers the one question
+    // the windowed list cannot: how many entries there actually are.
+    countLedger(),
     readOpenHolds(),
     readBillingProfile(),
     detectedCountry(),
@@ -111,9 +122,9 @@ export default async function WalletPage() {
       )}
 
       <section data-guide="wallet.ledger" className="space-y-3">
-        <CardLabel>Credit activity</CardLabel>
         {ledger.entries.length === 0 ? (
           <>
+            <CardLabel>Credit activity</CardLabel>
             <EmptyState
               icon={Receipt}
               title="No credit activity yet"
@@ -124,7 +135,12 @@ export default async function WalletPage() {
             <SkippedNote skipped={ledger.skipped} />
           </>
         ) : (
-          <LedgerTable entries={ledger.entries} skipped={ledger.skipped} limit={HISTORY_LIMIT} />
+          <CreditActivity
+            entries={ledger.entries}
+            skipped={ledger.skipped}
+            limit={HISTORY_LIMIT}
+            total={ledgerTotal}
+          />
         )}
       </section>
 

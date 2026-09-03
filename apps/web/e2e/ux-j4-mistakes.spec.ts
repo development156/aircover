@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 import type { Page } from '@playwright/test'
 
 import { adminClient, expect, signInSecondContext, test } from './fixtures/seeded-user'
-import { leaveOnboarding } from './fixtures/compose'
+import { leaveOnboarding, dismissPlanOffer } from './fixtures/compose'
 import { framesTaken, shot, timedGoto, useTheme, type Theme } from './helpers/ux-shot'
 
 /**
@@ -157,7 +157,7 @@ for (const { width, theme } of COMBOS) {
       // X is the tightest limit in the product, so it is where the refusal shows
       // first and where an unhelpful one costs the most.
       const id = await composerOn(page, 'x')
-      const body = page.getByLabel('Your post')
+      const body = page.getByLabel('Your post', { exact: true })
       if (!(await body.isVisible().catch(() => false))) {
         await shot(page, {
           journey: JOURNEY,
@@ -306,7 +306,7 @@ for (const { width, theme } of COMBOS) {
         await shot(page, { journey: JOURNEY, stop: 'D0-no-post', width, theme })
         return
       }
-      const body = page.getByLabel('Your post')
+      const body = page.getByLabel('Your post', { exact: true })
       await body.fill('First tab wrote this.').catch(() => {})
       await page.waitForTimeout(2500)
 
@@ -324,7 +324,7 @@ for (const { width, theme } of COMBOS) {
       await body.fill('First tab wrote this, then changed its mind.').catch(() => {})
       await page.waitForTimeout(2500)
 
-      const otherBody = other.getByLabel('Your post')
+      const otherBody = other.getByLabel('Your post', { exact: true })
       await otherBody.fill('Second tab never saw any of that.').catch(() => {})
       await other.waitForTimeout(3500)
       await shot(other, { journey: JOURNEY, stop: 'D1-stale-save', width, theme })
@@ -341,7 +341,7 @@ for (const { width, theme } of COMBOS) {
       await useTheme(page, theme)
       await bootstrap(page)
       await composerOn(page, 'instagram')
-      const body = page.getByLabel('Your post')
+      const body = page.getByLabel('Your post', { exact: true })
       if (await body.isVisible().catch(() => false)) {
         // Type and leave IMMEDIATELY, inside any debounce.
         await body.fill('Words that were never saved anywhere.')
@@ -352,6 +352,7 @@ for (const { width, theme } of COMBOS) {
         await home.click().catch(() => {})
       } else {
         await page.goto('/home')
+        await dismissPlanOffer(page)
       }
       await page.waitForTimeout(2500)
       await shot(page, { journey: JOURNEY, stop: 'E1-left-mid-edit', width, theme })

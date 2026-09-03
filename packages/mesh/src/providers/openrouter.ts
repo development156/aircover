@@ -62,15 +62,27 @@ const extraBody = (req: ChatRequest): Record<string, unknown> => {
  */
 const DATA_URL = /^data:([a-z0-9.+/-]+);base64,(.+)$/is
 
-/** The shape OpenRouter uses for image output on the chat-completions endpoint. */
-interface OpenRouterImageCompletion {
+/**
+ * The shape OpenRouter's DEDICATED Images API returns.
+ *
+ * `POST /api/v1/images` is a separate endpoint from chat completions, documented
+ * at https://openrouter.ai/docs/features/multimodal/image-generation and
+ * confirmed against it on 2026-08-29 (docs/43 §2). Its response is
+ * `{created, data:[{b64_json, media_type}], usage:{prompt_tokens,
+ * completion_tokens, total_tokens, cost}}`.
+ *
+ * `usage.cost` is the whole reason for moving off chat completions: it is the
+ * REAL dollar cost of the generation. The chat endpoint reports token counts for
+ * a model billed per image, which produces a number nobody quoted.
+ */
+interface OpenRouterImagesResponse {
   model?: string
-  choices?: {
-    message?: {
-      images?: { image_url?: { url?: string } }[]
-    }
-  }[]
-  usage?: { prompt_tokens?: number; completion_tokens?: number }
+  data?: { b64_json?: string; media_type?: string }[]
+  usage?: {
+    prompt_tokens?: number
+    completion_tokens?: number
+    cost?: number
+  }
 }
 
 export function createOpenRouterProvider(apiKey: string, fetchImpl?: FetchLike): Provider {
@@ -104,18 +116,28 @@ export function createOpenRouterProvider(apiKey: string, fetchImpl?: FetchLike):
    * same rule the chat client follows: the body may echo the prompt.
    */
   async function image(req: ImageRequest): Promise<ImageResponse> {
-    const body = {
+    const body: Record<string, unknown> = {
       model: req.model,
-      messages: [{ role: 'user', content: req.prompt }],
-      modalities: ['image', 'text'],
-      // The provider decides the exact pixels; the size is expressed in the prompt
-      // as well, because not every image model honours a structured hint.
-      image_generation: { size: `${req.width}x${req.height}` },
+      prompt: req.prompt,
+      // The exact canvas. `size` is what the Images API takes, and asking for a
+      // shape rather than a named ratio is what lets a story be a story: three
+      // named sizes cover three aspect ratios and this product needs six.
+      size: `${req.width}x${req.height}`,
+    }
+
+    // ABSENT when there are none, never an empty array. A field carrying `[]`
+    // and a field that is not there are different requests, and only the second
+    // one is "this generation had no references".
+    if (req.references !== undefined && req.references.length > 0) {
+      body.input_references = req.references.map((url) => ({
+        type: 'image_url',
+        image_url: { url },
+      }))
     }
 
     let res: Response
     try {
-      res = await doFetch(`${OPENROUTER_BASE}/chat/completions`, {
+      res = await doFetch(`${OPENROUTER_BASE}/images`, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -137,28 +159,31 @@ export function createOpenRouterProvider(apiKey: string, fetchImpl?: FetchLike):
       throw new ProviderCallError('openrouter', res.status, `provider returned HTTP ${res.status}`)
     }
 
-    let json: OpenRouterImageCompletion
+    let json: OpenRouterImagesResponse
     try {
-      json = (await res.json()) as OpenRouterImageCompletion
+      json = (await res.json()) as OpenRouterImagesResponse
     } catch {
       throw new ProviderCallError('openrouter', res.status, 'provider returned a non-JSON body')
     }
 
-    const url = json.choices?.[0]?.message?.images?.[0]?.image_url?.url
-    if (typeof url !== 'string') {
-      // A 200 with no image is not a success. Returning an empty string here would
-      // hand the caller zero bytes to attach to a customer's post.
+    const first = json.data?.[0]
+    const b64 = first?.b64_json
+    if (typeof b64 !== 'string' || b64 === '') {
+      // A 200 with no image is not a success. Returning an empty string here
+      // would hand the caller zero bytes to put in a customer's library.
       throw new ProviderCallError('openrouter', res.status, 'provider returned no image')
     }
 
-    const match = DATA_URL.exec(url.trim())
-    if (!match?.[1] || !match[2]) {
-      throw new ProviderCallError('openrouter', res.status, 'provider returned an unreadable image')
-    }
+    // The API returns raw base64 rather than a data URL. Tolerate a data URL
+    // anyway: the chat endpoint returned one, some providers still do, and
+    // rejecting it would turn a usable picture into a refusal.
+    const asDataUrl = DATA_URL.exec(b64.trim())
 
     return {
-      base64: match[2],
-      mime: match[1].toLowerCase(),
+      base64: asDataUrl ? asDataUrl[2]! : b64,
+      // The provider's CLAIM. `sniffImage` reads the real format from the bytes
+      // and the caller may disagree with this.
+      mime: (asDataUrl?.[1] ?? first?.media_type ?? 'image/png').toLowerCase(),
       usage: {
         provider: 'openrouter',
         model: json.model ?? req.model,
@@ -166,6 +191,9 @@ export function createOpenRouterProvider(apiKey: string, fetchImpl?: FetchLike):
         tokensOut: json.usage?.completion_tokens ?? 0,
         cachedTokens: 0,
       },
+      // Undefined when the provider did not say, never zero. A screen that
+      // renders a missing cost as nothing spent states a price nobody quoted.
+      costUsd: typeof json.usage?.cost === 'number' ? json.usage.cost : undefined,
     }
   }
 

@@ -66,3 +66,21 @@ export function reflectionWindow(at: Date, days = 7): { fromIso: string; toIso: 
   const from = new Date(to.getTime() - days * DAY_MS)
   return { fromIso: from.toISOString().slice(0, 10), toIso: to.toISOString().slice(0, 10) }
 }
+
+/**
+ * The Monday an ISO week starts on, in UTC.
+ *
+ * The inverse of `isoWeekOf`, and it exists for the same reason that function
+ * does: a week has to be turned back into two dates before it can be shown to a
+ * person, and "week 35" is not a thing anybody outside a calendar library says.
+ *
+ * Built from 4 January, which ISO guarantees falls in week 1 of its own year —
+ * the property that makes this correct in the last days of December, where
+ * counting weeks forward from 1 January is off by one about a fifth of the time.
+ */
+export function isoWeekStart(isoYear: number, isoWeek: number): Date {
+  const jan4 = new Date(Date.UTC(isoYear, 0, 4))
+  const isoDay = jan4.getUTCDay() === 0 ? 7 : jan4.getUTCDay()
+  const week1Monday = jan4.getTime() - (isoDay - 1) * DAY_MS
+  return new Date(week1Monday + (isoWeek - 1) * 7 * DAY_MS)
+}

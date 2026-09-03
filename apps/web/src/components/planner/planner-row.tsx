@@ -81,15 +81,16 @@ function rowGlyph(post: DisplayPost): typeof FileText {
  * `design-lint`'s ratchet, not a wash: the file's baseline goes 4 → 0.
  */
 export function PlannerRow({
+  zone,
   autoPublish = false,
   variantStates,
   post,
   now,
   connected,
   campaigns,
-}: PlannerRowProps) {
+}: PlannerRowProps & { zone?: string | null }) {
   const title = post.title?.trim()
-  const scheduledAt = formatScheduledAt(post.scheduled_at)
+  const scheduledAt = formatScheduledAt(post.scheduled_at, zone)
   // Distinct at the row boundary — see `post-card.tsx`. This row had the same
   // local de-dupe for its chips while handing the RAW array to `PlannerReschedule`
   // one branch below, which is the shape of every duplicate-channel defect so far.

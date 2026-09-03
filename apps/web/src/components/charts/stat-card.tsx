@@ -150,7 +150,15 @@ export function StatCard({
       href={href}
       className={cn(
         shell,
-        'focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+        /* ── THE RING DRAWS INSIDE, BECAUSE THE BOARD CLIPS ITS OUTSIDE ──────
+           `ring-2` is an OUTWARD box-shadow, and `StatStrip board` wraps these
+           in `overflow-hidden` with `gap-px` — so on the /home KPI strip the
+           ring was clipped away at every cell edge while `outline-none` had
+           already removed the fallback, leaving four links a keyboard user
+           could reach and not see. `ring-inset` keeps the whole indicator
+           inside the cell, which is the same pattern
+           `library-sidebar-row.tsx` uses. */
+        'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset focus-visible:outline-none',
       )}
     >
       {body}

@@ -202,8 +202,10 @@ async function listSurface<T>(
   surface: InboxSurfaceKey,
   call: (reads: ZernioReads, profile: ScopedProfileId) => Promise<ZernioPaged<T, ZernioCursorPage>>,
 ): Promise<InboxView<T>> {
-  const connectedAccounts = await countAccounts(surface)
-  const context = await readContext()
+  // Independent: the account count does not inform the context read, nor the
+  // reverse. This is on the inbox's own page load, so the serial version cost
+  // every visit an extra round trip before a single message could be shown.
+  const [connectedAccounts, context] = await Promise.all([countAccounts(surface), readContext()])
 
   if (!context.ok) {
     return {
@@ -263,8 +265,7 @@ export async function readConversations(): Promise<InboxView<ZernioConversation>
  * down to empty with more behind it says "could not confirm" rather than "none yet".
  */
 export async function readCommentedPosts(): Promise<InboxView<ZernioCommentedPost>> {
-  const connectedAccounts = await countAccounts('comments')
-  const context = await readContext()
+  const [connectedAccounts, context] = await Promise.all([countAccounts('comments'), readContext()])
 
   if (!context.ok) {
     return {

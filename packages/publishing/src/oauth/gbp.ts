@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { ok, type Result } from '@sahoda/shared'
 import type { Transport, TransportResponse } from '../transport'
-import type { ConnectionStore, ConnectionSummary } from './store'
+import type { ConnectionSummary } from './store'
 import {
   callProvider,
   cleanDisplay,

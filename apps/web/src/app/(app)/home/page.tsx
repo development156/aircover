@@ -1,5 +1,11 @@
 import { redirect } from 'next/navigation'
+import { auth } from '@clerk/nextjs/server'
 import { creditCost } from '@sahoda/shared'
+
+import { PlanOfferMount } from '@/components/billing/plan-offer-mount'
+import { planOfferDecision } from '@/lib/billing/plan-offer'
+import { planOfferRows } from '@/lib/billing/plan-offer-rows'
+import { readSubscription } from '@/lib/billing/read'
 
 import { AtAGlance } from '@/components/home/at-a-glance'
 import { FirstRun } from '@/components/home/first-run'
@@ -156,6 +162,8 @@ export default async function HomePage() {
     brain,
     connections,
     knowledgeDocuments,
+    subscription,
+    session,
   ] = await Promise.all([
     /**
      * IN THE BATCH, NOT IN FRONT OF IT.
@@ -196,6 +204,21 @@ export default async function HomePage() {
      * rather than a zero: a failed read is not an empty library.
      */
     countIndexedDocuments(),
+    /**
+     * The plan offer's read. In the batch rather than on its own line below —
+     * see the offer's own note for the guard that decided that. It short-circuits
+     * on a null workspace without touching the database, like the rest of them.
+     */
+    readSubscription(),
+    /**
+     * The Clerk session, for the plan offer's dismissal key. In the batch for
+     * the same reason `readSubscription` is: `lib/perf/read-waterfall.test.ts`
+     * counts a bare `await` below this block as a sequential read and refuses
+     * it, and it was right both times — a round trip in front of the dashboard
+     * costs every returning customer, where being in the batch costs only the
+     * accounts on their way into onboarding one throwaway call.
+     */
+    auth(),
   ])
 
   // THE RULING, ACTED ON. Everything above was read in parallel with the
@@ -208,6 +231,54 @@ export default async function HomePage() {
   // workspace WITHOUT touching the database, so this branch costs nothing and the
   // dashboard is replaced rather than rendered empty. See FirstRun for why.
   if (balance.status === 'no-workspace') return <FirstRun now={now} />
+
+  /**
+   * ── THE PLANS, OFFERED ONCE TO A WORKSPACE THAT IS NOT ON ONE ──────────────
+   *
+   * /home is where a session lands (see the landing rule above), so it is where
+   * "on arriving at the dashboard" happens. Mounting this in the `(app)` layout
+   * was the other candidate and was refused for the same reason the landing rule
+   * is not there: the layout runs for every route in the group, so the offer
+   * would appear over /posts, over a typed URL and over every refresh. That is a
+   * wall, not an offer.
+   *
+   * ── AND ITS READ IS IN THE BATCH ABOVE, BECAUSE A GUARD INSISTED ──────────
+   * It was written as its own `await` on this line, with a comment arguing that
+   * only accounts which actually reach the dashboard should pay for it.
+   * `lib/perf/read-waterfall.test.ts` refused: "/(app)/home: 7 to 8 sequential
+   * reads (new: readSubscription)". The guard is right and the argument was
+   * wrong. A sequential read is a whole extra round trip in front of EVERY
+   * returning customer's dashboard, and what it was buying was one saved query
+   * for an account on its way into onboarding. That is the same trade the batch
+   * already makes for its other nine reads, and its own comment says so.
+   *
+   * ── THE SESSION ID IS READ ON THE CLIENT, NOT HERE ────────────────────────
+   * The dismissal is scoped to the Clerk session so that closing it lasts for
+   * one sign-in and no longer. The obvious way to get that id is `auth()` on
+   * this server component, and it was written that way first. It broke four
+   * tests in this page's own suite: `auth()` pulls in `server-only`, which
+   * throws under the component test environment, and every existing assertion
+   * about the landing rule went red naming a Realtime auth token.
+   *
+   * That was the test telling the truth about a real cost — a whole Clerk
+   * server module dragged into the dashboard's render for one string the
+   * browser already has. `useAuth()` in the modal reads it where it is used, and
+   * this page keeps exactly one new read.
+   *
+   * ── AND IT SHOWS RUPEES, WITH NO LOCAL APPROXIMATION ──────────────────────
+   * /wallet converts its prices for the reader's country, which costs two more
+   * reads: the billing profile for a declared country and today's FX rates. Both
+   * on the hottest route in the product, for an approximation, when the rupee
+   * figure IS the charge — `plans.ts` is explicit that every plan is billed in
+   * rupees and anything else is an approximation of one. So the dialog states
+   * the charge and says it is in rupees, and /wallet stays the screen that
+   * converts. The component keeps the props for a caller that wants to pay for
+   * them.
+   */
+  const offer =
+    session.sessionId !== null && planOfferDecision(subscription).kind === 'offer' ? (
+      <PlanOfferMount sessionKey={session.sessionId} plans={planOfferRows()} />
+    ) : null
 
   /**
    * ── AND A WORKSPACE THAT EXISTS AND HOLDS NOTHING GETS ITS OWN SCREEN TOO ──
@@ -236,7 +307,21 @@ export default async function HomePage() {
     accountReported: instagram.kind === 'ready' && instagram.insights.length > 0,
   }
   if (!workspaceHasStarted(signals)) {
-    return <GetStarted now={now} steps={startSteps()} />
+    /* The offer rides BOTH dashboard states. A workspace with nothing in it yet
+       is still a workspace on Free, and it is the account most likely to be
+       weighing a plan — leaving it out here would mean the offer only ever
+       reached people who had already committed to the product. The one state it
+       does not ride is the branch above: an account with NO workspace cannot
+       check out at all, because `startCheckout` resolves a workspace to charge
+       for, and an offer that cannot be taken up is the "impossible remedy" this
+       codebase has a whole guard about. `planOfferDecision` returns `silent` for
+       it, so that exclusion is in the decision rather than in this JSX. */
+    return (
+      <>
+        <GetStarted now={now} steps={startSteps()} />
+        {offer}
+      </>
+    )
   }
 
   // The evidence behind `.is-real` on the strip. This page read publish-log
@@ -386,6 +471,11 @@ export default async function HomePage() {
           </StaggerItem>
         </div>
       </div>
+
+      {/* Last child, and a closed `<dialog>` is `display: none`, so the
+          `space-y-5` above it costs nothing while it is shut. Open, it is in the
+          browser's top layer and no ancestor's spacing reaches it at all. */}
+      {offer}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures/seeded-user'
-import { leaveOnboarding } from './fixtures/compose'
+import { leaveOnboarding, dismissPlanOffer } from './fixtures/compose'
 import { mkdirSync } from 'node:fs'
 import type { Page } from '@playwright/test'
 
@@ -43,6 +43,20 @@ async function isClipped(page: Page, selector: string): Promise<boolean> {
     .evaluate((el) => el.scrollWidth > el.clientWidth + 1)
 }
 
+/**
+ * NOT WIRED YET, AND DELIBERATELY NOT DELETED.
+ *
+ * `isClipped` measures the exact thing the test below is NAMED for — a shell
+ * control whose label overflows its box — and nothing calls it. The assertion
+ * cannot be added blind: this repository has no working environment for the
+ * smoke leg (root CLAUDE.md), so a new expectation here could not be watched
+ * fail, and a guard nobody has seen go red is not a guard.
+ *
+ * Referenced so it survives the unused-symbol ratchet as a recorded gap rather
+ * than being tidied away as dead code. Wire it up on a machine that can run it.
+ */
+void isClipped
+
 test.describe('shell across widths @smoke', () => {
   test.setTimeout(10 * 60_000)
 
@@ -51,6 +65,8 @@ test.describe('shell across widths @smoke', () => {
     signedIn,
     browser,
   }) => {
+    // Destructured to activate the fixture; `void` because the value itself is unused.
+    void signedIn
     await page.goto('/home')
     const create = page.locator('#main').getByRole('button', { name: /create workspace/i })
     await create.click()
@@ -75,6 +91,7 @@ test.describe('shell across widths @smoke', () => {
       for (const width of WIDTHS) {
         await p.setViewportSize({ width, height: 900 })
         await p.goto('/home', { waitUntil: 'domcontentloaded' })
+        await dismissPlanOffer(p)
         await p.waitForTimeout(1200)
 
         const dir = `shell-proof/${theme}`

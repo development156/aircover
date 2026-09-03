@@ -51,7 +51,7 @@ not a description somebody wrote down — it is a fact about how the database is
 holding a customer's data carries a `workspace_id` column, and the boundary between two customers is
 enforced by the database itself (PostgreSQL row-level security), not by the application.
 
-**MEASURED 2026-08-28: 56 tables.** They are listed in full in §3, and
+**MEASURED 2026-09-01: 59 tables.** They are listed in full in §3, and
 `packages/db/tests/data_handling_doc.pglite.test.ts` fails the build if that number or that list
 stops matching the database. (It read 52 on 2026-08-26, the figure this sentence carried until now.
 FOUR arrived on 2026-08-28 from three different lanes, which is why no lane's own figure — 53, 54
@@ -63,7 +63,7 @@ and `marketing_pass_runs`, which records when Sahoda last looked at your marketi
 `asset_folder_items` and `asset_smart_folders`. It read 48 on 2026-08-23; the forty-ninth was
 `marketing_observations`.)
 
-> **Production holds 52 of those 56 today.** MEASURED against production on 2026-08-28 by counting
+> **Production holds 52 of those 58 today.** MEASURED against production on 2026-08-28 by counting
 > `public` base tables carrying a `workspace_id` column, not inferred from the migration list, and
 > re-taken at the merge rather than carried over — the reading below it moved when the last two
 > lanes both edited this paragraph.
@@ -115,6 +115,7 @@ the table belongs to one identified workspace.
 | `asset_derivatives` | the per-channel crops made from your pictures | `created_by` | removed |
 | `asset_folder_items` | which folders you filed each picture in | `added_by` | removed |
 | `asset_folders` | the folders you made, and their names | `name` `created_by` | removed |
+| `asset_logo_facts` | what Sahoda measured about each logo you uploaded: whether it has transparency, where the mark sits inside the file, and whether its ink is light or dark | no direct identifiers | removed |
 | `asset_smart_folders` | the saved searches you named, and their rules | `name` `query` `created_by` | removed |
 | `asset_usages` | where each picture is used | no direct identifiers | removed |
 | `assets` | your picture library, including anything in its trash | `title` `created_by` | removed |
@@ -159,6 +160,8 @@ the table belongs to one identified workspace.
 | `site_sections` | the sections on those pages | `content` | removed |
 | `sites` | your websites | `name` `created_by` | removed |
 | `studio_designs` | the designs you made in Studio | `title` `doc` `created_by` | removed |
+| `studio_generations` | every picture you asked Studio to make, what you typed, and what it cost | `prompt_given` `prompt_sent` `brand_signals` `created_by` | removed |
+| `studio_generation_images` | the pictures Studio produced and which library file each became | `asset_id` `seed` `sha256` | removed |
 | `studio_exports` | which picture each design became | `created_by` via the asset | removed |
 | `subscriptions` | your plan | no direct identifiers | removed |
 | `templates` | your saved templates | `name` `body` `created_by` | removed |

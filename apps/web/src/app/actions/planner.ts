@@ -8,7 +8,7 @@ import { reportServerError } from '@/lib/observability/report'
 import { APPROVABLE_FROM } from '@/lib/planner/transitions'
 import type { ApproveState } from '@/lib/planner/state'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
+import { workspaceForWrite } from '@/lib/workspaces'
 
 const CANNOT_APPROVE = "Can't approve this post from its current state. Reload to see where it is."
 
