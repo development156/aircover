@@ -557,7 +557,10 @@ export async function emptyTrash(): Promise<EmptyTrashState> {
     }
 
     revalidatePath('/assets')
-    return { ok: true, deleted, kept }
+    // `capped` is the read saying it stopped at ASSET_LIST_LIMIT rather than at
+    // the end of the trash. Dropping it here is what made "Deleted 200 files for
+    // good" a claim that the trash was empty when 300 files were still in it.
+    return { ok: true, deleted, kept, more: trash.capped }
   } catch (error) {
     reportServerError(error, { action: 'emptyTrash', workspaceId })
     return { ok: false, message: 'Could not empty the trash. Try again.' }

@@ -75,7 +75,7 @@ export type TrashAssetsState =
  * happen.
  */
 export type EmptyTrashState =
-  { ok: true; deleted: number; kept: number } | { ok: false; message: string }
+  { ok: true; deleted: number; kept: number; more: boolean } | { ok: false; message: string }
 
 export type UpdateAssetState = { ok: true; asset: Asset } | { ok: false; message: string }
 
