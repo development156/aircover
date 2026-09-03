@@ -202,5 +202,83 @@ export const StampOutcomeSchema = z.enum([
   'logo_unreadable',
   /** Stamping ran and did not produce a stored copy. No remedy the reader owns. */
   'failed',
+  /**
+   * The customer turned the stamp off for this press.
+   *
+   * ── WHY THIS IS NOT NULL ────────────────────────────────────────────────
+   * A deliberate skip and a picture drawn before stamping existed are both
+   * "no stamping happened", and they are not the same sentence: one is a
+   * choice the reader made a minute ago and the other is a fact about when
+   * the product shipped. Writing NULL for a skip would have the screen tell
+   * somebody "made before Sahoda placed logos" about a picture they drew
+   * today with the toggle off, which is simply false.
+   *
+   * NULL keeps its meaning and gains nothing: never attempted, by us.
+   */
+  'skipped',
 ])
 export type StampOutcome = z.infer<typeof StampOutcomeSchema>
+
+/**
+ * WHAT A CUSTOMER MAY CHOOSE ABOUT THE MARK ON ONE PRESS, AS ONE CONTRACT.
+ *
+ * ── WHY THREE FIELDS AND NOT MORE ───────────────────────────────────────────
+ * Where it sits, how big it is, and whether it happens at all. Nothing else
+ * about the mark is a customer decision: the plate colour is derived from the
+ * workspace's own Brand Skin (`stamp-generated.ts`), and the clear-space ratio
+ * and contrast floor are house rules, not a per-press preference.
+ *
+ * ── WHY `sizeStep` IS THREE NAMED VALUES AND NOT A SLIDER ───────────────────
+ * A slider invites a number nobody can judge by looking at it: "17%" means
+ * nothing until it is rendered, and by then the press has already been made.
+ * Three words a person can hold in their head — small, medium, large — beat a
+ * control that needs a preview to mean anything. `medium` is deliberately the
+ * exact share this product shipped with before any of this existed
+ * (`MARK_HEIGHT_SHARE` in `logo-placement.ts`), so choosing nothing reproduces
+ * today's picture exactly.
+ *
+ * ── DEFAULTS REPRODUCE TODAY'S BEHAVIOUR, ON PURPOSE ────────────────────────
+ * `enabled: true`, `anchor: 'bottom-right'`, `sizeStep: 'medium'` is the mark
+ * every picture has carried since stamping shipped. A request that omits
+ * `stamp` altogether, or sends `{}`, gets exactly that: an old caller, a
+ * client built before this contract existed, or a hand-made request all draw
+ * the same picture they always did.
+ *
+ * ── WHY `anchor` IS NOT SOURCED FROM `logo-placement.ts` ────────────────────
+ * That file is geometry, in `apps/web`, and this package may not depend on an
+ * app. The four values are declared here as the STUDIO's own vocabulary for a
+ * corner; `logo-placement.ts`'s own `Anchor` type carries the identical four
+ * strings for the same reason `GenerationMode` and the mesh's task names are
+ * kept as plain string literals on both sides of a package boundary — the
+ * literal values are the contract, not a shared TypeScript type.
+ */
+export const STAMP_ANCHORS = ['bottom-right', 'bottom-left', 'top-right', 'top-left'] as const
+export const StampAnchorSchema = z.enum(STAMP_ANCHORS)
+export type StampAnchor = z.infer<typeof StampAnchorSchema>
+
+/**
+ * `medium` is today's fixed 14% of the canvas's shorter edge, unchanged.
+ * `small` and `large` are new. See `logo-placement.ts` for the exact shares
+ * and for why neither the width cap nor the height cap changes behaviour as a
+ * result of adding them.
+ */
+export const STAMP_SIZE_STEPS = ['small', 'medium', 'large'] as const
+export const StampSizeStepSchema = z.enum(STAMP_SIZE_STEPS)
+export type StampSizeStep = z.infer<typeof StampSizeStepSchema>
+
+/**
+ * Per-field defaults, not a top-level default on the object: `{}`, `{ enabled:
+ * false }` and a request that never mentions `stamp` at all must all validate
+ * to a complete, sensible options record rather than only the last of the
+ * three.
+ */
+export const StampOptionsSchema = z.object({
+  /** Whether a stamped copy is produced at all. Off never changes what is charged. */
+  enabled: z.boolean().default(true),
+  anchor: StampAnchorSchema.default('bottom-right'),
+  sizeStep: StampSizeStepSchema.default('medium'),
+})
+export type StampOptions = z.infer<typeof StampOptionsSchema>
+
+/** Exactly today's behaviour, as a value: on, bottom-right, medium (14%). */
+export const DEFAULT_STAMP_OPTIONS: StampOptions = StampOptionsSchema.parse({})

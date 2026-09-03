@@ -5,8 +5,10 @@ import { auth } from '@clerk/nextjs/server'
 import { createPgLedgerPort, createWithCredits, loadBillingEnv } from '@sahoda/billing'
 import { createMesh, type Mesh } from '@sahoda/mesh'
 import {
+  DEFAULT_STAMP_OPTIONS,
   GenerationModeSchema,
   MESH_TASK_ACTION,
+  StampOptionsSchema,
   StudioGenerationRowSchema,
   StudioGenerationSchema,
   type BrandSignal,
@@ -110,6 +112,17 @@ const GenerateInputSchema = z.object({
    * predates the picker still works and gets the everyday model.
    */
   modelId: z.string().min(1).default(defaultModelId()),
+  /**
+   * Where the logo goes, how big, and whether it happens at all.
+   *
+   * Optional so an old client and any hand-made request stay safe: absent
+   * means `DEFAULT_STAMP_OPTIONS`, which is exactly the picture this product
+   * has always drawn (on, bottom-right, 14% of the shorter edge). Validated
+   * through `@sahoda/shared`'s own schema rather than re-checked here, so a
+   * request that reaches this action and one built by hand can never disagree
+   * about what a valid choice is.
+   */
+  stamp: StampOptionsSchema.optional(),
 })
 
 export type QueueGenerationState =
@@ -184,6 +197,9 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
         message: onReferences ? REFUSALS.tooManyReferences : REFUSALS.malformed,
       }
     }
+
+    // Absent means exactly today's picture. See the field's own comment above.
+    const stampOptions = parsed.data.stamp ?? DEFAULT_STAMP_OPTIONS
 
     // Through the SAME function the picker uses, so a hand-made request cannot
     // reach a size the screen refused to offer.
@@ -455,12 +471,28 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
           // callback releases the hold and refuses a picture the customer
           // already has, and one owner of that guarantee is testable where two
           // are not. See `lib/studio/stamp-generated.ts`.
-          const stamped = await stampGeneratedPicture({
-            workspaceId: workspace.id,
-            userId,
-            picture: bytes,
-            supabase,
-          })
+          //
+          // ── UNLESS THE PERSON TURNED IT OFF FOR THIS PRESS ────────────────
+          // `stampOptions.enabled === false` means the function is never
+          // called: no read of the logo file, no compositing, no second asset,
+          // no extra cost. The row records `skipped`, NOT null.
+          //
+          // Null would have been the smaller change and it would have lied. A
+          // row carrying null renders as "made before Sahoda placed logos",
+          // which is false about a picture somebody drew today with the toggle
+          // off. A choice the customer made a minute ago and a fact about when
+          // the product shipped are not the same sentence, so they are not the
+          // same value.
+          const stamped = stampOptions.enabled
+            ? await stampGeneratedPicture({
+                workspaceId: workspace.id,
+                userId,
+                picture: bytes,
+                supabase,
+                anchor: stampOptions.anchor,
+                sizeStep: stampOptions.sizeStep,
+              })
+            : ({ outcome: 'skipped' } as const)
 
           const imageRow = {
             workspace_id: workspace.id,
@@ -479,13 +511,22 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
           // statement could never land. On `42703` (undefined column) the row
           // is written again without it, so a missing column costs the LINK and
           // never the record of a generation somebody paid for.
+          //
+          // Both fields are ALWAYS present, one shape either way, so the person
+          // turning the stamp off does not create a second row shape to
+          // maintain. When it is off, `stamped` is `null` and both land as
+          // literal `null`: the same bytes on the wire as a row from before
+          // this feature shipped, which is exactly the "never attempted" case
+          // the column's own migration comment names.
           let image = await supabase.from('studio_generation_images').insert({
             ...imageRow,
-            stamped_asset_id: stamped.outcome === 'stamped' ? stamped.assetId : null,
-            // WHY, beside the pointer and in the SAME insert. The pointer's null
-            // is one fact standing in for several situations and the screen has
-            // to tell them apart; the migration's step 5 carries the reasoning.
-            stamp_outcome: stamped.outcome,
+            stamped_asset_id:
+              stamped !== null && stamped.outcome === 'stamped' ? stamped.assetId : null,
+            // WHY, beside the pointer and in the SAME insert. The pointer's
+            // null is one fact standing in for several situations and the
+            // screen has to tell them apart; the migration's step 5 carries
+            // the reasoning.
+            stamp_outcome: stamped === null ? null : stamped.outcome,
           })
 
           if (image.error?.code === '42703') {
@@ -515,7 +556,7 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
           // stamped copy must not stop the generation's own from being removed
           // — so they are separate statements rather than one chain.
           if (image.error) {
-            if (stamped.outcome === 'stamped') {
+            if (stamped !== null && stamped.outcome === 'stamped') {
               await supabase.from('assets').delete().eq('id', stamped.assetId)
               await supabase.storage.from(MEDIA_BUCKET).remove([stamped.objectPath])
             }

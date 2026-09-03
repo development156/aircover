@@ -29,6 +29,8 @@
  * pixel margin that swallows a 400px square and vanishes on a 4000px one.
  */
 
+import type { StampSizeStep } from '@sahoda/shared'
+
 import type { InkPolarity } from './logo-facts'
 
 export type Anchor = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
@@ -48,7 +50,8 @@ export interface Placement {
 }
 
 /**
- * The mark's height, as a share of the canvas's SHORTER edge.
+ * The mark's height, as a share of the canvas's SHORTER edge, one entry per
+ * named size step a customer may choose.
  *
  * The shorter edge, not the width and not the diagonal, because that is what
  * makes one workspace's mark look like the same mark across formats: a 1200x628
@@ -57,11 +60,25 @@ export interface Placement {
  * no reason other than that the canvas is wide, and a story at 1080x1920 would
  * get a mark sized off 1920 that it has no room for.
  *
- * 0.14 is a mark about a seventh of the frame tall: legible when a post is
- * viewed as a thumbnail in a feed, and small enough that it never competes with
- * the content it is signing.
+ * `medium` is 0.14, UNCHANGED from before size steps existed: a mark about a
+ * seventh of the frame tall, legible when a post is viewed as a thumbnail in a
+ * feed and small enough that it never competes with the content it is signing.
+ * It is also `StampOptionsSchema`'s default in `@sahoda/shared`, so a request
+ * that names no step draws exactly the picture it always did.
+ *
+ * `small` and `large` step by the same proportion either side of it (roughly
+ * five sevenths and ten sevenths of `medium`) rather than by a fixed number of
+ * points, so the three steps read as "smaller", "as before" and "bigger" at
+ * every canvas size rather than being calibrated for one.
  */
-const MARK_HEIGHT_SHARE = 0.14
+const MARK_HEIGHT_SHARE: Record<StampSizeStep, number> = {
+  small: 0.1,
+  medium: 0.14,
+  large: 0.2,
+}
+
+/** `medium`, the step every caller gets when it names none. */
+const DEFAULT_SIZE_STEP: StampSizeStep = 'medium'
 
 /**
  * Hard ceiling on the mark's width as a share of the canvas WIDTH.
@@ -78,14 +95,16 @@ const MAX_MARK_WIDTH_SHARE = 0.32
 /**
  * Hard ceiling on the mark's height as a share of the canvas HEIGHT.
  *
- * Honest note: at today's constants this cap CANNOT bind, and saying so is
- * better than implying a guard that never fires. The mark's height starts at
- * 0.14 of the shorter edge, the shorter edge is never longer than the height, so
- * the starting height is never more than 0.14 of the canvas height, which is
- * below 0.25. The width cap only ever scales it further down. The cap is kept
- * because it bounds MARK_HEIGHT_SHARE rather than trusting whoever next tunes
- * it: raise that constant past 0.25 and a tall mark on a tall canvas would eat a
- * third of the frame, and this line is what stops it instead of a review.
+ * Honest note: at today's constants this cap CANNOT bind, for any size step,
+ * and saying so is better than implying a guard that never fires. The mark's
+ * height starts at `MARK_HEIGHT_SHARE[sizeStep]` of the shorter edge, the
+ * shorter edge is never longer than the height, so the starting height is
+ * never more than that share of the canvas height. The largest share any step
+ * offers is `large` at 0.2, still below 0.25. The width cap only ever scales it
+ * further down. The cap is kept because it bounds every entry in
+ * MARK_HEIGHT_SHARE rather than trusting whoever next tunes one of them: raise
+ * `large` past 0.25 and a tall mark on a tall canvas would eat a third of the
+ * frame, and this line is what stops it instead of a review.
  */
 const MAX_MARK_HEIGHT_SHARE = 0.25
 
@@ -176,18 +195,23 @@ function clearOrigin(
  * canvas's own shorter edge, a small canvas produces a small mark rather than
  * one that cannot fit, so there is no positive canvas for which the answer is
  * structurally impossible.
+ *
+ * `sizeStep` is optional and defaults to `'medium'`, today's fixed 0.14 share,
+ * so every caller that predates this parameter keeps drawing the same mark.
  */
 export function placeLogo(input: {
   canvas: { width: number; height: number }
   logoAspect: number
   anchor: Anchor
+  sizeStep?: StampSizeStep
 }): Placement {
   const { canvas, logoAspect, anchor } = input
+  const sizeStep = input.sizeStep ?? DEFAULT_SIZE_STEP
   assertPositiveIntegerCanvas(canvas.width, canvas.height)
   assertUsableAspect(logoAspect)
 
   const shorterEdge = Math.min(canvas.width, canvas.height)
-  let height = MARK_HEIGHT_SHARE * shorterEdge
+  let height = MARK_HEIGHT_SHARE[sizeStep] * shorterEdge
   let width = height * logoAspect
 
   // Both caps scale the whole rect, so the aspect survives them. Width first,

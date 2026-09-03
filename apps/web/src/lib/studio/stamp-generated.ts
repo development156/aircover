@@ -1,12 +1,12 @@
 import 'server-only'
 
-import type { StampOutcome } from '@sahoda/shared'
+import type { StampOutcome, StampSizeStep } from '@sahoda/shared'
 
 import { randomUUID } from 'node:crypto'
 
 import { kindForProvenMime } from '@/lib/assets/kind'
 import { readBrandLogo } from '@/lib/brand/logo'
-import { readBrandLogoBytes } from '@/lib/brand/logo-bytes'
+import { readBrandLogoBytesVariants } from '@/lib/brand/logo-bytes'
 import type { InkPolarity } from '@/lib/brand/logo-facts'
 import type { Anchor } from '@/lib/brand/logo-placement'
 import { oklchToRgb, parseOklch, relativeLuminance, type Rgb } from '@/lib/brand/oklch'
@@ -168,6 +168,14 @@ export interface StampGeneratedInput {
   picture: Uint8Array
   /** The caller's own client, so the write is scoped to the caller's token. */
   supabase: Supabase
+  /**
+   * Where the mark sits and how big it is, from the customer's own choice.
+   *
+   * Optional, and the defaults reproduce exactly what shipped before the
+   * controls existed. Every caller that predates them keeps working.
+   */
+  anchor?: Anchor
+  sizeStep?: StampSizeStep
 }
 
 /**
@@ -197,7 +205,10 @@ export async function stampGeneratedPicture(input: StampGeneratedInput): Promise
   let objectPath: string | null = null
 
   try {
-    const logo = await readBrandLogoBytes(workspaceId)
+    // BOTH variants, so `stampLogo` can choose the one that reads on this
+    // picture rather than drawing a plate behind the only one it has.
+    const variants = await readBrandLogoBytesVariants(workspaceId)
+    const logo = variants.light ?? variants.dark
     if (logo === null) {
       // ── TWO SITUATIONS, AND THE REMEDIES ARE OPPOSITE ────────────────────
       // `readBrandLogoBytes` answers null both for a workspace with no logo and
@@ -209,11 +220,18 @@ export async function stampGeneratedPicture(input: StampGeneratedInput): Promise
       return { outcome: pointer === null ? 'no_logo' : 'logo_unreadable' }
     }
 
+    // The OTHER variant, when there is one and it is not the one already
+    // chosen above. `stampLogo` owns the pick because only it knows the
+    // luminance under the mark; this hands it the material.
+    const alt = variants.light !== null && variants.dark !== null ? variants.dark : null
+
     const stamped = await stampLogo({
       picture: input.picture,
       logo: logo.bytes,
       facts: logo.facts,
-      anchor: STAMP_ANCHOR,
+      anchor: input.anchor ?? STAMP_ANCHOR,
+      sizeStep: input.sizeStep,
+      alt: alt === null ? undefined : { bytes: alt.bytes, facts: alt.facts },
       plate: await plateColour(workspaceId, logo.facts.inkPolarity),
     })
     if (!stamped.ok) return { outcome: 'failed' }

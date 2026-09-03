@@ -1,6 +1,8 @@
 import sharp from 'sharp'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type { LogoFacts } from '@/lib/brand/logo-facts'
+
 /**
  * THE STAMPING STEP, PROVEN TO COST A GENERATION NOTHING WHEN IT FAILS.
  *
@@ -47,6 +49,10 @@ const state = vi.hoisted(() => ({
   inserted: [] as Inserted[],
   insertError: null as { message: string } | null,
   insertThrows: false,
+  /** The dark-background variant, when the workspace has supplied one. */
+  logoDark: null as { assetId: string; bytes: Uint8Array; facts: LogoFacts } | null,
+  /** What `stampLogo` was actually handed, recorded by a spy that still runs it. */
+  lastStampInput: null as { alt?: unknown; anchor?: string; sizeStep?: string } | null,
   /**
    * Whether a logo POINTER exists, independent of whether its bytes read.
    *
@@ -61,6 +67,14 @@ const state = vi.hoisted(() => ({
 vi.mock('server-only', () => ({}))
 
 vi.mock('@/lib/brand/logo-bytes', () => ({
+  // BOTH readers, because `stamp-generated.ts` now asks for the variants so it
+  // can choose a mark that reads on the picture rather than plating behind the
+  // only one it has. `light` is the single-logo workspace every existing test
+  // describes; `dark` null keeps them describing exactly that.
+  readBrandLogoBytesVariants: async () => {
+    if (state.logoThrows) throw new Error('storage exploded')
+    return { light: state.logo, dark: state.logoDark }
+  },
   readBrandLogoBytes: async () => {
     if (state.logoThrows) throw new Error('storage exploded')
     return state.logo
@@ -70,6 +84,25 @@ vi.mock('@/lib/brand/logo-bytes', () => ({
 vi.mock('@/lib/brand/logo', () => ({
   readBrandLogo: async () => state.logoPointer,
 }))
+
+/**
+ * A SPY THAT STILL RUNS THE REAL THING.
+ *
+ * `stampLogo` and `sharp` deliberately run for real in this file, so a plain
+ * mock would trade the compositing these tests exist to exercise for the ability
+ * to read one argument. `importActual` keeps the real function and records what
+ * it was handed on the way in.
+ */
+vi.mock('./stamp', async (importActual) => {
+  const actual = await importActual<typeof import('./stamp')>()
+  return {
+    ...actual,
+    stampLogo: (input: Parameters<typeof actual.stampLogo>[0]) => {
+      state.lastStampInput = input
+      return actual.stampLogo(input)
+    },
+  }
+})
 
 vi.mock('@/lib/brand/read-theme', () => ({
   activeThemeTokens: async () => state.theme,
@@ -162,6 +195,8 @@ beforeEach(async () => {
   state.inserted = []
   state.insertError = null
   state.insertThrows = false
+  state.logoDark = null
+  state.lastStampInput = null
 })
 
 function run() {
@@ -331,5 +366,58 @@ describe('the plate colour', () => {
     state.theme = themeWith('not-a-colour')
 
     expect((await run()).outcome).toBe('stamped')
+  })
+})
+
+describe('two logo variants, and the one that reads on this picture', () => {
+  /**
+   * ── THE SEAM THIS GUARDS ──────────────────────────────────────────────────
+   * Two agents built the halves of this: one made a workspace able to hold a
+   * dark-background mark, the other made the Studio able to place a mark
+   * anywhere at any size. Neither could join them, because the JOIN needs the
+   * luminance under the mark, which exists only inside `stampLogo`. These tests
+   * are the join.
+   */
+  it('hands the compositor BOTH marks when the workspace has both', async () => {
+    state.logoDark = { assetId: 'logo-dark', bytes: logoBytes, facts: { ...FACTS } }
+
+    const result = await run()
+
+    expect(result.outcome).toBe('stamped')
+    // Not "it was called": WITH the second mark. A call that quietly dropped the
+    // alt would stamp correctly and plate where it should have swapped.
+    expect(state.lastStampInput?.alt).toBeTruthy()
+  })
+
+  it('hands it ONE mark when the workspace has one, and no empty second', async () => {
+    state.logoDark = null
+
+    await run()
+
+    // `undefined`, never `{ bytes: undefined }` — an alt that exists and holds
+    // nothing would make `pickLogoVariant` choose between a mark and a hole.
+    expect(state.lastStampInput?.alt).toBeUndefined()
+  })
+
+  it('passes the corner and the size the customer chose, not the old constants', async () => {
+    await stampGeneratedPicture({
+      workspaceId: WORKSPACE,
+      userId: USER,
+      picture,
+      supabase: fakeSupabase() as never,
+      anchor: 'top-left',
+      sizeStep: 'large',
+    })
+
+    expect(state.lastStampInput?.anchor).toBe('top-left')
+    expect(state.lastStampInput?.sizeStep).toBe('large')
+  })
+
+  it('falls back to the shipped defaults when the caller names neither', async () => {
+    await run()
+
+    // Every caller predating the controls keeps the behaviour it had.
+    expect(state.lastStampInput?.anchor).toBe('bottom-right')
+    expect(state.lastStampInput?.sizeStep).toBeUndefined()
   })
 })

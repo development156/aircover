@@ -5,7 +5,13 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { Lock, Sparkles } from 'lucide-react'
-import type { BrandSignal, GenerationMode } from '@sahoda/shared'
+import {
+  DEFAULT_STAMP_OPTIONS,
+  type BrandSignal,
+  type GenerationMode,
+  type StampAnchor,
+  type StampSizeStep,
+} from '@sahoda/shared'
 
 import { queueGeneration } from '@/app/actions/studio'
 import { creditWord } from '@/lib/credit-words'
@@ -76,6 +82,27 @@ const COMING_SOON = [
   { title: 'Tidy my words' },
 ] as const
 
+/**
+ * The four corners a stamp may sit in, in reading order.
+ *
+ * The values are `StampAnchor`'s own four strings from `@sahoda/shared` — never
+ * retyped here — so a choice this screen offers is always one the server
+ * action's own validation accepts.
+ */
+const ANCHOR_OPTIONS: readonly { value: StampAnchor; label: string }[] = [
+  { value: 'top-left', label: 'Top left' },
+  { value: 'top-right', label: 'Top right' },
+  { value: 'bottom-left', label: 'Bottom left' },
+  { value: 'bottom-right', label: 'Bottom right' },
+]
+
+/** The three named sizes, smallest first. Never a slider: see `StampOptionsSchema`'s own header. */
+const SIZE_STEP_OPTIONS: readonly { value: StampSizeStep; label: string }[] = [
+  { value: 'small', label: 'Small' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'large', label: 'Large' },
+]
+
 export function StudioWorkbench({
   formats,
   cost,
@@ -116,6 +143,15 @@ export function StudioWorkbench({
   const [picked, setPicked] = useState<string[]>([])
   const [count, setCount] = useState(1)
   const [modelId, setModelId] = useState(defaultModelId)
+  /**
+   * ── WHAT THE NEXT PRESS WILL DO WITH THE LOGO ─────────────────────────────
+   * Seeded from `DEFAULT_STAMP_OPTIONS`, the same value `queueGeneration` falls
+   * back to when `stamp` is absent, so a person who never opens this fieldset
+   * gets exactly the picture Sahoda has always drawn: on, bottom right, medium.
+   */
+  const [stampEnabled, setStampEnabled] = useState(DEFAULT_STAMP_OPTIONS.enabled)
+  const [stampAnchor, setStampAnchor] = useState<StampAnchor>(DEFAULT_STAMP_OPTIONS.anchor)
+  const [stampSizeStep, setStampSizeStep] = useState<StampSizeStep>(DEFAULT_STAMP_OPTIONS.sizeStep)
   const [note, setNote] = useState<string | null>(null)
   const [short, setShort] = useState(false)
   const [made, setMade] = useState(false)
@@ -281,6 +317,7 @@ export function StudioWorkbench({
         referenceAssetIds: picked,
         count,
         modelId,
+        stamp: { enabled: stampEnabled, anchor: stampAnchor, sizeStep: stampSizeStep },
       })
       if (result.ok) {
         setMade(true)
@@ -783,6 +820,93 @@ export function StudioWorkbench({
                 </span>
               )}
             </label>
+
+            {/* ── YOUR LOGO: WHETHER, WHERE, HOW BIG ──────────────────────────
+                Three named steps for size, never a slider a person cannot judge
+                by looking at it — `StampOptionsSchema`'s own header carries the
+                reasoning. Off never changes the price or the model's own
+                picture: it only means no stamped copy is made, and the chip row
+                above already shows the total for exactly what will be charged
+                either way. */}
+            <fieldset className="flex flex-col gap-2" data-guide="studio-logo">
+              <legend className="type-sm text-muted">Stamp your logo on this picture?</legend>
+              <div
+                role="group"
+                aria-label="Stamp your logo on this picture"
+                className="surface-ring flex w-fit gap-1 rounded-pill bg-canvas p-1"
+              >
+                {(
+                  [
+                    { value: true, label: 'Stamp it' },
+                    { value: false, label: 'Leave it off' },
+                  ] as const
+                ).map((option) => (
+                  <button
+                    key={String(option.value)}
+                    type="button"
+                    onClick={() => setStampEnabled(option.value)}
+                    aria-pressed={stampEnabled === option.value}
+                    className={`rounded-pill px-3 py-1 type-sm font-[550] transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                      stampEnabled === option.value
+                        ? 'bg-surface-3 text-ink'
+                        : 'text-muted hover:text-ink'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Both real controls, disabled (not hidden) once the stamp is
+                  off: a corner and a size that will not be used this press
+                  are correctly announced as unavailable, which is what
+                  `disabled` on a real button is for. This is not the
+                  coming-soon pattern above: these controls work, and will
+                  act on the very next press that turns the stamp back on. */}
+              <div className="flex flex-wrap gap-2" data-guide="studio-logo-corner">
+                {ANCHOR_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    disabled={!stampEnabled}
+                    onClick={() => setStampAnchor(option.value)}
+                    aria-pressed={stampAnchor === option.value}
+                    className={`surface-ring rounded-card px-3 py-1 type-sm transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50 ${
+                      stampAnchor === option.value
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-s2 text-muted'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap gap-2" data-guide="studio-logo-size">
+                {SIZE_STEP_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    disabled={!stampEnabled}
+                    onClick={() => setStampSizeStep(option.value)}
+                    aria-pressed={stampSizeStep === option.value}
+                    className={`surface-ring rounded-card px-3 py-1 type-sm transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50 ${
+                      stampSizeStep === option.value
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-s2 text-muted'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+
+              <p className="type-sm text-muted">
+                {stampEnabled
+                  ? 'Sahoda keeps the unstamped original too, so this is never a one-way choice.'
+                  : 'This picture is drawn without your logo. Nothing already made changes, and you can turn it back on for the next one.'}
+              </p>
+            </fieldset>
           </div>
         ) : null}
 

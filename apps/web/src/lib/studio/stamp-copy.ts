@@ -28,8 +28,11 @@ import type { StampOutcome } from '@sahoda/shared'
  *   failed           stamping ran and produced nothing · the picture is theirs
  *                    and they were charged once · offers NO remedy, because
  *                    there is none the reader owns
- *   null             never attempted · nothing went wrong · must NOT read as a
- *                    failure, and must not offer a remedy for one
+ *   skipped          the CUSTOMER turned it off for this press · their choice,
+ *                    stated back to them · must NOT read as a failure and must
+ *                    NOT claim the picture predates the feature
+ *   null             never attempted BY US · nothing went wrong · must NOT read
+ *                    as a failure, and must not offer a remedy for one
  *
  * ── AND WHY THERE IS NO SIXTH ──────────────────────────────────────────────
  * `failed` covers a mark that would not fit, bytes that would not encode and an
@@ -100,6 +103,14 @@ export function stampNote(outcome: StampOutcome | null): StampNote {
       return {
         title: 'Sahoda could not place your logo on this one',
         body: 'The picture is yours either way, and you were charged once. Drawing another usually works.',
+        remedy: null,
+        hasBothVersions: false,
+      }
+
+    case 'skipped':
+      return {
+        title: 'You turned the logo off for this one',
+        body: 'Nothing was placed, and nothing was charged for placing it. The next picture carries your logo unless you turn it off again.',
         remedy: null,
         hasBothVersions: false,
       }
