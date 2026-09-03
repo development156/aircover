@@ -48,14 +48,16 @@ or a shape.
   with Node's `http`, five pages checked (`/`, `/sign-in`, `/sign-up`,
   `/onboarding`, a 404), all five carrying the identical four link tags, and
   every icon's served bytes hashed equal to the file on disk. MEASURED.
-- **No preview URL exists for this work.** Every Vercel build on `wt-core`,
-  `wt-web` and this lane has failed since before the merge, so nothing carrying
-  the new icon has ever been published. Checked the four most recent READY
-  deployments (`bb117725`, `cc32c48b`, `49276f76`, `3a70f361`): none contains
-  `icon-source.png`. MEASURED. **Do not hand anyone a preview link for the
-  favicon until a build goes green.**
-- **`/loop` and `/assets` were left over budget.** Both are other lanes'
-  screens; see below.
+- **No preview URL was ever produced for this work.** Every Vercel build on
+  `wt-core`, `wt-web` and this lane failed through 2026-08-31, so nothing
+  carrying the new icon was published while this session could see. Checked the
+  four most recent READY deployments (`bb117725`, `cc32c48b`, `49276f76`,
+  `3a70f361`): none contains `icon-source.png`. MEASURED. The trunk builds again
+  now, so a green deployment is expected — but it was not observed from here.
+  **Confirm a build succeeded before handing anyone a link.**
+- **`/loop` and `/assets` were left over budget by this lane.** Another lane
+  cleared them by raising the budgets (`afb4a3ef`); see the next-session
+  section for why that is worth knowing.
 - **`public/brand/favicon-dark.png` and `favicon-white.png` were left on disk.**
   They stopped being icons but `bottom-nav.tsx:148,156` still renders them as
   in-app images. Deleting them would have broken the bottom bar.
