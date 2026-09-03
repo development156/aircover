@@ -15,8 +15,16 @@ const DEFAULT_PLAN: PlanId = 'free'
  * Filtering on the live set (rather than taking the newest row) is load-bearing: 'suspended'
  * and 'canceled' rows sit OUTSIDE that index, so a workspace can accumulate several. Ordering
  * by created_at would happily return a canceled row and grant its entitlements.
+ *
+ * EXPORTED so that the one other place asking "is this workspace on a plan" reads this set
+ * instead of retyping it. `apps/web/src/lib/billing/plan-offer.ts` decides whether to offer
+ * the plans, and it had its own copy with a comment claiming a test kept the two in step —
+ * the test typed the four names by hand and imported nothing, so adding a fifth status here
+ * would have left the two answers disagreeing with nothing to say so. One decides which
+ * features a customer gets; the other decides whether to sell them some.
  */
-const LIVE_STATUSES = ['trialing', 'active', 'past_due', 'grace'] as const
+export const LIVE_SUBSCRIPTION_STATUSES = ['trialing', 'active', 'past_due', 'grace'] as const
+const LIVE_STATUSES = LIVE_SUBSCRIPTION_STATUSES
 
 export interface PgPlanResolverOptions {
   connectionString: string

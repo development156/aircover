@@ -1,6 +1,8 @@
 # Handoff — jiban — wt-jiban2 — 2026-09-03
 
-**Branch** `wt-jiban2` at `87abe541`. Lane `wt-jiban2`. Pushed: yes.
+**Branch** `wt-jiban2`. The work is at `87abe541`; the branch tip carries this handoff
+on top of a fresh `wt-core` merge (`lane-sync` took 268 trunk commits first). Lane
+`wt-jiban2`. Pushed: yes.
 **MERGED into `wt-core`** — MEASURED, `git merge-base --is-ancestor HEAD origin/wt-core`
 returns true, and `87abe541` is 97 commits back on `origin/wt-core` (tip `2dba741c`).
 PR #31 merged 2026-08-31 05:27Z; this session unsubscribed from it after confirming.

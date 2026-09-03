@@ -113,14 +113,16 @@ describe('bootstrapWithRetry', () => {
         settings: {},
         created_at: 't',
         updated_at: 't',
-        // The five columns added to `workspaces` after this fixture was
+        // The six columns added to `workspaces` after this fixture was
         // written. NULL is the real value for all of them on a workspace the
-        // bootstrap has just created: nobody has been asked anything yet.
+        // bootstrap has just created: nobody has been asked anything yet, and
+        // no logo has been set.
         deleted_at: null,
         timezone: null,
         business_model: null,
         regime: null,
         locale: null,
+        logo_asset_id: null,
       },
       replayed: false,
     },

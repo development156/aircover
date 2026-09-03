@@ -1,5 +1,5 @@
 import type { PGlite } from '@electric-sql/pglite'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 
 import { bootFullSchema, migrationFiles, tenantTables } from './helpers/pglite-tenant'
 
@@ -21,10 +21,36 @@ import { bootFullSchema, migrationFiles, tenantTables } from './helpers/pglite-t
  * of date — the point is the printed count, and the assertion that the suite is
  * genuinely catalog-driven rather than list-driven.
  */
+/**
+ * ONE BOOT, IN A HOOK, AND THE REASON IS A GATE FAILURE THIS FILE CAUSED.
+ *
+ * Every other suite in this package boots its database in `beforeAll`, which
+ * `vitest.config.ts` gives 60 seconds. This file was the only one booting inside
+ * test BODIES, where the limit is `testTimeout`, 30 seconds — and it did it three
+ * times, once per test.
+ *
+ * MEASURED 2026-08-29 under `turbo run typecheck lint test --force`: the file took
+ * 72.2s, one of its three boots took 41.7s on its own, and that one failed with
+ * `Test timed out in 30000ms`. The other two came in under the limit. Which of the
+ * three loses is decided by what else the machine is compiling, so the same commit
+ * passes alone and fails under turbo — the signature the config's own header
+ * describes. An earlier unexplained `@sahoda/db#test` failure that did not
+ * reproduce was almost certainly this, unmeasured at the time.
+ *
+ * The repair is not a bigger number. Two of the three boots were redundant: the
+ * first two tests only READ the catalog, so they share one database. The third
+ * creates views and gets its own, in a nested hook, so nothing depends on the
+ * order tests happen to run in.
+ */
+let shared: PGlite
+
+beforeAll(async () => {
+  shared = await bootFullSchema()
+})
+
 describe('the isolation suite’s catalog', () => {
   it('is derived from this tree’s migrations, and reports its size', async () => {
-    const db = await bootFullSchema()
-    const tables = await tenantTables(db)
+    const tables = await tenantTables(shared)
 
     console.log(`migration files in this tree : ${migrationFiles().length}`)
     console.log(`tenant tables the suite sees : ${tables.length}`)
@@ -80,8 +106,7 @@ async function leakyViews(db: PGlite): Promise<string[]> {
 
 describe('workspace-scoped views', () => {
   it('never read as their owner', async () => {
-    const db = await bootFullSchema()
-    expect(await leakyViews(db)).toEqual([])
+    expect(await leakyViews(shared)).toEqual([])
   })
 
   /**
@@ -89,18 +114,35 @@ describe('workspace-scoped views', () => {
    * it is a pass that proves nothing — the exact shape this suite exists to
    * catch. This one hands the same detector a view that IS leaky and requires it
    * to say so. Without this, deleting the detector's body would leave both green.
+   *
+   * It gets its own database because it CREATES views, and the test above asserts
+   * that there are none to find. Sharing one instance would make that assertion a
+   * statement about which test ran first.
+   *
+   * MEASURED, and stated because a guard never shown to fail is not a guard:
+   * pointing `dirty` back at `shared` leaves all three tests GREEN. It passes on
+   * declaration order alone, and would go red the day someone moved this block
+   * above the one that asserts no leaky view exists. The separation below is
+   * structural, not asserted — no test in this file fails if it is undone.
    */
-  it('names a workspace-scoped view that is missing security_invoker', async () => {
-    const db = await bootFullSchema()
-    await db.exec(`create view audit_leaky_view as select workspace_id, id from posts`)
-    expect(await leakyViews(db)).toEqual(['audit_leaky_view'])
+  describe('when a leaky view exists', () => {
+    let dirty: PGlite
 
-    // And the correctly-declared form is not flagged, so the detector is not
-    // simply answering "every view".
-    await db.exec(
-      `create view audit_safe_view with (security_invoker = true)
-         as select workspace_id, id from posts`,
-    )
-    expect(await leakyViews(db)).toEqual(['audit_leaky_view'])
+    beforeAll(async () => {
+      dirty = await bootFullSchema()
+    })
+
+    it('names a workspace-scoped view that is missing security_invoker', async () => {
+      await dirty.exec(`create view audit_leaky_view as select workspace_id, id from posts`)
+      expect(await leakyViews(dirty)).toEqual(['audit_leaky_view'])
+
+      // And the correctly-declared form is not flagged, so the detector is not
+      // simply answering "every view".
+      await dirty.exec(
+        `create view audit_safe_view with (security_invoker = true)
+           as select workspace_id, id from posts`,
+      )
+      expect(await leakyViews(dirty)).toEqual(['audit_leaky_view'])
+    })
   })
 })

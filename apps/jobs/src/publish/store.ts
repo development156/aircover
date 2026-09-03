@@ -71,6 +71,17 @@ export function createPublishStore(opts: PublishStoreOptions) {
       // until the vault opener exists — so this costs nothing today and must be
       // revisited with X. See REQUESTS.md.
       hashtags: readHashtags(row.extras),
+      // The writer's choice about how that tail is written. Read here for the
+      // same reason the CTA is: the composer has been storing it since the box
+      // shipped, and the publisher was defaulting every send back to brackets
+      // because `formatForPlatform` reads an absent flag as `true`. A writer who
+      // unticked the box was told "Followers see the words on their own" and
+      // published `[chai] [pune]`.
+      //
+      // `undefined` for a row that states no choice, never `false` — absence is
+      // not a decision, and every variant written before the box existed must go
+      // on publishing exactly as it did.
+      keywordBrackets: readKeywordBrackets(row.extras),
       // The Google button. Written to `extras` by the composer since the CTA
       // picker shipped and read by NOTHING until now — the writer chose "ORDER",
       // saw it saved, and Google showed no button. Both halves or neither: Zernio
@@ -535,6 +546,22 @@ export function readOptions(extras: unknown): VariantOptions | undefined {
   }
 
   return Object.keys(out).length === 0 ? undefined : out
+}
+
+/**
+ * `post_variants.extras.keywordBrackets` — whether the keyword tail publishes as
+ * `[chai] [pune]` or as `chai pune`.
+ *
+ * Only a real boolean counts. A string `'false'` is not a decision this code can
+ * read, and guessing at one would publish the opposite of what a writer chose;
+ * ignoring it leaves the documented default, which is what every row without the
+ * key already gets. Same rule as `readHashtags` and `readCta`: an unrecognised
+ * shape drops the field, never the publish.
+ */
+export function readKeywordBrackets(extras: unknown): boolean | undefined {
+  if (typeof extras !== 'object' || extras === null || Array.isArray(extras)) return undefined
+  const raw = (extras as Record<string, unknown>).keywordBrackets
+  return typeof raw === 'boolean' ? raw : undefined
 }
 
 function readHashtags(extras: unknown): string[] | undefined {

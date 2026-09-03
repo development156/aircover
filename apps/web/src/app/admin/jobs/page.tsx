@@ -1,9 +1,13 @@
 import type { Metadata } from 'next'
 
+import { PageTitle } from '@/components/page-title'
 import { requireOpsAdmin } from '@/lib/ops/guard'
 import { readPublishDeadLetters } from '@/lib/ops/read'
 
 export const metadata: Metadata = { title: 'Dead letters' }
+
+const JOBS_SUB =
+  'Publishes that failed, newest first, across every workspace. Tenants are shown by id. Naming them would mean widening what an operator can read.'
 
 /**
  * `/admin/jobs` — the publishes that failed.
@@ -28,7 +32,9 @@ export default async function DeadLettersPage() {
   if (letters.status !== 'ok') {
     return (
       <div className="space-y-grid">
-        <h1 className="type-h2 font-extrabold">Dead letters</h1>
+        {/* NO `sub` — see /admin/brain. The read failed, so there is no list
+            for the description to describe. */}
+        <PageTitle>Dead letters</PageTitle>
         <div
           role="alert"
           className="rounded-input border border-danger-bg bg-danger-bg px-3 py-2.5 type-sm text-danger"
@@ -45,13 +51,7 @@ export default async function DeadLettersPage() {
 
   return (
     <div className="space-y-grid">
-      <div>
-        <h1 className="type-h2 font-extrabold">Dead letters</h1>
-        <p className="mt-1 type-body text-muted">
-          Publishes that failed, newest first, across every workspace. Tenants are shown by id.
-          Naming them would mean widening what an operator can read.
-        </p>
-      </div>
+      <PageTitle sub={JOBS_SUB}>Dead letters</PageTitle>
 
       {letters.data.length === 0 ? (
         <p className="type-body text-muted">

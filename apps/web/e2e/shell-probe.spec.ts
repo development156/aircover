@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures/seeded-user'
-import { leaveOnboarding } from './fixtures/compose'
+import { leaveOnboarding, dismissPlanOffer } from './fixtures/compose'
 import type { Page } from '@playwright/test'
 
 /**
@@ -173,6 +173,7 @@ test.describe('the shell clears the 44px touch floor on a phone @smoke', () => {
     // has re-read the workspace. Wait for the switcher itself before measuring, so a
     // slow read cannot turn STATE B into a second, quieter measurement of STATE A.
     await page.goto('/home', { waitUntil: 'domcontentloaded' })
+    await dismissPlanOffer(page)
     await page
       .locator(`header[data-guide="topbar.root"] [data-guide="${SWITCHER_ANCHOR}"]`)
       .waitFor({ state: 'visible', timeout: 30_000 })
@@ -244,6 +245,7 @@ test.describe('the shell clears the 44px touch floor on a phone @smoke', () => {
     expect(signedIn).toBeTruthy()
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/home', { waitUntil: 'domcontentloaded' })
+    await dismissPlanOffer(page)
     await page.waitForLoadState('networkidle')
 
     const clean = underFloor(await measureShell(page))

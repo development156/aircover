@@ -1,4 +1,4 @@
-import { expectPostSaved, leaveOnboarding } from './fixtures/compose'
+import { expectPostSaved, leaveOnboarding, dismissPlanOffer } from './fixtures/compose'
 import { expect, test } from './fixtures/seeded-user'
 
 /**
@@ -22,6 +22,8 @@ test.describe('golden path @smoke', () => {
     page,
     signedIn,
   }) => {
+    // Destructured to activate the fixture; `void` because the value itself is unused.
+    void signedIn
     // ── 1. Signed in, but no workspace yet — the state a wiped database leaves.
     await page.goto('/home')
     // Scoped to the PAGE, not the shell. A workspace-less account is offered the
@@ -60,7 +62,7 @@ test.describe('golden path @smoke', () => {
     // and the id then arrives in the address bar without the screen changing.
     await page.locator('[data-channel-tile="instagram"]').click()
 
-    const body = page.getByLabel('Your post')
+    const body = page.getByLabel('Your post', { exact: true })
     await expect(body).toBeVisible()
     await body.fill('Fresh chai every morning at the corner shop.')
 
@@ -87,7 +89,9 @@ test.describe('golden path @smoke', () => {
     // ── 5. The post is really persisted — a reload is the honest check, not
     //      the in-memory state we just typed into.
     await page.reload()
-    await expect(page.getByLabel('Your post')).toHaveValue(/Fresh chai every morning/)
+    await expect(page.getByLabel('Your post', { exact: true })).toHaveValue(
+      /Fresh chai every morning/,
+    )
 
     // ── 6. It shows up in the list.
     await page.goto('/posts')
@@ -118,6 +122,8 @@ test.describe('golden path @smoke', () => {
     page,
     signedIn,
   }) => {
+    // Destructured to activate the fixture; `void` because the value itself is unused.
+    void signedIn
     await page.goto('/home')
     // Scoped for the same reason as above — the offer appears in the shell too.
     await page
@@ -127,6 +133,7 @@ test.describe('golden path @smoke', () => {
     await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
     await leaveOnboarding(page)
     await page.goto('/home')
+    await dismissPlanOffer(page)
 
     // `—` is the honest "could not read" state. After a successful bootstrap the
     // balance IS readable, so an em dash here means the read broke.
