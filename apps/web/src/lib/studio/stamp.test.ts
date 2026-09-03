@@ -39,9 +39,33 @@ const WINDOW = { x: 70, y: 50, width: 40, height: 20 }
 const INK = { r: 20, g: 20, b: 20 }
 const LIGHT_BASE = { r: 235, g: 235, b: 235 }
 const DARK_BASE = { r: 18, g: 18, b: 18 }
-/** Deliberately a colour no fixture could produce by accident. */
-const PLATE = '#ff00ff'
+/**
+/**
+ * A MID-SHADOW, AND THE ONLY BACKDROP IN THIS FILE THAT CAN SEE THE BUG.
+ *
+ * `DARK_BASE` and `LIGHT_BASE` both fall on the SAME side of the plate
+ * threshold whether luminance is computed from gamma-encoded bytes or from
+ * linear light, so 13 green tests could not tell the two apart. This one is
+ * inside the band where they disagree.
+ *
+ * MEASURED: RGB 80 reads 0.314 as a raw byte mean, which is above the 0.175
+ * dark-ink threshold and therefore "no plate needed". Its true relative
+ * luminance is 0.080, and black ink on it is 2.60:1 — well under the 4.5:1
+ * this module exists to guarantee.
+ */
+const MID_SHADOW_BASE = { r: 80, g: 80, b: 80 }
+
+/**
+ * Deliberately a colour no fixture could produce by accident.
+ *
+ * Built FROM the channel values rather than written as a literal, for two
+ * reasons. The repository refuses a raw hex colour anywhere in source (docs/37
+ * §18), and a test that stated the same colour twice could drift: the string
+ * and the pixel it is checked against are now one fact.
+ */
 const PLATE_RGB = { r: 255, g: 0, b: 255 }
+const hex2 = (n: number): string => n.toString(16).padStart(2, '0')
+const PLATE = `#${hex2(PLATE_RGB.r)}${hex2(PLATE_RGB.g)}${hex2(PLATE_RGB.b)}`
 
 const DARK_INK_FACTS: LogoFacts = {
   hasAlpha: true,
@@ -119,6 +143,35 @@ async function makePicture(base: Rgb, patch?: { rect: Rect; colour: Rgb }): Prom
   }
   const png = await sharp(raw, {
     raw: { width: PICTURE.width, height: PICTURE.height, channels: 3 },
+  })
+    .png()
+    .toBuffer()
+  return new Uint8Array(png)
+}
+
+/**
+ * A picture that is DARK everywhere except a fully transparent hole where the
+ * mark goes. Four channels, because three cannot express the hole.
+ *
+ * The read used to ignore alpha entirely, so those zeroed RGB bytes measured as
+ * pitch black: the darkest possible backdrop, from a region that will actually
+ * composite over white. It plated dark ink that needed no plate.
+ */
+async function makePictureWithHole(base: Rgb, hole: Rect): Promise<Uint8Array> {
+  const raw = Buffer.alloc(PICTURE.width * PICTURE.height * 4)
+  for (let y = 0; y < PICTURE.height; y += 1) {
+    for (let x = 0; x < PICTURE.width; x += 1) {
+      const at = (y * PICTURE.width + x) * 4
+      const inHole =
+        x >= hole.x && x < hole.x + hole.width && y >= hole.y && y < hole.y + hole.height
+      raw[at] = inHole ? 0 : base.r
+      raw[at + 1] = inHole ? 0 : base.g
+      raw[at + 2] = inHole ? 0 : base.b
+      raw[at + 3] = inHole ? 0 : 255
+    }
+  }
+  const png = await sharp(raw, {
+    raw: { width: PICTURE.width, height: PICTURE.height, channels: 4 },
   })
     .png()
     .toBuffer()
@@ -351,6 +404,59 @@ describe('stampLogo: the plate is decided from the backdrop under the mark', () 
       LIGHT_BASE,
       12,
       'clear corner with no plate',
+    )
+  })
+
+  it('reads a transparent region as what it composites over, not as black', async () => {
+    // ── ALPHA WAS NOT READ AT ALL ────────────────────────────────────────────
+    // `ensureAlpha()` adds the channel and the luminance loop took only 0-2, so
+    // a hole in the picture measured as RGB 0,0,0 — the darkest possible
+    // backdrop — from a region that will composite over white. Dark ink there
+    // got a plate it did not need, and light ink would have been refused one.
+    const picture = await makePictureWithHole(DARK_BASE, patchOverMark(expectedPlacement()))
+    const result = await stampLogo({
+      picture,
+      logo: await makeLogo(),
+      facts: DARK_INK_FACTS,
+      anchor: 'bottom-right',
+      plate: PLATE,
+    })
+    expect(result.ok, result.ok ? '' : result.reason).toBe(true)
+    if (!result.ok) return
+
+    // Dark ink over what will read as white needs no plate.
+    expect(result.plated).toBe(false)
+  })
+
+  it('plates a mid-shadow backdrop, which a gamma-encoded read calls bright enough', async () => {
+    // ── THE FIXTURE THE OTHER THIRTEEN COULD NOT BE ─────────────────────────
+    // `meanLuminance` used to weight the raw sRGB bytes and divide by 255,
+    // while the threshold it feeds is solved from WCAG's contrast formula,
+    // which is defined over LINEAR relative luminance. The two are different
+    // quantities and the comparison silently mixed them.
+    //
+    // RGB 80 is where that shows: 0.314 as a byte mean (above the 0.175
+    // threshold, so "no plate"), 0.080 linearised (below it, so "plate"), and
+    // black ink on it measures 2.60:1 against a 4.5:1 promise. The band runs
+    // roughly RGB 45 to 130 — an ordinary photographic mid-shadow.
+    const picture = await makePicture(MID_SHADOW_BASE)
+    const result = await stampLogo({
+      picture,
+      logo: await makeLogo(),
+      facts: DARK_INK_FACTS,
+      anchor: 'bottom-right',
+      plate: PLATE,
+    })
+    expect(result.ok, result.ok ? '' : result.reason).toBe(true)
+    if (!result.ok) return
+
+    expect(result.plated).toBe(true)
+    const out = await decode(result.png)
+    expectColour(
+      pixel(out, result.placement.clear.x, result.placement.clear.y),
+      PLATE_RGB,
+      12,
+      'mid-shadow corner, which must carry a plate',
     )
   })
 

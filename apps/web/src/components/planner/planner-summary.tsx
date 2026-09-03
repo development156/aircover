@@ -56,7 +56,6 @@ function Figure({
   label,
   note,
   href,
-  destination,
   lead = false,
 }: {
   Icon: typeof FileText

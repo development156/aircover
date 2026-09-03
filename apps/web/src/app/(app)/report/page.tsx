@@ -204,8 +204,19 @@ export default async function ReportPage() {
   // The three-card column only promises insights while there genuinely are
   // none. Beside real ones it would read as a product that had not noticed its
   // own output.
-  const hasFindings =
+  // ── THREE ANSWERS, BECAUSE A FAILED READ IS NOT AN EMPTY ONE ──────────────
+  // This was a boolean, and `brain.status !== 'ok'` fell into the false arm — so
+  // a workspace whose Brand Brain could not be read got `InsightPromiseCard`
+  // ("Once your posts start rolling, you'll see clear insights here every
+  // Monday"), which blames the empty column on them not having posted, directly
+  // beside a block saying the read failed. The promise may only be made when we
+  // actually KNOW there is nothing.
+  const findings: 'some' | 'none' | 'unknown' =
     learnings.length > 0 || (brain.status === 'ok' && brain.observations.length > 0)
+      ? 'some'
+      : brain.status === 'ok'
+        ? 'none'
+        : 'unknown'
 
   return (
     <div className="space-y-6">
@@ -415,7 +426,15 @@ export default async function ReportPage() {
               { label: 'Posts measured', value: ranking ? ranking.postsMeasured : null },
               { label: 'Written this week', value: written.length },
               { label: 'Spent', value: cycle.spentCredits, unit: 'cr' },
-              { label: 'Approved', value: cycle.approvedCredits, unit: 'cr' },
+              {
+                label: 'Approved',
+                value: cycle.approvedCredits,
+                unit: 'cr',
+                // Null here means no spending was ever put to this person for
+                // approval, which is not a reading we failed to take. It was
+                // announced as "Approved has not been measured yet".
+                absent: 'Nothing has been put to you for approval in this cycle',
+              },
             ]}
             note={
               ranking
@@ -424,7 +443,7 @@ export default async function ReportPage() {
             }
           />
           <CreditsCard balance={balance} spent={cycle.spentCredits} budget={cycle.budgetCredits} />
-          {hasFindings ? null : <InsightPromiseCard />}
+          {findings === 'none' ? <InsightPromiseCard /> : null}
         </aside>
       </div>
     </div>

@@ -1,6 +1,6 @@
 import type { GenerationMode } from '@sahoda/shared'
 
-import { defaultModelId, modelById, type StudioModel } from './models'
+import { defaultModelId, modelById } from './models'
 
 /**
  * WHAT EACH MODE NEEDS BEFORE IT CAN SPEND ANYTHING.

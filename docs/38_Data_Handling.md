@@ -51,7 +51,7 @@ not a description somebody wrote down — it is a fact about how the database is
 holding a customer's data carries a `workspace_id` column, and the boundary between two customers is
 enforced by the database itself (PostgreSQL row-level security), not by the application.
 
-**MEASURED 2026-08-31: 59 tables.** They are listed in full in §3, and
+**MEASURED 2026-09-01: 59 tables.** They are listed in full in §3, and
 `packages/db/tests/data_handling_doc.pglite.test.ts` fails the build if that number or that list
 stops matching the database. (It read 52 on 2026-08-26, the figure this sentence carried until now.
 FOUR arrived on 2026-08-28 from three different lanes, which is why no lane's own figure — 53, 54

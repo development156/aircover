@@ -1,5 +1,5 @@
 import { CONSTRAINTS } from '@sahoda/shared'
-import type { Channel, ConstraintViolation } from '@sahoda/shared'
+import type { Channel } from '@sahoda/shared'
 import { describe, expect, test } from 'vitest'
 
 import { decideAttach } from './attach-decision'
