@@ -106,6 +106,11 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   },
   { table: 'asset_folders', readability: 'readable', describes: 'the folders you made' },
   {
+    table: 'asset_logo_facts',
+    readability: 'readable',
+    describes: 'what Sahoda measured about each logo you uploaded',
+  },
+  {
     table: 'asset_smart_folders',
     readability: 'readable',
     describes: 'the saved searches you named',
@@ -218,6 +223,16 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { table: 'site_sections', readability: 'readable', describes: 'the sections on those pages' },
   { table: 'sites', readability: 'readable', describes: 'your websites' },
   { table: 'studio_designs', readability: 'readable', describes: 'the designs you made in Studio' },
+  {
+    table: 'studio_generations',
+    readability: 'readable',
+    describes: 'every picture you asked Studio to make, what you typed, and what it cost',
+  },
+  {
+    table: 'studio_generation_images',
+    readability: 'readable',
+    describes: 'the pictures Studio produced and which file in your library each one became',
+  },
   {
     table: 'studio_exports',
     readability: 'readable',

@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
-import { readBalance, readLedger, readOpenHolds } from '@/lib/wallet/read'
+import { countLedger, readBalance, readLedger, readOpenHolds } from '@/lib/wallet/read'
 
 import WalletPage from './page'
 
@@ -26,6 +26,9 @@ vi.mock('@/lib/wallet/read', () => ({
   HISTORY_LIMIT: 50,
   readBalance: vi.fn(),
   readLedger: vi.fn(),
+  // The exact entry count, which the windowed list cannot answer for itself.
+  // `null` is its "could not count" answer and is the safe default here.
+  countLedger: vi.fn(),
   readOpenHolds: vi.fn(),
 }))
 
@@ -40,6 +43,7 @@ vi.mock('@/app/actions/workspace', () => ({ createWorkspace: vi.fn() }))
 
 const balanceRead = vi.mocked(readBalance)
 const ledgerRead = vi.mocked(readLedger)
+const ledgerCount = vi.mocked(countLedger)
 const holdsRead = vi.mocked(readOpenHolds)
 
 const FULL_WALLET = {
@@ -53,6 +57,7 @@ const FULL_WALLET = {
 beforeEach(() => {
   vi.clearAllMocks()
   ledgerRead.mockResolvedValue({ entries: [], skipped: 0 })
+  ledgerCount.mockResolvedValue(0)
   holdsRead.mockResolvedValue([])
 })
 

@@ -22,7 +22,7 @@ import { countSites } from '@/lib/sites/read'
 import { draftSlug } from '@/lib/sites/slug'
 import type { GenerateSiteState } from '@/lib/sites/state'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
+import { workspaceForWrite } from '@/lib/workspaces'
 
 /** Model-input caps — same reasoning as plan-week's GOALS_MAX_CHARS. */
 const NAME_MAX_CHARS = 80

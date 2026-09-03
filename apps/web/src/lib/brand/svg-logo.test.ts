@@ -84,7 +84,10 @@ describe('the pre-check', () => {
     ['a spaced script tag', svg('< script >x</script>')],
     ['an uppercase SCRIPT', svg('<SCRIPT>x</SCRIPT>')],
     ['foreignObject, which carries arbitrary HTML', svg('<foreignObject><b>x</b></foreignObject>')],
-    ['an entity declaration, for XXE and billion laughs', `<!DOCTYPE svg [<!ENTITY a "b">]>${svg('')}`],
+    [
+      'an entity declaration, for XXE and billion laughs',
+      `<!DOCTYPE svg [<!ENTITY a "b">]>${svg('')}`,
+    ],
     ['an external image reference', svg('<image href="https://elsewhere.test/x.png"/>')],
     ['an external use reference', svg('<use xlink:href="https://elsewhere.test/x.svg#a"/>')],
   ])('refuses %s', (_name, text) => {
@@ -105,7 +108,9 @@ describe('the pre-check', () => {
 describe('rasteriseSvgLogo', () => {
   /** THE POINT OF THE WHOLE FILE. What is stored is a raster, never the vector. */
   it('returns a PNG, not the SVG it was given', async () => {
-    const result = await rasteriseSvgLogo(bytesOf(svg('<rect width="64" height="64" fill="blue"/>')))
+    const result = await rasteriseSvgLogo(
+      bytesOf(svg('<rect width="64" height="64" fill="blue"/>')),
+    )
 
     expect(result.ok).toBe(true)
     if (!result.ok) return
@@ -114,7 +119,9 @@ describe('rasteriseSvgLogo', () => {
   })
 
   it('renders at the width a retina lockup and a model both want', async () => {
-    const result = await rasteriseSvgLogo(bytesOf(svg('<rect width="64" height="64" fill="blue"/>')))
+    const result = await rasteriseSvgLogo(
+      bytesOf(svg('<rect width="64" height="64" fill="blue"/>')),
+    )
     expect(result.ok).toBe(true)
     if (!result.ok) return
 

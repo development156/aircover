@@ -161,6 +161,111 @@ export function isUsableBrandColor(css: string): boolean {
   }
 }
 
+/**
+ * How far apart two offered swatches have to be to be two swatches.
+ *
+ * ── FOUR BLUES IS ONE CHOICE WEARING FOUR HATS ──────────────────────────────
+ * `isUsableBrandColor` removes the greys, which was the five-decoys fix, and it
+ * says nothing about whether the survivors differ from EACH OTHER. MEASURED on
+ * the founder's own screenshot after that fix landed: four swatches, all blue,
+ * all within a shade of one another. A logo drawn in one colour at four opacities
+ * yields exactly that, and a person reading the row cannot tell what picking the
+ * third one would do differently from picking the first.
+ *
+ * The distance is Euclidean in OKLab, which is what OKLCH is polar coordinates
+ * of, so it is perceptual rather than a hue arc that means nothing at low chroma:
+ * two near-greys 90 degrees apart are the same colour to an eye and this
+ * arithmetic says so.
+ *
+ * 0.09 is a deliberately LOW bar. It is not "these look different", it is "these
+ * are not the same colour twice", which is the claim a row of choices makes.
+ */
+export const MIN_SWATCH_DISTANCE = 0.09
+
+function lab(css: string): { l: number; a: number; b: number } | null {
+  try {
+    const { l, c, h } = parseOklch(css)
+    if (!Number.isFinite(l) || !Number.isFinite(c) || !Number.isFinite(h)) return null
+    const rad = (h * Math.PI) / 180
+    return { l, a: c * Math.cos(rad), b: c * Math.sin(rad) }
+  } catch {
+    return null
+  }
+}
+
+/** Keep the first of any run of colours an eye would call the same one. */
+export function distinctBrandColors(colors: string[]): string[] {
+  const kept: { css: string; l: number; a: number; b: number }[] = []
+
+  for (const css of colors) {
+    const point = lab(css)
+    if (!point) continue
+    const near = kept.some(
+      (k) => Math.hypot(k.l - point.l, k.a - point.a, k.b - point.b) < MIN_SWATCH_DISTANCE,
+    )
+    if (!near) kept.push({ css, ...point })
+  }
+
+  return kept.map((k) => k.css)
+}
+
+/**
+ * How far the Readability Guard is allowed to move a hue, in degrees.
+ *
+ * It is not a new promise. `brand-theme.dark.test.ts` already asserts that a
+ * navy lightened until it is visible is still navy, at this same 6 degrees, and
+ * that assertion is what makes the lookup below possible at all.
+ */
+export const MAX_BRAND_HUE_DRIFT = 6
+
+/**
+ * Which offered swatch is the one currently painting the product?
+ *
+ * ── WHY IT CANNOT BE STRING EQUALITY ────────────────────────────────────────
+ * The panel offers the colours EXTRACTED from the logo. What `workspace_themes`
+ * stores is `themeTokensFrom`'s output, which has been through the guard: a navy
+ * that was invisible against its own page comes back lightened, sometimes a lot.
+ * Comparing the two strings therefore never matches, and a row of swatches with
+ * no mark on any of them is what the panel shipped with.
+ *
+ * Hue is the one component the guard undertakes not to move, so hue is what is
+ * compared. Returns the NEAREST match and only one, so a mark can never appear
+ * twice however close two swatches sit.
+ */
+export function currentSwatchIndex(colors: string[], primary: string | null): number {
+  if (!primary) return -1
+
+  let hue: number
+  try {
+    hue = parseOklch(primary).h
+  } catch {
+    return -1
+  }
+  if (!Number.isFinite(hue)) return -1
+
+  let best = -1
+  let bestGap = MAX_BRAND_HUE_DRIFT
+
+  colors.forEach((css, index) => {
+    let candidate: number
+    try {
+      candidate = parseOklch(css).h
+    } catch {
+      return
+    }
+    if (!Number.isFinite(candidate)) return
+
+    const raw = Math.abs(candidate - hue)
+    const gap = Math.min(raw, 360 - raw)
+    if (gap < bestGap) {
+      bestGap = gap
+      best = index
+    }
+  })
+
+  return best
+}
+
 function guardedInput(input: { l: number; c: number; h: number }): {
   l: number
   c: number

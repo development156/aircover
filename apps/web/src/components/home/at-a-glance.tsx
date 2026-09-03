@@ -1,3 +1,5 @@
+import { CalendarClock, Coins, Inbox, Send } from 'lucide-react'
+
 import { StatCard, StatStrip, type StatAbsence } from '@/components/charts/stat-card'
 import { needsAPerson } from '@/lib/approvals/queue'
 import type { DisplayPost } from '@/lib/posts/display-post'
@@ -69,8 +71,10 @@ export function AtAGlance({
     publish.status === 'unreadable' ? 'unreadable' : undefined
 
   return (
-    <StatStrip>
+    <StatStrip board>
       <StatCard
+        variant="cell"
+        icon={<Inbox size={15} strokeWidth={1.9} />}
         label="Waiting on you"
         value={waiting}
         unit={waiting === 1 ? 'post' : 'posts'}
@@ -78,6 +82,8 @@ export function AtAGlance({
         href="/approvals"
       />
       <StatCard
+        variant="cell"
+        icon={<CalendarClock size={15} strokeWidth={1.9} />}
         label="Scheduled"
         value={scheduled}
         unit={scheduled === 1 ? 'post' : 'posts'}
@@ -85,6 +91,8 @@ export function AtAGlance({
         href="/planner"
       />
       <StatCard
+        variant="cell"
+        icon={<Send size={15} strokeWidth={1.9} />}
         label="Published"
         value={publishAbsent ? null : publish.live}
         absent={publishAbsent}
@@ -97,6 +105,8 @@ export function AtAGlance({
         href="/analytics"
       />
       <StatCard
+        variant="cell"
+        icon={<Coins size={15} strokeWidth={1.9} />}
         label="Credits left"
         value={balance.status === 'ok' ? balance.balance.available : null}
         absent={balance.status === 'ok' ? undefined : 'unreadable'}

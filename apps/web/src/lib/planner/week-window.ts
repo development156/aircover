@@ -12,7 +12,23 @@ import type { DisplayPost } from '@/lib/posts/display-post'
  * rendered in, and the zone the planner header already names out loud.
  */
 
-const IST = 'Asia/Kolkata'
+/**
+ * THE ZONE THE WEEK GRID IS BUILT IN, exported because the label must match it.
+ *
+ * `istDayKey`, `istMinutes` and `hourRange` all place a card with this, so the
+ * column a card lands in and the row it sits on are IST facts. When the chip's
+ * LABEL was moved to the workspace zone and the placement was not, the two
+ * disagreed: a America/New_York workspace with a post at 2026-09-02T20:00-04:00
+ * got a card drawn in the Sept 3 column at the 5 am row, captioned "08:00 pm
+ * EDT". Every part of that is a real number and the card is nonsense.
+ *
+ * Exported so the caption asks the grid what zone it is in rather than assuming.
+ * Moving the planner to the workspace zone means changing THIS, and the caption
+ * follows for free.
+ */
+export const PLANNER_GRID_ZONE = 'Asia/Kolkata'
+
+const IST = PLANNER_GRID_ZONE
 const DAY_MS = 86_400_000
 
 /** `en-GB` is Monday-first, which is what the grid is. Same source as `month.ts`. */

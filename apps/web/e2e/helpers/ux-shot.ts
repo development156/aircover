@@ -3,6 +3,8 @@ import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { dismissPlanOffer } from '../fixtures/compose'
+
 import type { Page } from '@playwright/test'
 
 import { DETECTORS } from './ux-detect'
@@ -242,5 +244,29 @@ export async function timedGoto(page: Page, path: string): Promise<number> {
   // open stream; `load` plus a short settle is what a person's eye waits for.
   await page.waitForLoadState('load').catch(() => {})
   await page.waitForTimeout(500)
-  return Date.now() - t0
+  /**
+   * ── /home OPENS THE PLAN OFFER, AND A FRAME OF IT IS NOT A FRAME OF /home ──
+   *
+   * Every seeded account is on Free, so the dashboard opens the plans in a modal
+   * `<dialog>`. That dialog is in the browser's top layer and makes the rest of
+   * the document inert, so a screenshot taken here photographs the dialog and a
+   * measurement taken here measures it. Neither failure would name the dialog:
+   * one reads as a redesign, the other as a broken selector.
+   *
+   * ── AND IT IS GATED ON THE PATH, NOT CALLED EVERYWHERE ────────────────────
+   * The helper waits for the dialog before concluding it is absent, and this
+   * function is the navigation for hundreds of frames across dozens of routes.
+   * An unconditional call would add that wait to every one of them. The offer
+   * exists on /home alone, so the check does too.
+   */
+  const ms = Date.now() - t0
+  /**
+   * AFTER the clock is stopped, and that is not cosmetic: every /home row in the
+   * frames manifest reports this number as the page's load time, and the
+   * harness's own housekeeping is not the page loading. Written above the
+   * subtraction, a second /home visit in the same test would have added the
+   * helper's full timeout to a figure that reports quote.
+   */
+  if (path === '/home' || path.startsWith('/home?')) await dismissPlanOffer(page)
+  return ms
 }

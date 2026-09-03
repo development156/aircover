@@ -50,7 +50,9 @@ const ctx: MeshContext = {
 
 describe('createMesh (wired end-to-end)', () => {
   it('runs a task through routing → provider → engine → telemetry with a fake transport', async () => {
-    const { fetchImpl, calls } = router()
+    // No `calls` here: the two tests below assert the routing key and the
+    // telemetry row off the same recorder. This one is about the result.
+    const { fetchImpl } = router()
     const mesh = createMesh({ env, fetchImpl })
     const input = CaptionRewriteInputSchema.parse({ text: 'come by', instruction: 'rewrite' })
 

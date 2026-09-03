@@ -5,6 +5,7 @@ import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-b
 import { PageTitle } from '@/components/page-title'
 import { CreatePostButton } from '@/components/posts/create-post-button'
 import { PostCard } from '@/components/posts/post-card'
+import { getActiveWorkspace } from '@/lib/workspaces'
 import { PostGrid } from '@/components/posts/post-grid'
 import { listPostMetrics } from '@/lib/analytics/post-metrics'
 import { forDisplay } from '@/lib/posts/display-post'
@@ -40,9 +41,13 @@ export default async function PostsPage({
   // which case every chip renders the weaker claim rather than a solid publish.
   const postIds = posts.map((post) => post.id)
   // Batched for the whole page: one query, not one per card.
-  const [variantStates, connected, photos] = await Promise.all([
+  const [variantStates, connected, workspace, photos] = await Promise.all([
     listVariantStates(postIds),
     readConnectedChannels(),
+    // Alongside the other reads, never after them: `read-waterfall.test.ts`
+    // counts sequential server reads per route and refuses a new one, which is
+    // how this page stays one round trip deep instead of ten.
+    getActiveWorkspace(),
     /**
      * Read the attached photos AND sign them, as one unit inside this
      * `Promise.all` rather than after it.
@@ -94,6 +99,10 @@ export default async function PostsPage({
   // which scheduled posts are past due. See `AutoPublishNote`.
   const autoPublish = autoPublishEnabled()
   const now = new Date()
+  // The workspace's own timezone, so every scheduled time on this page reads in
+  // the clock the customer chose rather than a hardcoded one. Null for a
+  // workspace that has not set one, which the formatter renders as it always did.
+  const zone = workspace?.timezone ?? null
 
   // Metrics last, because they need the variant rows: the analytics key is
   // `post_variants.platform_post_id`, and a channel without one is never asked
@@ -166,12 +175,9 @@ export default async function PostsPage({
 
   return (
     <div className="space-y-grid">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <PageTitle>Posts</PageTitle>
-        {/* The empty state owns the only create affordance when there is
-            nothing to list — two "Create post" buttons on one screen is noise. */}
-        {posts.length > 0 ? <CreatePostButton /> : null}
-      </div>
+      {/* The empty state owns the only create affordance when there is
+          nothing to list — two "Create post" buttons on one screen is noise. */}
+      <PageTitle actions={posts.length > 0 ? <CreatePostButton /> : null}>Posts</PageTitle>
 
       <ConnectFirstNote connections={connected} />
 
@@ -231,6 +237,7 @@ export default async function PostsPage({
                   <PostCard
                     compact
                     post={post}
+                    zone={zone}
                     now={now}
                     variantStates={variantStates.get(post.id) ?? []}
                     metrics={metrics.get(post.id)}
