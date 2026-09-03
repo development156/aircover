@@ -243,22 +243,20 @@ Run on `32471c8e`, 2026-09-03, in this order.
 | `pnpm exec vitest run` (root — the leg `turbo test` does NOT cover) | `Test Files 15 passed (15)` · `Tests 231 passed (231)` · 9.11s | **PASS** |
 | `pnpm exec prettier --check .` | `All matched files use Prettier code style!` | **PASS** |
 | `node scripts/design/design-lint.mjs` | all five rules ok; spacing **126** (baseline 126), dead breakpoints **0**, font sizes **654** (baseline 654); 1,651 files scanned | **PASS** |
-| `turbo run typecheck lint test --concurrency=1 --force` | see note below | **PASS** (CI, run 33648207132) |
+| `turbo run typecheck lint test --concurrency=1 --force` | `27 successful, 27 total` · `0 cached, 27 total` · **10m48.705s** | **PASS** |
 | `pnpm --filter @sahoda/web build` (js-budget) | `js-budget ok: 82 routes within budget`, exit 0 | **PASS** |
 | CI `typecheck · lint · test · format` on `32471c8e` | job `100309077886`, 15:25:50 → 15:31:55 = **6m05s**, `success` | **PASS** |
 | Vercel deployment on `32471c8e` | `dpl_5jUrYevrdDRvCQF6uuh4HvCrxj2c`, state **READY** | **PASS** |
 | Playwright `@smoke` | job skipped — no repository secrets exist | **UNRUN** |
 
-**Note on the one leg marked "see note".** The local `turbo` run was started at
-the end of this session and had not returned when the handoff was written. It is
-recorded PASS on the authority of the **CI run on this exact SHA** — `32471c8e`,
-job `100309077886`, `success`, 6m05s — which runs typecheck, lint, test and
-format together. **That is a real measurement of those four legs on this commit,
-taken by CI rather than by me**; the local run would have been a second opinion,
-not the only one. The build leg beside it WAS measured locally on `32471c8e`
-(`js-budget ok: 82 routes within budget`, exit 0) after the first draft of this
-file was written, and the row above now carries that output rather than the
-inference it originally carried.
+**Every leg above is a real local measurement on `32471c8e`, and CI agrees.** The
+turbo and build legs were still running when this file was first written and were
+recorded then as PASS-on-CI's-authority; both have since returned locally
+(`27 successful, 27 total`, `0 cached`, 10m48.705s; and `js-budget ok: 82 routes
+within budget`, exit 0) and the rows now carry that output instead. The
+distinction mattered enough to write down twice: **10m48s uncached is what this
+gate costs.** A run that finishes in seconds replayed a cache and verified
+nothing.
 
 **One known flake, named:** `components/composer/one-fill.test.tsx` failed once
 in a full-suite run and **passes alone** (`Tests 6 passed (6)`). It is
