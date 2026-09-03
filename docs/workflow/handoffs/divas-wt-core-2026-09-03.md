@@ -1,6 +1,6 @@
 # Handoff — divas / wt-core (2026-09-03)
 
-**Trunk is `eab6a831`, pushed, and all twelve lanes now point at it.** Every lane
+**Trunk is `c2458e5b`, pushed, and all twelve lanes now point at it.** Every lane
 was merged into `wt-core` first, then reset to the merged trunk by
 fast-forward. No branch was force-pushed and no lane's work was discarded.
 
@@ -67,15 +67,21 @@ the call removed the route builds at 761.5 kB, byte for byte the same number.
 pricing module costs nothing extra. The 9.0 kB is the sum of two lanes that
 could not see each other, and the budget was raised to the measured value only.
 
-## Gate: four legs of five
+## Gate: four legs of five, MEASURED ON `c2458e5b`
 
 | Leg | Result |
 | --- | --- |
-| turbo typecheck+lint+test | green, 351s, a real run and not a replay |
-| vitest root | green |
+| turbo typecheck+lint+test | green, 27/27 tasks |
+| vitest root | green, 240 tests |
 | **playwright @smoke** | **REFUSED — see below** |
 | prettier --check . | green |
-| turbo build | green, 82 routes within budget |
+| turbo build `--force` | green, "82 routes within budget" |
+
+Re-measured on the final head rather than carried over. The first run was at
+`ed025b14`, and four commits landed after it. All four were markdown, verified by
+`git diff ed025b14 HEAD` naming only LEARNINGS.md and four handoffs — but the
+build was re-run with `--force` anyway, because a cache hit is not a measurement
+and this file would otherwise carry a number from a different tree.
 
 The design-lint baseline was TIGHTENED 654 -> 652 rather than left as found: it
 reported a file improved, and a baseline looser than the code is a ratchet that
@@ -114,6 +120,11 @@ which gets its own ref and needs no acknowledgement at all.
   `studio_generation_images` has neither `stamped_asset_id` nor `stamp_outcome`.
   This is why girija editing `20260831150000` in place was allowed rather than
   prohibited — that migration has never run.
+- **All three `wt-divas` worktrees are now checked out at the same commit as
+  this one.** That is correct for git and a trap for the next session: four
+  worktrees on one tree all default to port 3100, so `pnpm dev` or `next start`
+  in a divas lane will silently land on whichever is already listening. Set
+  `E2E_PORT` before running anything that serves.
 - **The repository has moved.** Every push prints
   `This repository moved. Please use the new location: development156/aircover`.
   The remote still works by redirect. Nobody has updated the remote URL.
