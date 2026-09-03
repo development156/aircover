@@ -32,6 +32,7 @@ import { rgbToOklch } from '@/lib/brand/oklch'
  */
 export function BrandPanel({
   logoUrl,
+  logoUrlDark,
   current,
   skinOn,
   hasTheme,
@@ -40,6 +41,12 @@ export function BrandPanel({
   onClose,
 }: {
   logoUrl: string | null
+  /**
+   * The dark-background variant, when the workspace has chosen one. Optional so
+   * the shell that renders this panel does not have to fetch a second pointer
+   * to keep working: undefined and null both mean "none to show".
+   */
+  logoUrlDark?: string | null
   /**
    * The primary the workspace is stored with, so the row can say which swatch is
    * the one in use. Guard-adjusted, which is why the lookup is by hue.
@@ -56,6 +63,7 @@ export function BrandPanel({
 }) {
   const router = useRouter()
   const input = useRef<HTMLInputElement>(null)
+  const inputDark = useRef<HTMLInputElement>(null)
   const [palette, setPalette] = useState<string[] | null>(null)
   const [unreadable, setUnreadable] = useState(false)
   /**
@@ -78,6 +86,9 @@ export function BrandPanel({
   const [converted, setConverted] = useState(false)
   const [busy, startTransition] = useTransition()
   const [read, setRead] = useState(false)
+  /** Same shape as `failed`, for the optional dark-background variant. */
+  const [failedDark, setFailedDark] = useState<string | null>(null)
+  const [convertedDark, setConvertedDark] = useState(false)
 
   if (!read) {
     setRead(true)
@@ -220,6 +231,36 @@ export function BrandPanel({
     })
   }
 
+  /**
+   * The dark-background variant. No palette read: the theme comes from the
+   * primary logo, never from this one, so there is nothing this file's colours
+   * should change.
+   */
+  function replaceDark(file: File): void {
+    startTransition(async () => {
+      setFailedDark(null)
+      setConvertedDark(false)
+
+      const form = new FormData()
+      form.set('file', file)
+
+      let stored
+      try {
+        const { setBrandLogoDark } = await import('@/app/actions/brand-logo')
+        stored = await setBrandLogoDark(form)
+      } catch {
+        setFailedDark('Sahoda could not save that file. Try again.')
+        return
+      }
+      if (!stored.ok) {
+        setFailedDark(stored.message)
+        return
+      }
+      setConvertedDark(stored.converted)
+      router.refresh()
+    })
+  }
+
   return (
     <div
       role="dialog"
@@ -243,7 +284,7 @@ export function BrandPanel({
           <img
             src={logoUrl}
             alt="Your logo"
-            className="surface-ring h-7 w-auto max-w-[72px] shrink-0 rounded-control bg-s2 object-contain px-1"
+            className="surface-ring h-7 w-auto max-w-[72px] shrink-0 rounded-sm bg-s2 object-contain px-1"
           />
         ) : null}
         <p className="type-sm text-ink">Your brand colours</p>
@@ -259,7 +300,7 @@ export function BrandPanel({
           claim, and rule 1 is about claims rather than words. What went is the
           mechanism ("the colour it saw most of"), which is our arithmetic and
           not the reader's situation. */}
-      <p className="type-xs mt-1 text-muted">
+      <p className="type-meta mt-1 text-muted">
         Picked from your logo. Buttons and links follow the one you choose.
       </p>
 
@@ -291,8 +332,8 @@ export function BrandPanel({
                  an outline on the page behind it needs none. */
               className={
                 index === inUse
-                  ? 'size-8 rounded-control outline-2 outline-offset-2 outline-ink'
-                  : 'surface-ring size-8 rounded-control'
+                  ? 'size-8 rounded-sm outline-2 outline-offset-2 outline-ink'
+                  : 'surface-ring size-8 rounded-sm'
               }
               style={{ background: color }}
             />
@@ -307,11 +348,11 @@ export function BrandPanel({
           honest answer; five grey decoys was not. */}
       {monochrome ? (
         <div className="mt-3">
-          <p className="type-xs text-muted">
+          <p className="type-meta text-muted">
             Your logo is greys and blacks. Pick a colour and everything follows it.
           </p>
-          <label className="surface-ring mt-2 flex items-center justify-between gap-2 rounded-control p-2">
-            <span className="type-xs text-ink">Pick a colour</span>
+          <label className="surface-ring mt-2 flex items-center justify-between gap-2 rounded-sm p-2">
+            <span className="type-meta text-ink">Pick a colour</span>
             <input
               type="color"
               disabled={busy}
@@ -322,7 +363,7 @@ export function BrandPanel({
                  fires only on a real choice, so nothing is saved until the
                  person picks. */
               onChange={(e) => pick(e.target.value)}
-              className="size-8 cursor-pointer rounded-control border-0 bg-transparent p-0"
+              className="size-8 cursor-pointer rounded-sm border-0 bg-transparent p-0"
             />
           </label>
         </div>
@@ -345,7 +386,7 @@ export function BrandPanel({
           whose they are. */}
       {hasTheme ? (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
-          <span className="type-xs text-ink">
+          <span className="type-meta text-ink">
             {skinOn ? 'Brand colours are on' : 'Sahoda colours are on'}
           </span>
           <Button variant="secondary" disabled={busy} onClick={onToggleSkin}>
@@ -355,7 +396,7 @@ export function BrandPanel({
       ) : null}
 
       {failed ? (
-        <p className="type-xs mt-3 text-danger" role="alert">
+        <p className="type-meta mt-3 text-danger" role="alert">
           {failed}
         </p>
       ) : null}
@@ -364,11 +405,13 @@ export function BrandPanel({
           uploaded a vector should not have to discover from the media library
           that Sahoda holds a picture of it. */}
       {converted ? (
-        <p className="type-xs mt-3 text-muted">Sahoda saved your SVG as a high-resolution image.</p>
+        <p className="type-meta mt-3 text-muted">
+          Sahoda saved your SVG as a high-resolution image.
+        </p>
       ) : null}
 
       {unreadable ? (
-        <p className="type-xs mt-3 text-muted">
+        <p className="type-meta mt-3 text-muted">
           Sahoda could not read the colours from your logo. Replace it below and it will try again.
         </p>
       ) : null}
@@ -401,6 +444,56 @@ export function BrandPanel({
           if (file) replace(file)
         }}
       />
+      {/* ── THE DARK VARIANT, A SEPARATE FILE FOR A SEPARATE JOB ─────────────────
+          Sahoda stamps this on generated pictures with a dark backdrop instead
+          of drawing a plate behind the main logo. Said out loud, because a
+          second logo button with no explanation reads as a bug in the first
+          one. */}
+      <div className="mt-3 flex items-center gap-2 border-t border-line pt-3">
+        {logoUrlDark ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={logoUrlDark}
+            alt="Your dark-background logo"
+            className="surface-ring h-7 w-auto max-w-[72px] shrink-0 rounded-control bg-s2 object-contain px-1"
+          />
+        ) : null}
+        <p className="type-xs text-muted">
+          Optional: a version for dark backgrounds. Sahoda uses it instead of a plate behind your
+          logo.
+        </p>
+      </div>
+
+      {failedDark ? (
+        <p className="type-xs mt-2 text-danger" role="alert">
+          {failedDark}
+        </p>
+      ) : null}
+
+      {convertedDark ? (
+        <p className="type-xs mt-2 text-muted">Sahoda saved your SVG as a high-resolution image.</p>
+      ) : null}
+
+      <input
+        ref={inputDark}
+        type="file"
+        accept={LOGO_FILE_ACCEPT}
+        className="sr-only"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          // Same reason as the light input above: a file input fires `change`
+          // only when its value changes, so the value is cleared before the
+          // upload runs rather than after.
+          e.target.value = ''
+          if (file) replaceDark(file)
+        }}
+      />
+      <div className="mt-2">
+        <Button variant="ghost" disabled={busy} onClick={() => inputDark.current?.click()}>
+          {logoUrlDark ? 'Replace dark-background logo' : 'Add a dark-background logo'}
+        </Button>
+      </div>
+
       <div className="mt-3 flex gap-2">
         <Button variant="secondary" disabled={busy} onClick={() => input.current?.click()}>
           {logoUrl ? 'Replace logo' : 'Add a logo'}

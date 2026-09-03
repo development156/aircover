@@ -160,7 +160,7 @@ export function AssetTile({
         }
         aria-pressed={selectable ? selected : undefined}
         className={cn(
-          'surface-ring flex w-full flex-col overflow-hidden rounded-card bg-surface text-left transition-micro hover:bg-s1',
+          'surface-ring flex w-full flex-col overflow-hidden rounded-card bg-surface text-left transition-micro hover:bg-s2',
           selectable && selected ? 'shadow-[inset_0_0_0_2px_var(--acc)]' : '',
         )}
       >

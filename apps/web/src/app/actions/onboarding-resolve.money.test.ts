@@ -15,7 +15,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const withCredits = vi.fn()
 const runTask = vi.fn()
-const activeBrandMemory = vi.fn()
+const readActiveBrandMemory = vi.fn()
 
 vi.mock('@clerk/nextjs/server', () => ({ auth: async () => ({ userId: 'user-1' }) }))
 vi.mock('@sahoda/billing', () => ({
@@ -31,10 +31,15 @@ vi.mock('@sahoda/mesh', () => ({
   brandGuidelinesTask: { def: { name: 'brand_guidelines' } },
 }))
 vi.mock('@/lib/onboarding/read-brain', () => ({
-  activeBrandMemory: (...args: unknown[]) => activeBrandMemory(...args),
+  readActiveBrandMemory: (...args: unknown[]) => readActiveBrandMemory(...args),
 }))
 vi.mock('@/lib/workspaces', () => ({
-  getActiveWorkspace: async () => ({ id: 'ws-1', name: 'TRAINX' }),
+  workspaceForWrite: async () => ({ ok: true, workspace: { id: 'ws-1', name: 'TRAINX' } }),
+}))
+// The free path is bounded per day; this file is about the ledger key, so the
+// window is open. `onboarding-resolve.bounds.test.ts` closes it.
+vi.mock('@/lib/ops/rate-limit', () => ({
+  fixedWindowAllow: async () => ({ allowed: true, count: 1, unmeasured: false }),
 }))
 vi.mock('@/lib/actions/revalidate-balance', () => ({ revalidateBalance: vi.fn() }))
 vi.mock('@/lib/observability/report', () => ({ reportServerError: vi.fn() }))
@@ -66,7 +71,10 @@ beforeEach(() => {
 
 describe('the paid onboarding resolve', () => {
   it('keys the charge to the version of the brain the customer already has', async () => {
-    activeBrandMemory.mockResolvedValue({ version: 7, payload: {}, source: 'resolved' })
+    readActiveBrandMemory.mockResolvedValue({
+      status: 'ok',
+      brain: { version: 7, payload: {}, source: 'resolved' },
+    })
 
     await callResolve()
 
@@ -84,7 +92,10 @@ describe('the paid onboarding resolve', () => {
    * charge instead of taking a second one.
    */
   it('presents the same key on a retry after an abandoned paid build', async () => {
-    activeBrandMemory.mockResolvedValue({ version: 7, payload: {}, source: 'resolved' })
+    readActiveBrandMemory.mockResolvedValue({
+      status: 'ok',
+      brain: { version: 7, payload: {}, source: 'resolved' },
+    })
 
     await callResolve()
     await callResolve()
@@ -96,10 +107,16 @@ describe('the paid onboarding resolve', () => {
 
   /** And a saved brain opens the next charge, because that is a new purchase. */
   it('presents a new key once the brain they paid for has been saved', async () => {
-    activeBrandMemory.mockResolvedValue({ version: 7, payload: {}, source: 'resolved' })
+    readActiveBrandMemory.mockResolvedValue({
+      status: 'ok',
+      brain: { version: 7, payload: {}, source: 'resolved' },
+    })
     await callResolve()
 
-    activeBrandMemory.mockResolvedValue({ version: 8, payload: {}, source: 'resolved' })
+    readActiveBrandMemory.mockResolvedValue({
+      status: 'ok',
+      brain: { version: 8, payload: {}, source: 'resolved' },
+    })
     await callResolve()
 
     const first = withCredits.mock.calls[0]![0] as { objectRef: string }
@@ -109,7 +126,7 @@ describe('the paid onboarding resolve', () => {
 
   /** The first resolve is free and must never reach the ledger at all. */
   it('does not touch the ledger when there is no brain yet', async () => {
-    activeBrandMemory.mockResolvedValue(null)
+    readActiveBrandMemory.mockResolvedValue({ status: 'none' })
 
     await callResolve()
 

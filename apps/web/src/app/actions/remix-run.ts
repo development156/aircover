@@ -20,8 +20,9 @@ import { reportPaidActionFailure } from '@/lib/actions/paid-failure'
 import { revalidateBalance } from '@/lib/actions/revalidate-balance'
 import { hasLink } from '@/lib/posts/detect-link'
 import { ComposeError, composeKind } from '@/lib/remix/compose'
-import { plannedCharges, previewBatch } from '@/lib/remix/cost'
+import { plannedCharges, previewBatch, type PlannedCharge } from '@/lib/remix/cost'
 import { newRemixBatchRef, newRemixChargeRef } from '@/lib/remix/object-ref'
+import { RemixReadError } from '@/lib/remix/read-error'
 import * as store from '@/lib/remix/store'
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
@@ -58,6 +59,14 @@ import { workspaceForWrite } from '@/lib/workspaces'
  * One charge per kind, each releasing its own failure. A single batch-wide
  * charge would bill for twelve drafts when four of the calls failed, and "users
  * never pay for failures" is not a per-batch promise.
+ *
+ * ── AND THE BATCH FEE WRAPS ALL OF THEM ──────────────────────────────────────
+ * `remix_pack` buys the run, so its `withCredits` callback IS the run: the fee
+ * is held first, every kind is charged inside it, and the callback throws when
+ * not one draft came out, which releases the fee. It used to be settled by a
+ * callback that could not fail, before any model was asked, so a run in which
+ * every kind failed produced nothing and still cost the pack price.
+ * `remix-run.fee.test.ts` reads the ledger rows to prove both halves.
  */
 
 let meshSingleton: Mesh | undefined
@@ -126,7 +135,14 @@ export async function runRemixBatch(batchId: string): Promise<RunState> {
       }
     }
 
-    const derivatives = await store.readDerivatives(batchId, workspaceId)
+    const derivatives = await readDerivativesOrRefuse(batchId, workspaceId)
+    if (derivatives === null) {
+      return {
+        ok: false,
+        insufficient: false,
+        message: 'Sahoda could not read this batch, so nothing was started or charged.',
+      }
+    }
     const cost = previewBatch(derivatives)
     if (cost.includedCount === 0) {
       return {
@@ -215,112 +231,154 @@ export async function runRemixBatch(batchId: string): Promise<RunState> {
   }
 }
 
-/** Charge and write, kind by kind. Every failure releases its own hold. */
+/**
+ * A refused read is its own refusal, before anything moves. Null here is "the
+ * database would not say", never "no derivatives", which `previewBatch` would
+ * price as an empty batch and refuse with the wrong sentence.
+ */
+async function readDerivativesOrRefuse(
+  batchId: string,
+  workspaceId: string,
+): Promise<readonly RemixDerivative[] | null> {
+  try {
+    return await store.readDerivatives(batchId, workspaceId)
+  } catch (error) {
+    if (error instanceof RemixReadError) return null
+    throw error
+  }
+}
+
+/** What a run adds up to. Mutated only inside `spend`, returned once. */
+interface RunTally {
+  drafts: number
+  failedKinds: number
+  spent: number
+}
+
+/**
+ * Charge and write, kind by kind, inside the batch fee's own hold.
+ *
+ * The fee is the OUTER `withCredits`: held first, so a wallet that empties
+ * mid-batch has paid for the run it got; settled last, after every kind has
+ * answered, so its callback can know whether the run made anything. When it
+ * made nothing the callback throws and the fee is RELEASED. The per-kind
+ * charges are unaffected either way: each one settled or released itself.
+ *
+ * A fee whose HOLD is refused makes no run at all: the balance was checked for
+ * the whole total already, so that refusal is an infrastructure failure, and
+ * asking the model for kinds nobody can pay the pack for would charge for
+ * drafts inside a run that never officially began.
+ */
 async function spend(input: {
   batchId: string
   workspaceId: string
   userId: string
   sourceBody: string
   derivatives: readonly RemixDerivative[]
-}): Promise<{ drafts: number; failedKinds: number; spent: number }> {
-  const { batchId, workspaceId, userId, sourceBody, derivatives } = input
+}): Promise<RunTally> {
+  const { batchId, workspaceId, derivatives } = input
   const charges = plannedCharges(derivatives)
+  const fee = charges.find((charge) => charge.kind === null)
+  const kinds = charges.filter((charge) => charge.kind !== null)
+  const tally: RunTally = { drafts: 0, failedKinds: 0, spent: 0 }
+  if (!fee) return tally
 
-  let drafts = 0
-  let failedKinds = 0
-  let spent = 0
+  const charged = await getWithCredits()(
+    { workspaceId, action: fee.action, objectRef: newRemixBatchRef(batchId) },
+    async () => {
+      for (const charge of kinds) {
+        await spendKind({ ...input, charge, tally })
+      }
+      // Nothing was made, so there is no run to have paid for. → RELEASE.
+      if (tally.drafts === 0) throw new Error('NO_DRAFTS')
+      return { drafts: tally.drafts }
+    },
+  )
+  if (charged.ok) tally.spent += creditCost(fee.action)
 
-  for (const charge of charges) {
-    // The batch fee. It buys the run itself — planning is free and this is what
-    // the pack price is for. It is FIRST so a wallet that empties mid-batch has
-    // paid for the run it got.
-    if (charge.kind === null) {
-      const fee = await getWithCredits()(
-        { workspaceId, action: charge.action, objectRef: newRemixBatchRef(batchId) },
-        // The fee buys the run, so the callback records that it started and
-        // nothing more. It cannot fail, which is correct: a fee that could
-        // "fail" would be a fee for work nobody can point at.
-        async () => ({ started: true }),
-      )
-      if (fee.ok) spent += creditCost(charge.action)
-      continue
-    }
+  return tally
+}
 
-    const mine = derivatives.filter((d) => charge.derivativeIds.includes(d.id))
-    const channels = mine.map((d) => d.channel)
-    let failure: string | null = null
-    let postId: string | null = null
-    let written: RemixDerivative[] = []
+/** One kind: one hold, one model call, one draft post. Releases its own failure. */
+async function spendKind(input: {
+  batchId: string
+  workspaceId: string
+  userId: string
+  sourceBody: string
+  derivatives: readonly RemixDerivative[]
+  charge: PlannedCharge
+  tally: RunTally
+}): Promise<void> {
+  const { batchId, workspaceId, userId, sourceBody, derivatives, charge, tally } = input
+  const kind = charge.kind as RemixKind
+  const mine = derivatives.filter((d) => charge.derivativeIds.includes(d.id))
+  const channels = mine.map((d) => d.channel)
+  let failure: string | null = null
+  let postId: string | null = null
+  let written: RemixDerivative[] = []
 
-    const charged = await getWithCredits()(
-      {
-        workspaceId,
-        action: charge.action,
-        objectRef: newRemixChargeRef(batchId, charge.kind),
-      },
-      async (ctx) => {
-        let bodies
-        try {
-          bodies = await composeKind({
-            mesh: getMesh(),
-            kind: charge.kind as RemixKind,
-            sourceBody,
-            channels,
-            ctx: {
-              workspaceId,
-              traceId: randomUUID(),
-              userId,
-              actionType: ctx.actionType,
-              creditsCharged: ctx.creditsCharged,
-            },
-          })
-        } catch (error) {
-          // Our own copy, carried on the typed error — never a provider message.
-          failure = error instanceof ComposeError ? error.reason : null
-          throw new Error('COMPOSE_FAILED') // → RELEASE, no charge
-        }
-
-        const saved = await writeDraft({
-          workspaceId,
-          userId,
-          kind: charge.kind as RemixKind,
+  const charged = await getWithCredits()(
+    { workspaceId, action: charge.action, objectRef: newRemixChargeRef(batchId, kind) },
+    async (ctx) => {
+      let bodies
+      try {
+        bodies = await composeKind({
+          mesh: getMesh(),
+          kind,
           sourceBody,
-          bodies: bodies.bodies,
-          derivatives: mine,
+          channels,
+          ctx: {
+            workspaceId,
+            traceId: randomUUID(),
+            userId,
+            actionType: ctx.actionType,
+            creditsCharged: ctx.creditsCharged,
+          },
         })
-        if (!saved) throw new Error('SAVE_FAILED') // → RELEASE, no charge
-        postId = saved.postId
-        written = saved.written
-        return saved
-      },
-    )
-
-    if (!charged.ok || postId === null) {
-      failedKinds += 1
-      for (const derivative of mine) {
-        await store.markFailed(derivative.id, workspaceId, failure)
+      } catch (error) {
+        // Our own copy, carried on the typed error — never a provider message.
+        failure = error instanceof ComposeError ? error.reason : null
+        throw new Error('COMPOSE_FAILED') // → RELEASE, no charge
       }
-      continue
-    }
 
-    // `creditCost(action)` is the same lookup `withCredits` charged — never a
-    // number carried back from the callback, which would be a second source of
-    // truth about what moved.
-    spent += creditCost(charge.action)
-    const writtenIds = new Set(written.map((d) => d.id))
+      const saved = await writeDraft({
+        workspaceId,
+        userId,
+        kind,
+        sourceBody,
+        bodies: bodies.bodies,
+        derivatives: mine,
+      })
+      if (!saved) throw new Error('SAVE_FAILED') // → RELEASE, no charge
+      postId = saved.postId
+      written = saved.written
+      return saved
+    },
+  )
+
+  if (!charged.ok || postId === null) {
+    tally.failedKinds += 1
     for (const derivative of mine) {
-      if (writtenIds.has(derivative.id)) {
-        drafts += 1
-        await store.markWritten(derivative.id, workspaceId, postId)
-        continue
-      }
-      // A channel the model skipped is SKIPPED and says so — never a blank draft
-      // that reads as one nobody has written yet.
-      await store.markSkipped(derivative.id, workspaceId)
+      await store.markFailed(derivative.id, workspaceId, failure)
     }
+    return
   }
 
-  return { drafts, failedKinds, spent }
+  // `creditCost(action)` is the same lookup `withCredits` charged — never a
+  // number carried back from the callback, which would be a second source of
+  // truth about what moved.
+  tally.spent += creditCost(charge.action)
+  const writtenIds = new Set(written.map((d) => d.id))
+  for (const derivative of mine) {
+    if (writtenIds.has(derivative.id)) {
+      tally.drafts += 1
+      await store.markWritten(derivative.id, workspaceId, postId)
+      continue
+    }
+    // A channel the model skipped is SKIPPED and says so — never a blank draft
+    // that reads as one nobody has written yet.
+    await store.markSkipped(derivative.id, workspaceId)
+  }
 }
 
 /** One draft post per kind, with one channel version per draft it produced. */

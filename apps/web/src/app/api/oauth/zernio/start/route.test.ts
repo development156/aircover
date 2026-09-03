@@ -34,6 +34,18 @@ const state = vi.hoisted(() => ({
   connectUrlPlatforms: [] as string[],
   /** `platform:headless` for every connect start, so the flag cannot be assumed. */
   connectUrlHeadless: [] as string[],
+  /** The profile id handed to Zernio's connect endpoint, in order. */
+  connectUrlProfileIds: [] as string[],
+  /** The return URL handed to Zernio, in order. */
+  connectUrlRedirects: [] as string[],
+  /**
+   * The `zernio_profiles` row for this workspace. Null is a workspace that has
+   * never connected, which is the only case that may reach Zernio's profile
+   * endpoints; every test written before the stored mapping was read keeps that
+   * meaning by default.
+   */
+  mapping: null as { profile_id: string } | null,
+  mappingError: null as { message: string } | null,
 }))
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -46,13 +58,15 @@ vi.mock('@/lib/zernio/server', () => ({
       ? {
           connectUrl: (
             platform: string,
-            _profileId: string,
-            _redirectUrl: string,
+            profileId: string,
+            redirectUrl: string,
             options?: { headless?: boolean },
           ) => {
             state.connectUrlCalls += 1
             state.connectUrlPlatforms.push(platform)
             state.connectUrlHeadless.push(`${platform}:${options?.headless === true}`)
+            state.connectUrlProfileIds.push(profileId)
+            state.connectUrlRedirects.push(redirectUrl)
             return Promise.resolve('https://zernio.example/consent')
           },
         }
@@ -99,6 +113,13 @@ vi.mock('@/lib/observability/report', () => ({ reportServerError: () => Promise.
 
 vi.mock('@/lib/supabase/server', () => ({
   createServerSupabase: () => ({
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          maybeSingle: () => Promise.resolve({ data: state.mapping, error: state.mappingError }),
+        }),
+      }),
+    }),
     rpc: () => {
       state.rpcCalls += 1
       return Promise.resolve({ error: null })
@@ -131,6 +152,118 @@ beforeEach(() => {
   state.connectUrlCalls = 0
   state.connectUrlPlatforms = []
   state.connectUrlHeadless = []
+  state.connectUrlProfileIds = []
+  state.connectUrlRedirects = []
+  state.mapping = null
+  state.mappingError = null
+})
+
+/**
+ * ONE IDEMPOTENCY KEY, A RENAMED WORKSPACE, AND NO CHANNEL COULD BE CONNECTED.
+ *
+ * MEASURED: Sentry JAVASCRIPT-NEXTJS-1M, 2026-08-25, three events in 32 seconds
+ * on this route: `createProfile: This Idempotency-Key was already used with a
+ * different request body`. The workspace had been bound to its profile in
+ * `zernio_profiles` nine hours earlier. This route never read that row: it asked
+ * Zernio by a name that embeds the workspace name, the workspace had been
+ * renamed, the lookup missed, and the create went out under the old key.
+ *
+ * The stored mapping is the answer, and it is read first.
+ */
+describe('a workspace that is already bound never asks Zernio for a profile again', () => {
+  const BOUND = '6a8d3af765ef313d46dc012c'
+
+  it('uses the stored profile even after a rename, and provisions nothing', async () => {
+    state.mapping = { profile_id: BOUND }
+    // The rename that produced the Sentry events: bound under one name, pressed
+    // under another.
+    state.workspace = { id: 'ws-1', name: 'TRAINX' }
+
+    const res = await post({ platform: 'instagram' })
+
+    // MUTATION WITNESS. Put `ensureZernioProfile` back in front of the read and
+    // this counts one provisioning call on a workspace that already has a profile.
+    expect(res.status).toBe(200)
+    expect(state.profileEnsured).toBe(0)
+    expect(state.rpcCalls).toBe(0)
+    expect(state.connectUrlProfileIds).toEqual([BOUND])
+  })
+
+  it('still provisions, and records the binding, for a workspace that has none', async () => {
+    state.mapping = null
+
+    const res = await post({ platform: 'instagram' })
+
+    expect(res.status).toBe(200)
+    expect(state.profileEnsured).toBe(1)
+    expect(state.rpcCalls).toBe(1)
+    expect(state.connectUrlProfileIds).toEqual(['6a75cae32853ee463c6419d6'])
+  })
+
+  it('refuses when the binding cannot be read, rather than minting a second profile', async () => {
+    // A create for a workspace whose binding we could not read is how an orphan
+    // profile gets made and PROFILE_ALREADY_BOUND becomes permanent.
+    state.mappingError = { message: 'connection reset' }
+
+    const res = await post({ platform: 'instagram' })
+    const body = (await res.json()) as { message?: string }
+
+    expect(res.status).toBe(503)
+    expect(state.profileEnsured).toBe(0)
+    expect(state.connectUrlCalls).toBe(0)
+    expect(body.message).toMatch(/try again/i)
+    expect(res.headers.get('set-cookie')).toBeNull()
+  })
+})
+
+/**
+ * THE NONCE THAT TIES THE TRIP HOME TO THIS PRESS.
+ *
+ * The return route used to bind a picker to the customer with nothing but a
+ * profile id, which is on every return URL their browser ever visited. A
+ * per-press random value, in an httpOnly cookie AND on the return URL, is what
+ * a link built by somebody else cannot carry.
+ */
+describe('every press mints a nonce, and it travels both ways', () => {
+  const nonceFrom = (res: Response): string | null => {
+    const cookie = res.headers.getSetCookie().find((c) => c.startsWith('sahoda_connect_nonce='))
+    return cookie?.split(';')[0]?.split('=')[1] ?? null
+  }
+
+  it('puts the same value in an httpOnly cookie and on the return URL', async () => {
+    const res = await post({ platform: 'facebook', mode: 'popup' })
+
+    const nonce = nonceFrom(res)
+    expect(nonce).toMatch(/^[A-Za-z0-9_-]{22}$/)
+    const cookie = res.headers.getSetCookie().find((c) => c.startsWith('sahoda_connect_nonce='))
+    expect(cookie).toContain('HttpOnly')
+    expect(cookie).toContain('SameSite=Lax')
+    // The URL Zernio was given carries it, and Zernio preserves our query string.
+    // (`mode` and `platform` are `zernioReturnUrl`'s to add, and that is mocked
+    // here; return-url.test.ts pins them.)
+    const redirect = new URL(state.connectUrlRedirects[0] ?? '')
+    expect(redirect.searchParams.get('nonce')).toBe(nonce)
+  })
+
+  it('never reuses a value across presses', async () => {
+    const a = nonceFrom(await post({ platform: 'instagram' }))
+    const b = nonceFrom(await post({ platform: 'instagram' }))
+    expect(a).not.toBeNull()
+    expect(a).not.toBe(b)
+  })
+
+  it('still sends the pending-connect cookie beside it', async () => {
+    const res = await post({ platform: 'linkedin' })
+    const names = res.headers.getSetCookie().map((c) => c.split('=')[0])
+    expect(names).toEqual(['sahoda_connect', 'sahoda_connect_nonce'])
+  })
+
+  it('sends no nonce on a refusal', async () => {
+    state.limitVerdict = { kind: 'blocked', sentence: 'Your Free plan includes 2 channels.' }
+    const res = await post({ platform: 'instagram' })
+    expect(res.status).toBe(403)
+    expect(res.headers.getSetCookie()).toEqual([])
+  })
 })
 
 describe('the channels plan limit is enforced before the consent screen', () => {

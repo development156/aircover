@@ -207,7 +207,7 @@ export function ScheduleField({
               aria-pressed={on}
               onClick={() => choose(choice.when)}
               className={cn(
-                'flex flex-col items-start rounded-full border px-3 py-1.5 text-left transition-micro max-narrow:min-h-[var(--control-h-touch)]',
+                'flex flex-col items-start rounded-pill border px-3 py-1.5 text-left transition-micro max-narrow:min-h-[var(--control-h-touch)]',
                 on
                   ? 'border-transparent bg-ink text-white dark:bg-white dark:text-[var(--canvas)]'
                   : 'border-line bg-surface text-ink hover:bg-s2',

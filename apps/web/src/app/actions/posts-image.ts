@@ -15,7 +15,7 @@ import {
   FAILURE_REASON,
   type ChargeFailureState,
 } from '@/lib/posts/charge-failure'
-import { MEDIA_BUCKET, MEDIA_UPLOAD_CAP_BYTES } from '@/lib/posts/media-constants'
+import { CHANNEL_MEDIA_CAP_BYTES, MEDIA_BUCKET } from '@/lib/posts/media-constants'
 import { mediaObjectPath } from '@/lib/posts/media-path'
 import { newImageGenerateRef } from '@/lib/posts/object-ref'
 import { getPost, listMedia, readVariantFormats } from '@/lib/posts/read'
@@ -124,7 +124,12 @@ export async function generateImage(postId: string, input: unknown): Promise<Gen
         }
 
         const bytes = Uint8Array.from(Buffer.from(result.data.base64, 'base64'))
-        if (bytes.byteLength === 0 || bytes.byteLength > MEDIA_UPLOAD_CAP_BYTES) {
+        // The CHANNEL ceiling, not the upload cap. These bytes came back from
+        // the mesh inside this function; they never crossed the edge, so the
+        // 4.5 MB request-body limit that lowered the upload cap says nothing
+        // about them. Capping a generated image at the upload figure would fail
+        // an ordinary large PNG on a path the customer already paid for.
+        if (bytes.byteLength === 0 || bytes.byteLength > CHANNEL_MEDIA_CAP_BYTES) {
           failure = FAILURE_REASON.MESH_ERROR
           throw new Error('IMAGE_UNUSABLE') // → RELEASE
         }

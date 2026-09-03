@@ -3,10 +3,10 @@ import 'server-only'
 import { cache } from 'react'
 import sharp from 'sharp'
 
-import { MEDIA_BUCKET, MEDIA_UPLOAD_CAP_BYTES } from '@/lib/posts/media-constants'
+import { CHANNEL_MEDIA_CAP_BYTES, MEDIA_BUCKET } from '@/lib/posts/media-constants'
 import { createServerSupabase } from '@/lib/supabase/server'
 
-import { readBrandLogo } from './logo'
+import { readBrandLogo, readBrandLogoDark } from './logo'
 import { logoFactsFromRaw, type LogoFacts } from './logo-facts'
 
 /**
@@ -64,15 +64,19 @@ export interface BrandLogoBytes {
 const MAX_PIXELS = 100_000_000
 
 /**
- * A logo over this is refused rather than decoded. It is `MEDIA_UPLOAD_CAP_BYTES`
- * and not a number invented here: the file arrived through the same upload path
- * as every other asset, so nothing larger can be in the library to begin with,
- * and a second, smaller cap would mean a file the library accepted and this
- * reader silently declines to stamp. If a stricter logo-only limit is ever
- * wanted it belongs next to the upload that would enforce it, where a person can
- * be told at the moment they choose the file.
+ * A logo over this is refused rather than decoded. It is
+ * `CHANNEL_MEDIA_CAP_BYTES` and not a number invented here: a cap smaller than
+ * what the library HOLDS would mean a file the library accepted and this reader
+ * silently declines to stamp. If a stricter logo-only limit is ever wanted it
+ * belongs next to the upload that would enforce it, where a person can be told
+ * at the moment they choose the file.
+ *
+ * It followed the upload cap until 2026-09-02, when that cap dropped to 4 MB to
+ * fit inside a Vercel function request body. This read happens server-side on a
+ * STORED object, so no request limit applies to it, and following the new cap
+ * would have quietly stopped stamping every logo already in a library above 4 MB.
  */
-const LOGO_CAP_BYTES = MEDIA_UPLOAD_CAP_BYTES
+const LOGO_CAP_BYTES = CHANNEL_MEDIA_CAP_BYTES
 
 interface AssetRow {
   id: string
@@ -157,4 +161,57 @@ export const readBrandLogoBytes = cache(async function readBrandLogoBytes(
     // generation fails.
     return null
   }
+})
+
+/**
+ * The workspace's DARK-background logo variant, as bytes plus facts. Null for
+ * every reason `readBrandLogoBytes` above can be null, plus the ordinary case:
+ * no dark variant has been chosen.
+ *
+ * Deliberately not built by generalising `readBrandLogoBytes` to take a reader
+ * function as a parameter: the two are already this short, and a shared helper
+ * would need to thread `cache()` through a parameter, which `react`'s `cache()`
+ * cannot do without becoming a different cache key per call, per React's own
+ * dedup-by-function-identity rule. Duplicating five lines is cheaper than
+ * getting that wrong.
+ */
+export const readBrandLogoBytesDark = cache(async function readBrandLogoBytesDark(
+  workspaceId: string,
+): Promise<BrandLogoBytes | null> {
+  try {
+    const logo = await readBrandLogoDark(workspaceId)
+    if (logo === null) return null
+
+    const bytes = await downloadLogo(workspaceId, logo.assetId)
+    if (bytes === null) return null
+
+    const facts = await measure(bytes)
+    if (facts === null) return null
+
+    return { assetId: logo.assetId, bytes, facts }
+  } catch {
+    return null
+  }
+})
+
+export interface BrandLogoBytesVariants {
+  light: BrandLogoBytes | null
+  dark: BrandLogoBytes | null
+}
+
+/**
+ * Both logo variants a workspace may hold, as bytes plus facts, read together.
+ * Added alongside `readBrandLogoBytes` for the same reason `readBrandLogoVariants`
+ * sits alongside `readBrandLogo`: every existing caller wants exactly one file,
+ * and this is for the caller (the stamping pipeline) that wants both so it can
+ * choose which fits the picture it is stamping.
+ */
+export const readBrandLogoBytesVariants = cache(async function readBrandLogoBytesVariants(
+  workspaceId: string,
+): Promise<BrandLogoBytesVariants> {
+  const [light, dark] = await Promise.all([
+    readBrandLogoBytes(workspaceId),
+    readBrandLogoBytesDark(workspaceId),
+  ])
+  return { light, dark }
 })

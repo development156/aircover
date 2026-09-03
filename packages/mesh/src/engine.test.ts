@@ -4,7 +4,9 @@ import type { MeshContext, MeshTaskDef } from '@sahoda/shared'
 import type { ChatRequest, ChatResponse, Provider, ProviderUsage } from './providers/types'
 import { ProviderCallError } from './providers/types'
 import type { LogSink, ProviderLogRow } from './telemetry'
-import { createMeshRunner, type Attempt, type MeshTaskSpec } from './engine'
+import { createMeshRunner, isUnparseableOutput, type Attempt, type MeshTaskSpec } from './engine'
+import { createOpenRouterProvider } from './providers/openrouter'
+import { chatTimeoutMsFor } from './timeouts'
 
 // ── Test fixtures ─────────────────────────────────────────────────────────────
 
@@ -132,7 +134,13 @@ describe('createMeshRunner', () => {
     const result = await runner.run(spec(), { q: 'go' }, ctx)
 
     expect(result.ok).toBe(false)
-    if (!result.ok) expect(result.error.code).toBe('PROVIDER_ERROR')
+    if (!result.ok) {
+      expect(result.error.code).toBe('PROVIDER_ERROR')
+      // MARKED, so the refusal gate can hold the post for a person instead of
+      // re-asking a model that failed the schema twice on every tick.
+      expect(isUnparseableOutput(result.error)).toBe(true)
+      expect(result.error.message).toBe('model returned unparseable output')
+    }
     expect(rows[0]!.status).toBe('error')
     expect(rows[0]!.error_code).toBeTruthy()
   })
@@ -328,5 +336,89 @@ describe('createMeshRunner', () => {
 
     expect(result.ok).toBe(true)
     if (result.ok) expect(result.data).toEqual({ value: 'ok' })
+  })
+})
+
+/**
+ * A STALLED PROVIDER ENDS INSIDE THE CEILING, AS A TYPED FAILURE.
+ *
+ * The transport here is the real OpenRouter client over a fetch that settles
+ * only when its signal fires, which is how `fetch` behaves. The runner must come
+ * back with PROVIDER_ERROR, because that is the return `withCredits` releases the
+ * hold on; a promise that never settles is a hold nobody releases.
+ */
+describe('createMeshRunner — ceilings', () => {
+  const hangUntilAborted = (_url: string, init: RequestInit) =>
+    new Promise<Response>((_resolve, reject) => {
+      init.signal?.addEventListener('abort', () => reject(init.signal!.reason), { once: true })
+    })
+
+  it('hands every chat call the ceiling for its task', async () => {
+    const seen: ChatRequest[] = []
+    const capturing: Provider = {
+      name: 'openrouter',
+      async chat(req) {
+        seen.push(req)
+        return resp('openrouter', '{"value":"hi"}')
+      },
+    }
+    const { sink } = capturingSink()
+    const runner = runnerWith([{ provider: capturing, model: 'or-model' }], sink)
+
+    await runner.run(spec(), { q: 'go' }, ctx)
+
+    expect(seen[0]!.timeoutMs).toBe(chatTimeoutMsFor(def.name))
+    expect(chatTimeoutMsFor('gate_classify')).toBe(12_000)
+    expect(chatTimeoutMsFor('site_generate')).toBeGreaterThan(chatTimeoutMsFor('caption_rewrite'))
+  })
+
+  it('returns PROVIDER_ERROR and logs PROVIDER_TIMEOUT when the transport never answers', async () => {
+    const { sink, rows } = capturingSink()
+    const runner = createMeshRunner({
+      planAttempts: () => [
+        { provider: createOpenRouterProvider('k', hangUntilAborted), model: 'or-model' },
+      ],
+      logSink: sink,
+      now: clock(),
+      price: () => 0,
+      chatTimeoutMs: () => 20,
+    })
+
+    const result = await runner.run(spec(), { q: 'go' }, ctx)
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error.code).toBe('PROVIDER_ERROR')
+      expect(result.error.message).toBe('all providers failed to respond')
+      // An outage, not a schema failure: the gate may retry this one.
+      expect(isUnparseableOutput(result.error)).toBe(false)
+    }
+    expect(rows[0]!.status).toBe('error')
+    expect(rows[0]!.error_code).toBe('PROVIDER_TIMEOUT')
+  })
+
+  it('an image generation that never answers fails inside the ceiling and logs TIMEOUT', async () => {
+    const { sink, rows } = capturingSink()
+    const runner = createMeshRunner({
+      planAttempts: () => [],
+      logSink: sink,
+      now: clock(),
+      price: () => 0,
+      planImage: () => ({
+        provider: createOpenRouterProvider('k', hangUntilAborted),
+        model: 'img-model',
+      }),
+      imageTimeoutMs: 20,
+    })
+
+    const result = await runner.runImage(
+      { ...def, name: 'image_generate', tier: 'standard' } as MeshTaskDef<unknown, unknown>,
+      { prompt: 'p', width: 1024, height: 1024 },
+      ctx,
+    )
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error.message).toBe('image generation failed')
+    expect(rows[0]!.error_code).toBe('TIMEOUT')
   })
 })

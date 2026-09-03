@@ -120,26 +120,30 @@ describe('making a picture, which now lives in the Studio', () => {
     render(
       <StudioWorkbench
         formats={generatableFormats()}
-        cost={creditCost('image_standard')}
-        library={[]}
+        library={{ status: 'ok', pictures: [] }}
         pictures={[]}
+        signals={[]}
+        balance={null}
       />,
     )
-    // `MESH_TASK_ACTION.image_generate` maps to `image_standard` (6), not
-    // `image_premium` (12): a customer who asked for "a picture" and was charged
-    // for a tier they never chose has been overcharged, and the reverse never
-    // happens.
+    // The DEFAULT model is the draft tier, priced at `image_standard` (6) and
+    // not `image_premium` (12): a customer who asked for "a picture" without
+    // choosing the dear model is charged the cheap one. The premium price is
+    // reachable only by picking a finish-tier model, whose card names it. The
+    // price is no longer handed in by the page; the workbench derives it from
+    // the chosen model, which is why the prop is gone.
     expect(creditCost('image_standard')).toBe(6)
-    expect(document.body.textContent).toMatch(/6\s*credits/)
+    expect(document.body.textContent).toMatch(/Make a picture · 6\s*credits/)
   })
 
   test('refuses with both numbers, and says nothing was charged', async () => {
     render(
       <StudioWorkbench
         formats={generatableFormats()}
-        cost={creditCost('image_standard')}
-        library={[]}
+        library={{ status: 'ok', pictures: [] }}
         pictures={[]}
+        signals={[]}
+        balance={null}
       />,
     )
     await userEvent.type(screen.getByPlaceholderText(/plate of fresh samosas/i), 'a cup of chai')

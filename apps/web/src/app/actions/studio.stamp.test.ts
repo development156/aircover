@@ -60,6 +60,8 @@ const state = vi.hoisted(() => ({
   updates: [] as Record<string, unknown>[],
   uploads: [] as string[],
   withCreditsCalls: 0,
+  /** How many times the logo file was actually read. Zero proves stamping never ran. */
+  logoReads: 0,
 }))
 
 vi.mock('server-only', () => ({}))
@@ -75,7 +77,21 @@ vi.mock('@/app/actions/assets', () => ({ attachAssetToPost: vi.fn() }))
 vi.mock('@/app/actions/posts', () => ({ createPost: vi.fn() }))
 
 vi.mock('@/lib/brand/logo-bytes', () => ({
+  // BOTH readers, because `stamp-generated.ts` now asks for the variants so it
+  // can choose a mark that reads on the picture rather than plating behind the
+  // only one it has. `light` is the single-logo workspace every existing test
+  // describes; `dark` null keeps them describing exactly that.
+  readBrandLogoBytesVariants: async () => {
+    // Counted here, because this is the reader the stamping path actually calls
+    // now. Leaving the counter on the single-file reader would have "never reads
+    // the logo file" pass while the code read it through the other door — the
+    // test would have been describing a call site that no longer exists.
+    state.logoReads += 1
+    if (state.logoThrows) throw new Error('storage exploded')
+    return { light: state.logo, dark: null }
+  },
   readBrandLogoBytes: async () => {
+    state.logoReads += 1
     if (state.logoThrows) throw new Error('storage exploded')
     return state.logo
   },
@@ -220,6 +236,7 @@ beforeEach(async () => {
   state.updates = []
   state.uploads = []
   state.withCreditsCalls = 0
+  state.logoReads = 0
 })
 
 const imageRow = () => state.inserted.find((one) => one.table === 'studio_generation_images')!
@@ -258,6 +275,69 @@ describe('a generation that stamps', () => {
     expect(withStamp).toEqual(withoutStamp)
     // Stated absolutely as well, so the pair cannot agree by both being wrong.
     expect(withStamp).toEqual({ calls: 1, cost: 1 })
+  })
+})
+
+describe('a generation with the stamp turned off', () => {
+  it('never reads the logo file, produces one asset, and charges exactly the same', async () => {
+    const result = await queueGeneration({
+      ...REQUEST,
+      stamp: { enabled: false, anchor: 'bottom-right', sizeStep: 'medium' },
+    })
+
+    expect(result).toMatchObject({ ok: true, made: 1 })
+    // Nothing about the logo ran at all, not even a read that would have found one.
+    expect(state.logoReads).toBe(0)
+    expect(assetRows()).toHaveLength(1)
+    expect(imageRow().row.asset_id).toBe(assetRows()[0]!.row.id)
+    expect(imageRow().row.stamped_asset_id).toBeNull()
+    // ── RECORDED AS A CHOICE, NOT AS AN ABSENCE ─────────────────────────────
+    // This asserted `toBeNull()` when the toggle first shipped, and null was the
+    // smaller change and a lie: `stamp-copy.ts` renders null as "made before
+    // Sahoda placed logos", which is false about a picture somebody drew today
+    // with the stamp turned off. A choice the customer made a minute ago and a
+    // fact about when the product shipped are not the same sentence.
+    expect(imageRow().row.stamp_outcome).toBe('skipped')
+    expect(imageRow().row.stamp_outcome).not.toBeNull()
+    expect(state.withCreditsCalls).toBe(1)
+    expect(finished()!.cost_credits).toBe(1)
+  })
+
+  it('costs exactly what a stamped generation costs', async () => {
+    await queueGeneration(REQUEST)
+    const stamped = { calls: state.withCreditsCalls, cost: finished()!.cost_credits }
+
+    state.inserted = []
+    state.updates = []
+    state.withCreditsCalls = 0
+    await queueGeneration({
+      ...REQUEST,
+      stamp: { enabled: false, anchor: 'bottom-right', sizeStep: 'medium' },
+    })
+    const off = { calls: state.withCreditsCalls, cost: finished()!.cost_credits }
+
+    expect(off).toEqual(stamped)
+  })
+
+  it('an absent `stamp` field behaves exactly like `{ enabled: true, ... }` (the schema default)', async () => {
+    await queueGeneration(REQUEST)
+    const noField = { reads: state.logoReads, stampedAssetId: imageRow().row.stamped_asset_id }
+
+    state.inserted = []
+    state.logoReads = 0
+    await queueGeneration({
+      ...REQUEST,
+      stamp: { enabled: true, anchor: 'bottom-right', sizeStep: 'medium' },
+    })
+    const explicitDefault = {
+      reads: state.logoReads,
+      stampedAssetId: imageRow().row.stamped_asset_id,
+    }
+
+    expect(noField.reads).toBeGreaterThan(0)
+    expect(explicitDefault.reads).toBe(noField.reads)
+    expect(explicitDefault.stampedAssetId).not.toBeNull()
+    expect(noField.stampedAssetId).not.toBeNull()
   })
 })
 

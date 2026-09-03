@@ -1,4 +1,5 @@
 import { schedules } from '@trigger.dev/sdk'
+import { createWithCredits } from '@sahoda/billing'
 
 import { createRadarPgDb } from '../radar/pg'
 import { runRadarPass, type RadarPassReport } from '../radar/run'
@@ -14,8 +15,8 @@ export const RADAR_SCAN_TASK_ID = 'radar-scan'
  * returns everything the cadence says is ready, which after an outage could be
  * every source in the table at once. 100 is the same figure the manual script
  * uses; sources past the wall are reported in `refused` rather than dropped, and
- * tomorrow's pass takes them (NULL `last_seen_at` sorts first, so the ones that
- * waited go first).
+ * tomorrow's pass takes them (the order is by the last ATTEMPT, so the ones that
+ * waited longest go first).
  */
 const BATCH = 100
 
@@ -58,6 +59,10 @@ const BATCH = 100
  * minute is off the hour for the ordinary reason — every scheduler in the world
  * is busiest at :00.
  *
+ * A pass ALSO CHARGES THE CUSTOMER: `radar_scan` at the price /radar prints,
+ * once per watching workspace per competitor per ISO week. A page that will not
+ * load is held for and then released, so a gap costs nobody anything.
+ *
  * Running LATE is safe: a source not scanned this week is simply more overdue and
  * sorts first next time. Running TWICE is nearly free: `dueSources` will not
  * return a source scanned an hour ago, and `insertChange` is
@@ -79,9 +84,12 @@ export const radarScanTask = schedules.task({
   id: RADAR_SCAN_TASK_ID,
   cron: '40 3 * * 1',
   run: async (): Promise<RadarPassReport> => {
-    const { env, pool } = getRuntime()
+    const { env, pool, ledger } = getRuntime()
     return runRadarPass({
       db: createRadarPgDb(pool),
+      // The customer's 5 credits a scan. Held before the read and released on a
+      // page that would not load — see `radar/charge.ts`.
+      withCredits: createWithCredits(ledger),
       // The PROVIDER transport. NOT the competitor's page — see the header.
       fetch: globalThis.fetch as never,
       // Spread rather than passed as `| undefined`: an explicitly-undefined key

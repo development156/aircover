@@ -57,12 +57,11 @@ export function CheckoutResult({
   }
 
   if (result.simulated) {
-    // A REAL Cashfree order now exists for this session — but in the sandbox, where no money
-    // moves, and the page that would collect the payment (`/billing/checkout/{orderId}`,
-    // which hands `payment_session_id` to `cashfree-js`) is not built yet. So this is
-    // labelled and left inert: rendering it as a link, or as a completed purchase, would be
-    // a fake success. The old copy claimed "no payment rail is connected", which stopped
-    // being true the moment the fixture double was replaced.
+    // A REAL Cashfree order now exists for this session, but in the sandbox, where no money
+    // moves, and `startCheckout` returns no URL for it. So this is labelled and left inert:
+    // rendering it as a completed purchase would be a fake success. The old copy claimed
+    // "no payment rail is connected", which stopped being true the moment the fixture double
+    // was replaced.
     return (
       // role="status": the pending line goes silent when the transition ends, so
       // without this a screen-reader user is never told the action finished.

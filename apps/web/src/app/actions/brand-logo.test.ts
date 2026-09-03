@@ -113,7 +113,7 @@ vi.mock('@/lib/supabase/server', () => {
   }
 })
 
-const { setBrandLogo } = await import('./brand-logo')
+const { setBrandLogo, setBrandLogoDark } = await import('./brand-logo')
 
 const svgForm = () => {
   const data = new FormData()
@@ -335,5 +335,66 @@ describe('setBrandLogo', () => {
     const result = await setBrandLogo(form())
 
     expect(result).toEqual({ ok: true, adopted: false, converted: false })
+  })
+})
+
+/**
+ * The dark-background variant. Same sequence as `setBrandLogo`, proven above,
+ * so these pin only what DIFFERS: which column the pointer goes into, and
+ * that setting one variant never touches the other's title.
+ */
+describe('setBrandLogoDark', () => {
+  it('points the workspace at logo_asset_id_dark, not logo_asset_id', async () => {
+    const result = await setBrandLogoDark(form())
+
+    expect(result).toEqual({ ok: true, adopted: false, converted: false })
+    expect(state.pointerUpdates).toContainEqual({ logo_asset_id_dark: 'asset-new' })
+    expect(
+      state.pointerUpdates.some((u) => 'logo_asset_id' in u),
+      'the light pointer column must never be touched by the dark action',
+    ).toBe(false)
+  })
+
+  it('adopts a file the workspace already holds, same as the light variant', async () => {
+    state.match = { id: 'asset-1', deleted_at: null }
+
+    const result = await setBrandLogoDark(form())
+
+    expect(result).toEqual({ ok: true, adopted: true, converted: false })
+    expect(state.uploadCalled).toBe(0)
+    expect(state.pointerUpdates).toContainEqual({ logo_asset_id_dark: 'asset-1' })
+  })
+
+  /**
+   * The real upload door (`brand-panel.tsx`, `visual-step.tsx`) never sets a
+   * `title` field for the dark variant, unlike the light form's `form()`
+   * helper above. `setLogoVariant` must not need one: it names the title
+   * itself on the SVG path, and passes an untitled raster through unchanged,
+   * exactly as `setBrandLogo` does today.
+   */
+  it('accepts a plain upload with no title field at all', async () => {
+    const untitled = new FormData()
+    untitled.set('file', new File([new Uint8Array([1, 2, 3])], 'logo.png', { type: 'image/png' }))
+
+    const result = await setBrandLogoDark(untitled)
+
+    expect(result).toEqual({ ok: true, adopted: false, converted: false })
+    expect(state.uploaded, 'a fresh upload must have been sent').not.toBeNull()
+  })
+
+  it('reports why an upload was refused, unchanged from the light path', async () => {
+    state.uploadResult = { ok: false, message: 'That file is larger than 40 MB.' }
+
+    expect(await setBrandLogoDark(form())).toEqual({
+      ok: false,
+      message: 'That file is larger than 40 MB.',
+    })
+  })
+
+  it('refuses an empty file rather than storing nothing', async () => {
+    const empty = new FormData()
+    empty.set('file', new File([], 'logo.png', { type: 'image/png' }))
+
+    expect((await setBrandLogoDark(empty)).ok).toBe(false)
   })
 })

@@ -9,6 +9,7 @@ import { reportServerError } from '@/lib/observability/report'
 import { workspaceForWrite } from '@/lib/workspaces'
 import type { CheckoutState } from '@/lib/wallet/checkout-state'
 import { currentBillingPeriod } from '@/lib/wallet/checkout-state'
+import { checkoutFailureMessage } from '@/lib/billing/checkout-failure-copy'
 
 /**
  * Top-up entry point. This consumes the `PaymentProvider` INTERFACE only — it never
@@ -25,12 +26,12 @@ import { currentBillingPeriod } from '@/lib/wallet/checkout-state'
  * source literal in a public repository; keeping a code path that can construct it next to
  * the one the money uses is how a flag flip becomes free credits.
  *
- * ── WHAT STILL DOES NOT REDIRECT, AND WHY ────────────────────────────────────
+ * ── WHERE THE PAYMENT HAPPENS ────────────────────────────────────────────────
  * Cashfree publishes no hosted-checkout URL: Create Order returns a `payment_session_id`
- * for the `cashfree-js` browser SDK, so `CheckoutSession.url` points at an app-owned bridge
- * route (`/billing/checkout/{orderId}`) that does not exist yet. Sending someone there and
- * calling it checkout would be a 404 dressed as a purchase, so this keeps returning a
- * labelled session and lets the panel say plainly that the payment page is not reachable.
+ * for the `cashfree-js` browser SDK, so `CheckoutSession.url` points at the app-owned bridge
+ * route `/billing/checkout/{orderId}`, which reads the order back and hands that session to
+ * the SDK. Only the `live` branch below returns the URL; a sandbox session stays labelled
+ * and inert here.
  */
 function provider(): PaymentProvider | null {
   // A missing/invalid Cashfree env is a deployment state, not an exception: the customer
@@ -86,11 +87,8 @@ export async function startCheckout(planId: unknown): Promise<CheckoutState> {
     // Guard the label rather than trusting the provider id: anything that is not
     // a real charge must reach the UI marked as such.
     //
-    // NOTE FOR THE LIVE FLIP: the `live` branch below returns `session.url`, which points at
-    // `/billing/checkout/{orderId}` — the bridge page that hands `payment_session_id` to
-    // `cashfree-js`. THAT ROUTE DOES NOT EXIST YET. Setting CASHFREE_ENV=live before it does
-    // would render "Open the payment page" as a link to a 404, which is precisely the fake
-    // success this action was written to avoid.
+    // The `live` branch below returns `session.url`, which points at `/billing/checkout/
+    // {orderId}`: the bridge page that hands `payment_session_id` to `cashfree-js`.
     if (session.mode !== 'live') {
       return {
         ok: true,
@@ -104,6 +102,9 @@ export async function startCheckout(planId: unknown): Promise<CheckoutState> {
     return { ok: true, simulated: false, mode: 'live', sessionId: session.id, url: session.url }
   } catch (error) {
     reportServerError(error, { action: 'startCheckout', workspaceId })
-    return { ok: false, message: 'Could not start a top-up. Try again.' }
+    // "Try again" only when trying again can work. See checkout-failure-copy.ts:
+    // Cashfree answers 401 on production today, and that failure repeats
+    // identically however many times the button is pressed.
+    return { ok: false, message: checkoutFailureMessage(error) }
   }
 }

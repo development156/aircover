@@ -33,7 +33,9 @@ export function Chip({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded-sm border border-line bg-s2 py-[3px] text-[12px] font-medium',
+        // An inset ring, not a border (docs/37 §6), and the chip step rather
+        // than a 12px literal beside its own weight.
+        'surface-ring-firm inline-flex items-center gap-1 rounded-sm bg-s2 py-[3px] type-chip',
         onRemove ? 'pr-1 pl-2' : 'px-2',
         className,
       )}

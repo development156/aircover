@@ -407,3 +407,54 @@ describe('a filtered run must not record as a whole-workspace pass', () => {
     expect(rows[0].summary_plain).toMatch(/everything passed/)
   })
 })
+
+describe('a failing test must never write a credential into the queue', () => {
+  // The defect this pins: on 2026-08-31 a red unit run's assertion diff carried
+  // the production Postgres URL, password included, and `details` copied it
+  // verbatim into ops/state/qa.pending.json, which is tracked on a PUBLIC repo,
+  // and from there into ops_qa_runs.details through /api/admin/devops/ingest.
+  const PASSWORD = 'Hunter2Rotated'
+  const JWT = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhYmMifQ.abcdefghijklmnopqrstuvwxyz0123456789'
+
+  it('redacts a Postgres password, a Bearer token and a JWT out of details', () => {
+    const output = [
+      ' FAIL  tests/live-guard.test.ts',
+      `AssertionError: expected 'postgresql://postgres:${PASSWORD}@db.example.supabase.co:5432/postgres' to be ''`,
+      `  Authorization: Bearer ${JWT}`,
+      '  api_key=sk_live_0123456789abcdef',
+      ' Tests  1 failed | 3 passed (4)',
+    ].join('\n')
+
+    const [row] = classifyBashRuns({ command: 'pnpm exec vitest run', output, exitCode: 1 })
+
+    expect(row.status).toBe('fail')
+    expect(row.details).not.toContain(PASSWORD)
+    expect(row.details).not.toContain(JWT)
+    expect(row.details).not.toContain('sk_live_0123456789abcdef')
+    // The host survives: "which database refused us" is the diagnostic value.
+    expect(row.details).toContain('postgresql://[redacted]@db.example.supabase.co:5432/postgres')
+    expect(row.details).toContain('Bearer [redacted]')
+    expect(row.details).toContain('api_key=[redacted]')
+  })
+
+  it('redacts BEFORE the 4000-character tail is cut, so a cut cannot strip the prefix that names the shape', () => {
+    // If the slice ran first, the `Bearer ` in front of the token would fall off
+    // the tail and the bare token, which matches no rule on its own, would
+    // survive into the record.
+    const token = 'A'.repeat(40)
+    // The cut lands exactly between `Bearer ` and the token.
+    const padding = 'x'.repeat(4000 - token.length - '\nAssertionError'.length)
+    const output = `Bearer ${token}${padding}\nAssertionError`
+
+    const [row] = classifyBashRuns({ command: 'pnpm exec vitest run', output, exitCode: 1 })
+
+    expect(row.details).not.toContain(token)
+    expect(row.details.length).toBeLessThanOrEqual(4000)
+  })
+
+  it('leaves ordinary test output alone', () => {
+    const output = 'error code=23505 from Postgres\n Tests  1 failed | 3 passed (4)'
+    const [row] = classifyBashRuns({ command: 'pnpm exec vitest run', output, exitCode: 1 })
+    expect(row.details).toBe(output)
+  })
+})

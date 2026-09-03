@@ -8,7 +8,7 @@ import { CreditChip } from '@/components/shell/credit-chip'
 import { ThemeToggle } from '@/components/shell/theme-toggle'
 import { WorkspaceSwitcher } from '@/components/shell/workspace-switcher'
 import { BrandMark } from '@/components/shell/brand-mark'
-import { readBrandLogo, type BrandLogo } from '@/lib/brand/logo'
+import { readBrandLogo, readBrandLogoDark, type BrandLogo } from '@/lib/brand/logo'
 import { activeThemeTokens } from '@/lib/brand/read-theme'
 import type { ThemeTokens } from '@sahoda/shared'
 import { readBrain, type BrainRead } from '@/lib/brand/read-brain'
@@ -88,12 +88,17 @@ export async function Topbar() {
    * workspace that has neither renders the chip in Sahoda's own colour, which is
    * the truthful thing to show when a customer has not given us a brand.
    */
-  const [logo, theme] = active
+  const [logo, logoDark, theme] = active
     ? await Promise.all([
         softRead<BrandLogo | null>('brand_logo', () => readBrandLogo(active.id), null),
+        // The dark-background variant, read beside the light one rather than
+        // after it. Its own `softRead` key, because a workspace with a light
+        // logo and no dark one is the ordinary case and must not read as a
+        // failure of the pair.
+        softRead<BrandLogo | null>('brand_logo_dark', () => readBrandLogoDark(active.id), null),
         softRead<ThemeTokens | null>('brand_theme', () => activeThemeTokens(active.id), null),
       ])
-    : [null, null]
+    : [null, null, null]
 
   return (
     <header
@@ -145,6 +150,7 @@ export async function Topbar() {
               the brand colour rather than a decoration. */}
           <BrandMark
             logoUrl={logo?.url ?? null}
+            logoUrlDark={logoDark?.url ?? null}
             primary={theme?.primary ?? null}
             /* Whether there is anything to switch TO. A workspace that has never
                given Sahoda a brand gets the panel on a press rather than a

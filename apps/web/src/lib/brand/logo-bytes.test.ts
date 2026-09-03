@@ -251,13 +251,22 @@ describe('readBrandLogoBytes', () => {
     expect(await read()).toBeNull()
   })
 
-  /** A file bigger than the library would ever accept is refused, not decoded. */
-  it('refuses a logo over the upload cap without downloading it', async () => {
-    const { MEDIA_UPLOAD_CAP_BYTES } = await import('@/lib/posts/media-constants')
+  /**
+   * A file bigger than the library could ever hold is refused, not decoded.
+   *
+   * Retargeted 2026-09-02 from `MEDIA_UPLOAD_CAP_BYTES`, which dropped to 4 MB
+   * so an upload fits inside a Vercel function request body. This read happens
+   * server-side on a STORED object, where no request limit applies, so its
+   * ceiling stayed at the channel figure and following the upload cap would have
+   * stopped stamping every logo already in a library above 4 MB. The claim is
+   * unchanged: over the ceiling, refused before any transfer.
+   */
+  it('refuses a logo over the ceiling without downloading it', async () => {
+    const { CHANNEL_MEDIA_CAP_BYTES } = await import('@/lib/posts/media-constants')
     state.assetRow = {
       id: 'asset-logo',
       storage_path: `${WORKSPACE}/library/logo.png`,
-      bytes: MEDIA_UPLOAD_CAP_BYTES + 1,
+      bytes: CHANNEL_MEDIA_CAP_BYTES + 1,
     }
 
     expect(await read()).toBeNull()

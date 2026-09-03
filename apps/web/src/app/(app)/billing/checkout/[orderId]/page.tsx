@@ -4,6 +4,7 @@ import { createCashfreeProvider, loadCashfreeEnv } from '@sahoda/billing'
 import { PLAN_CATALOG, PlanIdSchema } from '@sahoda/shared'
 
 import { PageTitle } from '@/components/page-title'
+import { CashfreeCheckout, type CashfreeSdkMode } from '@/components/billing/cashfree-checkout'
 import { buttonVariants } from '@/components/ui/button'
 import { env } from '@/lib/env'
 import { reportServerError } from '@/lib/observability/report'
@@ -15,28 +16,23 @@ export const metadata = { title: 'Checkout' }
 export const dynamic = 'force-dynamic'
 
 /**
- * `/billing/checkout/{orderId}` — the destination `CheckoutSession.url` has always named.
+ * `/billing/checkout/{orderId}` — the destination `CheckoutSession.url` names.
  *
  * ── WHY THIS ROUTE EXISTS AT ALL ─────────────────────────────────────────────
  * Cashfree publishes no hosted-checkout URL. Create Order returns a `payment_session_id` for
- * the `cashfree-js` browser SDK, so the app has to own the page that hands it over. Until
- * now `session.url` pointed here and nothing was here — a 404 dressed as a purchase, sitting
- * one env flip away from being shown to a paying customer. `actions/wallet.ts` carries a
- * NOTE FOR THE LIVE FLIP saying exactly that.
+ * the `cashfree-js` browser SDK, so the app has to own the page that hands it over. This is
+ * that page: it reads the real order back from Cashfree, states what is true about it, and,
+ * while the order is still payable, mounts `CashfreeCheckout` with the order's own session.
  *
- * ── WHAT IT DOES AND DOES NOT DO TODAY ───────────────────────────────────────
- * It reads the real order from Cashfree and states what is true about it. It does NOT yet
- * hand the session to the SDK, and it does not pretend to: MEASURED on 2026-08-19, this
- * deployment's `CASHFREE_APP_ID` and `CASHFREE_SECRET_KEY` hold the identical 40-character
- * value, and a real sandbox Create Order returns
+ * ── EVERY ORDER STATE IS ITS OWN SENTENCE ────────────────────────────────────
+ * Cashfree's `order_status` is the only fact this page has. ACTIVE with a session is the one
+ * state that can be paid; PAID means Cashfree took the money and the webhook, not this page,
+ * writes the credits; EXPIRED and TERMINATED both mean nothing was charged. Anything else is
+ * shown verbatim rather than coerced into a state this page knows, because a status it has
+ * never seen is exactly the case where guessing is most dangerous.
  *
- *     HTTP 401 {"message":"authentication Failed","code":"request_failed",
- *               "type":"authentication_error"}
- *
- * So no order can be opened from this deployment at all, and an SDK integration written
- * against it could not be exercised even once. Shipping an untestable payment step and
- * calling it done is the "mock-success in prod path" the project forbids; shipping a page
- * that says precisely what is and is not connected is not a dead end, it is a labelled one.
+ * Nothing here claims credits. The ledger is written by the webhook alone, and this page ran
+ * no query that could produce a balance, so no state renders a figure.
  *
  * ── AND WHY IT DOES NOT CONFIRM AN ORDER IT CANNOT PLACE ─────────────────────
  * An order id in a URL is guessable. The page resolves the order through the provider and
@@ -51,19 +47,19 @@ export default async function CheckoutBridgePage({
   const { orderId } = await params
 
   const workspace = await activeWorkspaceRead()
-  // TWO answers, and only one of them is a missing page. A workspace read that
-  // merely FAILED used to 404 — telling a customer who has just paid that the
-  // page they were sent to does not exist, on the one screen where that reads as
-  // "my money went nowhere". `none` still 404s: an order belongs to a workspace,
-  // so without one there is genuinely nothing at this address.
+  // TWO answers, and only one of them is a missing page. A workspace read that merely
+  // FAILED must not 404: that tells a customer who has just paid that the page they were
+  // sent to does not exist. `none` still 404s: an order belongs to a workspace, so without
+  // one there is genuinely nothing at this address.
   if (workspace.status === 'unreadable') {
     return (
       <Shell>
-        <p className="type-h3">Sahoda couldn’t check your workspace just now</p>
+        <h2 className="type-h3">Sahoda could not check your workspace just now</h2>
         <p className="type-body mt-1.5 text-muted">
           This is not a payment problem and nothing about your order has changed. Reload this page
           in a moment, or open your wallet to see where it got to.
         </p>
+        <Back />
       </Shell>
     )
   }
@@ -75,11 +71,12 @@ export default async function CheckoutBridgePage({
   } catch {
     return (
       <Shell>
-        <p className="type-h3">Card payments are not connected</p>
+        <h2 className="type-h3">Card payments are not connected</h2>
         <p className="type-body mt-1.5 text-muted">
           Nothing was charged and nothing was added to your wallet. This is a setup that has not
           been finished, not a payment that failed.
         </p>
+        <Back />
       </Shell>
     )
   }
@@ -93,13 +90,12 @@ export default async function CheckoutBridgePage({
   try {
     order = await provider.fetchOrder(orderId)
   } catch (error) {
-    // The provider could not be reached, or refused us. Either way this is OUR problem to
-    // fix and the customer's money has not moved — say that, rather than implying their
-    // payment failed.
+    // The provider could not be reached, or refused us. Either way it is Sahoda's problem
+    // and the customer's money has not moved. Say that, not that their payment failed.
     reportServerError(error, { action: 'checkoutBridge', workspaceId: workspace.workspace.id })
     return (
       <Shell>
-        <p className="type-h3">Sahoda could not reach the payment provider</p>
+        <h2 className="type-h3">Sahoda could not reach the payment provider</h2>
         <p className="type-body mt-1.5 text-muted">
           Nothing was charged. Try again from the wallet, and if it keeps happening it is a problem
           at our end rather than with your card.
@@ -109,58 +105,118 @@ export default async function CheckoutBridgePage({
     )
   }
 
-  // An order id is guessable. Anything that is not THIS workspace's order is a 404 — no
+  // An order id is guessable. Anything that is not THIS workspace's order is a 404: no
   // existence oracle, the same rule the definer functions follow.
   if (order.tags?.workspace_id !== workspace.workspace.id) notFound()
 
   const planId = PlanIdSchema.safeParse(order.tags?.plan_id)
   const amountInr = Number(order.tags?.change_amount_inr ?? '')
   const isPlanChange = Number.isFinite(amountInr) && order.tags?.change_id !== undefined
+  // The amount is stated only when the order actually carries one. A plan change carries
+  // its prorated figure in the tags; a plain purchase is the catalogue price. Neither is
+  // invented here: an amount this page could not read is a slot that does not render.
+  const amountLabel = isPlanChange
+    ? rupees(Math.round(amountInr * 100))
+    : planId.success
+      ? rupees(PLAN_CATALOG[planId.data].priceInr * 100)
+      : null
+  // The SDK's own vocabulary. Derived from CASHFREE_ENV on the server, never from a
+  // NEXT_PUBLIC_ value: the env that opened the order is the env that must collect it.
+  const mode: CashfreeSdkMode = cashfree.env === 'live' ? 'production' : 'sandbox'
+  const state = orderState(order.status)
 
   return (
     <Shell>
-      <p className="type-h3">Your order is open</p>
+      <h2 className="type-h3">{HEADLINE[state]}</h2>
       <dl className="mt-4 space-y-2 border-t border-line-soft pt-4">
         <Row label="Order">
           <span className="num font-mono text-[12px]">{order.orderId}</span>
         </Row>
         {planId.success ? <Row label="Plan">{PLAN_CATALOG[planId.data].name}</Row> : null}
-        {/*
-          The amount is shown only when the order actually states one. A plan change carries
-          its prorated figure in the tags; a plain purchase is the catalogue price. Neither
-          is invented here — an amount this page could not read is a slot that does not
-          render at all.
-        */}
-        {isPlanChange ? (
+        {amountLabel ? (
           <Row label="Amount">
-            <span className="num">{rupees(Math.round(amountInr * 100))}</span>
-          </Row>
-        ) : planId.success ? (
-          <Row label="Amount">
-            <span className="num">{rupees(PLAN_CATALOG[planId.data].priceInr * 100)}</span>
+            <span className="num">{amountLabel}</span>
           </Row>
         ) : null}
-        {order.status ? <Row label="Status">{order.status}</Row> : null}
+        {order.status ? <Row label="Status">{STATUS_WORD[state] ?? order.status}</Row> : null}
       </dl>
 
-      {/*
-        Coming-soon is a DIV, never a `<button disabled>` (docs/26 §10.2). A disabled button
-        is still announced as a button: a screen reader offers the action, the customer takes
-        it, nothing happens, and the failure reads as a broken app rather than an unbuilt
-        step. Guarded by e2e/design-system.spec.ts for exactly this shape.
-      */}
-      <div className="is-proposed mt-4 rounded-card px-3 py-3">
-        <p className="type-h3">The payment step is not connected yet</p>
-        <p className="type-body mt-1.5">
-          Your order exists and nothing has been charged. Sahoda cannot collect the payment from
-          this page yet, so no credits have been added and none will be until a payment actually
-          completes.
-        </p>
-      </div>
+      {state === 'payable' && order.paymentSessionId ? (
+        <CashfreeCheckout
+          paymentSessionId={order.paymentSessionId}
+          mode={mode}
+          amountLabel={amountLabel}
+        />
+      ) : null}
+      {state === 'payable' && !order.paymentSessionId ? (
+        <Notice tone="warn">
+          Sahoda could not get a payment session for this order, so there is nothing to pay with
+          here. Nothing was charged. Start a new order from the wallet.
+        </Notice>
+      ) : null}
+      {state === 'paid' ? (
+        <Notice tone="ok">
+          Cashfree confirmed your payment. Credits land within a minute, as soon as Cashfree tells
+          Sahoda about it. Your wallet shows them the moment they arrive.
+        </Notice>
+      ) : null}
+      {state === 'expired' ? (
+        <Notice tone="warn">
+          This order expired before it was paid. Nothing was charged. Start a new order from the
+          wallet if you still want it.
+        </Notice>
+      ) : null}
+      {state === 'cancelled' ? (
+        <Notice tone="warn">
+          This order was cancelled before it was paid. Nothing was charged. Start a new order from
+          the wallet if you still want it.
+        </Notice>
+      ) : null}
+      {state === 'unknown' ? (
+        <Notice tone="warn">
+          Sahoda could not tell what state this order is in. If you paid, the credits still land
+          once Cashfree confirms the payment; if you did not, nothing was charged.
+        </Notice>
+      ) : null}
 
       <Back />
     </Shell>
   )
+}
+
+type OrderState = 'payable' | 'paid' | 'expired' | 'cancelled' | 'unknown'
+
+/** Cashfree's `order_status` vocabulary, and only that. Anything else stays unknown. */
+function orderState(status: string | null): OrderState {
+  switch (status) {
+    case 'ACTIVE':
+      return 'payable'
+    case 'PAID':
+      return 'paid'
+    case 'EXPIRED':
+      return 'expired'
+    case 'TERMINATED':
+    case 'TERMINATION_REQUESTED':
+      return 'cancelled'
+    default:
+      return 'unknown'
+  }
+}
+
+const HEADLINE: Record<OrderState, string> = {
+  payable: 'Your order is open',
+  paid: 'Payment received',
+  expired: 'Order expired',
+  cancelled: 'Order cancelled',
+  unknown: 'Your order',
+}
+
+/** The customer's word for a status this page knows. An unknown status is shown verbatim. */
+const STATUS_WORD: Partial<Record<OrderState, string>> = {
+  payable: 'Awaiting payment',
+  paid: 'Paid',
+  expired: 'Expired',
+  cancelled: 'Cancelled',
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -178,6 +234,19 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
       <dt className="type-sm text-muted">{label}</dt>
       <dd className="type-body min-w-0 break-all">{children}</dd>
     </div>
+  )
+}
+
+function Notice({ tone, children }: { tone: 'ok' | 'warn'; children: React.ReactNode }) {
+  return (
+    <p
+      role="status"
+      className={`type-body mt-4 rounded-input px-3 py-2.5 ${
+        tone === 'ok' ? 'bg-ok-bg text-ok' : 'bg-warn-bg text-warn'
+      }`}
+    >
+      {children}
+    </p>
   )
 }
 

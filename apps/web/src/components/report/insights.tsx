@@ -142,7 +142,7 @@ export function CreditsCard({
       <div className="flex items-start gap-3">
         <span
           aria-hidden
-          className="grid size-10 flex-none place-items-center rounded-full bg-tint-100 text-accent dark:bg-s2"
+          className="grid size-10 flex-none place-items-center rounded-pill bg-tint-100 text-accent dark:bg-s2"
         >
           <Wallet size={18} strokeWidth={1.8} />
         </span>
@@ -172,12 +172,12 @@ export function CreditsCard({
         <div className="mt-4">
           <div
             aria-hidden
-            className="h-1.5 w-full overflow-hidden rounded-full bg-surface-2"
+            className="h-1.5 w-full overflow-hidden rounded-pill bg-surface-2"
             /* The bar is decoration for the sentence below it, which carries
                both figures in words. Nothing here is only knowable from a
                width. */
           >
-            <span className="block h-full rounded-full bg-accent" style={{ width: `${filled}%` }} />
+            <span className="block h-full rounded-pill bg-accent" style={{ width: `${filled}%` }} />
           </div>
           <p className="mt-2 type-meta text-muted">
             <span className="num">{spent}</span> of <span className="num">{budget}</span>{' '}

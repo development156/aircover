@@ -67,7 +67,7 @@ export function PlannerToolbar({
               }}
               aria-current={on ? 'page' : undefined}
               className={cn(
-                'inline-flex items-center gap-2 rounded-full px-3 py-1.5 type-sm transition-micro',
+                'inline-flex items-center gap-2 rounded-pill px-3 py-1.5 type-sm transition-micro',
                 'max-narrow:min-h-11',
                 on
                   ? 'surface-ring-firm bg-surface font-[650] text-ink'
@@ -93,7 +93,7 @@ export function PlannerToolbar({
         {active !== 'all' ? <input type="hidden" name="tab" value={active} /> : null}
         {dateKey !== null ? <input type="hidden" name="date" value={dateKey} /> : null}
 
-        <div className="surface-ring flex items-center gap-2 rounded-full bg-surface px-3 transition-micro focus-within:shadow-[inset_0_0_0_1.5px_var(--brand)]">
+        <div className="surface-ring flex items-center gap-2 rounded-pill bg-surface px-3 transition-micro focus-within:shadow-[inset_0_0_0_1.5px_var(--brand)]">
           <Search size={14} strokeWidth={2} aria-hidden className="shrink-0 text-ink-mute" />
           <label htmlFor="planner-search" className="sr-only">
             Search post titles
@@ -114,7 +114,7 @@ export function PlannerToolbar({
               pathname: '/planner',
               query: { ...carry, ...(active === 'all' ? {} : { tab: active }) },
             }}
-            className="inline-flex items-center gap-1 rounded-full px-2 py-1.5 type-meta text-muted transition-micro hover:bg-s2 hover:text-ink max-narrow:min-h-11"
+            className="inline-flex items-center gap-1 rounded-pill px-2 py-1.5 type-meta text-muted transition-micro hover:bg-s2 hover:text-ink max-narrow:min-h-11"
           >
             <X size={13} strokeWidth={2} aria-hidden />
             Clear

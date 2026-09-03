@@ -16,9 +16,12 @@ import { CHANNEL_LABELS } from '@/components/posts/channel-label'
  * connected channel, and a loop needs a function.
  *
  * ── THE THREE REFUSALS, EACH ONE LOAD-BEARING ────────────────────────────────
- *  · `mode === 'fixture'` — the rail answered from a fixture, so nothing left
- *    the building. Reporting that as published is the single worst thing this
- *    code could do, and it is reachable whenever the rail is misconfigured.
+ *  · `mode === 'fixture'`, or a `fixture://` permalink — the rail answered
+ *    from a fixture, so nothing left the building. Reporting that as published
+ *    is the single worst thing this code could do, and it is reachable whenever
+ *    the rail is misconfigured. The permalink is checked as well as the mode
+ *    because the route's already-published branch once answered with no `mode`
+ *    at all, and the permalink is the one field that still knew.
  *  · no `permalink` — Instagram returns 201 with `status: processing` and no
  *    URL, and Meta may still fail the post afterwards. A success banner without
  *    a link is a claim the product cannot back.
@@ -87,7 +90,7 @@ export async function publishOne(
     }
   }
 
-  if (body.mode === 'fixture') {
+  if (body.mode === 'fixture' || body.permalink?.startsWith('fixture://') === true) {
     return {
       ok: false,
       channel,

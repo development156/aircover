@@ -58,7 +58,7 @@ export function SectionsList({ provenance }: { provenance: Provenance }) {
                   <span className="mt-1 block text-[12px] text-muted">{section.blurb}</span>
                   {/* Same split language as the lead card: solid is confirmed,
                       hatched is still a guess. */}
-                  <span className="surface-ring mt-2 flex h-[6px] w-full max-w-[220px] overflow-hidden rounded-full">
+                  <span className="surface-ring mt-2 flex h-[6px] w-full max-w-[220px] overflow-hidden rounded-pill">
                     <span className="h-full bg-ink" style={{ width: `${pct}%` }} />
                     <span
                       className="h-full flex-1"

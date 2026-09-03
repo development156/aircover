@@ -237,7 +237,7 @@ export function LibraryPicker({ postId, channels }: { postId: string; channels: 
                     type="button"
                     onClick={() => attach(card)}
                     disabled={pending}
-                    className="surface-ring flex w-full flex-col overflow-hidden rounded-card bg-surface text-left transition-micro hover:bg-s1 disabled:opacity-45"
+                    className="surface-ring flex w-full flex-col overflow-hidden rounded-card bg-surface text-left transition-micro hover:bg-s2 disabled:opacity-45"
                   >
                     <AssetThumb card={card} className="aspect-[4/3] w-full" />
                     <span className="min-w-0 px-2 py-1.5">

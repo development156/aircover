@@ -4,6 +4,7 @@ import { createPgLedgerPort, type PgLedgerPort } from '../ledger/pg'
 import { createApplyPlanGrant } from './applyPlanGrant'
 import { createProcessPaymentEvent, type ProcessResult } from './processPaymentEvent'
 import { createPgWebhookEventStore } from './pgStore'
+import { createPgPlanResolver, LIVE_SUBSCRIPTION_STATUSES } from '../entitlements/pg'
 import { createFixtureProvider } from '../providers/fixture'
 import type { Result } from '@sahoda/shared'
 import type { ParsedWebhookEvent, PaymentEventType } from '../providers/types'
@@ -119,11 +120,17 @@ describe('webhook processing against the real billing_webhook_events + ledger', 
     expect(count.rows[0]!.n).toBe(1)
   })
 
-  it('records a new audit row for a different event_id but the grant replays (two-layer idempotency)', async () => {
+  /**
+   * billing-ledger-4. A plain purchase used to be keyed on monthlyGrantKey (plan, period,
+   * workspace), so a customer who bought Starter on the 3rd and bought it AGAIN on the 20th was
+   * charged twice and credited once: the ledger replayed the first grant and the route answered
+   * 200. The key now names the payment, so real money always produces credits.
+   */
+  it('a second real payment for the same plan+period grants AGAIN (two GRANT rows, not a replay)', async () => {
     await process(build('evt-a'))
 
-    // Spend 400 before the replay, so `balanceAfter` below can discriminate: with the live
-    // balance still at 1500 the assertion cannot tell the original entry from a fresh read.
+    // Spend 400 between the two payments so the second balance can only be explained by a
+    // second grant: 1500 - 400 + 1500 = 2600, whereas a replay would leave 1100.
     const hold = await ledger.apply({
       workspaceId: ws,
       entryType: 'HOLD',
@@ -138,26 +145,188 @@ describe('webhook processing against the real billing_webhook_events + ledger', 
       settlesEntryId: hold.entry.id,
     })
 
-    const second = await process(build('evt-b')) // different provider event id, same plan + period
+    const second = await process(build('evt-b')) // a different payment, same plan + period
 
     expect(second.ok).toBe(true)
     if (!second.ok) throw new Error('expected ok')
     expect(second.data.status).toBe('processed')
-    // The events table let it through (new row), but the ledger's monthlyGrantKey replayed —
-    // so the grant is applied exactly once even across distinct provider event ids.
-    expect(second.data.grant?.replayed).toBe(true)
-    // Owner ruling: on replay these describe the ORIGINAL grant, not a second one. Note
-    // balanceAfter is 1500 — the balance as of that original entry — while the live balance is
-    // 1100. It is deliberately STALE; read it only alongside `replayed`.
+    expect(second.data.grant?.replayed).toBe(false)
     expect(second.data.grant?.granted).toBe(1500)
-    expect(second.data.grant?.balanceAfter).toBe(1500)
-    expect(await ledger.balance(ws)).toEqual({ total: 1100, held: 0 })
+    expect(second.data.grant?.balanceAfter).toBe(2600)
+    expect(await ledger.balance(ws)).toEqual({ total: 2600, held: 0 })
+
+    const grants = await ledger.pool.query<{ idempotency_key: string; amount: number }>(
+      `select idempotency_key, amount from credit_ledger
+        where workspace_id = $1 and entry_type = 'GRANT' order by seq`,
+      [ws],
+    )
+    expect(grants.rows.map((r) => r.amount)).toEqual([1500, 1500])
+    // Two distinct keys, each naming its own payment.
+    expect(new Set(grants.rows.map((r) => r.idempotency_key)).size).toBe(2)
+    expect(grants.rows[0]!.idempotency_key).toContain(`${ws}:evt-a`)
+    expect(grants.rows[1]!.idempotency_key).toContain(`${ws}:evt-b`)
 
     const count = await ledger.pool.query<{ n: number }>(
       `select count(*)::int as n from billing_webhook_events where event_id like $1`,
       [`${ws}:evt-%`],
     )
     expect(count.rows[0]!.n).toBe(2) // two audit rows
+  })
+
+  /**
+   * The crash window: the grant landed but the process died before the audit row was marked
+   * processed. The redelivery carries the SAME event id, so pgStore re-drives it and the ledger
+   * must replay (same key) rather than grant a second time for one payment.
+   */
+  it('re-driving the same event after a crash replays the grant instead of granting twice', async () => {
+    const event = build('evt-crash')
+    await process(event)
+    // Simulate "grant written, markProcessed never ran".
+    await ledger.pool.query(
+      `update billing_webhook_events set status = 'received', processed_at = null
+        where provider = 'fixture' and event_id = $1`,
+      [`${ws}:evt-crash`],
+    )
+
+    const again = await process(event)
+
+    expect(again.ok).toBe(true)
+    if (!again.ok) throw new Error('expected ok')
+    expect(again.data.status).toBe('processed')
+    expect(again.data.grant?.replayed).toBe(true)
+    expect(await ledger.balance(ws)).toEqual({ total: 1500, held: 0 }) // NOT 3000
+    expect((await rowStatus(`${ws}:evt-crash`)).status).toBe('processed')
+  })
+
+  /**
+   * billing-ledger-2. Credits arrived but nothing ever wrote a `subscriptions` row, so
+   * entitlements (`createPgPlanResolver`) and the plan screen kept a paying customer on Free:
+   * 0 sites, 2 channels, and a proration next month computed from Free again.
+   */
+  describe('the subscription row a payment must leave behind', () => {
+    async function liveRow(): Promise<{
+      plan_id: string
+      status: string
+      provider: string
+      current_period_start: Date | null
+      current_period_end: Date | null
+    } | null> {
+      const r = await ledger.pool.query<{
+        plan_id: string
+        status: string
+        provider: string
+        current_period_start: Date | null
+        current_period_end: Date | null
+      }>(
+        `select plan_id, status, provider, current_period_start, current_period_end
+           from subscriptions
+          where workspace_id = $1 and status = any($2::text[])`,
+        [ws, [...LIVE_SUBSCRIPTION_STATUSES]],
+      )
+      expect(r.rows.length).toBeLessThanOrEqual(1)
+      return r.rows[0] ?? null
+    }
+
+    it('a processed payment_succeeded leaves one live active row for the paid plan and period', async () => {
+      expect(await liveRow()).toBeNull()
+
+      const result = await process(build('evt-sub'))
+      expect(result.ok && result.data.status).toBe('processed')
+
+      const row = await liveRow()
+      expect(row).not.toBeNull()
+      expect(row!.plan_id).toBe('starter')
+      expect(row!.status).toBe('active')
+      expect(row!.provider).toBe('fixture')
+      expect(new Date(row!.current_period_start!).toISOString()).toBe('2026-07-01T00:00:00.000Z')
+      expect(new Date(row!.current_period_end!).toISOString()).toBe('2026-08-01T00:00:00.000Z')
+    })
+
+    it('the entitlements resolver then resolves the PAID plan, not free', async () => {
+      const resolver = createPgPlanResolver({
+        connectionString: db.connectionString,
+        pool: ledger.pool,
+      })
+      expect(await resolver.resolvePlanId(ws)).toBe('free')
+
+      await process(build('evt-ent'))
+
+      expect(await resolver.resolvePlanId(ws)).toBe('starter')
+    })
+
+    it('a second payment in the same period keeps ONE live row (the partial unique index holds)', async () => {
+      await process(build('evt-s1'))
+      await process(build('evt-s2'))
+
+      const n = await ledger.pool.query<{ n: number }>(
+        `select count(*)::int as n from subscriptions where workspace_id = $1`,
+        [ws],
+      )
+      expect(n.rows[0]!.n).toBe(1)
+      expect((await liveRow())!.status).toBe('active')
+    })
+
+    it('a mid-period plan change moves the live row to the new plan', async () => {
+      await process(build('evt-base'))
+      expect((await liveRow())!.plan_id).toBe('starter')
+
+      const { rawBody } = provider.emitEvent({
+        workspaceId: ws,
+        planId: 'growth',
+        period: '2026-07',
+        eventId: `${ws}:evt-upgrade`,
+        eventType: 'payment_succeeded',
+      })
+      const upgrade: ParsedWebhookEvent = {
+        ...provider.parseWebhookEvent(rawBody),
+        planChange: { changeId: `${ws}:chg-1`, credits: 1200 },
+      }
+      const result = await process(upgrade)
+      expect(result.ok && result.data.status).toBe('processed')
+
+      const row = await liveRow()
+      expect(row!.plan_id).toBe('growth')
+      expect(row!.status).toBe('active')
+    })
+
+    it('a paid-for later period rolls the row forward, and a late webhook for an older period does not roll it back', async () => {
+      await process(build('evt-jul', '2026-07'))
+      await process(build('evt-aug', '2026-08'))
+      let row = await liveRow()
+      expect(new Date(row!.current_period_end!).toISOString()).toBe('2026-09-01T00:00:00.000Z')
+
+      await process(build('evt-jun-late', '2026-06'))
+      row = await liveRow()
+      expect(new Date(row!.current_period_end!).toISOString()).toBe('2026-09-01T00:00:00.000Z')
+    })
+
+    it('a payment that lands during dunning reactivates the row and clears the dunning state', async () => {
+      await ledger.pool.query(
+        `insert into subscriptions (workspace_id, plan_id, status, provider, grace_ends_at, dunning_attempts, last_failure_at, last_failure_code)
+         values ($1, 'starter', 'past_due', 'fixture', now() + interval '3 days', 2, now(), 'CARD_DECLINED')`,
+        [ws],
+      )
+
+      await process(build('evt-recover'))
+
+      const r = await ledger.pool.query<{
+        status: string
+        grace_ends_at: Date | null
+        dunning_attempts: number
+        last_failure_code: string | null
+      }>(
+        `select status, grace_ends_at, dunning_attempts, last_failure_code
+           from subscriptions where workspace_id = $1`,
+        [ws],
+      )
+      expect(r.rows).toHaveLength(1)
+      expect(r.rows[0]).toEqual({
+        status: 'active',
+        grace_ends_at: null,
+        dunning_attempts: 0,
+        last_failure_code: null,
+      })
+    })
   })
 
   /**

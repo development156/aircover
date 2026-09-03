@@ -17,7 +17,12 @@ const ARMS: ReadonlyArray<{ status: number; code: string | null; what: string }>
   { status: 500, code: 'failed', what: 'we threw before reading' },
   { status: 502, code: null, what: 'a proxy ate the request' },
   { status: 413, code: null, what: 'the upload was refused at the edge' },
-  { status: 429, code: null, what: 'rate limited' },
+  { status: 429, code: null, what: 'rate limited by something in front of us' },
+  // The route's own three. The limiter and the body cap used to be sentences
+  // for statuses no server code produced; now the route produces them.
+  { status: 429, code: 'rate_limited', what: 'the route turned the read away' },
+  { status: 413, code: 'too_large', what: 'the route refused the body off its header' },
+  { status: 400, code: 'invalid_input', what: 'a field was longer than the schema allows' },
 ]
 
 /**

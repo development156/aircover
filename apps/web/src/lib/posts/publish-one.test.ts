@@ -64,6 +64,22 @@ describe('publishOne — what counts as published', () => {
     expect(result.ok === false && result.message).toMatch(/Instagram/)
   })
 
+  test('a fixture:// permalink is refused even when the body forgot to say mode', async () => {
+    // The already-published branch of the route used to answer with no `mode`
+    // at all, so a row whose only "publish" was the fixture rail passed the
+    // check above and rendered as "Already live on X" in green, with no link.
+    // The permalink itself says it is a simulation; that is enough to refuse.
+    const result = await publishOne(
+      'p1',
+      'x',
+      answering({ ok: true, alreadyPublished: true, permalink: 'fixture://x/1' }),
+    )
+
+    expect(result.ok).toBe(false)
+    expect(result.ok === false && result.message).toMatch(/isn’t switched on/i)
+    expect(result.ok === false && result.message).toMatch(/\bX\b/)
+  })
+
   test('a success with NO permalink is not reported as live', async () => {
     // Instagram returns 201 with `status: processing` and no URL, and Meta may
     // still fail the post afterwards. The claim made instead is exact: accepted,

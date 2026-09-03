@@ -61,7 +61,7 @@ export function NowLine({
       className="pointer-events-none absolute inset-x-0 z-10 flex items-center"
       style={{ top }}
     >
-      <span className="size-2 shrink-0 rounded-full bg-brand" />
+      <span className="size-2 shrink-0 rounded-pill bg-brand" />
       <span className="h-px flex-1 bg-brand" />
     </div>
   )
