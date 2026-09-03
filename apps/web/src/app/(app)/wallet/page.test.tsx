@@ -56,7 +56,7 @@ const FULL_WALLET = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  ledgerRead.mockResolvedValue({ entries: [], skipped: 0 })
+  ledgerRead.mockResolvedValue({ entries: [], skipped: 0, unreadable: false })
   ledgerCount.mockResolvedValue(0)
   holdsRead.mockResolvedValue([])
 })
@@ -92,6 +92,60 @@ describe('/wallet with no workspace yet', () => {
     // Top-up would dead-end: `startCheckout` refuses with "Create a workspace
     // first." Rendering the button is a fake affordance.
     expect(screen.queryByTestId('top-up-panel')).not.toBeInTheDocument()
+  })
+})
+
+/**
+ * THE LEDGER'S OWN VERSION OF THE SAME SPLIT.
+ *
+ * The balance got this treatment; the credit history did not. `readLedger`
+ * returned `{ entries: [] }` for a dropped connection exactly as it did for a
+ * workspace that has genuinely never spent anything, and this screen branched on
+ * `entries.length === 0` because that was the only signal it had. So a failed
+ * read printed "No credit activity yet" — a confident statement about somebody's
+ * money, made from a question that never got an answer.
+ */
+describe('/wallet when the credit history could not be read', () => {
+  beforeEach(() => {
+    balanceRead.mockResolvedValue({ status: 'ok', balance: FULL_WALLET })
+    ledgerRead.mockResolvedValue({ entries: [], skipped: 0, unreadable: true })
+  })
+
+  test('never claims the history is empty when it was never read', async () => {
+    render(await WalletPage())
+
+    expect(screen.queryByText(/no credit activity yet/i)).not.toBeInTheDocument()
+  })
+
+  test('says what actually happened, and offers a reload that can work', async () => {
+    render(await WalletPage())
+
+    const alerts = screen.getAllByRole('alert')
+    const said = alerts.map((node) => node.textContent ?? '').join(' ')
+    expect(said).toMatch(/could not read your credit activity/i)
+    expect(said).toMatch(/reload/i)
+  })
+
+  test('repeats the guarantee, because this is a screen about money', async () => {
+    render(await WalletPage())
+
+    const said = screen
+      .getAllByRole('alert')
+      .map((node) => node.textContent ?? '')
+      .join(' ')
+    expect(said).toMatch(/nothing has been charged/i)
+  })
+
+  test('a history that really is empty still reads as empty', async () => {
+    // The other half. A flag that were always true would swap one wrong
+    // sentence for another, and a new workspace would be told its wallet is
+    // broken on its first visit.
+    ledgerRead.mockResolvedValue({ entries: [], skipped: 0, unreadable: false })
+
+    render(await WalletPage())
+
+    expect(screen.getByText(/no credit activity yet/i)).toBeInTheDocument()
+    expect(screen.queryByText(/could not read your credit activity/i)).not.toBeInTheDocument()
   })
 })
 
