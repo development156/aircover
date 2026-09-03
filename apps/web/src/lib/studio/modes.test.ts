@@ -1,7 +1,9 @@
 import { describe, expect, test } from 'vitest'
 
+import { ImageGenerateInputSchema } from '@sahoda/shared'
+
 import { MODE_RULES, describeModeBlock, readyModes, ruleFor } from './modes'
-import { defaultModelId, modelById } from './models'
+import { STUDIO_MODELS, defaultModelId, modelById } from './models'
 
 /**
  * WHAT EACH MODE PROMISES, AND WHAT IT REFUSES TO PRETEND.
@@ -36,8 +38,46 @@ describe('the modes on offer', () => {
     expect(readyModes('google/gemini-3-pro-image').map((r) => r.mode)).not.toContain('series')
   })
 
-  test('and allowed by one that draws the whole set in a single call', () => {
-    expect(ruleFor('series', 'bytedance-seed/seedream-5-0-lite').ready).toBe(true)
+  /**
+   * RETARGETED A SECOND TIME, and the previous retarget was the defect.
+   *
+   * This asserted that Seedream ALLOWS a set, because its catalogue entry says
+   * it draws four pictures per call. That is a measured fact about the provider
+   * and the wrong question: `ImageGenerateInputSchema` carries no count and
+   * `ImageGenerateOutput` returns one picture, so whatever a model could do, the
+   * only thing this product can ask for is one picture at a time. Offering the
+   * mode delivered `count` separate calls with the same prompt: N unrelated
+   * pictures sold as a set, at N times the cost.
+   *
+   * So the guard is written against the CONTRACT rather than a model list. It
+   * asserts today's answer and flips by itself the day a count lands in the
+   * schema, which is the only way this cannot rot back into an overclaim.
+   */
+  test('a set is offered only when the mesh can actually ask for one', () => {
+    const canAskForASet = 'count' in ImageGenerateInputSchema.shape
+    expect(canAskForASet).toBe(false)
+
+    for (const model of STUDIO_MODELS) {
+      expect(ruleFor('series', model.id).ready, model.id).toBe(canAskForASet)
+      expect(
+        readyModes(model.id).map((r) => r.mode),
+        model.id,
+      ).not.toContain('series')
+    }
+  })
+
+  /**
+   * The refusal must not name a remedy that cannot work. It used to end
+   * "Choose a model that makes a matching set", and no model in the catalogue
+   * can, because the limit is ours.
+   */
+  test('the refusal offers no remedy that no model could satisfy', () => {
+    const said = describeModeBlock({ mode: 'series', references: 0 }) ?? ''
+
+    expect(said).not.toMatch(/choose a model|another model|different model/i)
+    expect(said).toMatch(/cannot make a matching set yet/i)
+    // And it still names something they CAN do today.
+    expect(said).toMatch(/several options/i)
   })
 
   test('the ones offered are exactly the ones the chosen model can do', () => {
@@ -47,12 +87,13 @@ describe('the modes on offer', () => {
       'match',
       'edit',
     ])
+    // Seedream draws four per call and still gets the same list: the ceiling
+    // is this product's request shape, not the model's ability.
     expect(readyModes('bytedance-seed/seedream-5-0-lite').map((r) => r.mode)).toEqual([
       'on_brand',
       'explore',
       'match',
       'edit',
-      'series',
     ])
   })
 

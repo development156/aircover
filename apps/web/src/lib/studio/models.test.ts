@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 
 import { ALLOWED_IMAGE_MODELS } from '@sahoda/mesh'
+import { ImageGenerateInputSchema } from '@sahoda/shared'
 import { IMAGE_TIER_ACTION, MESH_TASK_ACTION, creditCost } from '@sahoda/shared'
 
 import {
@@ -68,15 +69,21 @@ describe('what is on offer', () => {
 
 describe('what choosing one unlocks', () => {
   /**
-   * The "unlocks" line is a claim about a RULE. A model that says it draws a
-   * matching set had better draw more than one picture per call, or the
-   * sentence is selling something `modes.ts` will refuse.
+   * RETARGETED, and the old version is why the false claim shipped.
+   *
+   * It let any model with `maxPerPress > 1` say "in one go, all matching",
+   * because it checked the sentence against the PROVIDER's ability. That is the
+   * wrong side of the contract: `ImageGenerateInputSchema` carries no count and
+   * `ImageGenerateOutput` returns one picture, so no card may promise a set
+   * however many the model could draw. Bound to the schema, so it flips by
+   * itself the day the capability lands.
    */
-  test('anything claiming a matching set can really draw more than one at once', () => {
+  test('no card promises a set while the mesh can only ask for one picture', () => {
+    const canAskForASet = 'count' in ImageGenerateInputSchema.shape
+    expect(canAskForASet).toBe(false)
+
     for (const model of STUDIO_MODELS) {
-      if (model.unlocks !== null && /in one go|matching/i.test(model.unlocks)) {
-        expect(model.maxPerPress, model.id).toBeGreaterThan(1)
-      }
+      expect(model.unlocks ?? '', model.id).not.toMatch(/in one go|all matching/i)
     }
   })
 
