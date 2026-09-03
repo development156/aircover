@@ -132,7 +132,7 @@ export function PlanOfferCards({ plans, busyPlanId, onChoose }: PlanOfferCardsPr
                           'mt-icon-nudge grid size-[18px] shrink-0 place-content-center rounded-pill bg-surface',
                           recommended
                             ? 'shadow-[inset_0_0_0_1px_var(--brand-lift)]'
-                            : 'shadow-[inset_0_0_0_1px_var(--line)]',
+                            : 'surface-ring-firm',
                         )}
                       >
                         <Check

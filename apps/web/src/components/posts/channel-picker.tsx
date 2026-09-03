@@ -123,7 +123,7 @@ export function ChannelPicker({
                 // chip reflow the whole row. The kit's 28px was too tight to
                 // hold a mark, a label and a state dot without them touching;
                 // 36px is the same control rhythm as the rest of the card.
-                'inline-flex h-9 items-center gap-2 rounded-full py-0 pr-chip pl-chip-mark type-chip transition-micro max-narrow:h-11',
+                'inline-flex h-9 items-center gap-2 rounded-pill py-0 pr-chip pl-chip-mark type-chip transition-micro max-narrow:h-11',
                 'disabled:pointer-events-none disabled:opacity-45',
                 isOn
                   ? // `--t50` is 6% orange, so in DARK it composites to very
@@ -150,7 +150,7 @@ export function ChannelPicker({
                   // still carries. A class assertion would pass on a dot painted
                   // in the ground colour.
                   data-state-mark="selected"
-                  className="grid size-4 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground"
+                  className="grid size-4 shrink-0 place-items-center rounded-pill bg-primary text-primary-foreground"
                 >
                   <Check size={11} strokeWidth={3} />
                 </span>

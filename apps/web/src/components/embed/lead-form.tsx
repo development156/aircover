@@ -63,7 +63,7 @@ type Status =
 // viewport on focus below 16px, and on a page this application does not own
 // that zoom cannot be undone. See `--t-input-embed` in tokens.css.
 const FIELD =
-  'type-input-embed h-input max-narrow:min-h-11 w-full rounded-sm bg-surface px-3 text-ink shadow-[inset_0_0_0_1px_var(--line)] transition-micro focus-visible:shadow-[inset_0_0_0_1px_var(--brand),0_0_0_3px_var(--t50)] focus-visible:outline-none aria-invalid:shadow-[inset_0_0_0_1.5px_var(--danger)]'
+  'type-input-embed h-input max-narrow:min-h-11 w-full rounded-sm bg-surface px-3 text-ink surface-ring-firm transition-micro focus-visible:shadow-[inset_0_0_0_1px_var(--brand),0_0_0_3px_var(--t50)] focus-visible:outline-none aria-invalid:shadow-[inset_0_0_0_1.5px_var(--danger)]'
 
 // The density lives on the LABEL, which is why the field can afford 16px.
 const LABEL = 'type-sm mb-1.5 block font-[550] text-muted'

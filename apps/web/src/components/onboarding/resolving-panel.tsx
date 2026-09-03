@@ -85,7 +85,7 @@ export function ResolvingPanel({ isFree }: { isFree: boolean }) {
               <span
                 aria-hidden
                 className={[
-                  'size-1.5 shrink-0 rounded-full',
+                  'size-1.5 shrink-0 rounded-pill',
                   active ? 'animate-pulse bg-accent' : passed ? 'bg-accent/40' : 'bg-line',
                 ].join(' ')}
               />

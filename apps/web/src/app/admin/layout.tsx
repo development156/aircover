@@ -1,8 +1,8 @@
 import { UserButton } from '@clerk/nextjs'
 
 import { AdminSubNav } from '@/components/admin/sub-nav'
+import { AppToaster } from '@/components/shell/app-toaster'
 import { Rail } from '@/components/shell/rail'
-import { Toaster } from 'sonner'
 
 import { requireOpsAdmin } from '@/lib/ops/guard'
 
@@ -38,7 +38,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="grid min-h-dvh grid-cols-[auto_1fr]">
       <Rail />
       <div className="flex min-w-0 flex-col">
-        <header className="sticky top-0 z-5 flex h-topbar items-center gap-3 border-b border-line bg-s1/90 px-page backdrop-blur-[6px] max-narrow:px-page-mobile">
+        <header className="glass sticky top-0 z-5 flex h-topbar items-center gap-3 border-b border-line px-page max-narrow:px-page-mobile">
           <span className="text-[15px] font-extrabold tracking-[-0.01em]">Admin</span>
           <span className="rounded-pill bg-s2 px-2 py-[3px] font-mono text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
             {admin.role}
@@ -53,8 +53,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           {children}
         </main>
       </div>
-      {/* /admin is its own route group; the (app) Toaster does not reach it. */}
-      <Toaster position="bottom-left" />
+      {/* /admin is its own route group; the (app) toaster does not reach it. */}
+      <AppToaster />
     </div>
   )
 }

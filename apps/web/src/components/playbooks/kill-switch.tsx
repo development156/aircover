@@ -91,20 +91,27 @@ export function PlaybookKillSwitch() {
         </p>
       ) : null}
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Stop every playbook?">
+      {/* Footer slot, dismiss first, commitment last — see loop/kill-switch.tsx. */}
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Stop every playbook?"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setOpen(false)} disabled={pending}>
+              Leave them running
+            </Button>
+            <Button onClick={stop} loading={pending}>
+              Stop them
+            </Button>
+          </>
+        }
+      >
         <p className="type-body text-muted">
           Every run in progress stops, every post a playbook put on the calendar comes off it and
           goes back to being a draft, and every playbook switches off. Nothing is deleted, and a
           post you scheduled by hand is not touched.
         </p>
-        <div className="mt-4 flex gap-3">
-          <Button onClick={stop} disabled={pending}>
-            Stop them
-          </Button>
-          <Button variant="secondary" onClick={() => setOpen(false)} disabled={pending}>
-            Leave them running
-          </Button>
-        </div>
       </Modal>
     </section>
   )

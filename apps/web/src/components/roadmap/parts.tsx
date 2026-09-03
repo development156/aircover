@@ -175,7 +175,7 @@ export function InertToggle({ label }: { label: string }) {
   return (
     <span data-inert-control className="inline-flex items-center gap-2 select-none">
       <span aria-hidden className="is-proposed block h-[18px] w-[32px] rounded-pill">
-        <span className="mt-[3px] ml-[3px] block size-[12px] rounded-full bg-surface-3" />
+        <span className="mt-[3px] ml-[3px] block size-[12px] rounded-pill bg-surface-3" />
       </span>
       <span className="type-sm text-muted">{label}</span>
     </span>

@@ -100,11 +100,11 @@ function StatusPill({ view }: { view: LoopStatusView }) {
   return (
     <span
       className={[
-        'type-chip inline-flex items-center gap-2 rounded-full px-3 py-1',
+        'type-chip inline-flex items-center gap-2 rounded-pill px-3 py-1',
         view.ground,
       ].join(' ')}
     >
-      <span aria-hidden className={['size-1.5 rounded-full bg-current', view.tone].join(' ')} />
+      <span aria-hidden className={['size-1.5 rounded-pill bg-current', view.tone].join(' ')} />
       <span className={view.text}>{view.label}</span>
     </span>
   )

@@ -58,7 +58,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(fun
       }}
       aria-invalid={error || undefined}
       className={cn(
-        'min-h-[74px] w-full rounded-sm border-none bg-surface px-[11px] py-2 text-[13px] text-ink transition-micro placeholder:text-muted',
+        'min-h-[74px] w-full rounded-sm border-none bg-surface px-[11px] py-2 type-sm text-ink transition-micro placeholder:text-muted',
         // A box that sizes itself must not also carry a drag handle: the two
         // fight, and the handle wins until the next keystroke undoes it.
         autoGrow === true ? 'resize-none' : 'resize-y',
