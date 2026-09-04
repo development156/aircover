@@ -35,7 +35,11 @@ export const metadata = { title: 'Sites' }
  */
 
 type Preview =
-  { siteName: string; pages: PreviewPage[] } | 'unreadable' | 'read-failed' | 'no-workspace' | null
+  | { siteName: string; pages: PreviewPage[]; siteId: string }
+  | 'unreadable'
+  | 'read-failed'
+  | 'no-workspace'
+  | null
 
 /**
  * Walks the recent sites (newest first) until one renders. A newest row with
@@ -100,7 +104,7 @@ async function buildPreview(): Promise<Preview> {
         formAction: null,
         canonicalOrigin: null,
       })
-      return { siteName: site.name, pages: toPreviewPages(bundle) }
+      return { siteName: site.name, pages: toPreviewPages(bundle), siteId: site.id }
     })
     if (preview === null) continue
 
@@ -170,7 +174,7 @@ export default async function SitesPage() {
           again. You were only ever charged for drafts that saved.
         </p>
       ) : (
-        <SitePreview siteName={preview.siteName} pages={preview.pages} />
+        <SitePreview siteName={preview.siteName} pages={preview.pages} siteId={preview.siteId} />
       )}
     </div>
   )
