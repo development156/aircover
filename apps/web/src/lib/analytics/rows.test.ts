@@ -7,6 +7,7 @@ import {
   sortRows,
   pageOf,
   byChannel,
+  isSortKey,
 } from '@/lib/analytics/rows'
 import { MIN_BASELINE_POSTS } from '@/lib/analytics/like-age'
 import type { PublishedRow } from '@/lib/analytics/window-data'
@@ -25,6 +26,8 @@ function row(over: Partial<PublishedRow> & { postId: string }): PublishedRow {
     channel: over.channel ?? 'instagram',
     publishedAt: over.publishedAt ?? '2026-08-01',
     reachAtAge: over.reachAtAge ?? null,
+    impressionsAtAge: over.impressionsAtAge ?? null,
+    engagementAtAge: over.engagementAtAge ?? null,
   }
 }
 
@@ -228,5 +231,53 @@ describe('byChannel', () => {
     expect(result[0]?.measured).toBe(1)
     expect(result[0]?.measured).toBeLessThan(result[0]?.posts as number)
     expect(result[0]?.reach).toBe(10)
+  })
+})
+
+describe('the refusal holds for all three metrics, not just reach', () => {
+  /**
+   * Impressions and engagement arrived when the window read stopped asking for
+   * `metric = 'reach'` alone. They are the same kind of count with the same kind
+   * of gap, so the rule that an unmeasured post is never ordered as a low one
+   * has to cover them — and it is one branch rather than three so it cannot come
+   * apart one metric at a time.
+   *
+   * Asserted per metric rather than once over reach, because the defect this
+   * prevents is silent: a post nobody measured, sitting at the bottom of a list
+   * sorted by impressions, has been called the least-shown post of the month
+   * without a zero ever being drawn.
+   */
+  const metrics = ['reach', 'impressions', 'engagement'] as const
+
+  const withMetric = (postId: string, metric: (typeof metrics)[number], value: number | null) =>
+    row({
+      postId,
+      title: postId,
+      reachAtAge: metric === 'reach' ? value : null,
+      impressionsAtAge: metric === 'impressions' ? value : null,
+      engagementAtAge: metric === 'engagement' ? value : null,
+    })
+
+  it.each(metrics)('holds an unmeasured post out of a %s sort, descending', (metric) => {
+    const rows = [withMetric('gap', metric, null), withMetric('low', metric, 1)]
+    expect(sortRows(rows, metric, 'desc').map((r) => r.postId)).toEqual(['low', 'gap'])
+  })
+
+  it.each(metrics)('does not promote it to the top ascending either, for %s', (metric) => {
+    // "We have not measured this" is not a small number.
+    const rows = [withMetric('gap', metric, null), withMetric('high', metric, 900)]
+    expect(sortRows(rows, metric, 'asc').map((r) => r.postId)).toEqual(['high', 'gap'])
+  })
+
+  it.each(metrics)('orders the measured ones by %s, not by another metric', (metric) => {
+    // Each row carries a number for ONE metric, so a sort that read the wrong
+    // field would see three nulls and fall back to title order.
+    const rows = [withMetric('b', metric, 10), withMetric('a', metric, 20)]
+    expect(sortRows(rows, metric, 'desc').map((r) => r.postId)).toEqual(['a', 'b'])
+  })
+
+  it('accepts every metric key as a sort key, so a column header cannot 404', () => {
+    for (const metric of metrics) expect(isSortKey(metric)).toBe(true)
+    expect(isSortKey('followers')).toBe(false)
   })
 })

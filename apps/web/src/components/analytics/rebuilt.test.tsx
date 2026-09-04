@@ -29,6 +29,8 @@ const row = (over: Partial<PublishedRow> = {}): PublishedRow => ({
   channel: 'instagram',
   publishedAt: '2026-08-18T09:00:00Z',
   reachAtAge: 1410,
+  impressionsAtAge: 2180,
+  engagementAtAge: 96,
   ...over,
 })
 
