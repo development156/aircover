@@ -78,4 +78,27 @@ if git diff --cached --name-only | grep -qx "$SCRATCH"; then
   exit 1
 fi
 
+# ── EVERY OTHER FILE ─────────────────────────────────────────────────────────
+# Everything above guards ONE path, because that is the path that leaked on
+# 2026-08-31. A credential pasted into a scratch script, a handoff, a test
+# fixture or a log walks straight past it — the sibling-shape defect this
+# repository has been bitten by more than once.
+#
+# The obvious widening, running SECRET_SHAPES over every staged file, cannot
+# ship: this tree deliberately contains dozens of credential-SHAPED fixtures,
+# several of which exist to prove the redaction scrubber works. A shape scan
+# refuses every honest commit to those files, and a guard that cries wolf gets
+# turned off.
+#
+# So the scan below matches VALUES, read from apps/web/.env* at commit time. A
+# fixture never equals the live secret, so false positives are structurally
+# impossible, and what is refused is exactly what could be used against
+# production. It names the variable, never the value.
+#
+# No `|| true`: a scanner that fails open is worse than none, because the
+# refusal it never prints is indistinguishable from a clean tree.
+if [ -f scripts/lib/staged-secret-scan.mjs ]; then
+  node scripts/lib/staged-secret-scan.mjs || exit 1
+fi
+
 exit 0

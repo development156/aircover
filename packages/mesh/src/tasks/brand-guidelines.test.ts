@@ -39,9 +39,13 @@ function runnerFor(provider: Provider) {
 }
 
 describe('brandGuidelinesTask', () => {
-  it('is the standard-tier brand_guidelines task with an explicit token budget', () => {
+  it('is the economy-tier brand_guidelines task with an explicit token budget', () => {
+    // ECONOMY since 2026-09-04, applying a bake-off measured 2026-08-12 that had
+    // been written into `TASK_TIER` and never into the definition that routes the
+    // call. The tier lives in TWO places and `routing.test.ts` asserts they agree,
+    // so this line and that table move together or the suite says so.
     expect(brandGuidelinesTask.def.name).toBe('brand_guidelines')
-    expect(brandGuidelinesTask.def.tier).toBe('standard')
+    expect(brandGuidelinesTask.def.tier).toBe('economy')
     expect(brandGuidelinesTask.def.maxTokens).toBeGreaterThan(0)
   })
 
