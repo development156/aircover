@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
@@ -266,17 +266,29 @@ describe('choosing which model draws it', () => {
   })
 
   /**
-   * RETARGETED. Every model in the catalogue is reachable now, so there is no
-   * "not connected" section to show. The claim that survives is the one that
-   * mattered: nothing is offered that cannot be drawn. When a model is added
-   * ahead of its route, `models.test.ts` covers the sentence it gets.
+   * RETARGETED again, and back to the state the "not connected" section was
+   * built for. Three models are page-verified but not generation-verified (they
+   * 400 on every press), so they are shown as waiting rather than offered. What
+   * must hold: the models a person can actually choose are exactly the routed
+   * ones, and the waiting ones appear in the "not connected" section instead of
+   * as pressable cards. `models.test.ts` covers the routed/allow-list pair.
    */
-  test('nothing is offered that cannot be drawn', async () => {
+  test('only reachable models are offered, and the rest are shown as waiting', async () => {
     const user = userEvent.setup()
     const { container } = open()
     await openModel(user)
-    expect(container.querySelector('[data-guide="studio-model-waiting"]')).toBeNull()
-    expect(unroutedModels()).toHaveLength(0)
+
+    const picker = container.querySelector('[data-guide="studio-model"]') as HTMLElement
+    // One pressable card per routed model, and no more.
+    expect(within(picker).getAllByRole('button')).toHaveLength(routedModels().length)
+
+    // The waiting models are present, but as locked entries, not as buttons.
+    const waiting = container.querySelectorAll('[data-guide="studio-model-waiting"]')
+    expect(waiting).toHaveLength(unroutedModels().length)
+    expect(unroutedModels().length).toBeGreaterThan(0)
+    for (const model of unroutedModels()) {
+      expect(picker.textContent, model.id).toContain(model.label)
+    }
   })
 
   /**
@@ -332,9 +344,9 @@ describe('the canvas', () => {
    * pressed anything. The founder's own words: "800px of empty canvas... the
    * page currently ends in a huge empty panel waiting for a picture." The
    * artboard has no such object, and neither does this screen now: before a
-   * first picture exists, there is no canvas panel at all. `Draw it`'s own
-   * spinner (asserted in "before any spend" below) is the loading state for a
-   * first press.
+   * first picture exists, there is no canvas panel at all. `Generate Image`'s
+   * own spinner (asserted in "before any spend" below) is the loading state
+   * for a first press.
    */
   test('there is no canvas panel before anything has been made', () => {
     const { container } = open(LIBRARY, [])
@@ -488,7 +500,7 @@ describe('matching a picture', () => {
     open()
     await chooseModeUI(user, /match a picture/i)
     expect(screen.getByRole('status').textContent).toMatch(/pick one picture/i)
-    expect(screen.getByRole('button', { name: /draw it/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /generate image/i })).toBeDisabled()
   })
 
   test('picking one clears the block', async () => {
@@ -962,32 +974,145 @@ describe('before any spend', () => {
    * `modelId` in `studio-workbench.tsx` and this goes red.
    */
   test('the total follows the chosen model, before the press', async () => {
+    /**
+     * RETARGETED AGAIN, 2026-09-04, and the reason is a fact about the world
+     * rather than a fact about this component.
+     *
+     * This test used to switch to "The best one" and read the price change off
+     * the primary. It cannot any more: three of the four Studio models are now
+     * `routed: false` and render as LOCKED entries, because every generation
+     * against them returned HTTP_400 and not one has ever succeeded. Exactly
+     * one model is choosable, so there is nothing to switch TO, and a test that
+     * clicks a model card is asserting a choice the product no longer offers.
+     *
+     * What survives is the half that is still exercisable and still the thing
+     * that once shipped broken: the figure on the button is the figure that
+     * leaves the wallet, and it tracks the COUNT. `cost-per-model` is now
+     * covered where it can be, on the pure function in `models.test.ts`, rather
+     * than through a UI switch that cannot happen.
+     *
+     * WHEN A SECOND MODEL IS ROUTED, restore the switch half of this test. The
+     * guard in `models.test.ts` that every choosable model is routed is what
+     * will tell you that day has come.
+     *
+     * MUTATION: drop the `* count` from the total in `studio-workbench.tsx`
+     * and this goes red on the second assertion.
+     */
     const user = userEvent.setup()
     const { container } = open()
+
+    // The locked models are still SHOWN, and still not choosable. That is the
+    // claim the picker makes now, so it is the claim this asserts.
     await openModel(user)
     const picker = container.querySelector('[data-guide="studio-model"]') as HTMLElement
-    const best = within(picker)
+    const pressable = within(picker)
       .getAllByRole('button')
-      .find((button) => button.textContent?.includes('The best one'))
-    if (!best) throw new Error('no card for the best one')
+      .filter((button) => button.textContent?.includes('credits a picture'))
+    expect(
+      pressable.length,
+      'exactly one model is routed today, so exactly one model card is pressable',
+    ).toBe(1)
 
-    await user.click(best)
-    // Anchored on the primary's own accessible name, so a "12 credits a
-    // picture" line on the card cannot satisfy it on the button's behalf.
-    expect(screen.getByRole('button', { name: /draw it/i }).textContent).toMatch(/12\s*credits/)
+    expect(screen.getByRole('button', { name: /generate image/i }).textContent).toMatch(
+      /6\s*credits/,
+    )
 
     const more = screen.getByRole('button', { name: /more pictures this press/i })
     await user.click(more)
-    expect(screen.getByRole('button', { name: /draw it/i }).textContent).toMatch(/24\s*credits/)
+    expect(screen.getByRole('button', { name: /generate image/i }).textContent).toMatch(
+      /12\s*credits/,
+    )
   })
 
   test('the button waits for a description, because an empty prompt cannot be drawn', async () => {
     const user = userEvent.setup()
     open()
-    const button = screen.getByRole('button', { name: /draw it/i })
+    const button = screen.getByRole('button', { name: /generate image/i })
     expect(button).toBeDisabled()
     await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
     expect(button).toBeEnabled()
+  })
+})
+
+describe('a second press cannot reach the action while the first is in flight', () => {
+  /**
+   * ── THE FOUNDER'S OWN REASON: A SECOND PRESS BURNS CREDITS ────────────────
+   * `disabled={!ready || busy}` reads as a complete guard and is not one on
+   * its own: `busy` is `isPending` from `useTransition`, REACT STATE that
+   * updates on the NEXT render rather than the instant `generate` runs.
+   * `fireEvent.click` three times with nothing awaited between them fires all
+   * three DOM handlers in the same tick, before React has painted the
+   * disabled button — the exact window a fast double click, or a second
+   * Enter fired before a re-render, lands in. `queueGeneration` is held open
+   * on a promise this test controls, so what is proved is that the SECOND and
+   * THIRD clicks never reach the action at all, not merely that their result
+   * was discarded.
+   *
+   * MUTATION: delete `if (pressLocked.current) return` (and its paired
+   * `pressLocked.current = true`) from `generate` in `studio-workbench.tsx`
+   * and this goes red: `queueGeneration` called three times.
+   */
+  test('a second and third click while the first is in flight never reach queueGeneration', async () => {
+    let resolve: ((value: Awaited<ReturnType<typeof queueGeneration>>) => void) | null = null
+    vi.mocked(queueGeneration).mockImplementation(
+      () =>
+        new Promise((res) => {
+          resolve = res
+        }),
+    )
+    const user = userEvent.setup()
+    open()
+    await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
+    const button = screen.getByRole('button', { name: /generate image/i })
+
+    // ── ALL THREE INSIDE ONE `act`, ON PURPOSE ────────────────────────────
+    // `fireEvent.click` on its own wraps EACH call in its own `act`, which
+    // flushes React's pending state (including `busy`) before the next call
+    // — that would let the `disabled` attribute alone catch the second
+    // click and prove nothing about the race the founder described. A
+    // single `act` around all three keeps them in the SAME tick, before any
+    // re-render, which is the actual window a fast double click or a second
+    // Enter lands in.
+    act(() => {
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    })
+
+    expect(queueGeneration).toHaveBeenCalledTimes(1)
+
+    resolve!({ ok: true, generationId: 'g1', balanceAfter: 5, made: 1, asked: 1 })
+    await waitFor(() => expect(button).not.toBeDisabled())
+
+    // And a genuinely NEW press after the first one settled is not blocked by
+    // a lock the first press forgot to release.
+    fireEvent.click(button)
+    expect(queueGeneration).toHaveBeenCalledTimes(2)
+  })
+
+  /**
+   * ── UNMISTAKABLE, NOT JUST DISABLED ────────────────────────────────────
+   * The founder could not tell anything was happening before this: the
+   * button carried `aria-busy` and nothing else said so. This asserts the
+   * label itself names what is happening, the button announces it to a
+   * screen reader, and the place a first picture would appear says so too
+   * — not merely that the press is blocked.
+   *
+   * MUTATION: leave the button's label as "Generate Image" while `busy` and
+   * this goes red on the first assertion.
+   */
+  test('the button and the empty canvas both say Sahoda is working, not just that the button is disabled', async () => {
+    vi.mocked(queueGeneration).mockImplementation(() => new Promise(() => {}))
+    const user = userEvent.setup()
+    open(LIBRARY, [])
+    await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
+    const button = screen.getByRole('button', { name: /generate image/i })
+
+    fireEvent.click(button)
+
+    expect(button).toHaveAttribute('aria-busy', 'true')
+    expect(button.textContent).toMatch(/generating image/i)
+    expect(screen.getByText(/generating your first image now/i)).toBeTruthy()
   })
 })
 
@@ -1029,13 +1154,13 @@ describe('the bar', () => {
    * (dark theme, nested under `[data-theme="dark"]`) — either way it is the
    * SAME colour the scope already uses for text, so a primary hovering to
    * `bg-ink` with a literal `text-white` (the shared `Button`'s own recipe)
-   * paints the label on top of its own fill the moment they match. `Draw it`
-   * must hover through `--pstrong`/`--pstrong-fg` instead, the pair the
-   * scope solves for exactly this control.
+   * paints the label on top of its own fill the moment they match. `Generate
+   * Image` must hover through `--pstrong`/`--pstrong-fg` instead, the pair
+   * the scope solves for exactly this control.
    */
-  test('draw it hovers through the inverse-scope pair, never through --ink', () => {
+  test('generate image hovers through the inverse-scope pair, never through --ink', () => {
     open()
-    const button = screen.getByRole('button', { name: /draw it/i })
+    const button = screen.getByRole('button', { name: /generate image/i })
     expect(button.className).toMatch(/hover:bg-primary-strong/)
     expect(button.className).toMatch(/hover:text-primary-strong-foreground/)
     expect(button.className).not.toMatch(/hover:bg-ink\b/)
@@ -1112,14 +1237,14 @@ describe('the bar', () => {
   /**
    * ── CLOSED BY DEFAULT, AND THE BAR STAYS USABLE ───────────────────────────
    * The bar reads as ~100px on first paint: no pill's own panel is open until
-   * pressed. The thing a person came to do — write the prompt, press Draw it —
-   * is there regardless.
+   * pressed. The thing a person came to do — write the prompt, press
+   * Generate Image — is there regardless.
    */
   test('no panel is open by default, and the bar stays usable', () => {
     open()
     expect(screen.queryByRole('group', { name: /how should sahoda approach it/i })).toBeNull()
     expect(screen.getByRole('textbox')).toBeTruthy()
-    expect(screen.getByRole('button', { name: /draw it/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /generate image/i })).toBeTruthy()
   })
 
   /** Only one pill's panel is open at a time, so the bar never grows back into six stacked cards. */
@@ -1516,7 +1641,7 @@ describe('the rest of the composer the design asked for', () => {
 describe('control over the logo Sahoda stamps', () => {
   async function press(user: ReturnType<typeof userEvent.setup>): Promise<void> {
     await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
-    await user.click(screen.getByRole('button', { name: /draw it/i }))
+    await user.click(screen.getByRole('button', { name: /generate image/i }))
   }
 
   test("a press with nothing touched sends exactly today's default: on, bottom right, medium", async () => {

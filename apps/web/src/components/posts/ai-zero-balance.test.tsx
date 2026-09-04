@@ -136,7 +136,9 @@ describe('making a picture, which now lives in the Studio', () => {
     // RETARGETED for the bar redesign: the price is no longer a separate
     // label with a pipe separator — it is the primary button's own second
     // line, so the price and the press are one decision.
-    expect(screen.getByRole('button', { name: /draw it/i }).textContent).toMatch(/6\s*credits/)
+    expect(screen.getByRole('button', { name: /generate image/i }).textContent).toMatch(
+      /6\s*credits/,
+    )
   })
 
   test('refuses with both numbers, and says nothing was charged', async () => {
@@ -150,7 +152,7 @@ describe('making a picture, which now lives in the Studio', () => {
       />,
     )
     await userEvent.type(screen.getByPlaceholderText(/plate of fresh samosas/i), 'a cup of chai')
-    await userEvent.click(screen.getByRole('button', { name: /draw it/i }))
+    await userEvent.click(screen.getByRole('button', { name: /generate image/i }))
     // Scoped to the ALERT, not to the whole document. `/needs/i` used to be
     // unique on this screen and stopped being so when the model picker landed:
     // one model's description ends "this is what a carousel needs". The claim

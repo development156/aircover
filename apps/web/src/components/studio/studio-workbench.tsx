@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useState, useTransition } from 'react'
+import { Fragment, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
@@ -30,7 +30,7 @@ import { PictureViewer } from '@/components/studio/picture-viewer'
 import { ReferenceUpload } from '@/components/studio/reference-upload'
 import { Textarea } from '@/components/ui/textarea'
 import type { CanvasPicture } from '@/lib/studio/canvas'
-import type { StudioFormat } from '@/lib/studio/formats'
+import { aspectRatioLabel, type StudioFormat } from '@/lib/studio/formats'
 import {
   MAX_TRIES_PER_PRESS,
   describeModeBlock,
@@ -87,8 +87,8 @@ import { describeInsufficient, describePartial } from '@/lib/studio/refusal-copy
  * flips to black when the scope nests under `[data-theme="dark"]`, which is
  * the point — see tokens.css's own header on the inverse surface). The
  * shared `Button`'s primary variant hovers to `bg-ink` with a literal white
- * label, which paints white on white the moment `--ink` is white. `Draw it`
- * is therefore a CUSTOM button again, hovering through the `--pstrong` /
+ * label, which paints white on white the moment `--ink` is white. `Generate
+ * Image` is therefore a CUSTOM button again, hovering through the `--pstrong` /
  * `--pstrong-fg` pair instead (see the button's own className below) — the
  * pair the inverse scope solves for exactly this control, and which already
  * flips correctly with the scope in both themes (tokens.css lines 703–742,
@@ -248,6 +248,23 @@ export function StudioWorkbench({
   const [drawing, setDrawing] = useState<CanvasPicture | null>(null)
   const [busy, start] = useTransition()
   /**
+   * ── THE SECOND PRESS THAT `busy` ALONE CANNOT STOP ────────────────────────
+   * `disabled={!ready || busy}` reads correctly at first glance and is not
+   * enough on its own: `busy` is `isPending` from `useTransition`, which is
+   * REACT STATE, and React state changes on the next render, not the instant
+   * `start()` is called. `generate()` itself runs synchronously and its async
+   * body begins executing the moment `start()` is invoked, before React has
+   * painted the disabled button. A second click that lands in that window (a
+   * fast double-click, or a keyboard Enter fired again before the re-render)
+   * reaches `onClick={generate}` a second time and calls `queueGeneration` a
+   * second time, and a second call is a second hold on the wallet for a press
+   * the person only meant to make once — the exact defect the founder named.
+   * A plain ref side-steps React's render cycle entirely: it is read and
+   * written synchronously, in the same tick as the click, so the guard is up
+   * before the SECOND click's handler can run.
+   */
+  const pressLocked = useRef(false)
+  /**
    * Which pill's own control is open below the bar. Closed by default: the bar
    * is meant to read as ~100px, not as the old composer's six stacked cards
    * open on first paint. Each pill is a summary and a door, never both at once.
@@ -295,6 +312,15 @@ export function StudioWorkbench({
   // itself about what is about to be spent.
   const modelLabel = modelById(modelId)?.label ?? 'None'
   const chosen = formats.find((f) => f.id === formatId) ?? null
+  /**
+   * ── THE SHAPE, NOT JUST THE NAME ───────────────────────────────────────
+   * "Story" and "Square post" say nothing about the shape being chosen.
+   * Derived from the chosen format's own width and height via
+   * `aspectRatioLabel` (never a hardcoded table, and never rounded to look
+   * tidy: see that function's own header), so a preset added to the
+   * catalogue gets a correct ratio here for free.
+   */
+  const sizeLabel = chosen === null ? 'None' : `${chosen.label} (${aspectRatioLabel(chosen)})`
   // `modelId` only ever holds a catalogue id (the default or a picker choice),
   // so the null arm is the type's; the draft price is its total answer and not
   // a state a person reaches. The server refuses an unknown id before any hold.
@@ -415,38 +441,54 @@ export function StudioWorkbench({
   }
 
   function generate() {
+    // ── THE GUARD ITSELF ───────────────────────────────────────────────────
+    // Synchronous, and checked before anything else runs. A second press
+    // while the ref is already locked returns immediately: no second
+    // `queueGeneration`, no second hold on the wallet. See the ref's own
+    // comment for why `busy`/`disabled` alone cannot do this.
+    if (pressLocked.current) return
+    pressLocked.current = true
     setNote(null)
     setShort(false)
     start(async () => {
-      const result = await queueGeneration({
-        mode,
-        wanted,
-        formatId,
-        referenceAssetIds: picked,
-        count,
-        modelId,
-        stamp: { enabled: stampEnabled, anchor: stampAnchor, sizeStep: stampSizeStep },
-      })
-      if (result.ok) {
-        // Silent when everything asked for arrived. A partial result is neither
-        // a success nor a failure and gets its own sentence, which names both
-        // numbers and says what happened to the money.
-        setNote(describePartial({ made: result.made, asked: result.asked }))
-        // Back to position zero, so the refreshed data shows the NEW picture
-        // rather than whichever older one was being looked at when it started.
-        setActiveId(null)
-        // The picture itself arrives with the refreshed server data, which also
-        // carries its signed link. Holding bytes in state here would put a
-        // megabyte in the browser that the next navigation throws away.
-        router.refresh()
-        return
+      try {
+        const result = await queueGeneration({
+          mode,
+          wanted,
+          formatId,
+          referenceAssetIds: picked,
+          count,
+          modelId,
+          stamp: { enabled: stampEnabled, anchor: stampAnchor, sizeStep: stampSizeStep },
+        })
+        if (result.ok) {
+          // Silent when everything asked for arrived. A partial result is
+          // neither a success nor a failure and gets its own sentence, which
+          // names both numbers and says what happened to the money.
+          setNote(describePartial({ made: result.made, asked: result.asked }))
+          // Back to position zero, so the refreshed data shows the NEW
+          // picture rather than whichever older one was being looked at when
+          // it started.
+          setActiveId(null)
+          // The picture itself arrives with the refreshed server data, which
+          // also carries its signed link. Holding bytes in state here would
+          // put a megabyte in the browser that the next navigation throws
+          // away.
+          router.refresh()
+          return
+        }
+        setShort(result.insufficient)
+        setNote(
+          result.insufficient
+            ? describeInsufficient({ required: result.required, available: result.available })
+            : result.message,
+        )
+      } finally {
+        // Unlocked whichever way the press ended, success, shortfall or
+        // refusal, so the NEXT press (a genuinely new one) is never stuck
+        // behind a lock this one forgot to release.
+        pressLocked.current = false
       }
-      setShort(result.insufficient)
-      setNote(
-        result.insufficient
-          ? describeInsufficient({ required: result.required, available: result.available })
-          : result.message,
-      )
     })
   }
 
@@ -528,9 +570,10 @@ export function StudioWorkbench({
               </label>
 
               {/* ── THE PRICE IS ON THE PRIMARY, AND THE BUTTON IS CUSTOM ────────
-                  `Draw it` carries the total as its own second line. The price
-                  and the press are one decision, and a cost floating beside the
-                  button on its own row would read as unrelated to it.
+                  `Generate Image` carries the total as its own second line.
+                  The price and the press are one decision, and a cost
+                  floating beside the button on its own row would read as
+                  unrelated to it.
                   A CUSTOM button, not the shared `Button`: `Button`'s primary
                   variant hovers to `bg-ink`, which is correct on the page and
                   wrong in here — inside `data-surface="inverse"`, `--ink` IS
@@ -539,14 +582,31 @@ export function StudioWorkbench({
                   scope solves for exactly this control: the fill LIFTS on
                   hover rather than darkening toward the panel behind it, and
                   the pair already flips correctly per theme (this file's own
-                  header). */}
+                  header).
+
+                  ── UNMISTAKABLY BUSY, NOT JUST DISABLED ─────────────────────
+                  The founder's own complaint: a second press burns credits,
+                  and the old spinner-in-a-corner did not read as "something
+                  is happening" at a glance. While `busy`, the label itself
+                  changes to name what is happening (never staying "Generate
+                  Image" as if nothing had been pressed), the fill dims a step
+                  so the whole control reads as working rather than merely
+                  greyed out, and `aria-busy` carries the same fact to a
+                  screen reader. `pressLocked` (see its own comment) is the
+                  part that actually stops a second spend; `disabled` and this
+                  visible state are what make that unnecessary to discover by
+                  trying it twice. */}
               <button
                 type="button"
                 onClick={generate}
                 disabled={!ready || busy}
                 aria-busy={busy || undefined}
                 data-guide="studio-generate"
-                className="inline-flex h-[56px] shrink-0 flex-col items-start justify-center gap-0 rounded-lg bg-primary px-5 text-primary-foreground transition-micro hover:bg-primary-strong hover:text-primary-strong-foreground active:translate-y-[0.5px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:bg-s2 disabled:text-muted disabled:opacity-100 disabled:shadow-[inset_0_0_0_1px_var(--line)]"
+                className={`inline-flex h-[56px] shrink-0 flex-col items-start justify-center gap-0 rounded-lg bg-primary px-5 text-primary-foreground transition-micro hover:bg-primary-strong hover:text-primary-strong-foreground active:translate-y-[0.5px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:shadow-[inset_0_0_0_1px_var(--line)] ${
+                  busy
+                    ? 'disabled:bg-primary/80 disabled:text-primary-foreground disabled:opacity-100'
+                    : 'disabled:bg-s2 disabled:text-muted disabled:opacity-100'
+                }`}
               >
                 <span className="flex items-center gap-1.5 type-sm font-[650]">
                   {busy ? (
@@ -554,7 +614,7 @@ export function StudioWorkbench({
                   ) : (
                     <Sparkles className="size-[15px]" aria-hidden />
                   )}
-                  Draw it
+                  {busy ? 'Generating image…' : 'Generate Image'}
                 </span>
                 <span className="num type-sm font-[500] opacity-75">
                   {total} {creditWord(total)}
@@ -680,8 +740,8 @@ export function StudioWorkbench({
                 caret
               />
               <PillButton
-                label={chosen?.label ?? 'None'}
-                axisLabel={`Size, ${chosen?.label ?? 'None'}`}
+                label={sizeLabel}
+                axisLabel={`Size, ${sizeLabel}`}
                 onClick={() => togglePanel('size')}
                 expanded={openPanel === 'size'}
                 controls="studio-panel-size"
@@ -829,7 +889,7 @@ export function StudioWorkbench({
                     >
                       {formats.map((format) => (
                         <option key={format.id} value={format.id}>
-                          {format.label}
+                          {format.label} ({aspectRatioLabel(format)})
                         </option>
                       ))}
                     </select>
@@ -1152,9 +1212,26 @@ export function StudioWorkbench({
           second copy of the same five buttons. */}
       {pictures.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-6" data-guide="studio-empty">
-          <p className="type-sm text-muted">
-            Nothing made yet. Use an idea from the box above, or write your own, then press Draw it.
-          </p>
+          {/* ── THE PLACE THE FIRST PICTURE WILL APPEAR SAYS SO ────────────────
+              Before a picture exists there is no canvas panel to overlay (see
+              this file's own note above the button, and the test named "there
+              is no canvas panel before anything has been made"), so a person
+              waiting on their FIRST press has nowhere on screen that says
+              anything is happening besides the button itself. This is that
+              place: the same honest, no-percentage sentence the canvas
+              overlay uses once a picture exists, `role="status"` so it is
+              announced without anybody having to go looking for it. */}
+          {busy ? (
+            <p role="status" className="type-sm text-muted" data-guide="studio-empty-busy">
+              Sahoda is generating your first image now. It usually takes a few seconds, and you can
+              leave this screen without losing it.
+            </p>
+          ) : (
+            <p className="type-sm text-muted">
+              Nothing made yet. Use an idea from the box above, or write your own, then press
+              Generate Image.
+            </p>
+          )}
         </div>
       ) : (
         <section aria-labelledby="studio-canvas" className="flex flex-col gap-4">
@@ -1220,9 +1297,12 @@ export function StudioWorkbench({
                 </button>
 
                 {busy ? (
-                  <p className="pointer-events-none relative max-w-[38ch] px-6 text-center type-sm text-muted">
-                    Sahoda is drawing this now. It usually takes a few seconds, and you can leave
-                    this screen without losing it.
+                  <p
+                    role="status"
+                    className="pointer-events-none relative max-w-[38ch] px-6 text-center type-sm text-muted"
+                  >
+                    Sahoda is generating this image now. It usually takes a few seconds, and you can
+                    leave this screen without losing it.
                   </p>
                 ) : null}
               </div>

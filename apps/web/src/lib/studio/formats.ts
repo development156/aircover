@@ -114,6 +114,35 @@ export function publishableChannels(): Channel[] {
 }
 
 /**
+ * The shape a size draws as, in the smallest whole numbers that mean it —
+ * "9:16", never "1080:1920". Derived from the format's own width and height,
+ * never a hardcoded table: `formats.test.ts` proves every offered size reduces
+ * to what this function returns, so a preset added to `STUDIO_PRESETS` gets a
+ * ratio for free rather than needing a second entry somewhere else.
+ *
+ * A ratio is only shown when it reduces CLEANLY. 1200x628 (the link card) is
+ * 300:157 in lowest terms, which is not a shape anybody recognises, and
+ * rounding it to something tidy like "17:9" would be a shape the format is
+ * not — a defect this codebase forbids in writing. Past a small threshold on
+ * either side, the pixel dimensions are shown instead, honestly, rather than
+ * a ratio invented to look neat.
+ */
+export function aspectRatioLabel(format: { width: number; height: number }): string {
+  const divisor = greatestCommonDivisor(format.width, format.height)
+  const w = format.width / divisor
+  const h = format.height / divisor
+  const CLEAN_CEILING = 20
+  if (w > CLEAN_CEILING || h > CLEAN_CEILING) {
+    return `${format.width} × ${format.height}px`
+  }
+  return `${w}:${h}`
+}
+
+function greatestCommonDivisor(a: number, b: number): number {
+  return b === 0 ? a : greatestCommonDivisor(b, a % b)
+}
+
+/**
  * One format by id, or null.
  *
  * Null for a size Sahoda no longer offers AND for one it offers but cannot

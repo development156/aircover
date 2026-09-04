@@ -145,7 +145,7 @@ const CONTROLS: ReadonlyArray<{
         />,
       )
       await user.type(screen.getByPlaceholderText(/plate of fresh samosas/i), 'a warm shopfront')
-      await user.click(screen.getByRole('button', { name: /draw it/i }))
+      await user.click(screen.getByRole('button', { name: /generate image/i }))
     },
   },
   {
@@ -241,7 +241,7 @@ describe('the spend controls do not pre-disable on a balance they did not read',
 
     // Only the prompt gates it. A client-side balance check here would refuse a
     // customer who has just paid, and the server gate is the real enforcement.
-    const button = screen.getByRole('button', { name: /draw it/i })
+    const button = screen.getByRole('button', { name: /generate image/i })
     expect(button).toBeDisabled() // no prompt yet
     await userEvent.type(screen.getByPlaceholderText(/plate of fresh samosas/i), 'a shopfront')
     expect(button).toBeEnabled()
