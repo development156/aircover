@@ -507,7 +507,13 @@ describe('stampLogo: the plate is decided from the backdrop under the mark', () 
     )
   })
 
-  it('plates a mostly light picture whose dark corner is where the mark goes', async () => {
+  it('moves off a dark corner on an otherwise light picture, and does not plate the corner it lands on', async () => {
+    // ── THIS IS THE FEATURE, NOT A REGRESSION ───────────────────────────────
+    // Before `corner-choice.ts` existed, `stampLogo` only ever measured the
+    // ONE corner it was told and plated when that corner failed contrast, even
+    // with three perfectly good corners sitting unused. Moving to a corner
+    // that already clears beats plating: it is the difference between a
+    // legible mark and a rectangle painted over the picture.
     const picture = await makePicture(LIGHT_BASE, {
       rect: patchOverMark(expectedPlacement()),
       colour: DARK_BASE,
@@ -522,10 +528,13 @@ describe('stampLogo: the plate is decided from the backdrop under the mark', () 
     expect(result.ok, result.ok ? '' : result.reason).toBe(true)
     if (!result.ok) return
 
-    expect(result.plated).toBe(true)
-    const out = await decode(result.png)
-    const platePt = platePoint(result.placement.plate)
-    expectColour(pixel(out, platePt.x, platePt.y), PLATE_RGB, 12, 'plate edge')
+    expect(result.anchorChoice.kind).toBe('moved')
+    if (result.anchorChoice.kind === 'moved') {
+      expect(result.anchorChoice.from).toBe('bottom-right')
+      expect(result.anchorChoice.reason).toBe('unreadable')
+      expect(result.anchorChoice.to).not.toBe('bottom-right')
+    }
+    expect(result.plated).toBe(false)
   })
 })
 

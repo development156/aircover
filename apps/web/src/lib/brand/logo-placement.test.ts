@@ -575,12 +575,20 @@ describe('plateDecisionFor: which of the three mixed cases a measurement lands i
   })
 
   it('is bipolar when both shares clear the minority threshold, whatever the mean says', () => {
-    const mark: MixedInkMeasurement = { meanInkLuminance: 0.5, darkInkShare: 0.4, lightInkShare: 0.4 }
+    const mark: MixedInkMeasurement = {
+      meanInkLuminance: 0.5,
+      darkInkShare: 0.4,
+      lightInkShare: 0.4,
+    }
     expect(plateDecisionFor(mark)).toEqual({ kind: 'bipolar' })
   })
 
   it('is NOT bipolar when only one share clears the threshold', () => {
-    const mark: MixedInkMeasurement = { meanInkLuminance: 0.18, darkInkShare: 0.9, lightInkShare: 0 }
+    const mark: MixedInkMeasurement = {
+      meanInkLuminance: 0.18,
+      darkInkShare: 0.9,
+      lightInkShare: 0,
+    }
     expect(plateDecisionFor(mark)).toEqual({ kind: 'measured', markLuminance: 0.18 })
   })
 
@@ -617,7 +625,11 @@ describe('needsPlate: a mixed mark measured as mid-tone is judged on its own con
   })
 
   it('still plates unconditionally when the same mid-tone luminance is reported bipolar', () => {
-    const bipolar: MixedInkMeasurement = { meanInkLuminance: 0.1791, darkInkShare: 0.4, lightInkShare: 0.4 }
+    const bipolar: MixedInkMeasurement = {
+      meanInkLuminance: 0.1791,
+      darkInkShare: 0.4,
+      lightInkShare: 0.4,
+    }
     expect(needsPlate(0, 'mixed', bipolar)).toBe(true)
     expect(needsPlate(1, 'mixed', bipolar)).toBe(true)
   })

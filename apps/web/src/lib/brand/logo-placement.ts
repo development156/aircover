@@ -384,9 +384,7 @@ export interface MixedInkMeasurement {
 const BIPOLAR_MINORITY_SHARE = 0.1
 
 export type MixedPlateDecision =
-  | { kind: 'unmeasured' }
-  | { kind: 'bipolar' }
-  | { kind: 'measured'; markLuminance: number }
+  { kind: 'unmeasured' } | { kind: 'bipolar' } | { kind: 'measured'; markLuminance: number }
 
 /**
  * Which of the three cases a `mixed` mark is in, from the measurement alone.
