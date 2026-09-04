@@ -10,6 +10,14 @@ import {
   chooseImageModel,
 } from './routing'
 import { keyClassForTier } from './config'
+import { brandExtractTask } from './tasks/brand-extract'
+import { brandGuidelinesTask } from './tasks/brand-guidelines'
+import { captionRewriteTask } from './tasks/caption-rewrite'
+import { contentVariantsTask } from './tasks/content-variants'
+import { gateClassifyTask } from './tasks/gate-classify'
+import { imageGenerateDef } from './tasks/image-generate'
+import { planWeekTask } from './tasks/plan-week'
+import { siteGenerateTask } from './tasks/site-generate'
 
 describe('tier routing', () => {
   it('defines a primary + fallback model for every model tier', () => {
@@ -50,23 +58,74 @@ describe('task → tier map', () => {
     }
   })
 
-  it('matches the frozen sahoda-mesh tier guide, with one measured exception', () => {
+  it('matches the frozen sahoda-mesh tier guide', () => {
     /**
-     * brand_guidelines LEFT `standard` on 2026-08-12, against the guide, on a
-     * bake-off (n=3, same intake): haiku-4.5 produced the same FOUR specific red
-     * lines as sonnet-5 at 5.7x less cost and 2.6x less latency, while
-     * gemini-flash — cheaper still — echoed the intake back verbatim and was
-     * disqualified on the text rather than the price.
+     * THIS ASSERTION USED TO PIN `economy` FOR brand_guidelines, AND THAT WAS A
+     * TEST PINNING A VALUE NOTHING RAN.
      *
-     * The guide in the sahoda-mesh skill still says `standard`. It should be
-     * updated or this reverted; a doc and a routing table that disagree is how
-     * the next person makes the wrong call confidently. Flagged in REQUESTS.md.
+     * A bake-off on 2026-08-12 (n=3, same intake) chose haiku-4.5 over sonnet-5:
+     * the same FOUR specific red lines at 5.7x less cost and 2.6x less latency,
+     * with gemini-flash disqualified on the text (it echoed the intake) rather
+     * than on price. That conclusion was written into `TASK_TIER` — and
+     * `TASK_TIER` is read by nothing at runtime.
+     *
+     * MEASURED 2026-09-03: `MeshTaskDef.tier` is the routing source, and
+     * `tasks/brand-guidelines.ts` has said `standard` since it was created. The
+     * saving was never taken, and this test asserted otherwise for three weeks
+     * while the guide, the table and the runtime disagreed three ways.
+     *
+     * The value now matches what runs. Whether to APPLY the bake-off is an open
+     * decision recorded in `routing.ts`, and applying it means editing the task
+     * definition — at which point `agrees with every task definition` below
+     * fails until this line moves with it. That is the point of the pair.
      */
-    expect(TASK_TIER.brand_guidelines).toBe('economy')
+    expect(TASK_TIER.brand_guidelines).toBe('standard')
     expect(TASK_TIER.caption_rewrite).toBe('economy')
     expect(TASK_TIER.content_variants).toBe('economy')
     expect(TASK_TIER.plan_week).toBe('standard')
     expect(TASK_TIER.site_generate).toBe('premium')
+  })
+
+  it('agrees with every task definition, which is the tier that actually runs', () => {
+    /**
+     * THE GUARD THAT SHOULD HAVE EXISTED SINCE `TASK_TIER` DID.
+     *
+     * Two tables named the tier of every mesh task and only one of them was
+     * read. `routing.ts`'s header says `MeshTaskDef.tier` is the source; the
+     * `TASK_TIER` map thirty lines below it is exported, asserted, quoted in
+     * comments — and consumed by nothing that makes a model call. They drifted
+     * on brand_guidelines and no test could see it, because each side had a
+     * test that only ever read its own side.
+     *
+     * Deriving one from the other was the obvious fix and is the wrong one
+     * here: importing eight task modules to build a map is how the posts screen
+     * gained 10.9 kB when a shared list was re-exported (REQUESTS.md). Two
+     * copies plus an assertion that they agree is the cheaper correct answer,
+     * and it is the same shape `brand-readers.test.ts` uses.
+     *
+     * Listing all eight by hand is deliberate. A ninth task added to the schema
+     * makes the count guard above fail, which sends somebody here.
+     */
+    const defs = [
+      ['brand_guidelines', brandGuidelinesTask.def],
+      ['brand_extract', brandExtractTask.def],
+      ['gate_classify', gateClassifyTask.def],
+      ['image_generate', imageGenerateDef],
+      ['caption_rewrite', captionRewriteTask.def],
+      ['content_variants', contentVariantsTask.def],
+      ['plan_week', planWeekTask.def],
+      ['site_generate', siteGenerateTask.def],
+    ] as const
+
+    expect(defs.length).toBe(MeshTaskNameSchema.options.length)
+    for (const [name, def] of defs) {
+      expect(
+        TASK_TIER[name],
+        `TASK_TIER says '${TASK_TIER[name]}' for ${name}; the task definition, which is ` +
+          `what routes the call, says '${def.tier}'. The definition wins — fix the table, ` +
+          `or move both deliberately.`,
+      ).toBe(def.tier)
+    }
   })
 
   it('routes image_generate to an image model and the IMAGE key class', () => {

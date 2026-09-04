@@ -48,8 +48,77 @@ const COPY: Record<string, PublishErrorDisplay> = {
     worthRetrying: false,
     needsReconnect: true,
   },
+  /**
+   * The stored account id is not in the shape the platform expects, so reconnecting
+   * is what re-stores it. Found by the same sweep, on the same day, as the two below.
+   */
+  INVALID_ACCOUNT_ID: {
+    message:
+      'The saved details for this account are not in a form the platform accepts, so nothing was sent. Reconnect it and try again.',
+    worthRetrying: false,
+    needsReconnect: true,
+  },
+  /**
+   * Sahoda's own publishing key was refused, which is not the customer's account.
+   *
+   * `worthRetrying: false` and `needsReconnect: false` are BOTH load-bearing, and
+   * they disagree with each other on purpose: reconnecting is the remedy for every
+   * other entry in this block and it cannot help here. `adapters/zernio.ts` says so
+   * in its own comment — a customer who reconnects a perfectly good Instagram
+   * account has spent their time on our problem.
+   */
+  PROVIDER_UNAUTHORIZED: {
+    message:
+      'Sahoda could not sign in to its publishing service, so this was not sent. This is on Sahoda’s side, not your account, and it needs us to fix it.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
 
   // ── The content ────────────────────────────────────────────────────────────
+  /**
+   * THE PLATFORM ALREADY HAS THIS EXACT POST, and until 2026-09-03 this code had
+   * no entry here at all.
+   *
+   * It fell to GENERIC, whose sentence is "Try again" — and `variant-status.ts`
+   * renders a Retry button beside any failed variant that is `worthRetrying`. So
+   * the screen offered a button that resends identical bytes into the same 24-hour
+   * window and is refused identically, every time. A remedy that cannot work is
+   * the one thing this product's copy rules forbid outright.
+   *
+   * The remedy that DOES work is changing the post, so the sentence names it.
+   */
+  ALREADY_POSTED: {
+    message:
+      'This channel already has a post with these exact words and photos from the last 24 hours, so it was not sent again. Change the wording or a photo to post it.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+  /**
+   * Content built for one channel reached another channel's adapter. That is a
+   * Sahoda defect, never something the writer did, and the sentence says so rather
+   * than sending someone to edit a post that is not wrong.
+   */
+  CHANNEL_MISMATCH: {
+    message:
+      'Sahoda prepared this post for a different channel, so it was not sent. Nothing is wrong with your post. This one is ours to fix.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+  /**
+   * THE PLATFORM ACCEPTED IT AND TOLD US NOTHING BACK, which is not a failure.
+   *
+   * `adapters/zernio.ts` raises this when the post went through but no id came
+   * back, so the post may well be live. Both flags are false for the same reason
+   * and it is the opposite of the usual one: retrying could publish it a SECOND
+   * time, and this product's rule is an honest "we do not know" over a confident
+   * wrong answer in either direction. The sentence never says it failed.
+   */
+  NO_POST_ID: {
+    message:
+      'The platform accepted this post but did not confirm it, so Sahoda cannot tell whether it went out. Check the channel before sending it again.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
   MEDIA_REQUIRED: {
     message: 'Instagram needs at least one photo. There is no text-only post.',
     worthRetrying: false,

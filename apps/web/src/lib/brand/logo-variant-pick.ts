@@ -50,9 +50,7 @@ export interface LogoVariantFacts {
   dark: LogoFacts | null
 }
 
-export type LogoVariantPick =
-  | { ok: true; kind: LogoVariantKind }
-  | { ok: false; reason: string }
+export type LogoVariantPick = { ok: true; kind: LogoVariantKind } | { ok: false; reason: string }
 
 /** A file with ink to stamp. `trim === null` is the measured "nothing here" answer. */
 function hasInk(facts: LogoFacts | null): facts is LogoFacts {

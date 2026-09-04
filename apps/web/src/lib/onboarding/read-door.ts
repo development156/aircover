@@ -155,7 +155,13 @@ type PdfRead =
   | { ok: true; text: string; label: string; costUsd: number; creditsCharged: number }
   | { ok: false; message: string; costUsd: number; creditsCharged: 0 }
 
-const PDF_TOO_LARGE_MESSAGE = `That PDF is over ${Math.round(MAX_PDF_BYTES / 1024 / 1024)}MB. Upload a shorter one, or tell us in your own words.`
+/**
+ * Exported so `door-request.test.ts` can assert the SENTENCE against the cap that
+ * is actually enforced. It interpolates `MAX_PDF_BYTES`, so the number cannot drift
+ * from the copy — but nothing checked that either was reachable through the
+ * platform's own request ceiling, and for a while neither was.
+ */
+export const PDF_TOO_LARGE_MESSAGE = `That PDF is over ${Math.round(MAX_PDF_BYTES / 1024 / 1024)}MB. Upload a shorter one, or tell us in your own words.`
 
 const HOLD_FAILED_MESSAGE =
   'Sahoda could not set credits aside for this read, so it did not open your PDF. Nothing was charged. Try again.'
