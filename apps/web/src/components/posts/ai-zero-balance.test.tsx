@@ -147,7 +147,7 @@ describe('making a picture, which now lives in the Studio', () => {
       />,
     )
     await userEvent.type(screen.getByPlaceholderText(/plate of fresh samosas/i), 'a cup of chai')
-    await userEvent.click(screen.getByRole('button', { name: /make this picture/i }))
+    await userEvent.click(screen.getByRole('button', { name: /draw it/i }))
     // Scoped to the ALERT, not to the whole document. `/needs/i` used to be
     // unique on this screen and stopped being so when the model picker landed:
     // one model's description ends "this is what a carousel needs". The claim

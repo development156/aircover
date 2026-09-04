@@ -360,7 +360,7 @@ describe('matching a picture', () => {
     open()
     await user.click(modeButton(/match a picture/i))
     expect(screen.getByRole('status').textContent).toMatch(/pick one picture/i)
-    expect(screen.getByRole('button', { name: /make this picture/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /draw it/i })).toBeDisabled()
   })
 
   test('picking one clears the block', async () => {
@@ -836,7 +836,7 @@ describe('before any spend', () => {
   test('the button waits for a description, because an empty prompt cannot be drawn', async () => {
     const user = userEvent.setup()
     open()
-    const button = screen.getByRole('button', { name: /make this picture/i })
+    const button = screen.getByRole('button', { name: /draw it/i })
     expect(button).toBeDisabled()
     await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
     expect(button).toBeEnabled()
@@ -887,12 +887,35 @@ describe('the composer', () => {
     expect(chips()).not.toContain(ruleFor('on_brand').label)
   })
 
+  /**
+   * BARE VALUES, NOT "AXIS VALUE". The chip used to print its own axis beside
+   * the value ("Model Everyday"), which the artboard never does: it states the
+   * value and a caret, and the axis lives on the accessible name instead. A
+   * chip that still prints its axis is the OLD screen wearing the new copy.
+   */
+  test('the chips are bare values with a caret, not "axis value" pairs', () => {
+    const { container } = open()
+    const chipsEl = container.querySelector('[data-guide="studio-chips"]') as HTMLElement
+    const chipButtons = within(chipsEl)
+      .getAllByRole('button')
+      .filter((button) => button.hasAttribute('aria-label'))
+
+    // Four summary chips: model, look, size, count.
+    expect(chipButtons).toHaveLength(4)
+    for (const button of chipButtons) {
+      expect(button.textContent).not.toMatch(/^(Model|Look|Size|How many)/)
+    }
+    // The count chip reads "×1", not the bare digit and not "How many 1".
+    expect(chipsEl.textContent).toContain('×1')
+    expect(chipsEl.textContent).not.toMatch(/How many/)
+  })
+
   test('the settings can be put away, and the composer stays', async () => {
     const user = userEvent.setup()
     open()
     expect(screen.getByRole('group', { name: /how should sahoda approach it/i })).toBeTruthy()
 
-    await user.click(screen.getByRole('button', { name: /hide settings/i }))
+    await user.click(screen.getByRole('button', { name: /hide detail/i }))
 
     expect(screen.queryByRole('group', { name: /how should sahoda approach it/i })).toBeNull()
     // The thing a person came to do is still there. A composer that folded the
@@ -904,7 +927,7 @@ describe('the composer', () => {
     // left this test green until the query moved. `getByRole` excludes what is
     // hidden from the accessibility tree, which is the thing being claimed.
     expect(screen.getByRole('textbox')).toBeTruthy()
-    expect(screen.getByRole('button', { name: /make this picture/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /draw it/i })).toBeTruthy()
   })
 })
 
@@ -1064,6 +1087,38 @@ describe('the result screen: which version, and why there is only one', () => {
     open(LIBRARY, [{ ...stamped, stampedUrl: null, stampOutcome: 'failed' }])
     expect(screen.queryByRole('link', { name: /add your logo|replace your logo/i })).toBeNull()
   })
+
+  /**
+   * ── SAVE AND USE IN A POST ARE NAMED, NOT OFFERED ───────────────────────────
+   * `Main.dc.html` draws both as live orange controls in this bar. Nothing
+   * behind either one exists here — "Save it" and "Use it in a post" already
+   * work, on the picture actions row above the canvas — so this bar states the
+   * two names and locks them, the same house pattern as the four coming-soon
+   * controls in the composer: a `<span>` carrying `Lock`, never
+   * `<button disabled>`, which `design-lint.mjs` rule 3 refuses outright because
+   * a screen reader still announces a disabled button as an action.
+   */
+  test('Save and Use in a post are locked in this bar, not real actions', () => {
+    const { container } = open(LIBRARY, [stamped])
+    const bar = container.querySelector('[data-guide="studio-logo-bar"]') as HTMLElement
+    expect(bar).not.toBeNull()
+
+    // Named, so the reader knows what is coming.
+    const save = within(bar).getByText('Save')
+    const useInAPost = within(bar).getByText('Use in a post')
+
+    // Never a button, disabled or otherwise: a disabled button is still
+    // announced as an action a screen reader could take.
+    expect(save.closest('button')).toBeNull()
+    expect(useInAPost.closest('button')).toBeNull()
+    expect(within(bar).queryByRole('button', { name: /^save$/i })).toBeNull()
+    expect(within(bar).queryByRole('button', { name: /^use in a post$/i })).toBeNull()
+
+    // "Save it" and "Use it in a post" are the real, working actions
+    // elsewhere on the screen; this bar's own pair must not collide with them.
+    expect(within(bar).queryByRole('button', { name: /save it/i })).toBeNull()
+    expect(within(bar).queryByRole('button', { name: /use it in a post/i })).toBeNull()
+  })
 })
 
 describe('the rest of the composer the design asked for', () => {
@@ -1100,7 +1155,7 @@ describe('the rest of the composer the design asked for', () => {
     const inSettings = screen.getByLabelText(/add a picture from this device/i)
     expect(inComposer).not.toBe(inSettings)
     expect(inComposer.getAttribute('accept')).toBe(uploadAccept())
-    await user.click(screen.getByRole('button', { name: /hide settings/i }))
+    await user.click(screen.getByRole('button', { name: /hide detail/i }))
     // The composer's route survives the settings being put away; the other does
     // not, which is the whole reason the composer has one.
     expect(screen.getByLabelText(/add a picture to match/i)).toBeTruthy()
@@ -1144,7 +1199,7 @@ describe('the rest of the composer the design asked for', () => {
 describe('control over the logo Sahoda stamps', () => {
   async function press(user: ReturnType<typeof userEvent.setup>): Promise<void> {
     await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
-    await user.click(screen.getByRole('button', { name: /make this picture/i }))
+    await user.click(screen.getByRole('button', { name: /draw it/i }))
   }
 
   test("a press with nothing touched sends exactly today's default: on, bottom right, medium", async () => {

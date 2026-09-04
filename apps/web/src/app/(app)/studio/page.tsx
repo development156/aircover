@@ -1,6 +1,5 @@
 import { PageTitle } from '@/components/page-title'
 import { StudioWorkbench } from '@/components/studio/studio-workbench'
-import { RecentGenerations } from '@/components/studio/recent-generations'
 import { brandSignalsFor } from '@/lib/studio/brand-signals'
 import { canvasPictures } from '@/lib/studio/canvas'
 import { generatableFormats } from '@/lib/studio/formats'
@@ -92,8 +91,6 @@ export default async function StudioPage() {
         signals={signals}
         balance={balance}
       />
-
-      <RecentGenerations read={recent} />
     </div>
   )
 }

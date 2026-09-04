@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { Lock, Sparkles } from 'lucide-react'
+import { ChevronDown, Loader2, Lock, Sparkles } from 'lucide-react'
 import {
   DEFAULT_STAMP_OPTIONS,
   IMAGE_TIER_ACTION,
@@ -27,7 +27,6 @@ import { ModelPicker } from '@/components/studio/model-picker'
 import { PictureActions } from '@/components/studio/picture-actions'
 import { PictureViewer } from '@/components/studio/picture-viewer'
 import { ReferenceUpload } from '@/components/studio/reference-upload'
-import { Button } from '@/components/ui/button'
 import { CostLabel } from '@/components/ui/cost-label'
 import { Textarea } from '@/components/ui/textarea'
 import type { CanvasPicture } from '@/lib/studio/canvas'
@@ -504,24 +503,32 @@ export function StudioWorkbench({
               to choose between them, and one of them lists the models we cannot
               reach yet, which is a door rather than a wall. So a chip opens the
               settings and the real control keeps its label, its legend and its
-              keyboard behaviour. */}
+              keyboard behaviour.
+
+              BARE VALUES, A CARET, NO PREFIX. "Model Everyday" told a reader
+              the axis and the value in one breath; the artboard states only the
+              value and a caret says there is more behind it, the way the rest
+              of this product already treats a chip that opens something. The
+              accessible name carries the axis instead, so a screen reader still
+              hears "Model, Everyday" even though the label on screen does not. */}
           <div className="flex flex-wrap items-center gap-2" data-guide="studio-chips">
             {[
-              { label: 'Model', value: modelLabel },
-              { label: 'Look', value: rule.label },
-              { label: 'Size', value: chosen?.label ?? 'None' },
-              { label: 'How many', value: String(count) },
+              { axis: 'Model', value: modelLabel },
+              { axis: 'Look', value: rule.label },
+              { axis: 'Size', value: chosen?.label ?? 'None' },
+              { axis: 'How many', value: `×${count}` },
             ].map((chip) => (
               <button
-                key={chip.label}
+                key={chip.axis}
                 type="button"
                 onClick={() => setSettingsOpen(true)}
                 aria-expanded={settingsOpen}
                 aria-controls="studio-settings"
-                className="surface-ring flex items-center gap-2 rounded-pill bg-s2 px-3 py-1.5 type-sm transition-micro hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                aria-label={`${chip.axis}, ${chip.value}`}
+                className="surface-ring flex items-center gap-1.5 rounded-pill bg-s2 px-3 py-1.5 type-sm font-[550] text-ink transition-micro hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               >
-                <span className="text-muted">{chip.label}</span>
-                <span className="font-[550] text-ink">{chip.value}</span>
+                <span aria-hidden>{chip.value}</span>
+                <ChevronDown className="size-[10px] shrink-0 text-muted" aria-hidden />
               </button>
             ))}
 
@@ -534,24 +541,38 @@ export function StudioWorkbench({
               aria-controls="studio-settings"
               className="rounded-pill px-2 py-1.5 type-sm text-muted transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
-              {settingsOpen ? 'Hide settings' : 'Settings'}
+              {settingsOpen ? 'Hide detail' : 'What it sends'}
             </button>
+
+            <span aria-hidden className="mx-1 h-[18px] w-px bg-line" />
 
             {/* The TOTAL, not the unit price. Somebody who chose four and was
                 shown the price of one has not been told what this press costs. */}
-            <CostLabel
-              action={count === 1 ? 'Make a picture' : `Make ${count} pictures`}
-              cost={cost * count}
-            />
+            <span className="type-sm text-muted">
+              <CostLabel
+                action={count === 1 ? 'Make a picture' : `Make ${count} pictures`}
+                cost={cost * count}
+              />
+            </span>
 
-            <Button
+            {/* ── A CUSTOM BUTTON, NOT `Button` ────────────────────────────────
+                `Button`'s primary variant hovers to `bg-ink`, which is correct
+                on the page and wrong in here: inside `data-surface="inverse"`
+                `--ink` IS white, so that hover would paint white text on a
+                white fill. `--pstrong`/`--pstrong-fg` are the pair this scope
+                solved for exactly this control: the fill LIFTS on hover rather
+                than darkening toward the panel behind it. */}
+            <button
+              type="button"
               onClick={generate}
-              loading={busy}
-              disabled={!ready}
+              disabled={!ready || busy}
+              aria-busy={busy || undefined}
               data-guide="studio-generate"
+              className="inline-flex h-control shrink-0 items-center justify-center gap-1.5 rounded-pill bg-primary px-5 type-sm font-[650] text-primary-foreground transition-micro hover:bg-primary-strong hover:text-primary-strong-foreground active:translate-y-[0.5px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:bg-s2 disabled:text-muted disabled:opacity-100 disabled:shadow-[inset_0_0_0_1px_var(--line)]"
             >
-              Make this picture
-            </Button>
+              {busy ? <Loader2 className="size-[14px] animate-spin" aria-hidden /> : null}
+              Draw it
+            </button>
           </div>
 
           {/* Inside the composer, because it is about THIS press. */}
@@ -574,15 +595,25 @@ export function StudioWorkbench({
           <div
             id="studio-settings"
             data-surface="inverse"
-            className="flex flex-col gap-4 rounded-xl bg-canvas p-4 shadow-lg"
+            className="flex flex-col gap-3 rounded-xl bg-canvas p-3 shadow-lg"
           >
             {/* ── WHAT SAHODA WILL ADD, BEFORE ANYTHING IS SPENT ────────────
                 The same array the action stores on the row, so the screen and
                 the record cannot disagree. Three states and never two: a read
                 that failed is not a workspace with nothing to add, and Explore
-                deliberately sends nothing at all. */}
-            <div className="flex flex-col gap-2" data-guide="studio-signals">
-              <span className="type-eyebrow text-muted">Will send</span>
+                deliberately sends nothing at all.
+
+                ONE ROW, not a stacked block: the artboard states this as a
+                fixed-width eyebrow beside inline pills, with the confirmed and
+                guessed key at the far end of the SAME row rather than a second
+                paragraph underneath. The full sentence a hollow dot means is
+                still carried, on the `sr-only` span each pill already has, for
+                anybody who cannot see which dot is which. */}
+            <div
+              className="flex flex-wrap items-center gap-x-3 gap-y-2"
+              data-guide="studio-signals"
+            >
+              <span className="type-eyebrow w-[64px] shrink-0 text-muted">Will send</span>
               {signals === null ? (
                 <p className="type-sm text-muted">
                   Sahoda could not read your Brand Brain just now, so it cannot show what it would
@@ -595,7 +626,7 @@ export function StudioWorkbench({
                 </p>
               ) : (
                 <>
-                  <ul className="flex flex-wrap gap-2">
+                  <ul className="flex flex-1 flex-wrap items-center gap-2">
                     {signals.map((signal) => (
                       <li
                         key={signal.field}
@@ -616,15 +647,23 @@ export function StudioWorkbench({
                       </li>
                     ))}
                   </ul>
-                  <p className="type-sm text-muted">
-                    A hollow dot is one Sahoda worked out for you. Confirm it in the Brand Brain and
-                    the picture stops drifting between one attempt and the next.
-                  </p>
+                  <span
+                    className="flex items-center gap-2 type-sm text-muted"
+                    title="Confirm a guessed one in the Brand Brain and the picture stops drifting between one attempt and the next."
+                  >
+                    <span aria-hidden className="size-[6px] shrink-0 rounded-full bg-primary" />
+                    set
+                    <span
+                      aria-hidden
+                      className="surface-ring-firm size-[6px] shrink-0 rounded-full"
+                    />
+                    guessed
+                  </span>
                 </>
               )}
             </div>
 
-            {/* ── COMING SOON, LISTED RATHER THAN HIDDEN ────────────────────
+            {/* ── NOT BUILT, LISTED RATHER THAN HIDDEN ───────────────────────
                 The same choice `ModelPicker` makes for a model we cannot reach:
                 shown, visibly not a control, with the reason. Hiding them would
                 be tidier and would leave somebody wondering whether Sahoda can
@@ -633,9 +672,12 @@ export function StudioWorkbench({
                 SPANS, not `<button disabled>`. `design-lint.mjs` rule 3 refuses
                 that pairing outright, because a screen reader still announces a
                 disabled button as an action the reader could take. */}
-            <div className="flex flex-col gap-2" data-guide="studio-coming-soon">
-              <span className="type-eyebrow text-muted">Coming soon</span>
-              <ul className="flex flex-wrap gap-2">
+            <div
+              className="flex flex-wrap items-center gap-x-3 gap-y-2"
+              data-guide="studio-coming-soon"
+            >
+              <span className="type-eyebrow w-[64px] shrink-0 text-muted">Not built</span>
+              <ul className="flex flex-1 flex-wrap items-center gap-2">
                 {COMING_SOON.map((one) => (
                   <li
                     key={one.title}
@@ -646,9 +688,9 @@ export function StudioWorkbench({
                   </li>
                 ))}
               </ul>
-              <p className="type-sm text-muted">
+              <span className="sr-only">
                 Designed and not built yet. Nothing here changes what a press does today.
-              </p>
+              </span>
             </div>
 
             <div className="h-px bg-line" />
@@ -682,7 +724,7 @@ export function StudioWorkbench({
                     type="button"
                     onClick={() => chooseMode(option.mode)}
                     aria-pressed={mode === option.mode}
-                    className={`surface-ring rounded-card px-3 py-2 text-left transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                    className={`surface-ring rounded-card px-3 py-1.5 text-left transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
                       mode === option.mode
                         ? 'bg-primary text-primary-foreground'
                         : 'bg-s2 text-muted'
@@ -753,7 +795,7 @@ export function StudioWorkbench({
                   appears here to match.
                 </p>
               ) : (
-                <ul className="grid grid-cols-4 gap-2">
+                <ul className="grid grid-cols-6 gap-1.5">
                   {library.pictures.map((picture) => {
                     // The POSITION, not a yes. `signReferences` sends them in
                     // pick order and the first weighs most, so an order-free
@@ -1126,6 +1168,25 @@ export function StudioWorkbench({
                 {note_.remedy.label}
               </Link>
             )}
+
+            {/* ── SAVE AND USE IN A POST: NAMED, NOT BUILT ────────────────────
+                `Main.dc.html` draws these as live orange controls; this bar
+                does not, because nothing behind either one exists yet in THIS
+                bar — "Save it" and "Use it in a post" already work, on the
+                picture actions row above the canvas. The same house pattern as
+                the four coming-soon controls in the composer: a `<span>`
+                carrying `Lock` and the label, never `<button disabled>`, so a
+                screen reader does not announce an action nobody can take. */}
+            <span className="ml-auto flex items-center gap-2">
+              <span className="flex items-center gap-1.5 type-sm text-muted opacity-70">
+                <Lock className="size-[12px]" aria-hidden />
+                Save
+              </span>
+              <span className="flex items-center gap-1.5 rounded-pill px-3 py-1.5 type-sm font-[550] text-muted opacity-70">
+                <Lock className="size-[12px]" aria-hidden />
+                Use in a post
+              </span>
+            </span>
           </div>
         )}
 
