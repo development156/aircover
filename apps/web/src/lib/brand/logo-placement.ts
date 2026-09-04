@@ -27,6 +27,13 @@
  * edge and the gap between the mark and anything else are the same number: there
  * is only one number, and it scales with the mark rather than being a fixed
  * pixel margin that swallows a 400px square and vanishes on a 4000px one.
+ *
+ * `clear` is never itself painted. It is the exclusion zone, the claim that
+ * nothing else comes within that gap of the mark, and a caller that paints
+ * `clear` has turned a guarantee into a slab flush against the picture's own
+ * edge. What a caller paints, when `needsPlate` says one is needed at all, is
+ * `plate`: a third rectangle, smaller than `clear` and centred on the same
+ * mark, that always leaves real room between its own edge and `clear`'s.
  */
 
 import type { StampSizeStep } from '@sahoda/shared'
@@ -47,6 +54,23 @@ export interface Placement {
   mark: Rect
   /** The mark plus its clear space. Contains `mark` and is what sits flush into the corner. */
   clear: Rect
+  /**
+   * The rectangle a plate is PAINTED into, when one is needed at all.
+   *
+   * `clear` is an EXCLUSION ZONE, the brand report's guarantee that nothing else
+   * sits within half the mark's height of it. Painting a plate over the whole of
+   * `clear` was the defect this field exists to fix: it turned the guarantee
+   * into an opaque slab flush against the picture's own edge, on two sides, with
+   * no margin left over. `plate` is the mark plus a SMALLER pad, `PLATE_PAD_SHARE`
+   * of the mark's height rather than `CLEAR_SPACE_SHARE`, so it is always
+   * strictly inside `clear` with real breathing room left between the plate's own
+   * edge and the picture's: the exclusion zone stays excluded even where a plate
+   * is drawn. `plate` is centred on `mark`, exactly like `clear` is, so the two
+   * share the same centre and differ only in how far out they reach. Whether
+   * this rectangle gets painted at all is `needsPlate`'s call, not this file's:
+   * a workspace whose mark already reads gets a `plate` rect it never uses.
+   */
+  plate: Rect
 }
 
 /**
@@ -119,6 +143,19 @@ const MAX_MARK_HEIGHT_SHARE = 0.25
  * large one in the middle of nowhere.
  */
 const CLEAR_SPACE_SHARE = 0.5
+
+/**
+ * Pad on all four sides of the PLATE, as a share of the mark's own height.
+ *
+ * Half of `CLEAR_SPACE_SHARE`, on purpose: the plate must never reach as far
+ * out as `clear` does, or a plate at exactly the clear-space margin would BE
+ * the exclusion zone rather than sit inside it, with nothing left to call a
+ * guarantee. Keeping this at half leaves a margin equal to itself, 0.25 of the
+ * mark's height, between the plate's own edge and the edge of `clear` (and, for
+ * the anchor corner's two touching sides, the edge of the canvas) on every
+ * side, at every mark size and every canvas shape.
+ */
+const PLATE_PAD_SHARE = 0.25
 
 /**
  * The contrast ratio a stamped mark is held to, against the backdrop under it.
@@ -269,9 +306,40 @@ export function placeLogo(input: {
   const clearHeight = markHeight + margin * 2
   const origin = clearOrigin(anchor, canvas, clearWidth, clearHeight)
 
+  const mark: Rect = {
+    x: origin.x + margin,
+    y: origin.y + margin,
+    width: markWidth,
+    height: markHeight,
+  }
+
+  // ── PAD IS CLAMPED BELOW MARGIN, NOT JUST COMPUTED FROM A SMALLER SHARE ─────
+  // `PLATE_PAD_SHARE * markHeight` is mathematically half of `CLEAR_SPACE_SHARE
+  // * markHeight`, but the two are rounded SEPARATELY and each carries its own
+  // `Math.max(1, …)` floor, exactly the trap the width cap above already ran
+  // into once. At markHeight 1, the smallest a real mark ever floors to,
+  // `Math.round(1 * 0.5)` and `Math.round(1 * 0.25)` both land on 1: without
+  // this clamp `pad` would equal `margin` and `plate` would equal `clear`
+  // exactly, which is not "strictly inside". Clamping `pad` to at most
+  // `margin - 1` (never below 0) keeps `plate` inside `clear` by construction
+  // rather than by an arithmetic coincidence that breaks at the edge case this
+  // very file's width-cap comment already measured going wrong once.
+  // `logo-placement.test.ts` pins the strict containment directly rather than
+  // trusting this reasoning, at the extreme aspects the width-cap comment
+  // documents (200x200 aspect 200; 1080x1080 aspect 10 and 16).
+  const pad =
+    margin > 1 ? Math.min(margin - 1, Math.max(1, Math.round(markHeight * PLATE_PAD_SHARE))) : 0
+  const plate: Rect = {
+    x: mark.x - pad,
+    y: mark.y - pad,
+    width: markWidth + pad * 2,
+    height: markHeight + pad * 2,
+  }
+
   return {
-    mark: { x: origin.x + margin, y: origin.y + margin, width: markWidth, height: markHeight },
+    mark,
     clear: { x: origin.x, y: origin.y, width: clearWidth, height: clearHeight },
+    plate,
   }
 }
 

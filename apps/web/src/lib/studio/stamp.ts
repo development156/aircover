@@ -17,6 +17,7 @@ import {
   type Rect,
 } from '../brand/logo-placement'
 import { sniffImage } from '../posts/sniff-image'
+import { roundedRectPng } from './rounded-rect'
 
 /**
  * STAMPING A WORKSPACE'S LOGO ONTO A PICTURE THE MODEL JUST DREW.
@@ -96,6 +97,17 @@ interface Rgb {
  * under it and light ink a dark one. `mixed` ink works at neither extreme, so it
  * gets the light plate, which is the surface most marks are drawn for.
  */
+/**
+ * The plate's corner radius, as a share of the plate's own height.
+ *
+ * A share rather than a pixel count, for the same reason every other number in
+ * this pair of files is a share: a fixed radius is a soft badge on a 400px
+ * picture and an invisible bevel on a 4000px one. 0.18 is enough curve to read
+ * as a deliberate shape at a glance and far short of the stadium a half-height
+ * radius would produce.
+ */
+const PLATE_RADIUS_SHARE = 0.18
+
 const LIGHT_PLATE: Rgb = { r: 255, g: 255, b: 255 }
 const DARK_PLATE: Rgb = { r: 17, g: 17, b: 17 }
 
@@ -376,17 +388,29 @@ export async function stampLogo(input: StampInput): Promise<StampResult> {
   const layers: OverlayOptions[] = []
   if (plated) {
     const colour = plateColour ?? defaultPlate(input.facts.inkPolarity)
+    // ── THE PLATE IS `placement.plate`, AND NEVER `placement.clear` ───────────
+    // `clear` is the exclusion zone: the promise that nothing encroaches on the
+    // mark. Painting it was this file's worst defect. It made the plate twice
+    // the mark's height and flush against two of the picture's own edges, which
+    // a founder screenshot showed swallowing the corner of a food photo as an
+    // opaque white slab. `plate` is the mark plus a quarter of its height, so
+    // the exclusion zone stays excluded even where a plate is drawn.
+    //
+    // The radius is what turns the remaining rectangle into a badge rather than
+    // a torn sticker. Clamped to half the shorter side because an SVG `rect`
+    // past that silently becomes a stadium instead of erroring.
+    const radius = Math.min(
+      Math.round(placement.plate.height * PLATE_RADIUS_SHARE),
+      Math.floor(Math.min(placement.plate.width, placement.plate.height) / 2),
+    )
+    // Fully opaque, deliberately: `needsPlate` computed a 4.5:1 guarantee that
+    // assumes the plate is the only colour between the backdrop and the mark.
+    // A translucent plate would let the backdrop bleed back and break the ratio
+    // the caller already decided it needed.
     layers.push({
-      input: {
-        create: {
-          width: placement.clear.width,
-          height: placement.clear.height,
-          channels: 4,
-          background: { ...colour, alpha: 1 },
-        },
-      },
-      left: placement.clear.x,
-      top: placement.clear.y,
+      input: await roundedRectPng(placement.plate.width, placement.plate.height, radius, colour),
+      left: placement.plate.x,
+      top: placement.plate.y,
     })
   }
   // The mark goes on last, so it sits on top of its own plate.

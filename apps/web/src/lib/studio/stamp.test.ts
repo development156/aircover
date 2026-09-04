@@ -242,6 +242,16 @@ function markCorners(mark: Rect): Array<{ x: number; y: number; label: string }>
   ]
 }
 
+/**
+ * A point on the plate's own left edge, vertically centred, away from the
+ * corner the radius rounds off. The exact corner pixel `(plate.x, plate.y)`
+ * is deliberately NOT this point: a badge with a real radius leaves that pixel
+ * unpainted, which is what `stamp.test.ts` asserts separately below.
+ */
+function platePoint(plate: Rect): { x: number; y: number } {
+  return { x: plate.x, y: plate.y + Math.floor(plate.height / 2) }
+}
+
 describe('stampLogo: the mark lands where the placement put it', () => {
   it('draws the TRIMMED logo at the placement rect on a light picture, and plates nothing', async () => {
     const picture = await makePicture(LIGHT_BASE)
@@ -366,18 +376,54 @@ describe('stampLogo: the plate is decided from the backdrop under the mark', () 
     const centreY = result.placement.mark.y + Math.floor(result.placement.mark.height / 2)
     expectColour(pixel(out, centreX, centreY), PLATE_RGB, 12, 'window over the plate')
 
-    // The plate is sized to clear, so its own corner is the plate colour too.
-    expectColour(
-      pixel(out, result.placement.clear.x, result.placement.clear.y),
-      PLATE_RGB,
-      12,
-      'clear corner',
-    )
+    // The plate rect (not the clear rect) carries the plate colour, on its
+    // edge away from the rounded corner.
+    const platePt = platePoint(result.placement.plate)
+    expectColour(pixel(out, platePt.x, platePt.y), PLATE_RGB, 12, 'plate edge')
 
     // And the ink is still drawn on top of it.
     for (const corner of markCorners(result.placement.mark)) {
       expectColour(pixel(out, corner.x, corner.y), INK, 24, corner.label)
     }
+  })
+
+  it('paints the plate rect, not the clear rect: the clear corner stays the picture, and the plate corner is rounded off', async () => {
+    const picture = await makePicture(DARK_BASE)
+    const result = await stampLogo({
+      picture,
+      logo: await makeLogo(),
+      facts: DARK_INK_FACTS,
+      anchor: 'bottom-right',
+      plate: PLATE,
+    })
+    expect(result.ok, result.ok ? '' : result.reason).toBe(true)
+    if (!result.ok) return
+
+    const out = await decode(result.png)
+    const { clear, plate } = result.placement
+
+    // `clear` is the exclusion zone, never painted. Its own corner, flush
+    // against the picture's own corner, must still read as the picture.
+    expectColour(
+      pixel(out, clear.x, clear.y),
+      DARK_BASE,
+      12,
+      'clear corner must be the untouched picture, not the plate',
+    )
+    // Sanity: plate is a strictly smaller rect than clear, geometrically, so
+    // there is no way this could pass by the plate happening to cover it too.
+    expect(plate.x).toBeGreaterThan(clear.x)
+    expect(plate.y).toBeGreaterThan(clear.y)
+
+    // The plate's own exact corner pixel is where the radius rounds the badge
+    // off: it must NOT be the plate colour either, or the "badge" is really a
+    // square with the label changed.
+    expectColour(
+      pixel(out, plate.x, plate.y),
+      DARK_BASE,
+      12,
+      'plate corner pixel must be rounded off, not squared',
+    )
   })
 
   it('does not plate a mostly dark picture whose bright corner is where the mark goes', async () => {
@@ -452,11 +498,12 @@ describe('stampLogo: the plate is decided from the backdrop under the mark', () 
 
     expect(result.plated).toBe(true)
     const out = await decode(result.png)
+    const platePt = platePoint(result.placement.plate)
     expectColour(
-      pixel(out, result.placement.clear.x, result.placement.clear.y),
+      pixel(out, platePt.x, platePt.y),
       PLATE_RGB,
       12,
-      'mid-shadow corner, which must carry a plate',
+      'mid-shadow plate edge, which must carry a plate',
     )
   })
 
@@ -477,12 +524,79 @@ describe('stampLogo: the plate is decided from the backdrop under the mark', () 
 
     expect(result.plated).toBe(true)
     const out = await decode(result.png)
-    expectColour(
-      pixel(out, result.placement.clear.x, result.placement.clear.y),
-      PLATE_RGB,
-      12,
-      'clear corner',
+    const platePt = platePoint(result.placement.plate)
+    expectColour(pixel(out, platePt.x, platePt.y), PLATE_RGB, 12, 'plate edge')
+  })
+})
+
+describe('stampLogo: the plate radius never exceeds half the plate’s own shorter side', () => {
+  /**
+   * A tall, narrow trim (2px wide, 400px tall inside a 410x410 file) drives
+   * `logoAspect` down to 0.005, small enough that `markWidth` floors to 1px
+   * while `markHeight` stays substantial at `large` on a 500x500 canvas, so
+   * `plate.width` ends up far smaller than `plate.height`.
+   *
+   * MEASURED by hand from the constants at these inputs: markHeight 100,
+   * markWidth 1, pad 25, plate 51x150. `PLATE_RADIUS_SHARE * 150` rounds to
+   * 27, past `floor(51 / 2) = 25`, so this is a real case where the unclamped
+   * formula would overshoot. SVG's own `rx` silently collapses an over-large
+   * radius to a stadium rather than erroring (`rounded-rect.ts`'s own header),
+   * so the clamp cannot be told apart from SVG's own by a pixel read; what
+   * this test pins is that `stampLogo` still succeeds and still paints a real
+   * plate for the tiniest reachable mark, rather than the extreme aspect
+   * throwing or silently painting nothing.
+   */
+  it('still plates the tiniest reachable mark without throwing', async () => {
+    const narrowFileSize = 410
+    const narrowTrim: TrimBox = { x: 5, y: 5, width: 2, height: 400 }
+    const narrowRaw = Buffer.alloc(narrowFileSize * narrowFileSize * 4, 0)
+    for (let y = narrowTrim.y; y < narrowTrim.y + narrowTrim.height; y += 1) {
+      for (let x = narrowTrim.x; x < narrowTrim.x + narrowTrim.width; x += 1) {
+        const at = (y * narrowFileSize + x) * 4
+        narrowRaw[at] = INK.r
+        narrowRaw[at + 1] = INK.g
+        narrowRaw[at + 2] = INK.b
+        narrowRaw[at + 3] = 255
+      }
+    }
+    const narrowLogo = new Uint8Array(
+      await sharp(narrowRaw, {
+        raw: { width: narrowFileSize, height: narrowFileSize, channels: 4 },
+      })
+        .png()
+        .toBuffer(),
     )
+
+    const raw = Buffer.alloc(500 * 500 * 3)
+    for (let at = 0; at < raw.length; at += 3) {
+      raw[at] = DARK_BASE.r
+      raw[at + 1] = DARK_BASE.g
+      raw[at + 2] = DARK_BASE.b
+    }
+    const squarePicture = new Uint8Array(
+      await sharp(raw, { raw: { width: 500, height: 500, channels: 3 } })
+        .png()
+        .toBuffer(),
+    )
+
+    const result = await stampLogo({
+      picture: squarePicture,
+      logo: narrowLogo,
+      facts: { ...DARK_INK_FACTS, trim: narrowTrim },
+      anchor: 'bottom-right',
+      sizeStep: 'large',
+      plate: PLATE,
+    })
+    expect(result.ok, result.ok ? '' : result.reason).toBe(true)
+    if (!result.ok) return
+
+    expect(result.plated).toBe(true)
+    expect(result.placement.mark.width).toBe(1)
+    expect(result.placement.plate.width).toBeLessThan(result.placement.plate.height)
+
+    const out = await decode(result.png)
+    const platePt = platePoint(result.placement.plate)
+    expectColour(pixel(out, platePt.x, platePt.y), PLATE_RGB, 12, 'tiny-mark plate edge')
   })
 })
 

@@ -274,6 +274,109 @@ describe("clear: a fraction of the mark's own height, symmetric on all four side
   })
 })
 
+describe('plate: strictly inside clear, never the exclusion zone itself', () => {
+  const CASES: Array<{ label: string; canvas: { width: number; height: number }; aspect: number }> =
+    [
+      { label: 'ordinary wide canvas', canvas: CANVAS_WIDE, aspect: 1.5 },
+      { label: 'square canvas', canvas: { width: 1000, height: 1000 }, aspect: 1 },
+      // The extreme aspects the width-cap comment in logo-placement.ts already
+      // measured re-deriving markHeight down to 1px, which is exactly the
+      // markHeight where pad and margin round to the same integer unless the
+      // clamp holds.
+      { label: '200x200 canvas, aspect 200', canvas: { width: 200, height: 200 }, aspect: 200 },
+      { label: '1080x1080 canvas, aspect 10', canvas: { width: 1080, height: 1080 }, aspect: 10 },
+      { label: '1080x1080 canvas, aspect 16', canvas: { width: 1080, height: 1080 }, aspect: 16 },
+    ]
+
+  it.each(CASES)('$label: plate is strictly inside clear, on every side', ({ canvas, aspect }) => {
+    for (const anchor of ANCHORS) {
+      const { plate, clear } = placeLogo({ canvas, logoAspect: aspect, anchor })
+      expect(plate.x, 'plate.x > clear.x').toBeGreaterThan(clear.x)
+      expect(plate.y, 'plate.y > clear.y').toBeGreaterThan(clear.y)
+      expect(plate.x + plate.width, 'plate right < clear right').toBeLessThan(clear.x + clear.width)
+      expect(plate.y + plate.height, 'plate bottom < clear bottom').toBeLessThan(
+        clear.y + clear.height,
+      )
+    }
+  })
+
+  it.each(CASES)('$label: plate is strictly inside the canvas', ({ canvas, aspect }) => {
+    for (const anchor of ANCHORS) {
+      const { plate } = placeLogo({ canvas, logoAspect: aspect, anchor })
+      expect(plate.x).toBeGreaterThanOrEqual(0)
+      expect(plate.y).toBeGreaterThanOrEqual(0)
+      expect(plate.x + plate.width).toBeLessThanOrEqual(canvas.width)
+      expect(plate.y + plate.height).toBeLessThanOrEqual(canvas.height)
+    }
+  })
+
+  it.each(CASES)('$label: plate is smaller than clear in both dimensions', ({ canvas, aspect }) => {
+    for (const anchor of ANCHORS) {
+      const { plate, clear } = placeLogo({ canvas, logoAspect: aspect, anchor })
+      expect(plate.width).toBeLessThan(clear.width)
+      expect(plate.height).toBeLessThan(clear.height)
+    }
+  })
+
+  it('plate contains mark, and is centred on it', () => {
+    const placement = placeLogo({
+      canvas: { width: 900, height: 900 },
+      logoAspect: 1,
+      anchor: 'bottom-right',
+    })
+    const { mark, plate } = placement
+    expect(plate.x).toBeLessThanOrEqual(mark.x)
+    expect(plate.y).toBeLessThanOrEqual(mark.y)
+    expect(plate.x + plate.width).toBeGreaterThanOrEqual(mark.x + mark.width)
+    expect(plate.y + plate.height).toBeGreaterThanOrEqual(mark.y + mark.height)
+    // Centred: the gap on the left equals the gap on the right, same for top/bottom.
+    const leftGap = mark.x - plate.x
+    const rightGap = plate.x + plate.width - (mark.x + mark.width)
+    const topGap = mark.y - plate.y
+    const bottomGap = plate.y + plate.height - (mark.y + mark.height)
+    expect(leftGap).toBe(rightGap)
+    expect(topGap).toBe(bottomGap)
+  })
+
+  it("plate's exact pad is a quarter of the mark's height, not merely smaller than clear's half", () => {
+    // A square canvas and a square mark, at 'large', where no cap engages: the
+    // exact-share test above already pins mark.height at 200 for these
+    // inputs. margin (CLEAR_SPACE_SHARE 0.5) is round(200 * 0.5) = 100, and pad
+    // (PLATE_PAD_SHARE 0.25) must be round(200 * 0.25) = 50, EXACTLY. A test
+    // that only checked "plate is smaller than clear" would keep passing if
+    // PLATE_PAD_SHARE silently drifted back up toward CLEAR_SPACE_SHARE, right
+    // up until the clamp below margin started biting; this test catches the
+    // drift immediately, at the first pixel it changes.
+    const canvas = { width: 1000, height: 1000 }
+    const placement = placeLogo({
+      canvas,
+      logoAspect: 1,
+      anchor: 'bottom-right',
+      sizeStep: 'large',
+    })
+    expect(placement.mark.height).toBe(200)
+    const pad = (placement.plate.width - placement.mark.width) / 2
+    expect(pad).toBe(50)
+    expect(placement.plate.width).toBe(300)
+    expect(placement.plate.height).toBe(300)
+  })
+
+  it('the tiniest reachable mark (markHeight 1px, at the 200x200/aspect-200 extreme) still keeps plate strictly inside clear', () => {
+    const placement = placeLogo({
+      canvas: { width: 200, height: 200 },
+      logoAspect: 200,
+      anchor: 'bottom-right',
+    })
+    // Pin the extreme this case exists to reach: this is the width-cap
+    // derivation the file's own comment measures landing on markHeight 1.
+    expect(placement.mark.height).toBe(1)
+    expect(placement.plate.width).toBeLessThan(placement.clear.width)
+    expect(placement.plate.height).toBeLessThan(placement.clear.height)
+    expect(placement.plate.x).toBeGreaterThan(placement.clear.x)
+    expect(placement.plate.y).toBeGreaterThan(placement.clear.y)
+  })
+})
+
 describe('inset: the mark sits one clear-space in from its anchor corner, for every anchor', () => {
   const canvas = { width: 1200, height: 628 }
 
