@@ -14,6 +14,7 @@ import { mapPostError } from '@/lib/posts/post-error'
 import { getPost, readMedia, readVariantFormatsStrict } from '@/lib/posts/read'
 import { sniffImage } from '@/lib/posts/sniff-image'
 import type { AttachMediaState, DetachMediaState } from '@/lib/posts/media-state'
+import { readStorageUsage, storageRefusal } from '@/lib/storage/usage'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { workspaceForWrite } from '@/lib/workspaces'
 
@@ -63,6 +64,13 @@ export async function attachMedia(postId: string, formData: FormData): Promise<A
         message: `That file is larger than ${Math.floor(MEDIA_UPLOAD_CAP_BYTES / 1_000_000)} MB, which is the most an upload can carry.`,
       }
     }
+
+    // The per-WORKSPACE allowance, asked before the bytes are read. The ceiling
+    // above is per file; this one is the 1 GB the whole workspace shares, and a
+    // full workspace is refused here rather than after we have paid to move the
+    // file. Fails open on an unreadable figure — `storageRefusal` says why.
+    const overAllowance = storageRefusal(await readStorageUsage(ws.workspace.id), file.size)
+    if (overAllowance) return { ok: false, message: overAllowance }
 
     const bytes = new Uint8Array(await file.arrayBuffer())
 
