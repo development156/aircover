@@ -9,6 +9,12 @@ import { APPROVABLE_FROM } from '@/lib/planner/transitions'
 import type { ApproveState } from '@/lib/planner/state'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { workspaceForWrite } from '@/lib/workspaces'
+import {
+  APPROVE_ROLE_REFUSAL,
+  APPROVE_ROLE_UNKNOWN,
+  canApproveAsRole,
+  getWorkspaceRole,
+} from '@/lib/workspace-role'
 
 const CANNOT_APPROVE = "Can't approve this post from its current state. Reload to see where it is."
 
@@ -32,6 +38,12 @@ export async function approvePost(postId: string): Promise<ApproveState> {
     if (!ws.ok) return { ok: false, message: ws.message }
     const workspace = ws.workspace
     workspaceId = workspace.id
+
+    // BEFORE the update, because RLS does not close this one: `posts` carries the
+    // plain tenant policy, which lets any member write. Read the role, then decide.
+    const role = await getWorkspaceRole(workspace.id)
+    if (role === null) return { ok: false, message: APPROVE_ROLE_UNKNOWN }
+    if (!canApproveAsRole(role)) return { ok: false, message: APPROVE_ROLE_REFUSAL }
 
     const supabase = createServerSupabase()
     const { data, error } = await supabase

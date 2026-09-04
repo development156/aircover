@@ -33,8 +33,7 @@ import { uploadAsset } from '@/app/actions/assets'
 export type LogoVariantKind = 'light' | 'dark'
 
 export type SetLogoVariantState =
-  | { ok: true; adopted: boolean; converted: boolean }
-  | { ok: false; message: string }
+  { ok: true; adopted: boolean; converted: boolean } | { ok: false; message: string }
 
 interface VariantConfig {
   /** The title that marks the current asset for this variant in the library. */

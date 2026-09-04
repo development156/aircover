@@ -180,7 +180,13 @@ describe('the PDF arm holds credits', () => {
     expect(big.read).not.toHaveBeenCalled()
     expect(ledger.holds).toHaveLength(0)
     expect(runTask).not.toHaveBeenCalled()
-    if (!result.ok) expect(result.message).toMatch(/over 6MB/)
+    // Derived from the constant rather than typed. This read `/over 6MB/` and had
+    // to be edited by hand when the cap dropped to 4 MB to fit under the platform's
+    // request ceiling — which means it was pinning a NUMBER, not the claim. The
+    // claim is that the refusal names the cap actually enforced; that survives the
+    // next change to the cap, and still fails if the sentence stops naming one.
+    const capMB = Math.round(MAX_PDF_BYTES / 1024 / 1024)
+    if (!result.ok) expect(result.message).toContain(`over ${capMB}MB`)
   })
 
   it('the URL and sentence arms take no hold at all', async () => {
