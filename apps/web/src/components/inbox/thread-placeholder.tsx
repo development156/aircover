@@ -2,6 +2,7 @@ import { CardEmpty, EmptyState } from '@/components/empty-state'
 import Link from 'next/link'
 import { MessagesSquare } from 'lucide-react'
 
+import { FailedAccounts } from '@/components/inbox/surface-notice'
 import { PaneScroll } from '@/components/inbox/inbox-panes'
 import { buttonVariants } from '@/components/ui/button'
 import type { InboxEmptiness } from '@/lib/inbox/emptiness'
@@ -26,6 +27,19 @@ import type { InboxEmptiness } from '@/lib/inbox/emptiness'
  *   nothing to open   the reason + the action that changes it
  *   nothing selected  a list exists; pick from it
  */
+/**
+ * The states where "Connect a channel" is a remedy that actually works.
+ *
+ * `never_connected` — nothing is connected yet. `unresolved` — something is, and
+ * the provider recognised none of it, so reconnecting is the fix. Every other
+ * state is ours, and sending the customer to the connect flow would blame them
+ * for it.
+ */
+const CONNECT_FIXES_IT: ReadonlySet<InboxEmptiness['state']> = new Set([
+  'never_connected',
+  'unresolved',
+])
+
 export function ThreadPlaceholder({
   emptiness,
   hasConversations,
@@ -52,22 +66,36 @@ export function ThreadPlaceholder({
            screen" that docs/27 §4 diagnoses. The classifier's own words are
            kept verbatim: its headline and body are written per state and are
            the only account of why this is empty. */
-        <EmptyState
-          icon={MessagesSquare}
-          title={emptiness.headline}
-          body={emptiness.body}
-          /* One action, and only when connecting is actually the remedy.
-             Telling someone to connect a channel when the real problem is that
-             we could not reach the provider sends them to fix something that is
-             not broken. */
-          action={
-            emptiness.state === 'never_connected' ? (
-              <Link href="/connections" className={buttonVariants({ variant: 'primary' })}>
-                Connect a channel
-              </Link>
-            ) : undefined
-          }
-        />
+        <div data-surface-state={emptiness.state}>
+          <EmptyState
+            icon={MessagesSquare}
+            title={emptiness.headline}
+            body={emptiness.body}
+            /* One action, and only when connecting is actually the remedy.
+               Telling someone to connect a channel when the real problem is that
+               we could not reach the provider sends them to fix something that is
+               not broken.
+
+               `unresolved` is in that set and was dropped from it at the
+               three-pane rework: it means we HOLD an account and the provider
+               recognised none of them, so reconnecting is precisely the fix. The
+               product's rule is never to offer a remedy that cannot work, and
+               withholding one that can is the same defect facing the other way.
+               Restored 2026-09-04, caught by retargeting the deleted
+               `SurfaceNotice`'s tests onto this component. */
+            action={
+              CONNECT_FIXES_IT.has(emptiness.state) ? (
+                <Link href="/connections" className={buttonVariants({ variant: 'primary' })}>
+                  Connect a channel
+                </Link>
+              ) : undefined
+            }
+          />
+          {/* Which accounts did not answer. Attached to `could_not_ask` by the
+              classifier and rendered nowhere between the rework and 2026-09-04,
+              so "we asked and got no answer" could not say who. */}
+          <FailedAccounts state={emptiness} className="mt-3 justify-center" />
+        </div>
       )}
     </PaneScroll>
   )

@@ -74,7 +74,16 @@ const BRAND_BRAIN = { label: 'Add your logo', href: '/brain' } as const
 const REPLACE_LOGO = { label: 'Replace your logo', href: '/brain' } as const
 
 export function stampNote(outcome: StampOutcome | null): StampNote {
-  switch (outcome) {
+  // Coalesced before the switch, and not for tidiness. `read.ts` builds this
+  // from a `select('*')` row, so on a deploy without
+  // `20260831150000_studio_stamped_asset.sql` the column is absent and the value
+  // is `undefined`. A `switch` on `undefined` matches no case here — including
+  // `case null`, which is written for that exact deploy — and an exhaustive
+  // switch with no `default` then returns `undefined`, so the one message about
+  // US rather than them could never be shown in the one situation it describes.
+  // The boundary in `read.ts` normalises too; this is the half that cannot be
+  // walked around by a future caller.
+  switch (outcome ?? null) {
     case 'stamped':
       return {
         title: 'Logo placed',

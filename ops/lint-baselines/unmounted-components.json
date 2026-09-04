@@ -3,16 +3,11 @@
     "apps/web/src/components/analytics/channel-table.tsx::ChannelTable",
     "apps/web/src/components/analytics/post-table.tsx::PostTable",
     "apps/web/src/components/analytics/week-card.tsx::WeekCard",
-    "apps/web/src/components/connections/channel-browser.tsx::ChannelBrowser",
     "apps/web/src/components/connections/kind-glyph.tsx::DRAWN_KINDS",
-    "apps/web/src/components/inbox/surface-notice.tsx::SurfaceNotice",
     "apps/web/src/components/onboarding/onboarding-flow.tsx::OnboardingFlow",
-    "apps/web/src/components/onboarding/stage/color-field.tsx::ColorField",
     "apps/web/src/components/onboarding/stage/drop-zone.tsx::DropZone",
     "apps/web/src/components/planner/week-grid.tsx::WeekGrid",
     "apps/web/src/components/report/report-body.tsx::ReportBody",
-    "apps/web/src/components/roadmap/parts.tsx::InertColumn",
-    "apps/web/src/components/roadmap/parts.tsx::InertToggle",
     "apps/web/src/components/shell/theme-script.tsx::THEME_SCRIPT_SOURCE"
   ]
 }
