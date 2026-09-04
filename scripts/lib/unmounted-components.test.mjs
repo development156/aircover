@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { findUnmountedComponents, keyOf } from './unmounted-components.mjs'
+import { findUnmountedComponents, keyOf, stripComments } from './unmounted-components.mjs'
 
 /**
  * A COMPONENT NOBODY PUTS ON A SCREEN.
@@ -116,6 +116,32 @@ describe('the scan itself', () => {
     // point. MEASURED 2026-09-01: 79 of 91 raw hits came from app/, and a rule
     // that is 87% noise on day one does not survive its first red build.
     expect(found.every((c) => !c.file.startsWith('apps/web/src/app/'))).toBe(true)
+  })
+
+  it('does not count a component named only in a comment as mounted', () => {
+    // MEASURED 2026-09-04, hours after this file was written: the first version
+    // counted a name anywhere in product text, and that hid the two LARGEST
+    // orphans in the repository. `WeekGrid` (187 lines, tested) is named in
+    // three block comments — month-grid.tsx, week-timeline.tsx and the planner
+    // page, each explaining what it does or why something else was chosen —
+    // and rendered nowhere. `OnboardingFlow` (417 lines, tested) is named once,
+    // in a comment in (onboarding)/error.tsx, and rendered nowhere.
+    //
+    // A guard whose blind spot is "somebody explained this component" is blind
+    // exactly where a careful codebase writes most. Same defect this lane fixed
+    // in scanner-registry.mjs the same day.
+    const mentioned = '/** Rendering `Thing` here would have been wrong. */\nexport const A = 1\n'
+    expect(stripComments(mentioned)).not.toContain('Thing')
+
+    expect(stripComments('// see Thing for why\nconst a = 1')).not.toContain('Thing')
+  })
+
+  it('keeps a URL in a string, because eating a code line would invent an orphan', () => {
+    // `https://…` contains `//`. Stripping from there to end of line would drop
+    // any component named later on that line and report it unmounted.
+    const line = `const u = 'https://x.test/a'; render(<Thing />)`
+    expect(stripComments(line)).toContain('Thing')
+    expect(stripComments(line)).toContain('https://x.test/a')
   })
 
   it('does not count a component’s own test as a use', () => {

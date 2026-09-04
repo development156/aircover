@@ -57,6 +57,33 @@ const IS_TEST = /\.test\.|\.spec\./
 const EXPORTED_PASCAL =
   /^export\s+(?:default\s+)?(?:async\s+)?(?:function|const)\s+([A-Z][A-Za-z0-9_]*)/gm
 
+/**
+ * WRITING ABOUT A COMPONENT IS NOT MOUNTING IT.
+ *
+ * The first version of this counted a name anywhere in product text as a use,
+ * and MEASURED 2026-09-04 that hid the two largest orphans in the repository:
+ * `WeekGrid` (187 lines, tested) is named in three block comments — in
+ * `month-grid.tsx`, `week-timeline.tsx` and the planner page, each explaining
+ * what it does or why something else was chosen instead — and rendered nowhere;
+ * `OnboardingFlow` (417 lines, tested) is named once, in a comment in
+ * `(onboarding)/error.tsx`, and rendered nowhere. A guard whose blind spot is
+ * "somebody explained this component" is blind exactly where a careful codebase
+ * writes most.
+ *
+ * That is the same defect this lane fixed in `scanner-registry.mjs` on the same
+ * day — a rule that cannot tell a description from the thing described — and it
+ * was in this file within hours of writing that one down.
+ *
+ * Block comments go first and completely. Line comments are removed only when
+ * the `//` is not preceded by a colon, so `https://…` inside a string survives:
+ * over-keeping a line is safe here (it can only count a use that is not one,
+ * which is the direction that was already true), while eating a line of real
+ * code would invent an orphan.
+ */
+export function stripComments(source) {
+  return source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+}
+
 /** Every `.tsx` under apps/web/src, tracked or not, so an uncommitted one counts. */
 function tsxFiles(repoRoot) {
   return execFileSync(
@@ -85,8 +112,11 @@ export function findUnmountedComponents(repoRoot) {
   const tests = files.filter((f) => IS_TEST.test(f))
 
   const read = (f) => readFileSync(resolve(repoRoot, f), 'utf8')
-  const productText = product.map(read).join('\n')
-  const testText = tests.map(read).join('\n')
+
+  // Comments are stripped from the USAGE corpus, never from the declaration
+  // scan: explaining a component is not mounting it. See `stripComments`.
+  const productText = product.map((f) => stripComments(read(f))).join('\n')
+  const testText = tests.map((f) => stripComments(read(f))).join('\n')
 
   const mentions = (text, name) =>
     text.split(new RegExp(`\\b${name.replace(/[$]/g, '\\$')}\\b`)).length - 1
