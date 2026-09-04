@@ -217,38 +217,96 @@ jobs:
       # prints only whether each name is set, never a value: `vars` are not
       # masked in logs, so echoing one would publish it.
       - name: Refuse without the keys the suite needs
+        # ── ALL SIX, BECAUSE THREE WAS THE SAME DEFECT ONE LAYER DOWN ──────────
+        # This step checked THREE names while the run step below forwards SIX.
+        # `scripts/cloud-setup.sh`'s ENV_REQUIRED names two of the missing three
+        # as needed for the app to boot at all. So somebody who added exactly the
+        # three this guard asked for CLEARED IT and then died inside the suite
+        # with the opaque failure the guard exists to prevent -- a guard that
+        # certifies a configuration it never checked, which is worse than no
+        # guard, because it tells you the environment is ready.
+        #
+        # The six are the six `test:smoke` declares in turbo.json. Turborepo 2.x
+        # defaults to `envMode: "strict"` and strips anything undeclared, so a
+        # name checked here but not declared there would be checked and then
+        # thrown away. `SUPABASE_JWT_SECRET` is deliberately NOT among them: it
+        # is in ENV_REQUIRED because that script provisions `packages/db`'s live
+        # proofs, and nothing apps/web runs in this job reads it.
+        #
+        # `scripts/lib/ci-gate-coverage.test.mjs` now asserts that this list, the
+        # run step's list and turbo.json's list are the same set, so the drift
+        # that caused this cannot come back quietly.
+        #
+        # ── IT SAYS WHICH TAB, BECAUSE "ADD THEM" WAS NOT ENOUGH ───────────────
+        # MEASURED twice, 2026-08-29 run 981 and 2026-08-30 run 1061: the founder
+        # added all three and the job still refused with the identical message,
+        # naming the identical three. "Repository secrets are not configured" is
+        # true and useless, because the page it points at has THREE tabs that all
+        # store a name and a value:
+        #
+        #   Secrets   -> Repository secrets   `secrets.X`   what this job reads
+        #   Secrets   -> Dependabot           invisible to Actions entirely
+        #   Variables -> Repository variables `vars.X`      a different namespace
+        #
+        # and Settings -> Environments is a fourth place, invisible unless the
+        # job declares `environment:`, which this one deliberately does not.
+        #
+        # So the guard LOOKS in the other places before it complains. It prints
+        # only whether each name is set, never a value: `vars` are not masked in
+        # logs, so echoing one would publish it.
         env:
-          CLERK_PUBLISHABLE: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET: ${{ secrets.CLERK_SECRET_KEY }}
-          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          VAR_CLERK_PUBLISHABLE: ${{ vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          VAR_CLERK_SECRET: ${{ vars.CLERK_SECRET_KEY }}
-          VAR_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          SECRET_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          SECRET_CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          SECRET_NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SECRET_NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SECRET_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SECRET_SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          VAR_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          VAR_CLERK_SECRET_KEY: ${{ vars.CLERK_SECRET_KEY }}
+          VAR_NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          VAR_NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          VAR_SUPABASE_SERVICE_ROLE_KEY: ${{ vars.SUPABASE_SERVICE_ROLE_KEY }}
+          VAR_SUPABASE_DB_URL: ${{ vars.SUPABASE_DB_URL }}
         run: |
+          # One list, walked twice, so the "is it missing" half and the "is it in
+          # the wrong tab" half cannot disagree the way the old six hand-written
+          # lines could.
+          NEEDED="NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+          CLERK_SECRET_KEY
+          NEXT_PUBLIC_SUPABASE_URL
+          NEXT_PUBLIC_SUPABASE_ANON_KEY
+          SUPABASE_SERVICE_ROLE_KEY
+          SUPABASE_DB_URL"
+
           missing=""
-          [ -z "$CLERK_PUBLISHABLE" ] && missing="$missing NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
-          [ -z "$CLERK_SECRET" ] && missing="$missing CLERK_SECRET_KEY"
-          [ -z "$SUPABASE_URL" ] && missing="$missing NEXT_PUBLIC_SUPABASE_URL"
+          found_as_vars=""
+          for name in $NEEDED; do
+            secret_ref="SECRET_$name"
+            var_ref="VAR_$name"
+            if [ -z "${!secret_ref}" ]; then
+              missing="$missing $name"
+              # Presence only, never the value.
+              if [ -n "${!var_ref}" ]; then
+                found_as_vars="$found_as_vars $name"
+              fi
+            fi
+          done
 
           if [ -n "$missing" ]; then
-            # Where they ARE, if anywhere. Presence only — never the value.
-            found_as_vars=""
-            [ -n "$VAR_CLERK_PUBLISHABLE" ] && found_as_vars="$found_as_vars NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
-            [ -n "$VAR_CLERK_SECRET" ] && found_as_vars="$found_as_vars CLERK_SECRET_KEY"
-            [ -n "$VAR_SUPABASE_URL" ] && found_as_vars="$found_as_vars NEXT_PUBLIC_SUPABASE_URL"
-
             echo "::error::Not readable as repository secrets:$missing"
             if [ -n "$found_as_vars" ]; then
               echo "::error::FOUND UNDER THE VARIABLES TAB INSTEAD:$found_as_vars"
               echo "A variable is a different namespace from a secret, is not masked in logs,"
               echo "and this job reads secrets. Delete them from Variables and re-add them under"
-              echo "Settings → Secrets and variables → Actions → Secrets → Repository secrets."
+              echo "Settings -> Secrets and variables -> Actions -> Secrets -> Repository secrets."
             else
-              echo "Add them under Settings → Secrets and variables → Actions, on the SECRETS tab,"
+              echo "Add them under Settings -> Secrets and variables -> Actions, on the SECRETS tab,"
               echo "as REPOSITORY secrets. Three other places store a name and a value and none of"
               echo "them reaches this job: the Variables tab, the Dependabot tab, and"
-              echo "Settings → Environments (this job declares no environment, by design)."
+              echo "Settings -> Environments (this job declares no environment, by design)."
             fi
+            echo "All six are needed: the suite signs in through Clerk and the app it drives"
+            echo "reads Supabase with the anon key, the service role key and the pooler URL."
             exit 1
           fi
 

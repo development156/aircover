@@ -161,4 +161,49 @@ describe('the CI workflow covers the gate, or says which part it does not', () =
       ).toContain(`${name}:`)
     }
   })
+
+  it('the refusal guard checks every secret the run step forwards', () => {
+    /**
+     * ── THE DEFECT THIS EXISTS FOR ──────────────────────────────────────────
+     * The guard step refused on THREE names while the run step below it
+     * forwarded SIX. Two of the missing three are in `cloud-setup.sh`'s
+     * ENV_REQUIRED, so somebody who added exactly the three the guard asked for
+     * CLEARED IT and then died inside the suite with the opaque failure the
+     * guard exists to prevent. A guard that certifies a configuration it never
+     * checked is worse than no guard: it says the environment is ready.
+     *
+     * The test directly above -- "passes every environment variable the smoke
+     * task declares" -- could NOT see this, and that is the point of adding a
+     * second one. It asserts the workflow mentions each name somewhere, and the
+     * run step mentions all six, so it was green throughout. Presence in the
+     * FILE is not presence in the GUARD.
+     */
+    const turbo = JSON.parse(readFileSync(resolve(ROOT, 'turbo.json'), 'utf8'))
+    const declared = turbo.tasks['test:smoke'].env.filter(
+      (name) => !name.startsWith('E2E_') && name !== 'SAHODA_E2E_ACK_TARGET',
+    )
+    expect(declared.length).toBe(6)
+
+    // The guard's list, read out of its own NEEDED block rather than retyped --
+    // a retyped copy is a third list that can drift from the other two.
+    const block = /NEEDED="([^"]+)"/.exec(WORKFLOW)
+    expect(block, 'could not find the NEEDED list in the refusal guard').not.toBeNull()
+    const checked = block[1]
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line !== '')
+
+    expect([...checked].sort()).toEqual([...declared].sort())
+
+    // And each one must be wired to BOTH namespaces, or the "wrong tab" half of
+    // the message silently stops reporting for that name.
+    for (const name of declared) {
+      expect(WORKFLOW, `${name} has no SECRET_ binding in the guard`).toContain(
+        `SECRET_${name}: \${{ secrets.${name} }}`,
+      )
+      expect(WORKFLOW, `${name} has no VAR_ binding in the guard`).toContain(
+        `VAR_${name}: \${{ vars.${name} }}`,
+      )
+    }
+  })
 })
