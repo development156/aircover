@@ -135,6 +135,43 @@ function modeButton(name: RegExp): HTMLElement {
   )
 }
 
+describe('the shape of the screen', () => {
+  /**
+   * ── ONE COLUMN, NOT TWO ────────────────────────────────────────────────────
+   * The artboard has no 420px composer beside a large empty canvas panel: the
+   * composer is a single wide panel and the result stacks beneath it. The
+   * regression this guards is the class that made the screen two columns on a
+   * wide viewport, `wide:grid-cols-[...]`, coming back.
+   */
+  test('the root is a single column, not a two-column grid', () => {
+    const { container } = open()
+    const root = container.querySelector('[data-guide="studio-workbench"]') as HTMLElement
+    expect(root).not.toBeNull()
+    expect(root.className).not.toMatch(/grid-cols/)
+  })
+
+  /**
+   * ── THE RESULT COMES AFTER THE COMPOSER, NOT BESIDE IT ────────────────────
+   * With the second column gone there is no `max-wide` fallback hiding a
+   * side-by-side layout at narrow widths: the composer section and the canvas
+   * section are SIBLINGS in document order, composer first, so the result and
+   * the "Made earlier" strip read as what comes next rather than what sits
+   * beside it.
+   */
+  test('the composer section precedes the canvas section in the same flow', () => {
+    const { container } = open()
+    const root = container.querySelector('[data-guide="studio-workbench"]') as HTMLElement
+    const make = root.querySelector('#studio-make') as HTMLElement
+    const canvas = root.querySelector('#studio-canvas') as HTMLElement
+    expect(make).not.toBeNull()
+    expect(canvas).not.toBeNull()
+    // `compareDocumentPosition` bit 4 (DOCUMENT_POSITION_FOLLOWING) means
+    // `canvas` comes after `make` in the tree, not nested inside a sibling
+    // column beside it.
+    expect(make.compareDocumentPosition(canvas) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+})
+
 describe('choosing which model draws it', () => {
   test('the reachable models are offered by what they are good at, never by id', () => {
     const { container } = open()
@@ -908,6 +945,32 @@ describe('the composer', () => {
     // The count chip reads "×1", not the bare digit and not "How many 1".
     expect(chipsEl.textContent).toContain('×1')
     expect(chipsEl.textContent).not.toMatch(/How many/)
+  })
+
+  /**
+   * ── PERMANENT, NOT GATED ──────────────────────────────────────────────────
+   * The artboard states "Will send" and "Not built" as two rows on the
+   * composer's own dark panel, not inside the collapsible tray. Putting the
+   * settings away used to take these with it, hiding what a press would spend
+   * on and what it would add at the exact moment somebody is deciding whether
+   * to press. `[data-guide="studio-signals"]` and `[data-guide="studio-coming-soon"]`
+   * live on the always-on panel now, and this is the guard for it.
+   */
+  test('will send and not built survive putting the settings away', async () => {
+    const user = userEvent.setup()
+    const { container } = open()
+    const signalsFirst = () =>
+      container.querySelector('[data-guide="studio-signals"]') as HTMLElement | null
+    const comingSoonFirst = () =>
+      container.querySelector('[data-guide="studio-coming-soon"]') as HTMLElement | null
+    expect(signalsFirst()).not.toBeNull()
+    expect(comingSoonFirst()).not.toBeNull()
+
+    await user.click(screen.getByRole('button', { name: /hide detail/i }))
+
+    expect(signalsFirst()).not.toBeNull()
+    expect(comingSoonFirst()).not.toBeNull()
+    expect(screen.getByText('Leave out')).toBeTruthy()
   })
 
   test('the settings can be put away, and the composer stays', async () => {

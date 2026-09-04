@@ -354,10 +354,12 @@ export function StudioWorkbench({
   }
 
   return (
-    <div
-      className="grid gap-4 wide:grid-cols-[minmax(0,420px)_minmax(0,1fr)] max-wide:grid-cols-1"
-      data-guide="studio-workbench"
-    >
+    // ── ONE COLUMN, NOT TWO ────────────────────────────────────────────────
+    // The artboard has no side-by-side canvas: the composer is a single wide
+    // panel and everything that follows (the result, the strip) stacks
+    // beneath it at the same width. A 420px composer beside a large empty
+    // panel was answering a question nobody asked before the first press.
+    <div className="flex flex-col gap-4" data-guide="studio-workbench">
       <section aria-labelledby="studio-make" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <h2 id="studio-make" className="type-h2">
@@ -584,117 +586,122 @@ export function StudioWorkbench({
               {blocked}
             </p>
           )}
+
+          <div className="h-px bg-line/20" aria-hidden />
+
+          {/* ── WHAT SAHODA WILL ADD, BEFORE ANYTHING IS SPENT ──────────────────
+              PERMANENT, not gated behind "Hide detail". The artboard states this
+              as two compact rows at the bottom of the composer's own dark panel:
+              a fixed-width uppercase eyebrow at the left, then inline pills on
+              one line. It used to live inside the settings tray, where closing
+              the tray hid what the press would spend on and what it would add —
+              the two things that matter most BEFORE a press, hidden by the same
+              control that hides the model picker.
+
+              The same array the action stores on the row, so the screen and the
+              record cannot disagree. Three states and never two: a read that
+              failed is not a workspace with nothing to add, and Explore
+              deliberately sends nothing at all. */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2" data-guide="studio-signals">
+            <span className="type-eyebrow w-[64px] shrink-0 text-muted">Will send</span>
+            {signals === null ? (
+              <p className="type-sm text-muted">
+                Sahoda could not read your Brand Brain just now, so it cannot show what it would
+                add. The picture can still be drawn.
+              </p>
+            ) : signals.length === 0 ? (
+              <p className="type-sm text-muted">
+                Nothing from your Brand Brain. Fill it in and pictures start looking like your
+                business rather than generic.
+              </p>
+            ) : (
+              <>
+                <ul className="flex flex-1 flex-wrap items-center gap-2">
+                  {signals.map((signal) => (
+                    <li
+                      key={signal.field}
+                      className="flex items-center gap-2 rounded-pill bg-s2 px-3 py-1 type-sm text-ink"
+                    >
+                      <span
+                        aria-hidden
+                        className={`size-[6px] shrink-0 rounded-full ${
+                          signal.certainty === 'confirmed' ? 'bg-primary' : 'surface-ring-firm'
+                        }`}
+                      />
+                      {signal.value}
+                      <span className="sr-only">
+                        {signal.certainty === 'confirmed'
+                          ? ', which you confirmed'
+                          : ', which Sahoda guessed'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <span
+                  className="flex items-center gap-2 type-sm text-muted"
+                  title="Confirm a guessed one in the Brand Brain and the picture stops drifting between one attempt and the next."
+                >
+                  <span aria-hidden className="size-[6px] shrink-0 rounded-full bg-primary" />
+                  set
+                  <span
+                    aria-hidden
+                    className="surface-ring-firm size-[6px] shrink-0 rounded-full"
+                  />
+                  guessed
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* ── NOT BUILT, LISTED RATHER THAN HIDDEN ────────────────────────────
+              Also permanent now, for the same reason: the same choice
+              `ModelPicker` makes for a model we cannot reach, shown, visibly not
+              a control, with the reason. Hiding them would be tidier and would
+              leave somebody wondering whether Sahoda can do this at all, a wall
+              instead of a door.
+
+              SPANS, not `<button disabled>`. `design-lint.mjs` rule 3 refuses
+              that pairing outright, because a screen reader still announces a
+              disabled button as an action the reader could take. */}
+          <div
+            className="flex flex-wrap items-center gap-x-3 gap-y-2"
+            data-guide="studio-coming-soon"
+          >
+            <span className="type-eyebrow w-[64px] shrink-0 text-muted">Not built</span>
+            <ul className="flex flex-1 flex-wrap items-center gap-2">
+              {COMING_SOON.map((one) => (
+                <li
+                  key={one.title}
+                  className="surface-ring flex items-center gap-2 rounded-pill px-3 py-1 opacity-70"
+                >
+                  <Lock className="size-[12px] text-muted" aria-hidden />
+                  <span className="type-sm text-muted">{one.title}</span>
+                </li>
+              ))}
+            </ul>
+            <span className="sr-only">
+              Designed and not built yet. Nothing here changes what a press does today.
+            </span>
+          </div>
         </div>
 
         {/* ── THE SETTINGS, ON THE SAME OBJECT ────────────────────────────────
             Its own `data-surface="inverse"`, because the scope does not cross a
             sibling boundary. `bg-canvas` rather than `bg-surface`, so the two
             halves read as two zones of one block: in this scope those are
-            #0d0d0d and #171717, a real step rather than the same value twice. */}
+            #0d0d0d and #171717, a real step rather than the same value twice.
+
+            Only the REAL controls live here now: the model, the mode, the
+            references, the count, the size and the logo. "Will send" and
+            "Not built" are summaries a person reads before deciding whether to
+            open this tray at all, so they moved up into the panel that is
+            always on screen. */}
         {settingsOpen ? (
           <div
             id="studio-settings"
             data-surface="inverse"
             className="flex flex-col gap-3 rounded-xl bg-canvas p-3 shadow-lg"
           >
-            {/* ── WHAT SAHODA WILL ADD, BEFORE ANYTHING IS SPENT ────────────
-                The same array the action stores on the row, so the screen and
-                the record cannot disagree. Three states and never two: a read
-                that failed is not a workspace with nothing to add, and Explore
-                deliberately sends nothing at all.
-
-                ONE ROW, not a stacked block: the artboard states this as a
-                fixed-width eyebrow beside inline pills, with the confirmed and
-                guessed key at the far end of the SAME row rather than a second
-                paragraph underneath. The full sentence a hollow dot means is
-                still carried, on the `sr-only` span each pill already has, for
-                anybody who cannot see which dot is which. */}
-            <div
-              className="flex flex-wrap items-center gap-x-3 gap-y-2"
-              data-guide="studio-signals"
-            >
-              <span className="type-eyebrow w-[64px] shrink-0 text-muted">Will send</span>
-              {signals === null ? (
-                <p className="type-sm text-muted">
-                  Sahoda could not read your Brand Brain just now, so it cannot show what it would
-                  add. The picture can still be drawn.
-                </p>
-              ) : signals.length === 0 ? (
-                <p className="type-sm text-muted">
-                  Nothing from your Brand Brain. Fill it in and pictures start looking like your
-                  business rather than generic.
-                </p>
-              ) : (
-                <>
-                  <ul className="flex flex-1 flex-wrap items-center gap-2">
-                    {signals.map((signal) => (
-                      <li
-                        key={signal.field}
-                        className="flex items-center gap-2 rounded-pill bg-s2 px-3 py-1 type-sm text-ink"
-                      >
-                        <span
-                          aria-hidden
-                          className={`size-[6px] shrink-0 rounded-full ${
-                            signal.certainty === 'confirmed' ? 'bg-primary' : 'surface-ring-firm'
-                          }`}
-                        />
-                        {signal.value}
-                        <span className="sr-only">
-                          {signal.certainty === 'confirmed'
-                            ? ', which you confirmed'
-                            : ', which Sahoda guessed'}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                  <span
-                    className="flex items-center gap-2 type-sm text-muted"
-                    title="Confirm a guessed one in the Brand Brain and the picture stops drifting between one attempt and the next."
-                  >
-                    <span aria-hidden className="size-[6px] shrink-0 rounded-full bg-primary" />
-                    set
-                    <span
-                      aria-hidden
-                      className="surface-ring-firm size-[6px] shrink-0 rounded-full"
-                    />
-                    guessed
-                  </span>
-                </>
-              )}
-            </div>
-
-            {/* ── NOT BUILT, LISTED RATHER THAN HIDDEN ───────────────────────
-                The same choice `ModelPicker` makes for a model we cannot reach:
-                shown, visibly not a control, with the reason. Hiding them would
-                be tidier and would leave somebody wondering whether Sahoda can
-                do this at all — a wall instead of a door.
-
-                SPANS, not `<button disabled>`. `design-lint.mjs` rule 3 refuses
-                that pairing outright, because a screen reader still announces a
-                disabled button as an action the reader could take. */}
-            <div
-              className="flex flex-wrap items-center gap-x-3 gap-y-2"
-              data-guide="studio-coming-soon"
-            >
-              <span className="type-eyebrow w-[64px] shrink-0 text-muted">Not built</span>
-              <ul className="flex flex-1 flex-wrap items-center gap-2">
-                {COMING_SOON.map((one) => (
-                  <li
-                    key={one.title}
-                    className="surface-ring flex items-center gap-2 rounded-pill px-3 py-1 opacity-70"
-                  >
-                    <Lock className="size-[12px] text-muted" aria-hidden />
-                    <span className="type-sm text-muted">{one.title}</span>
-                  </li>
-                ))}
-              </ul>
-              <span className="sr-only">
-                Designed and not built yet. Nothing here changes what a press does today.
-              </span>
-            </div>
-
-            <div className="h-px bg-line" />
-
             {/* ── ABOVE THE MODES, BECAUSE IT CHANGES WHAT THEY CAN DO ───────
                 Picking a model that draws a whole set in one call is what makes
                 "a set that matches" appear at all, and it moves the reference
