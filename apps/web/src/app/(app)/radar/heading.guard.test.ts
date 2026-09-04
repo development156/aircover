@@ -48,16 +48,24 @@ import { RADAR_H1 } from '../../../../e2e/helpers/headings'
 
 const PAGE = resolve(import.meta.dirname, 'page.tsx')
 
-/** The `h1`'s text, as the file actually spells it. */
+/**
+ * The `h1`'s text, as the file actually spells it.
+ *
+ * The capture group is read through a local rather than a `!` assertion because
+ * `noUncheckedIndexedAccess` is on: a missing group would otherwise become a
+ * `TypeError` at `.trim()`, and an accidental crash is not a failing guard. It
+ * throws a sentence instead, naming what to do.
+ */
 function headingInPage(): string {
   const source = readFileSync(PAGE, 'utf8')
-  const match = source.match(/<h1[^>]*>([^<{]+)<\/h1>/)
-  expect(
-    match,
-    'no plain-text <h1> found in radar/page.tsx — if the heading is now built ' +
-      'from a variable or a component, rewrite this guard rather than removing it',
-  ).not.toBeNull()
-  return match![1].trim()
+  const text = source.match(/<h1[^>]*>([^<{]+)<\/h1>/)?.[1]
+  if (text === undefined) {
+    throw new Error(
+      'no plain-text <h1> found in radar/page.tsx — if the heading is now built ' +
+        'from a variable or a component, rewrite this guard rather than removing it',
+    )
+  }
+  return text.trim()
 }
 
 describe('the radar heading the specs pin', () => {
