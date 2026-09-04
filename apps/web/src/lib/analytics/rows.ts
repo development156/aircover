@@ -175,13 +175,43 @@ export function pageOf<T>(rows: readonly T[], page: number, size = PAGE_SIZE): P
 }
 
 /** Rollup for one channel's card, ordered by the caller. */
+/**
+ * A summed metric, and how many rows carried one.
+ *
+ * COVERAGE IS PER METRIC, and that is the whole reason this is a pair rather
+ * than a bare number. A channel can hold reach on five of its posts and
+ * impressions on two — the nightly job captures the three metrics separately and
+ * a platform can report one without the others. Sharing one `measured` count
+ * across all three would print a denominator that is true of one of them and
+ * flattering to the rest.
+ */
+export interface MetricRollup {
+  /** Null when nothing on this channel reported it. Never 0 — that is a measurement. */
+  total: number | null
+  measured: number
+}
+
 export interface ChannelRollup {
   channel: Channel
   posts: number
   /** Sum of reach at the shared age, and how many rows carried one. */
   reach: number | null
   measured: number
+  /** The same, for the two metrics the window read gained on 2026-09-04. */
+  impressions: MetricRollup
+  engagement: MetricRollup
   best: PublishedRow | null
+}
+
+/** Sum one metric over a channel's rows, keeping its own coverage. */
+function rollUp(rows: readonly PublishedRow[], key: MetricSortKey): MetricRollup {
+  const field = METRIC_FIELD[key]
+  const measured = rows.filter((row) => row[field] !== null)
+  return {
+    total:
+      measured.length === 0 ? null : measured.reduce((sum, row) => sum + (row[field] as number), 0),
+    measured: measured.length,
+  }
 }
 
 /**
@@ -208,14 +238,14 @@ export function byChannel(rows: readonly PublishedRow[]): ChannelRollup[] {
         top === null || (row.reachAtAge as number) > (top.reachAtAge as number) ? row : top,
       null,
     )
+    const reach = rollUp(list, 'reach')
     out.push({
       channel,
       posts: new Set(list.map((row) => row.postId)).size,
-      reach:
-        measured.length === 0
-          ? null
-          : measured.reduce((sum, row) => sum + (row.reachAtAge as number), 0),
-      measured: measured.length,
+      reach: reach.total,
+      measured: reach.measured,
+      impressions: rollUp(list, 'impressions'),
+      engagement: rollUp(list, 'engagement'),
       best,
     })
   }

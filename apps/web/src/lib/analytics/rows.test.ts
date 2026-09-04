@@ -281,3 +281,46 @@ describe('the refusal holds for all three metrics, not just reach', () => {
     expect(isSortKey('followers')).toBe(false)
   })
 })
+
+describe('a channel rollup keeps each metric’s coverage separate', () => {
+  /**
+   * The three metrics are captured separately and a platform can report one
+   * without the others, so a channel can hold reach on every post and
+   * impressions on one. Sharing a single `measured` count across all three would
+   * print a denominator that is true of one metric and flattering to the rest —
+   * the same defect as a total that quietly skipped its gaps, one level in.
+   */
+  const rows = [
+    row({ postId: 'a', title: 'A', reachAtAge: 100, impressionsAtAge: 400, engagementAtAge: null }),
+    row({ postId: 'b', title: 'B', reachAtAge: 50, impressionsAtAge: null, engagementAtAge: null }),
+  ]
+
+  it('sums each metric over only the rows that carried it', () => {
+    const [channel] = byChannel(rows)
+    expect(channel!.reach).toBe(150)
+    expect(channel!.impressions.total).toBe(400)
+  })
+
+  it('counts coverage per metric, not once for the card', () => {
+    const [channel] = byChannel(rows)
+    expect(channel!.measured).toBe(2)
+    expect(channel!.impressions.measured).toBe(1)
+  })
+
+  it('reports a metric nothing carried as null, never as a zero', () => {
+    // Both posts are missing engagement. Zero would say the channel drew no
+    // likes, comments or shares, which is a claim about the reader's business
+    // made from no evidence at all.
+    const [channel] = byChannel(rows)
+    expect(channel!.engagement.total).toBeNull()
+    expect(channel!.engagement.measured).toBe(0)
+  })
+
+  it('still orders channels by reach, so the new figures cannot reorder the page', () => {
+    const ordered = byChannel([
+      row({ postId: 'x', channel: 'x', reachAtAge: 10, impressionsAtAge: 9000 }),
+      row({ postId: 'i', channel: 'instagram', reachAtAge: 900, impressionsAtAge: 1 }),
+    ])
+    expect(ordered.map((c) => c.channel)).toEqual(['instagram', 'x'])
+  })
+})

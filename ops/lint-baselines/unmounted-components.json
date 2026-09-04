@@ -7,7 +7,6 @@
     "apps/web/src/components/onboarding/onboarding-flow.tsx::OnboardingFlow",
     "apps/web/src/components/onboarding/stage/drop-zone.tsx::DropZone",
     "apps/web/src/components/planner/week-grid.tsx::WeekGrid",
-    "apps/web/src/components/report/report-body.tsx::ReportBody",
     "apps/web/src/components/shell/theme-script.tsx::THEME_SCRIPT_SOURCE"
   ]
 }

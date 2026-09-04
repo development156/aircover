@@ -68,6 +68,38 @@ export function ChannelCards({
                 ? `, ${rollup.measured} measured`
                 : ''}
             </p>
+            {/* ── THE OTHER TWO, EACH WITH ITS OWN DENOMINATOR ────────────
+                Quieter than the hero figure on purpose: reach is the number this
+                card is about, and three equal figures would make the reader pick.
+                Each carries its own "of N" because coverage is per metric — a
+                channel can report reach on five posts and impressions on two,
+                and one shared denominator would be true of one and flattering to
+                the rest. */}
+            <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1">
+              {(
+                [
+                  { label: 'Times shown', roll: rollup.impressions },
+                  { label: 'Likes, comments, shares', roll: rollup.engagement },
+                ] as const
+              ).map(({ label, roll }) => (
+                <div key={label}>
+                  <dt className="type-meta text-muted">{label}</dt>
+                  <dd className="type-sm text-ink tabular-nums">
+                    {roll.total === null ? (
+                      <span className="text-muted">—</span>
+                    ) : (
+                      roll.total.toLocaleString('en-IN')
+                    )}
+                    {roll.total !== null && roll.measured < rollup.posts ? (
+                      <span className="ml-1 type-meta text-muted">
+                        from <span className="tabular-nums">{roll.measured}</span>
+                      </span>
+                    ) : null}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+
             {rollup.best ? (
               <p className="mt-3 type-meta text-muted">
                 Furthest:{' '}
