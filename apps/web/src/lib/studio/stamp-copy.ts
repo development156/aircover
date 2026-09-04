@@ -65,6 +65,15 @@ export type StampNote = {
    * one picture is a control that does nothing.
    */
   hasBothVersions: boolean
+  /**
+   * Whether the status dot beside this note is filled or hollow.
+   *
+   * Same binary the signals list already uses for certainty (`bg-primary` for
+   * confirmed, a hollow ring for guessed): filled means "this picture carries
+   * your logo right now", which is true of `stamped` alone. Every other answer
+   * gets the hollow dot, because none of them put a mark on the picture.
+   */
+  dotFilled: boolean
 }
 
 // Typed as the literal route rather than `string`: Next's typed routes refuse a
@@ -81,6 +90,7 @@ export function stampNote(outcome: StampOutcome | null): StampNote {
         body: 'Sized off the shorter edge, so it reads the same on a square post and a wide banner.',
         remedy: null,
         hasBothVersions: true,
+        dotFilled: true,
       }
 
     case 'no_logo':
@@ -89,6 +99,7 @@ export function stampNote(outcome: StampOutcome | null): StampNote {
         body: 'Add one and every picture Sahoda draws from then on carries it. This one stays as it is.',
         remedy: BRAND_BRAIN,
         hasBothVersions: false,
+        dotFilled: false,
       }
 
     case 'logo_unreadable':
@@ -97,6 +108,7 @@ export function stampNote(outcome: StampOutcome | null): StampNote {
         body: 'So this picture has none. It is yours either way, and you were charged once. Replacing the file fixes the next one.',
         remedy: REPLACE_LOGO,
         hasBothVersions: false,
+        dotFilled: false,
       }
 
     case 'failed':
@@ -105,6 +117,7 @@ export function stampNote(outcome: StampOutcome | null): StampNote {
         body: 'The picture is yours either way, and you were charged once. Drawing another usually works.',
         remedy: null,
         hasBothVersions: false,
+        dotFilled: false,
       }
 
     case 'skipped':
@@ -113,6 +126,7 @@ export function stampNote(outcome: StampOutcome | null): StampNote {
         body: 'Nothing was placed, and nothing was charged for placing it. The next picture carries your logo unless you turn it off again.',
         remedy: null,
         hasBothVersions: false,
+        dotFilled: false,
       }
 
     // ── NULL IS NOT A DEFAULT CASE ──────────────────────────────────────────
@@ -127,6 +141,7 @@ export function stampNote(outcome: StampOutcome | null): StampNote {
         body: 'Nothing went wrong. Pictures drawn from now on carry yours.',
         remedy: null,
         hasBothVersions: false,
+        dotFilled: false,
       }
   }
 }

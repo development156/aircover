@@ -277,6 +277,20 @@ describe('the canvas draws the picture, not a description of one', () => {
     expect(within(strip).getAllByRole('button')).toHaveLength(MADE.length)
   })
 
+  test('the canvas names the shape and age of the picture on it', () => {
+    open(LIBRARY, [{ ...MADE[0]!, width: 1600, height: 1000, madeAgo: 'just now' }])
+    const meta = screen.getByText(
+      (_content, node) => node?.textContent === '1600 × 1000 · just now',
+    )
+    expect(meta).toBeTruthy()
+  })
+
+  test('a picture whose age would not parse shows the shape alone', () => {
+    open(LIBRARY, [{ ...MADE[0]!, width: 1600, height: 1000, madeAgo: null }])
+    const meta = screen.getByText((_content, node) => node?.textContent === '1600 × 1000')
+    expect(meta).toBeTruthy()
+  })
+
   test('clicking an older one puts it on the canvas', async () => {
     const user = userEvent.setup()
     const { container } = open(LIBRARY, MADE)
@@ -984,6 +998,46 @@ describe('the result screen: which version, and why there is only one', () => {
     // would put a control on screen with nothing behind half of it.
     open(LIBRARY, [{ ...stamped, stampedUrl: null }])
     expect(screen.queryByRole('button', { name: /without it/i })).toBeNull()
+  })
+
+  /**
+   * THE STATUS DOT. Filled only when the logo is actually on the picture on
+   * screen right now, asked of `stampNote(outcome).dotFilled` rather than
+   * re-derived here, for the same reason the title and body are asked of it.
+   */
+  test('the status dot is filled for a stamped picture and hollow for every other answer', () => {
+    const { container } = open(LIBRARY, [stamped])
+    const bar = container.querySelector('[data-guide="studio-logo-bar"]') as HTMLElement
+    expect(bar.querySelector('.bg-primary')).not.toBeNull()
+    cleanup()
+
+    const { container: other } = open(LIBRARY, [
+      { ...stamped, stampedUrl: null, stampOutcome: 'no_logo' },
+    ])
+    const otherBar = other.querySelector('[data-guide="studio-logo-bar"]') as HTMLElement
+    expect(otherBar.querySelector('.bg-primary')).toBeNull()
+  })
+
+  /**
+   * WHICH FRAME THIS IS. `active.url` is always the model's own output, so
+   * that claim is true for the original in every outcome. The exact placed
+   * size is true only of the stamped frame and is not recorded per picture,
+   * so it is locked rather than guessed at.
+   */
+  test('says plainly which frame is on screen, and locks the placement it cannot know', async () => {
+    const user = userEvent.setup()
+    open(LIBRARY, [stamped])
+    expect(screen.getByText(/exact placement: coming soon/i)).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: /without it/i }))
+    expect(screen.getByText(/as the model drew it/i)).toBeTruthy()
+    expect(screen.queryByText(/exact placement: coming soon/i)).toBeNull()
+  })
+
+  test('a single-version answer states the frame without offering a locked placement', () => {
+    open(LIBRARY, [{ ...stamped, stampedUrl: null, stampOutcome: 'no_logo' }])
+    expect(screen.getByText(/as the model drew it/i)).toBeTruthy()
+    expect(screen.queryByText(/exact placement: coming soon/i)).toBeNull()
   })
 
   test('asks stamp-copy for the sentence rather than writing its own', () => {
