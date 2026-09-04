@@ -70,16 +70,16 @@ describe('task → tier map', () => {
      * `TASK_TIER` is read by nothing at runtime.
      *
      * MEASURED 2026-09-03: `MeshTaskDef.tier` is the routing source, and
-     * `tasks/brand-guidelines.ts` has said `standard` since it was created. The
-     * saving was never taken, and this test asserted otherwise for three weeks
-     * while the guide, the table and the runtime disagreed three ways.
+     * `tasks/brand-guidelines.ts` had said `standard` since it was created. The
+     * saving went untaken for three weeks while the guide, the table and the
+     * runtime disagreed three ways.
      *
-     * The value now matches what runs. Whether to APPLY the bake-off is an open
-     * decision recorded in `routing.ts`, and applying it means editing the task
-     * definition — at which point `agrees with every task definition` below
-     * fails until this line moves with it. That is the point of the pair.
+     * APPLIED 2026-09-04: the task definition moved to `economy` and this line
+     * moved with it. The pair proved itself in the process — changing only the
+     * definition made `agrees with every task definition` fail by name, which is
+     * exactly the drift that hid the problem for three weeks.
      */
-    expect(TASK_TIER.brand_guidelines).toBe('standard')
+    expect(TASK_TIER.brand_guidelines).toBe('economy')
     expect(TASK_TIER.caption_rewrite).toBe('economy')
     expect(TASK_TIER.content_variants).toBe('economy')
     expect(TASK_TIER.plan_week).toBe('standard')
