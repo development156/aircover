@@ -135,6 +135,42 @@ function modeButton(name: RegExp): HTMLElement {
   )
 }
 
+/**
+ * ── PILLS OPEN THEIR OWN PANEL, ONE AT A TIME ─────────────────────────────
+ * The redesign replaced the single always-open settings tray with pills that
+ * each open their own picker below the bar. These helpers click the pill by
+ * its accessible name — the axis on the label, never the bare value the eye
+ * reads — so a test does not care which model, mode or size happens to be
+ * selected when it runs.
+ */
+async function openApproach(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await user.click(screen.getByRole('button', { name: /^approach,/i }))
+}
+async function openMatch(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await user.click(screen.getByRole('button', { name: /^match,/i }))
+}
+async function openModel(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await user.click(screen.getByRole('button', { name: /^model,/i }))
+}
+async function openSize(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await user.click(screen.getByRole('button', { name: /^size,/i }))
+}
+async function openLogo(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await user.click(screen.getByRole('button', { name: /^logo,/i }))
+}
+
+/**
+ * Opens Approach and picks a mode by name, in one step. Picking a mode also
+ * moves the bar to the Match panel (see `chooseMode` in the component), which
+ * is what makes the reference legend and grid visible immediately afterwards
+ * without a second click — the same thing the old always-open tray did for
+ * free.
+ */
+async function chooseModeUI(user: ReturnType<typeof userEvent.setup>, name: RegExp): Promise<void> {
+  await openApproach(user)
+  await user.click(modeButton(name))
+}
+
 describe('the shape of the screen', () => {
   /**
    * ── ONE COLUMN, NOT TWO ────────────────────────────────────────────────────
@@ -174,24 +210,38 @@ describe('the shape of the screen', () => {
   })
 
   /**
-   * ── ONE MEASURE ────────────────────────────────────────────────────────────
-   * Every row on the old screen ran the full page width, roughly 1400px, well
-   * past a comfortable reading measure of 45-75 characters. The artboard caps
-   * the whole column at the 720px composer's own width and centres it.
-   * `--measure-form` is the token this already reads as (docs/37 §4), not a new
-   * literal — a bare `max-w-[720px]` would drift the moment the token moved.
+   * ── THE PAGE IS CONTENT-LED, NOT ONE CAPPED COLUMN ────────────────────────
+   * RETARGETED for the bar redesign. The old screen capped and centred the
+   * WHOLE page at the 720px composer's own width. The bar keeps a measure of
+   * its own — 820px, capped and centred — but the root no longer carries any
+   * cap at all, because the work grid beneath it wants the page's own width.
+   * `gen3.py`'s own header says so: "a grid of pictures wants room and a line
+   * of text does not."
    */
-  test('the whole column is capped at the form measure and centred', () => {
+  test('the root itself carries no width cap, so the work below can run full width', () => {
     const { container } = open()
     const root = container.querySelector('[data-guide="studio-workbench"]') as HTMLElement
-    expect(root.className).toContain('max-w-[var(--measure-form)]')
-    expect(root.className).toContain('mx-auto')
+    expect(root.className).not.toMatch(/max-w-\[var\(--measure-form\)\]/)
+  })
+
+  /**
+   * The bar is still capped, so the prompt keeps a readable measure even
+   * though the page around it does not.
+   */
+  test('the bar itself is capped at 820px and centred', () => {
+    const { container } = open()
+    const bar = container.querySelector('[data-guide="studio-bar"]') as HTMLElement
+    const wrap = bar.parentElement as HTMLElement
+    expect(wrap.className).toContain('max-w-[820px]')
+    expect(wrap.className).toContain('mx-auto')
   })
 })
 
 describe('choosing which model draws it', () => {
-  test('the reachable models are offered by what they are good at, never by id', () => {
+  test('the reachable models are offered by what they are good at, never by id', async () => {
+    const user = userEvent.setup()
     const { container } = open()
+    await openModel(user)
     const picker = container.querySelector('[data-guide="studio-model"]') as HTMLElement
     expect(picker).not.toBeNull()
 
@@ -214,8 +264,10 @@ describe('choosing which model draws it', () => {
    * mattered: nothing is offered that cannot be drawn. When a model is added
    * ahead of its route, `models.test.ts` covers the sentence it gets.
    */
-  test('nothing is offered that cannot be drawn', () => {
+  test('nothing is offered that cannot be drawn', async () => {
+    const user = userEvent.setup()
     const { container } = open()
+    await openModel(user)
     expect(container.querySelector('[data-guide="studio-model-waiting"]')).toBeNull()
     expect(unroutedModels()).toHaveLength(0)
   })
@@ -249,15 +301,19 @@ describe('the modes on offer', () => {
    * hold is that the offer tracks the model rather than a hardcoded list, which
    * the model tests above assert from both directions.
    */
-  test('offers every mode the default model can actually do', () => {
+  test('offers every mode the default model can actually do', async () => {
+    const user = userEvent.setup()
     open()
+    await openApproach(user)
     for (const rule of readyModes()) {
       expect(modeButton(new RegExp(rule.label, 'i'))).toBeTruthy()
     }
   })
 
-  test('on brand is chosen to begin with, because it is the one that uses the brand', () => {
+  test('on brand is chosen to begin with, because it is the one that uses the brand', async () => {
+    const user = userEvent.setup()
     open()
+    await openApproach(user)
     expect(modeButton(/on brand/i)).toHaveAttribute('aria-pressed', 'true')
   })
 })
@@ -311,6 +367,7 @@ describe('the canvas', () => {
     const canvas = container.querySelector('[data-guide="studio-canvas"]') as HTMLElement
     const before = canvas.style.aspectRatio
 
+    await openSize(user)
     await user.selectOptions(screen.getByLabelText(/what size/i), story!.id)
 
     expect(canvas.style.aspectRatio).toBe(`${story!.width} / ${story!.height}`)
@@ -414,7 +471,7 @@ describe('matching a picture', () => {
   test('a mode that ignores references says what picking one will do', async () => {
     const user = userEvent.setup()
     open()
-    await user.click(screen.getByRole('button', { name: /explore/i }))
+    await chooseModeUI(user, /explore/i)
     expect(screen.queryByText(/which picture should Sahoda match/i)).toBeNull()
     expect(screen.getByText(/moves you to match a picture/i)).toBeTruthy()
   })
@@ -422,7 +479,7 @@ describe('matching a picture', () => {
   test('matching asks for a picture before it will run', async () => {
     const user = userEvent.setup()
     open()
-    await user.click(modeButton(/match a picture/i))
+    await chooseModeUI(user, /match a picture/i)
     expect(screen.getByRole('status').textContent).toMatch(/pick one picture/i)
     expect(screen.getByRole('button', { name: /draw it/i })).toBeDisabled()
   })
@@ -430,7 +487,7 @@ describe('matching a picture', () => {
   test('picking one clears the block', async () => {
     const user = userEvent.setup()
     open()
-    await user.click(modeButton(/match a picture/i))
+    await chooseModeUI(user, /match a picture/i)
     await user.type(screen.getByLabelText(/what should the picture show/i), 'a cup of chai')
     await user.click(screen.getAllByRole('button', { pressed: false })[3]!)
     expect(screen.queryByText(/pick one picture/i)).toBeNull()
@@ -444,7 +501,7 @@ describe('matching a picture', () => {
   test('the selection cannot grow past what the model will look at', async () => {
     const user = userEvent.setup()
     const { container } = open()
-    await user.click(modeButton(/match a picture/i))
+    await chooseModeUI(user, /match a picture/i)
 
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     const thumbs = within(picker).getAllByRole('button')
@@ -462,12 +519,12 @@ describe('matching a picture', () => {
   test('switching to a mode that ignores references clears them, rather than leaving a contradiction', async () => {
     const user = userEvent.setup()
     const { container } = open()
-    await user.click(modeButton(/match a picture/i))
+    await chooseModeUI(user, /match a picture/i)
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     await user.click(within(picker).getAllByRole('button')[0]!)
 
-    await user.click(screen.getByRole('button', { name: /explore/i }))
-    await user.click(modeButton(/match a picture/i))
+    await chooseModeUI(user, /explore/i)
+    await chooseModeUI(user, /match a picture/i)
     expect(screen.getByRole('status').textContent).toMatch(/pick one picture/i)
   })
 
@@ -478,7 +535,7 @@ describe('matching a picture', () => {
   test('a picture with no preview is still offered, not hidden', async () => {
     const user = userEvent.setup()
     const { container } = open()
-    await user.click(modeButton(/match a picture/i))
+    await chooseModeUI(user, /match a picture/i)
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     expect(within(picker).getAllByRole('button')).toHaveLength(LIBRARY.length)
     expect(within(picker).getByText(/no preview/i)).toBeTruthy()
@@ -487,7 +544,7 @@ describe('matching a picture', () => {
   test('an empty library says how to fill it rather than showing nothing', async () => {
     const user = userEvent.setup()
     open([])
-    await user.click(modeButton(/match a picture/i))
+    await chooseModeUI(user, /match a picture/i)
     expect(screen.getByText(/you have no pictures yet/i)).toBeTruthy()
   })
 
@@ -503,7 +560,7 @@ describe('matching a picture', () => {
   test('a library that could not be read says so, and never claims it is empty', async () => {
     const user = userEvent.setup()
     open({ status: 'unreadable' })
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await chooseModeUI(user, /match a picture/i)
     expect(screen.getByText(/sahoda could not read your pictures/i)).toBeTruthy()
     expect(screen.queryByText(/no pictures yet/i)).toBeNull()
   })
@@ -512,7 +569,7 @@ describe('matching a picture', () => {
   test('a failed read still offers the device, which works regardless of the read', async () => {
     const user = userEvent.setup()
     open({ status: 'unreadable' })
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await chooseModeUI(user, /match a picture/i)
     expect(screen.getByText(/sahoda could not read your pictures/i).textContent).toMatch(
       /from this device/i,
     )
@@ -524,7 +581,7 @@ describe('matching a picture', () => {
   test('no workspace is a third answer, not an empty library and not a failure', async () => {
     const user = userEvent.setup()
     open({ status: 'no-workspace' })
-    await user.click(screen.getByRole('button', { name: /match a picture/i }))
+    await chooseModeUI(user, /match a picture/i)
     expect(screen.queryByText(/no pictures yet/i)).toBeNull()
     expect(screen.queryByText(/could not read/i)).toBeNull()
     expect(screen.getByText(/no workspace/i)).toBeTruthy()
@@ -542,7 +599,7 @@ describe('a press that changes nothing must say why', () => {
   test('a pick beyond the limit is explained rather than ignored', async () => {
     const user = userEvent.setup()
     const { container } = open()
-    await user.click(modeButton(/match a picture/i))
+    await chooseModeUI(user, /match a picture/i)
 
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     const thumbs = within(picker).getAllByRole('button')
@@ -561,7 +618,7 @@ describe('a press that changes nothing must say why', () => {
   test('the sentence is the one the action would refuse with, not a second wording', async () => {
     const user = userEvent.setup()
     const { container } = open()
-    await user.click(screen.getByRole('button', { name: /change a picture/i }))
+    await chooseModeUI(user, /change a picture/i)
 
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     const thumbs = within(picker).getAllByRole('button')
@@ -587,7 +644,7 @@ describe('adding a picture from this device', () => {
   test('the way in is a real file control, reachable by name', async () => {
     const user = userEvent.setup()
     open()
-    await user.click(modeButton(/match a picture/i))
+    await chooseModeUI(user, /match a picture/i)
     expect(screen.getByLabelText(/add a picture from this device/i)).toBeTruthy()
   })
 
@@ -599,7 +656,7 @@ describe('adding a picture from this device', () => {
   test('it is an input, not a drop target pretending to be one', async () => {
     const user = userEvent.setup()
     open()
-    await user.click(modeButton(/match a picture/i))
+    await chooseModeUI(user, /match a picture/i)
     const control = screen.getByLabelText(/add a picture from this device/i)
     expect(control.tagName).toBe('INPUT')
     expect(control.getAttribute('type')).toBe('file')
@@ -608,7 +665,7 @@ describe('adding a picture from this device', () => {
   test('what it offers is the proven list, so it cannot drift from the server', async () => {
     const user = userEvent.setup()
     open()
-    await user.click(modeButton(/match a picture/i))
+    await chooseModeUI(user, /match a picture/i)
     const control = screen.getByLabelText(/add a picture from this device/i)
     expect(control.getAttribute('accept')).toBe(uploadAccept())
   })
@@ -616,7 +673,7 @@ describe('adding a picture from this device', () => {
   test('the empty library points at this device rather than at a library trip', async () => {
     const user = userEvent.setup()
     open([])
-    await user.click(modeButton(/match a picture/i))
+    await chooseModeUI(user, /match a picture/i)
     expect(screen.getByText(/add one from this device/i)).toBeTruthy()
   })
 })
@@ -671,6 +728,7 @@ describe('asking for the same thing again', () => {
     expect(
       (screen.getByLabelText(/what should the picture show/i) as HTMLTextAreaElement).value,
     ).toBe(MADE[0]!.prompt)
+    await openApproach(user)
     expect(modeButton(/on brand/i)).toHaveAttribute('aria-pressed', 'true')
   })
 
@@ -693,7 +751,9 @@ describe('asking for the same thing again', () => {
     await user.click(within(strip).getAllByRole('button')[1]!)
     await user.click(screen.getByRole('button', { name: /use these words again/i }))
 
+    await openApproach(user)
     expect(modeButton(/match a picture/i)).toHaveAttribute('aria-pressed', 'true')
+    await openMatch(user)
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     expect(within(picker).getByRole('button', { name: /picked 1 of 1/i })).toBeTruthy()
   })
@@ -743,11 +803,12 @@ describe('picking a picture in a mode that ignores one', () => {
   test('moves to the mode that uses it, and says so', async () => {
     const user = userEvent.setup()
     const { container } = open()
-    await user.click(screen.getByRole('button', { name: /explore/i }))
+    await chooseModeUI(user, /explore/i)
 
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     await user.click(within(picker).getAllByRole('button')[0]!)
 
+    await openApproach(user)
     expect(modeButton(/match a picture/i)).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('alert').textContent).toMatch(/moved you to match a picture/i)
   })
@@ -755,7 +816,7 @@ describe('picking a picture in a mode that ignores one', () => {
   test('the picture that was picked is the one that is now selected', async () => {
     const user = userEvent.setup()
     const { container } = open()
-    await user.click(screen.getByRole('button', { name: /explore/i }))
+    await chooseModeUI(user, /explore/i)
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     await user.click(within(picker).getAllByRole('button')[1]!)
 
@@ -772,7 +833,7 @@ describe('which picture is which', () => {
   test('a picked reference shows its position, not just that it is picked', async () => {
     const user = userEvent.setup()
     const { container } = open()
-    await user.click(modeButton(/match a picture/i))
+    await chooseModeUI(user, /match a picture/i)
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     const thumbs = within(picker).getAllByRole('button')
 
@@ -786,7 +847,7 @@ describe('which picture is which', () => {
   test('the position is announced, not only drawn', async () => {
     const user = userEvent.setup()
     const { container } = open()
-    await user.click(modeButton(/match a picture/i))
+    await chooseModeUI(user, /match a picture/i)
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     await user.click(within(picker).getAllByRole('button')[0]!)
 
@@ -806,10 +867,10 @@ describe('the box says what to type for the mode that is chosen', () => {
     const box = screen.getByLabelText(/what should the picture show/i)
     const first = box.getAttribute('placeholder')
 
-    await user.click(screen.getByRole('button', { name: /explore/i }))
+    await chooseModeUI(user, /explore/i)
     expect(box.getAttribute('placeholder')).not.toBe(first)
 
-    await user.click(screen.getByRole('button', { name: /change a picture/i }))
+    await chooseModeUI(user, /change a picture/i)
     expect(box.getAttribute('placeholder')).toMatch(/background/i)
   })
 
@@ -821,15 +882,24 @@ describe('the box says what to type for the mode that is chosen', () => {
 
 describe('asking for more than one', () => {
   /**
+   * RETARGETED for the stepper. The count used to be four separate buttons (one
+   * per number); it is now a −/+ a person reads at a glance, bounded by the
+   * same `MAX_TRIES_PER_PRESS` the action enforces.
+   */
+  async function stepUp(user: ReturnType<typeof userEvent.setup>, times: number): Promise<void> {
+    const more = screen.getByRole('button', { name: /more pictures this press/i })
+    for (let i = 0; i < times; i++) await user.click(more)
+  }
+
+  /**
    * THE MONEY SENTENCE. Somebody who chose four options and was shown the price
    * of one has not been told what this press costs. The total is what leaves
    * their wallet, so the total is what the screen names.
    */
   test('the price shown is the TOTAL for the press, not the unit price', async () => {
     const user = userEvent.setup()
-    const { container } = open()
-    const counts = container.querySelector('[data-guide="studio-count"]') as HTMLElement
-    await user.click(within(counts).getByRole('button', { name: '4' }))
+    open()
+    await stepUp(user, 3)
     expect(document.body.textContent).toMatch(/24\s*credits/)
   })
 
@@ -840,26 +910,28 @@ describe('asking for more than one', () => {
    */
   test('says plainly that the options will not match each other', async () => {
     const user = userEvent.setup()
-    const { container } = open()
-    const counts = container.querySelector('[data-guide="studio-count"]') as HTMLElement
-    await user.click(within(counts).getByRole('button', { name: '3' }))
+    open()
+    await stepUp(user, 2)
     expect(screen.getByText(/will not match each other/i)).toBeTruthy()
   })
 
   test('one is chosen to begin with, and says nothing extra about matching', () => {
     const { container } = open()
     const counts = container.querySelector('[data-guide="studio-count"]') as HTMLElement
-    expect(within(counts).getByRole('button', { name: '1' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
+    expect(within(counts).getByText('1')).toBeTruthy()
+    expect(
+      within(counts).getByRole('button', { name: /fewer pictures this press/i }),
+    ).toBeDisabled()
     expect(screen.queryByText(/will not match each other/i)).toBeNull()
   })
 
-  test('the choice stops at the bound the action enforces', () => {
+  test('the choice stops at the bound the action enforces', async () => {
+    const user = userEvent.setup()
     const { container } = open()
     const counts = container.querySelector('[data-guide="studio-count"]') as HTMLElement
-    expect(within(counts).getAllByRole('button')).toHaveLength(MAX_TRIES_PER_PRESS)
+    await stepUp(user, MAX_TRIES_PER_PRESS + 2)
+    expect(within(counts).getByText(String(MAX_TRIES_PER_PRESS))).toBeTruthy()
+    expect(within(counts).getByRole('button', { name: /more pictures this press/i })).toBeDisabled()
   })
 })
 
@@ -870,10 +942,14 @@ describe('before any spend', () => {
   })
 
   /**
-   * THE MONEY SENTENCE, PER MODEL. The total beside the button was a fixed
+   * THE MONEY SENTENCE, PER MODEL. The total on the primary was a fixed
    * number handed in by the page, so choosing "The best one" left it reading
    * the everyday price while the hold was taken at the premium one. The label
    * a person reads before pressing has to be the figure that leaves the wallet.
+   *
+   * RETARGETED for the redesign: the price is no longer a separate label with
+   * a pipe separator (`Make a picture · 12 credits`) — it is the primary
+   * button's own second line, read here off the button's accessible name.
    *
    * MUTATION: compute `cost` from `IMAGE_TIER_ACTION.draft` regardless of
    * `modelId` in `studio-workbench.tsx` and this goes red.
@@ -881,6 +957,7 @@ describe('before any spend', () => {
   test('the total follows the chosen model, before the press', async () => {
     const user = userEvent.setup()
     const { container } = open()
+    await openModel(user)
     const picker = container.querySelector('[data-guide="studio-model"]') as HTMLElement
     const best = within(picker)
       .getAllByRole('button')
@@ -888,13 +965,13 @@ describe('before any spend', () => {
     if (!best) throw new Error('no card for the best one')
 
     await user.click(best)
-    // Anchored on the button's own label, so the card's "12 credits a picture"
-    // cannot satisfy it on the picker's behalf.
-    expect(document.body.textContent).toMatch(/Make a picture · 12\s*credits/)
+    // Anchored on the primary's own accessible name, so a "12 credits a
+    // picture" line on the card cannot satisfy it on the button's behalf.
+    expect(screen.getByRole('button', { name: /draw it/i }).textContent).toMatch(/12\s*credits/)
 
-    const counts = container.querySelector('[data-guide="studio-count"]') as HTMLElement
-    await user.click(within(counts).getByRole('button', { name: '2' }))
-    expect(document.body.textContent).toMatch(/Make 2 pictures · 24\s*credits/)
+    const more = screen.getByRole('button', { name: /more pictures this press/i })
+    await user.click(more)
+    expect(screen.getByRole('button', { name: /draw it/i }).textContent).toMatch(/24\s*credits/)
   })
 
   test('the button waits for a description, because an empty prompt cannot be drawn', async () => {
@@ -907,83 +984,69 @@ describe('before any spend', () => {
   })
 })
 
-describe('the composer', () => {
+describe('the bar', () => {
   /**
-   * ── THE SCOPE IS THE DESIGN, NOT A COLOUR ─────────────────────────────────
-   * The composer is a dark panel on a light page, and `data-surface="inverse"`
-   * is the only correct way to paint one here. A hand-written dark fill would
-   * look identical in a screenshot and be wrong in every token inside it:
-   * `--ink` is #000000 on light, so `text-ink` would be black on near-black,
-   * and `--pstrong` would be black on black at 1.23:1 the moment somebody
-   * hovered the button they came to press. tokens.css's INVERSE SURFACE header
-   * carries the measurements.
-   *
-   * This is asserted rather than left to review because the failure is
-   * invisible in the theme most people develop in.
+   * ── NOTHING INVERTS ────────────────────────────────────────────────────────
+   * RETARGETED. The old composer painted itself with `data-surface="inverse"`,
+   * a permanent dark panel regardless of theme. The founder's redesign removes
+   * that entirely: every panel follows the page theme, and separation comes
+   * from `surface-ring` and elevation. This asserts the scope is GONE, which is
+   * the exact opposite claim the old test made — and that is the point.
    */
-  test('the composer paints itself with the inverse scope, not a hand-written fill', () => {
+  test('nothing on this screen paints itself with the inverse scope', () => {
     const { container } = open()
-    const prompt = screen.getByPlaceholderText(promptHintFor('on_brand'))
-    expect(prompt.closest('[data-surface="inverse"]')).not.toBeNull()
-    // And the settings sit on the same object, which is a second scope: a CSS
-    // scope does not cross a sibling boundary, so the tray needs its own.
-    expect(container.querySelectorAll('[data-surface="inverse"]').length).toBeGreaterThanOrEqual(2)
+    expect(container.querySelectorAll('[data-surface="inverse"]')).toHaveLength(0)
   })
 
   /**
-   * The chip row is a SUMMARY of what the press will do. It reads its labels
+   * The pills are a SUMMARY of what the press will do. They read their labels
    * from `models.ts` and `modes.ts`, the same modules the rules come from, so a
-   * chip cannot name a model the picker no longer offers.
+   * pill cannot name a model the picker no longer offers.
    */
-  test('says which model, look, size and count this press will use', async () => {
+  test('says which model, approach and size this press will use', async () => {
     const user = userEvent.setup()
     const { container } = open()
     const chips = () => container.querySelector('[data-guide="studio-chips"]')!.textContent ?? ''
 
-    // Read from `models.ts` and `modes.ts`, the modules the RULES come from, so
-    // a chip cannot name a model the picker no longer offers.
     expect(chips()).toContain(routedModels()[0]!.label)
     expect(chips()).toContain(ruleFor('on_brand').label)
 
     // And it tracks the control rather than the first render.
-    await user.click(modeButton(/explore/i))
+    await chooseModeUI(user, /explore/i)
     expect(chips()).toContain(ruleFor('explore').label)
     expect(chips()).not.toContain(ruleFor('on_brand').label)
   })
 
   /**
-   * BARE VALUES, NOT "AXIS VALUE". The chip used to print its own axis beside
+   * BARE VALUES, NOT "AXIS VALUE". The pill used to print its own axis beside
    * the value ("Model Everyday"), which the artboard never does: it states the
-   * value and a caret, and the axis lives on the accessible name instead. A
-   * chip that still prints its axis is the OLD screen wearing the new copy.
+   * value and a caret, and the axis lives on the accessible name instead.
    */
-  test('the chips are bare values with a caret, not "axis value" pairs', () => {
+  test('the pills are bare values with a caret, not "axis value" pairs', () => {
     const { container } = open()
     const chipsEl = container.querySelector('[data-guide="studio-chips"]') as HTMLElement
+    // `aria-expanded` is the pill's own attribute (it opens a panel); the
+    // stepper's −/+ buttons also carry an `aria-label` but no `aria-expanded`,
+    // so filtering on that keeps this to the five doors.
     const chipButtons = within(chipsEl)
       .getAllByRole('button')
-      .filter((button) => button.hasAttribute('aria-label'))
+      .filter((button) => button.hasAttribute('aria-expanded'))
 
-    // Four summary chips: model, look, size, count.
-    expect(chipButtons).toHaveLength(4)
+    // Match, Model, Approach, Size, Logo — five doors, each summarised bare.
+    expect(chipButtons).toHaveLength(5)
     for (const button of chipButtons) {
-      expect(button.textContent).not.toMatch(/^(Model|Look|Size|How many)/)
+      expect(button.textContent).not.toMatch(/^(Match|Model|Approach|Size|Logo),/)
     }
-    // The count chip reads "×1", not the bare digit and not "How many 1".
-    expect(chipsEl.textContent).toContain('×1')
-    expect(chipsEl.textContent).not.toMatch(/How many/)
   })
 
   /**
    * ── PERMANENT, NOT GATED ──────────────────────────────────────────────────
-   * The artboard states "Will send" and "Not built" as two rows on the
-   * composer's own dark panel, not inside the collapsible tray. Putting the
-   * settings away used to take these with it, hiding what a press would spend
-   * on and what it would add at the exact moment somebody is deciding whether
-   * to press. `[data-guide="studio-signals"]` and `[data-guide="studio-coming-soon"]`
-   * live on the always-on panel now, and this is the guard for it.
+   * "Will send" and "Not built" live on the bar's own always-on rows, never
+   * inside a pill's own panel. Opening and closing a panel must not take them
+   * with it, because they are what a person reads before deciding whether to
+   * open anything at all.
    */
-  test('will send and not built survive putting the settings away', async () => {
+  test('will send and not built survive opening and closing a panel', async () => {
     const user = userEvent.setup()
     const { container } = open()
     const signalsFirst = () =>
@@ -993,31 +1056,38 @@ describe('the composer', () => {
     expect(signalsFirst()).not.toBeNull()
     expect(comingSoonFirst()).not.toBeNull()
 
-    await user.click(screen.getByRole('button', { name: /hide detail/i }))
-
+    await openApproach(user)
     expect(signalsFirst()).not.toBeNull()
     expect(comingSoonFirst()).not.toBeNull()
     expect(screen.getByText('Leave out')).toBeTruthy()
+
+    await openApproach(user) // toggles it closed again
+    expect(signalsFirst()).not.toBeNull()
+    expect(comingSoonFirst()).not.toBeNull()
   })
 
-  test('the settings can be put away, and the composer stays', async () => {
-    const user = userEvent.setup()
+  /**
+   * ── CLOSED BY DEFAULT, AND THE BAR STAYS USABLE ───────────────────────────
+   * The bar reads as ~100px on first paint: no pill's own panel is open until
+   * pressed. The thing a person came to do — write the prompt, press Draw it —
+   * is there regardless.
+   */
+  test('no panel is open by default, and the bar stays usable', () => {
     open()
-    expect(screen.getByRole('group', { name: /how should sahoda approach it/i })).toBeTruthy()
-
-    await user.click(screen.getByRole('button', { name: /hide detail/i }))
-
     expect(screen.queryByRole('group', { name: /how should sahoda approach it/i })).toBeNull()
-    // The thing a person came to do is still there. A composer that folded the
-    // prompt away with the settings would be a screen with nothing on it.
-    //
-    // BY ROLE, not by placeholder: `getByPlaceholderText` finds an element that
-    // is `hidden`, so the placeholder query passed against a prompt nobody
-    // could see. MEASURED — adding `hidden={!settingsOpen}` to the Textarea
-    // left this test green until the query moved. `getByRole` excludes what is
-    // hidden from the accessibility tree, which is the thing being claimed.
     expect(screen.getByRole('textbox')).toBeTruthy()
     expect(screen.getByRole('button', { name: /draw it/i })).toBeTruthy()
+  })
+
+  /** Only one pill's panel is open at a time, so the bar never grows back into six stacked cards. */
+  test('opening a second pill closes the first', async () => {
+    const user = userEvent.setup()
+    open()
+    await openApproach(user)
+    expect(screen.getByRole('group', { name: /how should sahoda approach it/i })).toBeTruthy()
+
+    await openModel(user)
+    expect(screen.queryByRole('group', { name: /how should sahoda approach it/i })).toBeNull()
   })
 })
 
@@ -1264,17 +1334,20 @@ describe('the rest of the composer the design asked for', () => {
   test('a picture can be added without leaving the composer', async () => {
     const user = userEvent.setup()
     open()
-    // Two upload controls exist and they carry DIFFERENT names, so a screen
-    // reader — and this query — can say which is which.
+    // The bar's own quick-add tile is reachable with NO panel open at all —
+    // the whole reason it exists is the photograph on the phone in somebody's
+    // hand, which should not need a pill opened first.
+    expect(screen.queryByRole('group', { name: /how should sahoda approach it/i })).toBeNull()
     const inComposer = screen.getByLabelText(/add a picture to match/i)
+    expect(inComposer.getAttribute('accept')).toBe(uploadAccept())
+
+    // The full picker, with its own sentence and legend, lives behind the
+    // Match pill — a DIFFERENT name, so a screen reader can say which is
+    // which — and is not present until that pill is opened.
+    expect(screen.queryByLabelText(/add a picture from this device/i)).toBeNull()
+    await openMatch(user)
     const inSettings = screen.getByLabelText(/add a picture from this device/i)
     expect(inComposer).not.toBe(inSettings)
-    expect(inComposer.getAttribute('accept')).toBe(uploadAccept())
-    await user.click(screen.getByRole('button', { name: /hide detail/i }))
-    // The composer's route survives the settings being put away; the other does
-    // not, which is the whole reason the composer has one.
-    expect(screen.getByLabelText(/add a picture to match/i)).toBeTruthy()
-    expect(screen.queryByLabelText(/add a picture from this device/i)).toBeNull()
   })
 
   test('every earlier picture carries the two facts that tell it from the others', () => {
@@ -1362,6 +1435,7 @@ describe('control over the logo Sahoda stamps', () => {
     })
     const user = userEvent.setup()
     const { container } = open()
+    await openLogo(user)
     const logoFieldset = container.querySelector('[data-guide="studio-logo"]') as HTMLElement
     await user.click(within(logoFieldset).getByRole('button', { name: /leave it off/i }))
     await press(user)
@@ -1383,6 +1457,7 @@ describe('control over the logo Sahoda stamps', () => {
     })
     const user = userEvent.setup()
     const { container } = open()
+    await openLogo(user)
     const corner = container.querySelector('[data-guide="studio-logo-corner"]') as HTMLElement
     const size = container.querySelector('[data-guide="studio-logo-size"]') as HTMLElement
     await user.click(within(corner).getByRole('button', { name: /top left/i }))
@@ -1399,11 +1474,151 @@ describe('control over the logo Sahoda stamps', () => {
   test('the corner and size controls are disabled once the stamp is off, not hidden', async () => {
     const user = userEvent.setup()
     const { container } = open()
+    await openLogo(user)
     const logoFieldset = container.querySelector('[data-guide="studio-logo"]') as HTMLElement
     const corner = container.querySelector('[data-guide="studio-logo-corner"]') as HTMLElement
     for (const button of within(corner).getAllByRole('button')) expect(button).toBeEnabled()
 
     await user.click(within(logoFieldset).getByRole('button', { name: /leave it off/i }))
     for (const button of within(corner).getAllByRole('button')) expect(button).toBeDisabled()
+  })
+})
+
+describe('first run: nothing made yet', () => {
+  /**
+   * ── NEVER A VOID, NEVER INVENTED PICTURES ─────────────────────────────────
+   * The old screen simply ended after the composer before a first picture
+   * existed. The redesign replaces the grid with the starters, centred, under
+   * a line stating the claim plainly — never a blank stretch of page and never
+   * a sample picture this workspace did not make.
+   */
+  test('the grid is replaced by starters under a line saying nothing has been made', () => {
+    const { container } = open(LIBRARY, [])
+    expect(screen.getByText(/nothing made yet/i)).toBeTruthy()
+    const starters = container.querySelector('[data-guide="studio-empty-starters"]') as HTMLElement
+    expect(starters).not.toBeNull()
+    expect(within(starters).getAllByRole('button').length).toBeGreaterThan(2)
+    // Never invented sample pictures: no img in the empty-run block.
+    expect(within(starters).queryAllByRole('img')).toHaveLength(0)
+  })
+
+  /** Pressing one fills the prompt, the same as the in-bar starters — nothing is spent. */
+  test('pressing a starter here fills the prompt rather than spending anything', async () => {
+    // Reset rather than trust the running total: other tests in this file
+    // exercise `queueGeneration` earlier, and this assertion is about what
+    // THIS press does, not the file's cumulative call count.
+    vi.mocked(queueGeneration).mockClear()
+    const user = userEvent.setup()
+    const { container } = open(LIBRARY, [])
+    const starters = container.querySelector('[data-guide="studio-empty-starters"]') as HTMLElement
+    const first = within(starters).getAllByRole('button')[0]!
+    const words = first.textContent
+    await user.click(first)
+
+    expect(
+      (screen.getByLabelText(/what should the picture show/i) as HTMLTextAreaElement).value,
+    ).toBe(words)
+    expect(queueGeneration).not.toHaveBeenCalled()
+  })
+
+  test('the empty-run block disappears once a picture exists', () => {
+    const { container } = open(LIBRARY, MADE)
+    expect(container.querySelector('[data-guide="studio-empty"]')).toBeNull()
+  })
+})
+
+describe('the work grid: full page width, with a filter row', () => {
+  const square = { ...MADE[0]!, imageId: 'sq', width: 1080, height: 1080 }
+  const story = {
+    ...MADE[1]!,
+    imageId: 'story',
+    width: 1080,
+    height: 1920,
+    stampedUrl: null,
+    stampOutcome: null,
+  }
+  const wide = {
+    ...MADE[0]!,
+    imageId: 'wide',
+    width: 1600,
+    height: 900,
+    stampedUrl: null,
+    stampOutcome: null,
+  }
+  const stamped = {
+    ...MADE[0]!,
+    imageId: 'stamped',
+    width: 1080,
+    height: 1080,
+    stampedUrl: 'https://example.test/stamped.png',
+    stampOutcome: 'stamped' as const,
+  }
+  const SHAPES = [square, story, wide, stamped]
+
+  test('all four shapes are shown under "All"', () => {
+    const { container } = open(LIBRARY, SHAPES)
+    const grid = container.querySelector('[data-guide="studio-strip"]') as HTMLElement
+    expect(within(grid).getAllByRole('button')).toHaveLength(SHAPES.length)
+  })
+
+  /**
+   * THE FILTER NARROWS BY THE PICTURE'S OWN SHAPE, never by the format
+   * currently chosen for the NEXT press — a fact about a future picture is not
+   * a fact about one already made.
+   *
+   * MUTATION: filter by `formatId === chosen?.id` instead of the picture's own
+   * width/height and this goes red the moment two shapes share a formatId.
+   */
+  test('"Square post" narrows the grid to square pictures', async () => {
+    const user = userEvent.setup()
+    const { container } = open(LIBRARY, SHAPES)
+    const filters = container.querySelector('[data-guide="studio-filter"]') as HTMLElement
+    await user.click(within(filters).getByRole('button', { name: 'Square post' }))
+
+    const grid = container.querySelector('[data-guide="studio-strip"]') as HTMLElement
+    // Both the plain square and the stamped-square picture are square.
+    expect(within(grid).getAllByRole('button')).toHaveLength(2)
+  })
+
+  test('"Story" and "Wide" narrow to the tall and the landscape picture respectively', async () => {
+    const user = userEvent.setup()
+    const { container } = open(LIBRARY, SHAPES)
+    const filters = container.querySelector('[data-guide="studio-filter"]') as HTMLElement
+    const grid = () => container.querySelector('[data-guide="studio-strip"]') as HTMLElement
+
+    await user.click(within(filters).getByRole('button', { name: 'Story' }))
+    expect(within(grid()).getAllByRole('button')).toHaveLength(1)
+    expect(within(grid()).getByRole('button', { name: story.prompt })).toBeTruthy()
+
+    await user.click(within(filters).getByRole('button', { name: 'Wide' }))
+    expect(within(grid()).getAllByRole('button')).toHaveLength(1)
+    expect(within(grid()).getByRole('button', { name: wide.prompt })).toBeTruthy()
+  })
+
+  test('"With logo" narrows to pictures Sahoda actually stamped', async () => {
+    const user = userEvent.setup()
+    const { container } = open(LIBRARY, SHAPES)
+    const filters = container.querySelector('[data-guide="studio-filter"]') as HTMLElement
+    await user.click(within(filters).getByRole('button', { name: 'With logo' }))
+
+    const grid = container.querySelector('[data-guide="studio-strip"]') as HTMLElement
+    expect(within(grid).getAllByRole('button')).toHaveLength(1)
+    expect(within(grid).getByRole('button', { name: stamped.prompt })).toBeTruthy()
+  })
+
+  test('a filter that matches nothing says so rather than showing an empty grid silently', async () => {
+    const user = userEvent.setup()
+    const { container } = open(LIBRARY, [square])
+    const filters = container.querySelector('[data-guide="studio-filter"]') as HTMLElement
+    await user.click(within(filters).getByRole('button', { name: 'Story' }))
+    expect(container.querySelector('[data-guide="studio-strip"]')).toBeNull()
+    expect(screen.getByText(/nothing matches this filter/i)).toBeTruthy()
+  })
+
+  /** The bar keeps its own cap; the grid runs the page's own width. */
+  test("the grid is not capped at the bar's own measure", () => {
+    const { container } = open(LIBRARY, SHAPES)
+    const grid = container.querySelector('[data-guide="studio-strip"]') as HTMLElement
+    expect(grid.className).not.toMatch(/max-w-\[820px\]/)
   })
 })

@@ -133,7 +133,10 @@ describe('making a picture, which now lives in the Studio', () => {
     // price is no longer handed in by the page; the workbench derives it from
     // the chosen model, which is why the prop is gone.
     expect(creditCost('image_standard')).toBe(6)
-    expect(document.body.textContent).toMatch(/Make a picture · 6\s*credits/)
+    // RETARGETED for the bar redesign: the price is no longer a separate
+    // label with a pipe separator — it is the primary button's own second
+    // line, so the price and the press are one decision.
+    expect(screen.getByRole('button', { name: /draw it/i }).textContent).toMatch(/6\s*credits/)
   })
 
   test('refuses with both numbers, and says nothing was charged', async () => {
