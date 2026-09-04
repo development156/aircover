@@ -179,3 +179,79 @@ export const PROMPT_STARTERS: readonly string[] = [
   'A cup of chai beside a rain-streaked window',
   'The counter laid out for a festival, seen from above',
 ]
+
+/**
+ * BRAND-DERIVED STARTERS, FOR A WORKSPACE THE FIVE ABOVE DO NOT FIT.
+ *
+ * `PROMPT_STARTERS` is a food-and-shopfront workspace's five ideas, hardcoded,
+ * and a software-training workspace reading "a cup of chai" is being told a
+ * false thing about a photograph of a business that is not theirs. That is the
+ * defect: not that the five are bad ideas, but that they ASSERT a business the
+ * Brand Brain never claimed.
+ *
+ * ── EVERY FALLBACK PHRASE STAYS BUSINESS-TYPE-FREE ──────────────────────────
+ * When a leaf is missing, the phrase used in its place ("what you make or
+ * offer", "the work in progress") names no product, food, shop or location.
+ * That is what keeps a partial brain from producing a HALF-invented sentence:
+ * the parts that are known are named; the parts that are not stay abstract
+ * rather than guessed at.
+ *
+ * ── SAME VOCABULARY AS THE PICTURE ITSELF, ON PURPOSE ───────────────────────
+ * The four fields read here (`voice`, `character`, `what the business is`,
+ * `feeling`) and the palette are exactly what `brandSignalsFor` already reads
+ * to condition the picture, and what `prompt-refine.ts` reads to refine the
+ * words. One vocabulary, so a starter and the refinement it might lead to can
+ * never disagree about what the brand holds.
+ *
+ * ── NO MODEL CALL, EVER ──────────────────────────────────────────────────────
+ * Every one of the five is a plain template substitution over data the caller
+ * already has. Nothing here awaits a network response, so nothing here can put
+ * a person's first paint behind a model's answer. The caller decides WHEN
+ * `signals` gets resolved (typically wherever this app already reads the Brand
+ * Brain for the same screen); this function adds no I/O of its own.
+ */
+export interface PromptStarters {
+  starters: readonly string[]
+  /** `'brand'` when at least one starter used a real brand fact; `'generic'` when nothing was available and PROMPT_STARTERS was returned unchanged. */
+  source: 'brand' | 'generic'
+}
+
+function fieldValue(signals: readonly BrandSignal[], field: string): string | undefined {
+  return signals.find((s) => s.field === field)?.value
+}
+
+/**
+ * Five starters, each demonstrating a different thing worth knowing about
+ * describing a photograph — same five lessons `PROMPT_STARTERS` was written
+ * to teach (subject-surface-light, time of day, season, no people, a close
+ * detail) — built from whatever the Brand Brain actually holds.
+ */
+export function buildPromptStarters(signals: readonly BrandSignal[]): PromptStarters {
+  if (signals.length === 0) return { starters: PROMPT_STARTERS, source: 'generic' }
+
+  const oneLiner = fieldValue(signals, 'what the business is')
+  const character = fieldValue(signals, 'character')
+  const emotion = fieldValue(signals, 'feeling')
+  const colours = fieldValue(signals, 'colours')
+
+  const subject = oneLiner ?? 'What you make or offer'
+  const palette = colours ? ` In ${colours} tones.` : ''
+
+  const starters = [
+    `${subject}, set on a plain surface with soft morning light.${palette}`,
+    character
+      ? `Something that feels ${character.toLowerCase()}, lit at the end of the day, the lights just coming on.`
+      : 'Where the work happens, right at the end of the day, the lights just coming on.',
+    oneLiner
+      ? `${oneLiner}, styled for the season, nothing else in the frame.`
+      : 'Something seasonal from what you offer, styled simply, nothing else in the frame.',
+    oneLiner
+      ? `${oneLiner}, alone in the frame, quiet and well lit, nobody in the shot.`
+      : 'The one thing you want people to notice, alone in the frame, nobody in the shot.',
+    emotion
+      ? `A close-up that feels ${emotion.toLowerCase()}: hands or tools at work, nothing posed.`
+      : 'A close-up of the work in progress: hands or tools, nothing posed.',
+  ]
+
+  return { starters, source: 'brand' }
+}

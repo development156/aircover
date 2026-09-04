@@ -32,6 +32,7 @@ import { contentVariantsTask } from './tasks/content-variants'
 import { planWeekTask } from './tasks/plan-week'
 import { siteGenerateTask } from './tasks/site-generate'
 import { gateClassifyTask } from './tasks/gate-classify'
+import { promptRefineTask } from './tasks/prompt-refine'
 
 /** Rough $/1M-token estimate for ai_provider_logs margin telemetry (not billing). */
 function estimateCostUsd(u: ProviderUsage): number {
@@ -192,6 +193,7 @@ export function createMesh(opts: CreateMeshOptions = {}): Mesh {
   // wiring the real mesh. `registered-tasks.test.ts` is the guard that closes
   // the class: it asserts EVERY exported task spec is reachable here.
   register(gateClassifyTask)
+  register(promptRefineTask)
 
   async function runTask<I, O>(
     def: MeshTaskDef<I, O>,
