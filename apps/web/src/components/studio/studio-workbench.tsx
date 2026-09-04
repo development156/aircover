@@ -4,7 +4,18 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { Lock, Sparkles } from 'lucide-react'
+import {
+  Brain,
+  Copy,
+  LayoutGrid,
+  Lightbulb,
+  Lock,
+  SlidersHorizontal,
+  Sparkles,
+  Tag,
+  Target,
+  Wand2,
+} from 'lucide-react'
 import {
   DEFAULT_STAMP_OPTIONS,
   IMAGE_TIER_ACTION,
@@ -416,19 +427,25 @@ export function StudioWorkbench({
               words can be edited first. Hidden once there is something to edit,
               because then they are only in the way. */}
           {wanted.trim() === '' ? (
-            <ul className="flex flex-wrap gap-2" data-guide="studio-starters">
+            <div className="flex flex-wrap items-center gap-2" data-guide="studio-starters">
+              <span className="flex items-center gap-1.5 type-eyebrow text-muted">
+                <Lightbulb className="size-[13px]" aria-hidden />
+                Try one
+              </span>
               {PROMPT_STARTERS.map((starter) => (
-                <li key={starter}>
-                  <button
-                    type="button"
-                    onClick={() => setWanted(starter)}
-                    className="surface-ring rounded-pill bg-s2 px-3 py-1 text-left type-sm text-muted transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                  >
-                    {starter}
-                  </button>
-                </li>
+                <button
+                  key={starter.label}
+                  type="button"
+                  // The whole sentence, so the chip's own tooltip says what the
+                  // box is about to get rather than only the subject.
+                  title={starter.prompt}
+                  onClick={() => setWanted(starter.prompt)}
+                  className="surface-ring rounded-pill bg-s2 px-3 py-1 text-left type-sm text-muted transition-micro hover:bg-surface-3 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  {starter.label}
+                </button>
               ))}
-            </ul>
+            </div>
           ) : null}
 
           {/* ── WHAT IT IS MATCHING, IN THE ORDER IT WILL BE SENT ─────────────
@@ -506,11 +523,17 @@ export function StudioWorkbench({
               settings and the real control keeps its label, its legend and its
               keyboard behaviour. */}
           <div className="flex flex-wrap items-center gap-2" data-guide="studio-chips">
+            {/* ── ONE ICON PER CHIP, AND NEVER TWO IDEAS TO ONE GLYPH ────────
+                The icon is a landmark for a row a person reads a hundred times,
+                not decoration: it is what lets somebody find the size chip
+                without reading the other four. It is `aria-hidden` throughout,
+                because the label beside it already says the word. */}
             {[
-              { label: 'Model', value: modelLabel },
-              { label: 'Look', value: rule.label },
-              { label: 'Size', value: chosen?.label ?? 'None' },
-              { label: 'How many', value: String(count) },
+              { label: 'Model', value: modelLabel, Icon: Wand2 },
+              { label: 'Look', value: rule.label, Icon: Target },
+              { label: 'Size', value: chosen?.label ?? 'None', Icon: LayoutGrid },
+              { label: 'How many', value: String(count), Icon: Copy },
+              { label: 'Logo', value: stampEnabled ? 'Stamped' : 'Off', Icon: Tag },
             ].map((chip) => (
               <button
                 key={chip.label}
@@ -520,22 +543,24 @@ export function StudioWorkbench({
                 aria-controls="studio-settings"
                 className="surface-ring flex items-center gap-2 rounded-pill bg-s2 px-3 py-1.5 type-sm transition-micro hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               >
+                <chip.Icon className="size-[14px] shrink-0 text-muted" aria-hidden />
                 <span className="text-muted">{chip.label}</span>
                 <span className="font-[550] text-ink">{chip.value}</span>
               </button>
             ))}
-
-            <div className="grow" />
 
             <button
               type="button"
               onClick={() => setSettingsOpen((open) => !open)}
               aria-expanded={settingsOpen}
               aria-controls="studio-settings"
-              className="rounded-pill px-2 py-1.5 type-sm text-muted transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              className="flex items-center gap-1.5 rounded-pill px-2 py-1.5 type-sm text-muted transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
+              <SlidersHorizontal className="size-[14px] shrink-0" aria-hidden />
               {settingsOpen ? 'Hide settings' : 'Settings'}
             </button>
+
+            <div className="grow" />
 
             {/* The TOTAL, not the unit price. Somebody who chose four and was
                 shown the price of one has not been told what this press costs. */}
@@ -550,6 +575,10 @@ export function StudioWorkbench({
               disabled={!ready}
               data-guide="studio-generate"
             >
+              {/* Not while it spins: `Button` already renders a spinner beside
+                  {children} when it is loading, and two icons on one button
+                  reads as a glitch rather than as progress. */}
+              {busy ? null : <Sparkles aria-hidden />}
               Make this picture
             </Button>
           </div>
@@ -570,89 +599,118 @@ export function StudioWorkbench({
             sibling boundary. `bg-canvas` rather than `bg-surface`, so the two
             halves read as two zones of one block: in this scope those are
             #0d0d0d and #171717, a real step rather than the same value twice. */}
+        {/* ── WHAT MAKES THESE PICTURES YOURS, ON THE SCREEN RATHER THAN IN A
+            DRAWER ──────────────────────────────────────────────────────────
+            This used to live inside the settings tray, one scroll below the
+            press. It is the whole differentiator of the product and it was
+            filed under Settings: a person who never opened that tray got
+            brand-conditioned pictures and never learned why they looked like
+            their shop. It is a card of its own now, between the composer and
+            the tray, at the width of the thing it describes.
+
+            The same array the action stores on the row, so the screen and the
+            record cannot disagree. Three states and never two: a read that
+            failed is not a workspace with nothing to add, and Explore
+            deliberately sends nothing at all. */}
+        <div
+          className="surface-ring flex flex-col gap-2 rounded-card bg-surface p-4"
+          data-guide="studio-signals"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="flex items-center gap-1.5 type-eyebrow text-muted">
+              <Brain className="size-[13px]" aria-hidden />
+              Using your brand
+            </span>
+            {/* ── A REMEDY ONLY WHERE ONE WORKS ──────────────────────────────
+                Offered for the two answers a person can act on: a brain with
+                things in it, where the work is confirming the guesses, and an
+                empty one, where the work is filling it. NOT offered when the
+                read FAILED, because opening the brain is not what fixes a read
+                that could not be made. `no-impossible-remedy.spec.ts` is the
+                standing rule this follows. */}
+            {signals === null ? null : (
+              <Link
+                href="/brain"
+                className="type-sm text-muted underline underline-offset-2 transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
+                Open your Brand Brain
+              </Link>
+            )}
+          </div>
+          {signals === null ? (
+            <p className="type-sm text-muted">
+              Sahoda could not read your Brand Brain just now, so it cannot show what it would add.
+              The picture can still be drawn.
+            </p>
+          ) : signals.length === 0 ? (
+            <p className="type-sm text-muted">
+              Nothing from your Brand Brain. Fill it in and pictures start looking like your
+              business rather than generic.
+            </p>
+          ) : (
+            <>
+              <ul className="flex flex-wrap gap-2">
+                {signals.map((signal) => (
+                  <li
+                    key={signal.field}
+                    className="surface-ring flex items-center gap-2 rounded-pill bg-s2 px-3 py-1 type-sm text-ink"
+                  >
+                    <span
+                      aria-hidden
+                      className={`size-[6px] shrink-0 rounded-full ${
+                        signal.certainty === 'confirmed' ? 'bg-primary' : 'surface-ring-firm'
+                      }`}
+                    />
+                    {signal.value}
+                    <span className="sr-only">
+                      {signal.certainty === 'confirmed'
+                        ? ', which you confirmed'
+                        : ', which Sahoda guessed'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="type-sm text-muted">
+                A hollow dot is one Sahoda worked out for you. Confirm it in the Brand Brain and the
+                picture stops drifting between one attempt and the next.
+              </p>
+            </>
+          )}
+        </div>
+
+        {/* ── REFINE: DESIGNED, NOT BUILT, AND SAID SO ──────────────────────
+            The same choice `ModelPicker` makes for a model we cannot reach:
+            shown, visibly not a control, with the reason. Hiding them would be
+            tidier and would leave somebody wondering whether Sahoda can do this
+            at all, which is a wall instead of a door.
+
+            SPANS, not `<button disabled>`. `design-lint.mjs` rule 3 refuses that
+            pairing outright, because a screen reader still announces a disabled
+            button as an action the reader could take. */}
+        <div className="flex flex-wrap items-center gap-2" data-guide="studio-coming-soon">
+          <span className="type-eyebrow text-muted">Refine</span>
+          <ul className="flex flex-wrap gap-2">
+            {COMING_SOON.map((one) => (
+              <li
+                key={one.title}
+                className="surface-ring flex items-center gap-1.5 rounded-pill px-3 py-1 opacity-70"
+              >
+                <Lock className="size-[12px] text-muted" aria-hidden />
+                <span className="type-sm text-muted">{one.title}</span>
+              </li>
+            ))}
+          </ul>
+          <span className="type-sm text-muted">
+            Designed and not built yet. Nothing here changes what a press does today.
+          </span>
+        </div>
+
         {settingsOpen ? (
           <div
             id="studio-settings"
             data-surface="inverse"
             className="flex flex-col gap-4 rounded-xl bg-canvas p-4 shadow-lg"
           >
-            {/* ── WHAT SAHODA WILL ADD, BEFORE ANYTHING IS SPENT ────────────
-                The same array the action stores on the row, so the screen and
-                the record cannot disagree. Three states and never two: a read
-                that failed is not a workspace with nothing to add, and Explore
-                deliberately sends nothing at all. */}
-            <div className="flex flex-col gap-2" data-guide="studio-signals">
-              <span className="type-eyebrow text-muted">Will send</span>
-              {signals === null ? (
-                <p className="type-sm text-muted">
-                  Sahoda could not read your Brand Brain just now, so it cannot show what it would
-                  add. The picture can still be drawn.
-                </p>
-              ) : signals.length === 0 ? (
-                <p className="type-sm text-muted">
-                  Nothing from your Brand Brain. Fill it in and pictures start looking like your
-                  business rather than generic.
-                </p>
-              ) : (
-                <>
-                  <ul className="flex flex-wrap gap-2">
-                    {signals.map((signal) => (
-                      <li
-                        key={signal.field}
-                        className="flex items-center gap-2 rounded-pill bg-s2 px-3 py-1 type-sm text-ink"
-                      >
-                        <span
-                          aria-hidden
-                          className={`size-[6px] shrink-0 rounded-full ${
-                            signal.certainty === 'confirmed' ? 'bg-primary' : 'surface-ring-firm'
-                          }`}
-                        />
-                        {signal.value}
-                        <span className="sr-only">
-                          {signal.certainty === 'confirmed'
-                            ? ', which you confirmed'
-                            : ', which Sahoda guessed'}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="type-sm text-muted">
-                    A hollow dot is one Sahoda worked out for you. Confirm it in the Brand Brain and
-                    the picture stops drifting between one attempt and the next.
-                  </p>
-                </>
-              )}
-            </div>
-
-            {/* ── COMING SOON, LISTED RATHER THAN HIDDEN ────────────────────
-                The same choice `ModelPicker` makes for a model we cannot reach:
-                shown, visibly not a control, with the reason. Hiding them would
-                be tidier and would leave somebody wondering whether Sahoda can
-                do this at all — a wall instead of a door.
-
-                SPANS, not `<button disabled>`. `design-lint.mjs` rule 3 refuses
-                that pairing outright, because a screen reader still announces a
-                disabled button as an action the reader could take. */}
-            <div className="flex flex-col gap-2" data-guide="studio-coming-soon">
-              <span className="type-eyebrow text-muted">Coming soon</span>
-              <ul className="flex flex-wrap gap-2">
-                {COMING_SOON.map((one) => (
-                  <li
-                    key={one.title}
-                    className="surface-ring flex items-center gap-2 rounded-pill px-3 py-1 opacity-70"
-                  >
-                    <Lock className="size-[12px] text-muted" aria-hidden />
-                    <span className="type-sm text-muted">{one.title}</span>
-                  </li>
-                ))}
-              </ul>
-              <p className="type-sm text-muted">
-                Designed and not built yet. Nothing here changes what a press does today.
-              </p>
-            </div>
-
-            <div className="h-px bg-line" />
-
             {/* ── ABOVE THE MODES, BECAUSE IT CHANGES WHAT THEY CAN DO ───────
                 Picking a model that draws a whole set in one call is what makes
                 "a set that matches" appear at all, and it moves the reference
