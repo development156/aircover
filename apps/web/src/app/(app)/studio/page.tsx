@@ -79,7 +79,12 @@ export default async function StudioPage() {
   const pictures = recent.status === 'ok' ? canvasPictures(recent.cards) : []
 
   return (
-    <div className="space-y-grid">
+    // ── ONE MEASURE, THE WHOLE SCREEN ─────────────────────────────────────────
+    // The artboard has nothing wider than the 720px composer, centred — the
+    // title included. `StudioWorkbench` caps and centres itself the same way,
+    // so this wrapper is what makes the title agree with it rather than
+    // running the full ~1400px content band above a narrow column.
+    <div className="mx-auto w-full max-w-[var(--measure-form)] space-y-grid">
       <PageTitle sub="Describe a picture and Sahoda draws it, using what it knows about your brand.">
         Studio
       </PageTitle>

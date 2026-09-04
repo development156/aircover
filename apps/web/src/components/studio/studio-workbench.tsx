@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { ChevronDown, Loader2, Lock, Sparkles } from 'lucide-react'
+import { ChevronDown, Loader2, Lock } from 'lucide-react'
 import {
   DEFAULT_STAMP_OPTIONS,
   IMAGE_TIER_ACTION,
@@ -16,6 +16,7 @@ import {
 } from '@sahoda/shared'
 
 import { queueGeneration } from '@/app/actions/studio'
+import { colorNames } from '@/lib/brand/color-name'
 import { creditWord } from '@/lib/credit-words'
 // Lazy: a canvas editor is a large chunk that most visits never open, and the
 // Studio's first paint is where a person is deciding whether to spend.
@@ -104,6 +105,27 @@ const SIZE_STEP_OPTIONS: readonly { value: StampSizeStep; label: string }[] = [
   { value: 'large', label: 'Large' },
 ]
 
+/**
+ * The field this brain leaf was built from, `brand-signals.ts`'s own string,
+ * turned into a label a reader recognises. Sentence-cased rather than
+ * relisted here: a second list of field names is how one drifts from the
+ * other the first time a leaf is added there and not here.
+ */
+function labelFor(field: string): string {
+  return field.length === 0 ? field : field[0]!.toUpperCase() + field.slice(1)
+}
+
+/**
+ * `brandSignalsFor` names this leaf `colours` and its `value` is the raw
+ * theme tokens joined with `, ` — `oklch(0.5663 0.16 262.1)` and the like.
+ * Printing that string is the single worst thing the old screen did: a shop
+ * owner reads notation, not colour. This never prints it; it always paints
+ * it, as swatches, and only for the one leaf that is actually colour.
+ */
+function colourValuesOf(signal: { field: string; value: string }): string[] | null {
+  return signal.field === 'colours' ? signal.value.split(', ').filter((c) => c !== '') : null
+}
+
 export function StudioWorkbench({
   formats,
   library,
@@ -156,7 +178,6 @@ export function StudioWorkbench({
   const [stampSizeStep, setStampSizeStep] = useState<StampSizeStep>(DEFAULT_STAMP_OPTIONS.sizeStep)
   const [note, setNote] = useState<string | null>(null)
   const [short, setShort] = useState(false)
-  const [made, setMade] = useState(false)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [viewing, setViewing] = useState<CanvasPicture | null>(null)
   const [drawing, setDrawing] = useState<CanvasPicture | null>(null)
@@ -330,7 +351,6 @@ export function StudioWorkbench({
         stamp: { enabled: stampEnabled, anchor: stampAnchor, sizeStep: stampSizeStep },
       })
       if (result.ok) {
-        setMade(true)
         // Silent when everything asked for arrived. A partial result is neither
         // a success nor a failure and gets its own sentence, which names both
         // numbers and says what happened to the money.
@@ -359,7 +379,10 @@ export function StudioWorkbench({
     // panel and everything that follows (the result, the strip) stacks
     // beneath it at the same width. A 420px composer beside a large empty
     // panel was answering a question nobody asked before the first press.
-    <div className="flex flex-col gap-4" data-guide="studio-workbench">
+    <div
+      className="mx-auto flex w-full max-w-[var(--measure-form)] flex-col gap-4"
+      data-guide="studio-workbench"
+    >
       <section aria-labelledby="studio-make" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <h2 id="studio-make" className="type-h2">
@@ -586,24 +609,31 @@ export function StudioWorkbench({
               {blocked}
             </p>
           )}
+        </div>
 
-          <div className="h-px bg-line/20" aria-hidden />
-
+        {/* ── "WILL SEND" AND "NOT BUILT YET": A LIGHT CARD, NOT THE COMPOSER ────
+            The artboard draws these as a SEPARATE white card below the dark
+            composer, split two up, and that is a real move away from the earlier
+            shape of this screen rather than a colour swap: the composer's one job
+            is the press, and everything that used to compete with `Draw it` for
+            the same dark surface now sits on an object of its own visual weight.
+            `data-guide="studio-signals"` and `data-guide="studio-coming-soon"`
+            keep their names, so nothing that queried them by location moved. */}
+        <div className="surface-ring grid grid-cols-1 gap-4 rounded-xl bg-surface p-4 shadow-lg narrow:grid-cols-2 narrow:gap-6">
           {/* ── WHAT SAHODA WILL ADD, BEFORE ANYTHING IS SPENT ──────────────────
-              PERMANENT, not gated behind "Hide detail". The artboard states this
-              as two compact rows at the bottom of the composer's own dark panel:
-              a fixed-width uppercase eyebrow at the left, then inline pills on
-              one line. It used to live inside the settings tray, where closing
-              the tray hid what the press would spend on and what it would add —
-              the two things that matter most BEFORE a press, hidden by the same
-              control that hides the model picker.
-
               The same array the action stores on the row, so the screen and the
               record cannot disagree. Three states and never two: a read that
               failed is not a workspace with nothing to add, and Explore
-              deliberately sends nothing at all. */}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2" data-guide="studio-signals">
-            <span className="type-eyebrow w-[64px] shrink-0 text-muted">Will send</span>
+              deliberately sends nothing at all.
+
+              ── LABEL, VALUE, ONE LINE ──────────────────────────────────────────
+              A brand fact used to be a whole sentence stuffed into a pill, which
+              wrapped over three lines the moment the fact was long. Each leaf is
+              now a row: a certainty dot, a fixed-width label naming the field,
+              and the value clamped to one line with an ellipsis rather than
+              wrapping the row tall. */}
+          <div className="flex flex-col gap-2" data-guide="studio-signals">
+            <span className="type-eyebrow text-muted">Will send</span>
             {signals === null ? (
               <p className="type-sm text-muted">
                 Sahoda could not read your Brand Brain just now, so it cannot show what it would
@@ -616,26 +646,49 @@ export function StudioWorkbench({
               </p>
             ) : (
               <>
-                <ul className="flex flex-1 flex-wrap items-center gap-2">
-                  {signals.map((signal) => (
-                    <li
-                      key={signal.field}
-                      className="flex items-center gap-2 rounded-pill bg-s2 px-3 py-1 type-sm text-ink"
-                    >
-                      <span
-                        aria-hidden
-                        className={`size-[6px] shrink-0 rounded-full ${
-                          signal.certainty === 'confirmed' ? 'bg-primary' : 'surface-ring-firm'
-                        }`}
-                      />
-                      {signal.value}
-                      <span className="sr-only">
-                        {signal.certainty === 'confirmed'
-                          ? ', which you confirmed'
-                          : ', which Sahoda guessed'}
-                      </span>
-                    </li>
-                  ))}
+                <ul className="flex flex-col gap-2">
+                  {signals.map((signal) => {
+                    // The one leaf that is colour, and the reason this screen
+                    // exists: `signal.value` here is raw theme notation
+                    // (`oklch(...)`, comma-joined), and printing it is the exact
+                    // defect being fixed. A colour is painted, never spelled.
+                    const swatches = colourValuesOf(signal)
+                    return (
+                      <li key={signal.field} className="flex items-baseline gap-2.5">
+                        <span
+                          aria-hidden
+                          className={`size-[6px] shrink-0 rounded-full ${
+                            signal.certainty === 'confirmed' ? 'bg-primary' : 'surface-ring-firm'
+                          }`}
+                        />
+                        <span className="w-24 shrink-0 type-sm text-muted">
+                          {labelFor(signal.field)}
+                        </span>
+                        {swatches === null ? (
+                          <span className="min-w-0 flex-1 truncate type-sm text-ink">
+                            {signal.value}
+                          </span>
+                        ) : (
+                          <span className="flex min-w-0 flex-1 items-center gap-1">
+                            {swatches.map((colour, at) => (
+                              <span
+                                key={`${colour}-${at}`}
+                                aria-hidden
+                                style={{ background: colour }}
+                                className="surface-ring size-[13px] shrink-0 rounded-sm"
+                              />
+                            ))}
+                            <span className="sr-only">{colorNames(swatches).join(', ')}</span>
+                          </span>
+                        )}
+                        <span className="sr-only">
+                          {signal.certainty === 'confirmed'
+                            ? ', which you confirmed'
+                            : ', which Sahoda guessed'}
+                        </span>
+                      </li>
+                    )
+                  })}
                 </ul>
                 <span
                   className="flex items-center gap-2 type-sm text-muted"
@@ -654,21 +707,17 @@ export function StudioWorkbench({
           </div>
 
           {/* ── NOT BUILT, LISTED RATHER THAN HIDDEN ────────────────────────────
-              Also permanent now, for the same reason: the same choice
-              `ModelPicker` makes for a model we cannot reach, shown, visibly not
-              a control, with the reason. Hiding them would be tidier and would
-              leave somebody wondering whether Sahoda can do this at all, a wall
-              instead of a door.
+              The same choice `ModelPicker` makes for a model we cannot reach,
+              shown, visibly not a control, with the reason. Hiding them would be
+              tidier and would leave somebody wondering whether Sahoda can do this
+              at all, a wall instead of a door.
 
               SPANS, not `<button disabled>`. `design-lint.mjs` rule 3 refuses
               that pairing outright, because a screen reader still announces a
               disabled button as an action the reader could take. */}
-          <div
-            className="flex flex-wrap items-center gap-x-3 gap-y-2"
-            data-guide="studio-coming-soon"
-          >
-            <span className="type-eyebrow w-[64px] shrink-0 text-muted">Not built</span>
-            <ul className="flex flex-1 flex-wrap items-center gap-2">
+          <div className="flex flex-col gap-2" data-guide="studio-coming-soon">
+            <span className="type-eyebrow text-muted">Not built yet</span>
+            <ul className="flex flex-wrap items-center gap-2">
               {COMING_SOON.map((one) => (
                 <li
                   key={one.title}
@@ -679,8 +728,8 @@ export function StudioWorkbench({
                 </li>
               ))}
             </ul>
-            <span className="sr-only">
-              Designed and not built yet. Nothing here changes what a press does today.
+            <span className="type-sm text-muted">
+              Designed and not built. Nothing here changes what a press does today.
             </span>
           </div>
         </div>
@@ -1008,46 +1057,51 @@ export function StudioWorkbench({
         )}
       </section>
 
-      {/* ── THE CANVAS ──────────────────────────────────────────────────────── */}
-      <section aria-labelledby="studio-canvas" className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <div className="flex flex-wrap items-baseline gap-3">
-            <h2 id="studio-canvas" className="type-h2">
-              The canvas
-            </h2>
-            {/* Shape and age, both real facts about the ACTIVE picture rather
+      {/* ── THE CANVAS: ONLY WHEN THERE IS SOMETHING TO SHOW ────────────────────
+          The old screen ended in a large empty panel, sized to whatever format
+          was selected, saying "your picture appears here" before anybody had
+          pressed anything — roughly 800px of canvas nobody could look at yet. The
+          artboard has no such object: before a first picture exists the page
+          simply ends after the composer and its light card. `Draw it`'s own
+          spinner is the loading state for a first press; a full panel devoted to
+          saying "nothing yet" is the thing being removed. */}
+      {active === null ? null : (
+        <section aria-labelledby="studio-canvas" className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <div className="flex flex-wrap items-baseline gap-3">
+              <h2 id="studio-canvas" className="type-h2">
+                The canvas
+              </h2>
+              {/* Shape and age, both real facts about the ACTIVE picture rather
                 than the chosen format: switching through the strip can land
                 on a picture drawn at a size nobody has selected since. */}
-            {active === null || active.width === null || active.height === null ? null : (
-              <span className="type-sm text-muted" data-guide="studio-canvas-meta">
-                <span className="num">{active.width}</span> ×{' '}
-                <span className="num">{active.height}</span>
-                {active.madeAgo === null ? null : <> · {active.madeAgo}</>}
-              </span>
-            )}
-          </div>
-          {active === null ? null : (
+              {active.width === null || active.height === null ? null : (
+                <span className="type-sm text-muted" data-guide="studio-canvas-meta">
+                  <span className="num">{active.width}</span> ×{' '}
+                  <span className="num">{active.height}</span>
+                  {active.madeAgo === null ? null : <> · {active.madeAgo}</>}
+                </span>
+              )}
+            </div>
             <PictureActions
               picture={active}
               onOpen={() => setViewing(active)}
               onReuse={() => reuse(active)}
               onDraw={() => setDrawing(active)}
             />
-          )}
-        </div>
+          </div>
 
-        <div
-          className="surface-ring relative flex items-center justify-center overflow-hidden rounded-card bg-s2"
-          style={{
-            aspectRatio: chosen === null ? '1 / 1' : `${chosen.width} / ${chosen.height}`,
-          }}
-          data-guide="studio-canvas"
-        >
-          {/* ── THE PICTURE, WHEN THERE IS ONE ──────────────────────────────
+          <div
+            className="surface-ring relative flex items-center justify-center overflow-hidden rounded-card bg-s2"
+            style={{
+              aspectRatio: chosen === null ? '1 / 1' : `${chosen.width} / ${chosen.height}`,
+            }}
+            data-guide="studio-canvas"
+          >
+            {/* ── THE PICTURE ITSELF ────────────────────────────────────────────
               Shown UNDER the drawing message rather than replaced by it, so a
               second press does not blank the picture somebody is still looking
               at. Nothing is lost while the next one is being made. */}
-          {active === null ? null : (
             <button
               type="button"
               onClick={() => setViewing(active)}
@@ -1055,8 +1109,8 @@ export function StudioWorkbench({
               className="absolute inset-0 block focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- a
-                  short-lived signed URL from a private bucket cannot be
-                  optimised by next/image without proxying the credential. */}
+                short-lived signed URL from a private bucket cannot be
+                optimised by next/image without proxying the credential. */}
               <img
                 src={shown ?? active.url}
                 alt={
@@ -1069,26 +1123,20 @@ export function StudioWorkbench({
                 className={`size-full object-contain transition-micro ${busy ? 'opacity-40' : ''}`}
               />
             </button>
-          )}
 
-          {busy || active === null ? (
-            <p className="pointer-events-none relative max-w-[38ch] px-6 text-center type-sm text-muted">
-              {busy ? (
-                'Sahoda is drawing this now. It usually takes a few seconds, and you can leave this screen without losing it.'
-              ) : made ? (
-                'Made. It is saved to your library, and it appears here in a moment.'
-              ) : (
-                <>
-                  <Sparkles className="mx-auto mb-2 size-[18px]" aria-hidden />
-                  Your picture appears here, at the size you picked, so you can judge it before you
-                  use it.
-                </>
-              )}
-            </p>
-          ) : null}
-        </div>
+            {/* Only a REGENERATION reaches this: a first-ever press has no
+              `active` picture yet, so this whole section is not on the page —
+              `Draw it`'s own spinner is that state's only feedback, on
+              purpose (see the section header above). */}
+            {busy ? (
+              <p className="pointer-events-none relative max-w-[38ch] px-6 text-center type-sm text-muted">
+                Sahoda is drawing this now. It usually takes a few seconds, and you can leave this
+                screen without losing it.
+              </p>
+            ) : null}
+          </div>
 
-        {/* ── WHICH ONE DO YOU WANT, AND WHY THERE IS ONLY ONE ────────────────
+          {/* ── WHICH ONE DO YOU WANT, AND WHY THERE IS ONLY ONE ────────────────
             The same dark object the composer uses, and the same reason: this is
             the bar you act from once the picture exists. `data-surface="inverse"`
             re-resolves every token inside it, so nothing here paints a colour of
@@ -1099,35 +1147,35 @@ export function StudioWorkbench({
             toggle over one picture is a control that does nothing — and the
             sentence is asked of `stamp-copy.ts` rather than written here, so the
             five answers cannot quietly collapse into "no logo". */}
-        {active === null || note_ === null ? null : (
-          <div
-            data-surface="inverse"
-            data-guide="studio-logo-bar"
-            className="flex flex-wrap items-center gap-3 rounded-xl bg-surface p-3 pl-4 shadow-lg"
-          >
-            {bothVersions ? (
-              <div
-                role="group"
-                aria-label="Which version of this picture to show"
-                className="surface-ring flex gap-1 rounded-pill bg-canvas p-1"
-              >
-                {(['stamped', 'original'] as const).map((which) => (
-                  <button
-                    key={which}
-                    type="button"
-                    onClick={() => setShowing(which)}
-                    aria-pressed={showing === which}
-                    className={`rounded-pill px-3 py-1 type-sm font-[550] transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-                      showing === which ? 'bg-surface-3 text-ink' : 'text-muted hover:text-ink'
-                    }`}
-                  >
-                    {which === 'stamped' ? 'With your logo' : 'Without it'}
-                  </button>
-                ))}
-              </div>
-            ) : null}
+          {note_ === null ? null : (
+            <div
+              data-surface="inverse"
+              data-guide="studio-logo-bar"
+              className="flex flex-wrap items-center gap-3 rounded-xl bg-surface p-3 pl-4 shadow-lg"
+            >
+              {bothVersions ? (
+                <div
+                  role="group"
+                  aria-label="Which version of this picture to show"
+                  className="surface-ring flex gap-1 rounded-pill bg-canvas p-1"
+                >
+                  {(['stamped', 'original'] as const).map((which) => (
+                    <button
+                      key={which}
+                      type="button"
+                      onClick={() => setShowing(which)}
+                      aria-pressed={showing === which}
+                      className={`rounded-pill px-3 py-1 type-sm font-[550] transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                        showing === which ? 'bg-surface-3 text-ink' : 'text-muted hover:text-ink'
+                      }`}
+                    >
+                      {which === 'stamped' ? 'With your logo' : 'Without it'}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
 
-            {/* ── WHICH FRAME THIS IS, IN ONE WORD ────────────────────────────
+              {/* ── WHICH FRAME THIS IS, IN ONE WORD ────────────────────────────
                 `active.url` is always the model's own output, untouched,
                 whichever version is on screen. That is true and shown plainly.
                 The exact placed size and clear space are true only of the
@@ -1136,47 +1184,47 @@ export function StudioWorkbench({
                 never written to `studio_generation_images`, so this screen
                 cannot say what a picture made last week was actually placed
                 at. Locked rather than guessed. */}
-            <span className="type-sm text-muted" data-guide="studio-frame-note">
-              {bothVersions && showing === 'stamped' ? (
-                <span className="inline-flex items-center gap-1 opacity-70">
-                  <Lock className="size-[11px]" aria-hidden />
-                  Exact placement: coming soon
-                </span>
-              ) : (
-                'As the model drew it'
-              )}
-            </span>
+              <span className="type-sm text-muted" data-guide="studio-frame-note">
+                {bothVersions && showing === 'stamped' ? (
+                  <span className="inline-flex items-center gap-1 opacity-70">
+                    <Lock className="size-[11px]" aria-hidden />
+                    Exact placement: coming soon
+                  </span>
+                ) : (
+                  'As the model drew it'
+                )}
+              </span>
 
-            <div className="flex min-w-[24ch] flex-1 items-baseline gap-2">
-              {/* Filled only for `stamped`: the one answer where the logo is
+              <div className="flex min-w-[24ch] flex-1 items-baseline gap-2">
+                {/* Filled only for `stamped`: the one answer where the logo is
                   actually on the picture. Same filled/hollow convention the
                   signals list above uses for confirmed vs guessed, so a
                   reader learns the shape once and reuses it here. */}
-              <span
-                aria-hidden
-                className={`size-[7px] shrink-0 rounded-full ${
-                  note_.dotFilled ? 'bg-primary' : 'surface-ring-firm'
-                }`}
-              />
-              <div className="flex flex-col gap-0.5">
-                <span className="type-sm font-[550] text-ink">{note_.title}</span>
-                <span className="type-sm text-muted">{note_.body}</span>
+                <span
+                  aria-hidden
+                  className={`size-[7px] shrink-0 rounded-full ${
+                    note_.dotFilled ? 'bg-primary' : 'surface-ring-firm'
+                  }`}
+                />
+                <div className="flex flex-col gap-0.5">
+                  <span className="type-sm font-[550] text-ink">{note_.title}</span>
+                  <span className="type-sm text-muted">{note_.body}</span>
+                </div>
               </div>
-            </div>
 
-            {/* A remedy is offered ONLY when one exists. `remedy: null` is the
+              {/* A remedy is offered ONLY when one exists. `remedy: null` is the
                 assertion that no action of theirs would change this, not a gap
                 somebody forgot to fill — see `no-impossible-remedy.spec.ts`. */}
-            {note_.remedy === null ? null : (
-              <Link
-                href={note_.remedy.href}
-                className="surface-ring rounded-pill px-3 py-1.5 type-sm font-[550] text-ink transition-micro hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
-                {note_.remedy.label}
-              </Link>
-            )}
+              {note_.remedy === null ? null : (
+                <Link
+                  href={note_.remedy.href}
+                  className="surface-ring rounded-pill px-3 py-1.5 type-sm font-[550] text-ink transition-micro hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  {note_.remedy.label}
+                </Link>
+              )}
 
-            {/* ── SAVE AND USE IN A POST: NAMED, NOT BUILT ────────────────────
+              {/* ── SAVE AND USE IN A POST: NAMED, NOT BUILT ────────────────────
                 `Main.dc.html` draws these as live orange controls; this bar
                 does not, because nothing behind either one exists yet in THIS
                 bar — "Save it" and "Use it in a post" already work, on the
@@ -1184,40 +1232,40 @@ export function StudioWorkbench({
                 the four coming-soon controls in the composer: a `<span>`
                 carrying `Lock` and the label, never `<button disabled>`, so a
                 screen reader does not announce an action nobody can take. */}
-            <span className="ml-auto flex items-center gap-2">
-              <span className="flex items-center gap-1.5 type-sm text-muted opacity-70">
-                <Lock className="size-[12px]" aria-hidden />
-                Save
+              <span className="ml-auto flex items-center gap-2">
+                <span className="flex items-center gap-1.5 type-sm text-muted opacity-70">
+                  <Lock className="size-[12px]" aria-hidden />
+                  Save
+                </span>
+                <span className="flex items-center gap-1.5 rounded-pill px-3 py-1.5 type-sm font-[550] text-muted opacity-70">
+                  <Lock className="size-[12px]" aria-hidden />
+                  Use in a post
+                </span>
               </span>
-              <span className="flex items-center gap-1.5 rounded-pill px-3 py-1.5 type-sm font-[550] text-muted opacity-70">
-                <Lock className="size-[12px]" aria-hidden />
-                Use in a post
-              </span>
-            </span>
-          </div>
-        )}
+            </div>
+          )}
 
-        {/* Both are kept, always. Said once, here, rather than inside the
+          {/* Both are kept, always. Said once, here, rather than inside the
             toggle: it is true of every stamped picture whether or not anybody
             touches the control. */}
-        {bothVersions ? (
-          <p className="type-sm text-muted">
-            Both versions are saved. Picking one here does not delete the other.
-          </p>
-        ) : null}
+          {bothVersions ? (
+            <p className="type-sm text-muted">
+              Both versions are saved. Picking one here does not delete the other.
+            </p>
+          ) : null}
 
-        {/* ── THE STRIP ───────────────────────────────────────────────────────
+          {/* ── THE STRIP ───────────────────────────────────────────────────────
             Every picture this workspace has made that can actually be drawn,
             newest first. Judging one against the last one is the work, and it
             cannot be done by scrolling to a grid and back. */}
-        {pictures.length === 0 ? null : (
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-3">
-              <span className="type-eyebrow text-muted">Made earlier</span>
-              <div className="h-px flex-1 bg-line" />
-            </div>
+          {pictures.length === 0 ? null : (
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <span className="type-eyebrow text-muted">Made earlier</span>
+                <span className="type-sm text-muted">Open one to change it</span>
+              </div>
 
-            {/* ── A GRID, NOT A SCROLLING RIBBON ──────────────────────────────
+              {/* ── A GRID, NOT A SCROLLING RIBBON ──────────────────────────────
                 Judging one picture against the last one is the work, and a
                 64px ribbon that scrolls sideways shows about four of them at a
                 size nothing can be judged at. Square tiles at six across show a
@@ -1228,50 +1276,51 @@ export function StudioWorkbench({
                 The age is rendered on the SERVER and passed down — a relative
                 time computed in the browser is computed against a clock the
                 server never saw, and React re-renders the mismatch. */}
-            <ul
-              className="grid grid-cols-3 gap-3 narrow:grid-cols-4 wide:grid-cols-6"
-              data-guide="studio-strip"
-            >
-              {pictures.map((picture) => {
-                const on = picture.imageId === (active?.imageId ?? null)
-                const meta = [picture.formatId, picture.madeAgo].filter(Boolean).join(' · ')
-                return (
-                  <li key={picture.imageId} className="flex flex-col gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setActiveId(picture.imageId)}
-                      aria-pressed={on}
-                      aria-label={picture.prompt}
-                      className={`surface-ring relative block aspect-square w-full overflow-hidden rounded-card transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-                        on ? 'ring-2 ring-accent' : ''
-                      }`}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element -- as above. */}
-                      <img
-                        src={picture.stampedUrl ?? picture.url}
-                        // Empty on purpose: the BUTTON is already labelled with
-                        // the prompt, and a screen reader announcing it twice
-                        // makes a strip of twelve read as twenty-four things.
-                        alt=""
-                        // Top-anchored: a square crop of a portrait photograph
-                        // cuts a face off at the chin, and this product's
-                        // pictures are food, shopfronts and people.
-                        className="size-full object-cover object-top"
-                      />
-                    </button>
-                    {meta === '' ? null : <span className="num type-sm text-muted">{meta}</span>}
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
-        )}
+              <ul
+                className="grid grid-cols-3 gap-3 narrow:grid-cols-4 wide:grid-cols-6"
+                data-guide="studio-strip"
+              >
+                {pictures.map((picture) => {
+                  const on = picture.imageId === (active?.imageId ?? null)
+                  const meta = [picture.formatId, picture.madeAgo].filter(Boolean).join(' · ')
+                  return (
+                    <li key={picture.imageId} className="flex flex-col gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setActiveId(picture.imageId)}
+                        aria-pressed={on}
+                        aria-label={picture.prompt}
+                        className={`surface-ring relative block aspect-square w-full overflow-hidden rounded-card transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                          on ? 'ring-2 ring-accent' : ''
+                        }`}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element -- as above. */}
+                        <img
+                          src={picture.stampedUrl ?? picture.url}
+                          // Empty on purpose: the BUTTON is already labelled with
+                          // the prompt, and a screen reader announcing it twice
+                          // makes a strip of twelve read as twenty-four things.
+                          alt=""
+                          // Top-anchored: a square crop of a portrait photograph
+                          // cuts a face off at the chin, and this product's
+                          // pictures are food, shopfronts and people.
+                          className="size-full object-cover object-top"
+                        />
+                      </button>
+                      {meta === '' ? null : <span className="num type-sm text-muted">{meta}</span>}
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )}
 
-        <p className="type-sm text-muted">
-          Every picture is saved to your library the moment it is made, so nothing is lost if you
-          leave.
-        </p>
-      </section>
+          <p className="type-sm text-muted">
+            Every picture is saved to your library the moment it is made, so nothing is lost if you
+            leave.
+          </p>
+        </section>
+      )}
 
       <PictureViewer picture={viewing} onClose={() => setViewing(null)} />
 

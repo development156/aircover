@@ -159,7 +159,9 @@ describe('the shape of the screen', () => {
    * beside it.
    */
   test('the composer section precedes the canvas section in the same flow', () => {
-    const { container } = open()
+    // A picture has to exist for the canvas section to render at all — see
+    // "the canvas" describe block below for the empty-state guard.
+    const { container } = open(LIBRARY, MADE)
     const root = container.querySelector('[data-guide="studio-workbench"]') as HTMLElement
     const make = root.querySelector('#studio-make') as HTMLElement
     const canvas = root.querySelector('#studio-canvas') as HTMLElement
@@ -169,6 +171,21 @@ describe('the shape of the screen', () => {
     // `canvas` comes after `make` in the tree, not nested inside a sibling
     // column beside it.
     expect(make.compareDocumentPosition(canvas) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  /**
+   * ── ONE MEASURE ────────────────────────────────────────────────────────────
+   * Every row on the old screen ran the full page width, roughly 1400px, well
+   * past a comfortable reading measure of 45-75 characters. The artboard caps
+   * the whole column at the 720px composer's own width and centres it.
+   * `--measure-form` is the token this already reads as (docs/37 §4), not a new
+   * literal — a bare `max-w-[720px]` would drift the moment the token moved.
+   */
+  test('the whole column is capped at the form measure and centred', () => {
+    const { container } = open()
+    const root = container.querySelector('[data-guide="studio-workbench"]') as HTMLElement
+    expect(root.className).toContain('max-w-[var(--measure-form)]')
+    expect(root.className).toContain('mx-auto')
   })
 })
 
@@ -247,12 +264,19 @@ describe('the modes on offer', () => {
 
 describe('the canvas', () => {
   /**
-   * An empty rectangle reads as something that failed to load. The canvas is
-   * always saying which of three things is true.
+   * RETARGETED. The old screen showed a large empty panel — sized to the
+   * chosen format, saying "your picture appears here" — before anybody had
+   * pressed anything. The founder's own words: "800px of empty canvas... the
+   * page currently ends in a huge empty panel waiting for a picture." The
+   * artboard has no such object, and neither does this screen now: before a
+   * first picture exists, there is no canvas panel at all. `Draw it`'s own
+   * spinner (asserted in "before any spend" below) is the loading state for a
+   * first press.
    */
-  test('says what will appear there before anything has been made', () => {
-    open()
-    expect(screen.getByText(/your picture appears here/i)).toBeTruthy()
+  test('there is no canvas panel before anything has been made', () => {
+    const { container } = open(LIBRARY, [])
+    expect(container.querySelector('[data-guide="studio-canvas"]')).toBeNull()
+    expect(screen.queryByText(/your picture appears here/i)).toBeNull()
   })
 
   /**
@@ -266,10 +290,13 @@ describe('the canvas', () => {
    * `\d+ / \d+`, because a canvas pinned to `1 / 1` satisfies that shape and
    * fails the claim. MEASURED: pinning it green-lit this test before this
    * rewrite.
+   *
+   * RETARGETED to a fixture WITH a picture, because the panel this asserts
+   * against no longer exists before one does.
    */
   test('is sized to the chosen format, not to a fixed shape', () => {
     const first = generatableFormats()[0]!
-    const { container } = open()
+    const { container } = open(LIBRARY, MADE)
     const canvas = container.querySelector('[data-guide="studio-canvas"]') as HTMLElement | null
     expect(canvas).not.toBeNull()
     expect(canvas!.style.aspectRatio).toBe(`${first.width} / ${first.height}`)
@@ -280,7 +307,7 @@ describe('the canvas', () => {
     const story = generatableFormats().find((f) => f.width !== f.height)
     expect(story, 'no format with a non-square shape to switch to').toBeTruthy()
 
-    const { container } = open()
+    const { container } = open(LIBRARY, MADE)
     const canvas = container.querySelector('[data-guide="studio-canvas"]') as HTMLElement
     const before = canvas.style.aspectRatio
 
@@ -338,10 +365,10 @@ describe('the canvas draws the picture, not a description of one', () => {
     expect(within(canvas).getByAltText('the shopfront at dawn')).toBeTruthy()
   })
 
-  test('with nothing made, there is no strip to scroll rather than an empty one', () => {
+  test('with nothing made, there is no strip to scroll and no canvas panel either', () => {
     const { container } = open(LIBRARY, [])
     expect(container.querySelector('[data-guide="studio-strip"]')).toBeNull()
-    expect(screen.getByText(/your picture appears here/i)).toBeTruthy()
+    expect(container.querySelector('[data-guide="studio-canvas"]')).toBeNull()
   })
 
   /**
@@ -1031,6 +1058,31 @@ describe('what Sahoda will send, shown before the spend', () => {
     expect(unread).not.toMatch(/nothing from your brand brain/i)
     expect(screen.queryByText(/fill it in/i)).toBeNull()
   })
+
+  /**
+   * THE SINGLE WORST THING ON THE OLD SCREEN. `brandSignalsFor`'s `colours`
+   * leaf carries the raw theme tokens joined with `, ` — real values look like
+   * `oklch(0.5663 0.16 262.1)` — and the old pill printed that string straight
+   * to a shop owner. A brand colour is painted as a swatch, never spelled out
+   * as notation.
+   *
+   * MUTATION: render `signal.value` directly for the `colours` field instead
+   * of branching on `colourValuesOf` and this goes red on the first
+   * assertion.
+   */
+  test('brand colours render as swatches, never as oklch notation', () => {
+    const colours: BrandSignal = {
+      field: 'colours',
+      certainty: 'guessed',
+      value: 'oklch(0.5663 0.16 262.1), oklch(0.98 0.01 90)',
+    }
+    const { container } = open(LIBRARY, [], [colours])
+
+    expect(container.textContent).not.toMatch(/oklch\(/i)
+    const signals = container.querySelector('[data-guide="studio-signals"]') as HTMLElement
+    const swatches = signals.querySelectorAll('span[style*="background"]')
+    expect(swatches).toHaveLength(2)
+  })
 })
 
 describe('the result screen: which version, and why there is only one', () => {
@@ -1240,6 +1292,22 @@ describe('the rest of the composer the design asked for', () => {
 
     expect(screen.getByText(/square · 2 h ago/i)).toBeTruthy()
     expect(screen.getByText(/story · 3 days ago/i)).toBeTruthy()
+  })
+
+  /**
+   * The strip's tiles are real, named controls even though they do not yet do
+   * anything beyond swapping the canvas — this is where a remix view will open
+   * from, and the artboard says so beside the eyebrow.
+   */
+  test('says how to open one, and each tile is a real button with a name', () => {
+    const { container } = open(LIBRARY, MADE)
+    expect(screen.getByText(/open one to change it/i)).toBeTruthy()
+
+    const strip = container.querySelector('[data-guide="studio-strip"]') as HTMLElement
+    for (const tile of within(strip).getAllByRole('button')) {
+      expect(tile).not.toBeDisabled()
+      expect(tile.getAttribute('aria-label')).toBeTruthy()
+    }
   })
 
   test('a picture whose age would not parse still shows its shape', () => {
