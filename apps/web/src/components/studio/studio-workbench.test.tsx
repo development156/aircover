@@ -227,13 +227,20 @@ describe('the shape of the screen', () => {
   /**
    * The bar is still capped, so the prompt keeps a readable measure even
    * though the page around it does not.
+   *
+   * RETARGETED. `mx-auto` used to centre this column, which drifted its left
+   * edge away from the title's own left edge (flush at the page gutter) the
+   * moment the viewport was wider than 820px plus whatever margin centring
+   * produced — one of the four different alignments this screen used to
+   * show at once. The column is capped, not centred, so its left edge is the
+   * container's own edge and matches the title's.
    */
-  test('the bar itself is capped at 820px and centred', () => {
+  test('the bar itself is capped at 820px and left-aligned, not centred', () => {
     const { container } = open()
     const bar = container.querySelector('[data-guide="studio-bar"]') as HTMLElement
     const wrap = bar.parentElement as HTMLElement
     expect(wrap.className).toContain('max-w-[820px]')
-    expect(wrap.className).toContain('mx-auto')
+    expect(wrap.className).not.toContain('mx-auto')
   })
 })
 
@@ -986,16 +993,52 @@ describe('before any spend', () => {
 
 describe('the bar', () => {
   /**
-   * ── NOTHING INVERTS ────────────────────────────────────────────────────────
-   * RETARGETED. The old composer painted itself with `data-surface="inverse"`,
-   * a permanent dark panel regardless of theme. The founder's redesign removes
-   * that entirely: every panel follows the page theme, and separation comes
-   * from `surface-ring` and elevation. This asserts the scope is GONE, which is
-   * the exact opposite claim the old test made — and that is the point.
+   * ── EXACTLY ONE OBJECT INVERTS, AND IT IS THE BAR ─────────────────────────
+   * RETARGETED. `data-surface="inverse"` was dropped entirely and then
+   * reinstated by founder ruling, scoped to the composer bar alone: without
+   * it, the bar and the page shared the same fill in dark theme (1.30:1,
+   * `#171717` on `#0d0d0d`) and read as barely separated from the ground it
+   * sits on. This asserts the scope exists exactly once, and that the one
+   * element carrying it is the bar — never "Will send", the result bar, the
+   * work grid or the empty state, all of which must follow the page theme.
    */
-  test('nothing on this screen paints itself with the inverse scope', () => {
+  test('exactly one element inverts, and it is the composer bar', () => {
     const { container } = open()
-    expect(container.querySelectorAll('[data-surface="inverse"]')).toHaveLength(0)
+    const inverted = container.querySelectorAll('[data-surface="inverse"]')
+    expect(inverted).toHaveLength(1)
+    expect(inverted[0]).toHaveAttribute('data-guide', 'studio-bar')
+  })
+
+  /**
+   * ── NO RESERVED HEIGHT BEFORE ANYTHING IS TYPED ───────────────────────────
+   * The shared `Textarea` carries `min-h-[74px]` unconditionally, which is
+   * correct for a field sized on purpose and wrong here: `autoGrow` measures
+   * `scrollHeight` and sets an inline height, and a CSS `min-height` above
+   * that inline value still wins, which was the ~80px of dead space that used
+   * to open the bar before anything was typed. `min-h-0` overrides it.
+   */
+  test('the prompt box carries no reserved minimum height', () => {
+    open()
+    const prompt = screen.getByLabelText(/what should the picture show/i)
+    expect(prompt.className).toMatch(/(^|\s)min-h-0(\s|$)/)
+  })
+
+  /**
+   * ── THE PRIMARY'S HOVER USES THE INVERSE-SCOPE PAIR, NOT `--ink` ──────────
+   * Inside `data-surface="inverse"`, `--ink` is white (light theme) or black
+   * (dark theme, nested under `[data-theme="dark"]`) — either way it is the
+   * SAME colour the scope already uses for text, so a primary hovering to
+   * `bg-ink` with a literal `text-white` (the shared `Button`'s own recipe)
+   * paints the label on top of its own fill the moment they match. `Draw it`
+   * must hover through `--pstrong`/`--pstrong-fg` instead, the pair the
+   * scope solves for exactly this control.
+   */
+  test('draw it hovers through the inverse-scope pair, never through --ink', () => {
+    open()
+    const button = screen.getByRole('button', { name: /draw it/i })
+    expect(button.className).toMatch(/hover:bg-primary-strong/)
+    expect(button.className).toMatch(/hover:text-primary-strong-foreground/)
+    expect(button.className).not.toMatch(/hover:bg-ink\b/)
   })
 
   /**
@@ -1105,6 +1148,35 @@ describe('what Sahoda will send, shown before the spend', () => {
     // The certainty is carried for a screen reader too, not by a dot alone.
     expect(screen.getByText(/which Sahoda guessed/i)).toBeTruthy()
     expect(screen.getByText(/which you confirmed/i)).toBeTruthy()
+  })
+
+  /**
+   * ── A LABEL COLUMN, AND VALUES THAT ALIGN ─────────────────────────────────
+   * RETARGETED shape. This used to be one `flex-wrap` row where the eyebrow
+   * stayed inline with the first pair and later labels started wherever the
+   * previous value's wrap happened to end. A real two-column structure: every
+   * label lives in a `dt` that never wraps, every value in a `dd` clamped to
+   * two lines rather than left to run to the page edge — the value's WORDS
+   * are unchanged, only how many lines it may claim.
+   */
+  test('each label sits in a column that never wraps, and long values clamp to two lines', () => {
+    const long: BrandSignal = {
+      field: 'business',
+      certainty: 'confirmed',
+      value: 'Character Mentor, a tutoring studio that pairs each learner with a story',
+    }
+    const { container } = open(LIBRARY, [], [long])
+    const signals = container.querySelector('[data-guide="studio-signals"]') as HTMLElement
+    const dt = signals.querySelector('dt') as HTMLElement
+    expect(dt).not.toBeNull()
+    expect(dt.className).toMatch(/whitespace-nowrap/)
+    expect(dt.textContent).toContain('Business')
+
+    const dd = signals.querySelector('dd') as HTMLElement
+    const value = within(dd).getByText(long.value)
+    expect(value.className).toMatch(/line-clamp-2/)
+    // The words themselves are never trimmed to make it fit.
+    expect(value.textContent).toBe(long.value)
   })
 
   /**
@@ -1331,19 +1403,60 @@ describe('the rest of the composer the design asked for', () => {
     expect(screen.getByText(/nothing here changes what a press does today/i)).toBeTruthy()
   })
 
-  test('a picture can be added without leaving the composer', async () => {
+  /**
+   * ── "N MORE" IS LEGIBLE, NOT FADING CHROME ────────────────────────────────
+   * A promise about what is coming, not a disabled control: it stays a
+   * `<span>` with a `Lock` icon (never `<button disabled>`, design-lint rule
+   * 3), but it must not carry `opacity-70` on top of `text-muted`'s own
+   * lighter weight — that combination reads as disabled rather than as a
+   * label worth reading.
+   */
+  test('"N more" is legible: a span with a lock, and no extra dimming', () => {
+    const { container } = open()
+    const chips = container.querySelector('[data-guide="studio-chips"]') as HTMLElement
+    const more = Array.from(chips.querySelectorAll('span')).find(
+      (el) => /more$/i.test(el.textContent?.trim() ?? '') && el.querySelector('svg') !== null,
+    ) as HTMLElement
+    expect(more).toBeTruthy()
+    expect(more.tagName).toBe('SPAN')
+    expect(more.className).not.toMatch(/opacity-70/)
+  })
+
+  /**
+   * RETARGETED. The composer used to carry an always-present "quick add" tile
+   * even with nothing picked — the same door as the Match pill beside it,
+   * adjacent, twice. Now the Match pill is the ONE way in for a first
+   * picture: its own panel carries the full `ReferenceUpload`. Once a
+   * picture is actually picked, the numbered-thumbnail row appears and
+   * carries its own compact tile, so a SECOND picture can be added without
+   * reopening the panel — that quick-add capability survives, just moved to
+   * only where a picture has already been picked.
+   */
+  test('the quick-add tile is not a second door before anything is picked', () => {
+    open(LIBRARY)
+    expect(screen.queryByRole('group', { name: /how should sahoda approach it/i })).toBeNull()
+    // No compact tile in the composer's own row yet: the Match pill is the
+    // only way in for a first picture.
+    expect(screen.queryByLabelText(/add a picture to match/i)).toBeNull()
+  })
+
+  test('once a picture is picked, another can be added without reopening the panel', async () => {
     const user = userEvent.setup()
-    open()
-    // The bar's own quick-add tile is reachable with NO panel open at all —
-    // the whole reason it exists is the photograph on the phone in somebody's
-    // hand, which should not need a pill opened first.
+    const { container } = open(LIBRARY)
+    await openMatch(user)
+    const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
+    await user.click(within(picker).getAllByRole('button')[0]!)
+
+    // Closing the panel again — the numbered thumbnail row and its own
+    // compact tile stay in the composer, reachable with no panel open.
+    await openMatch(user)
     expect(screen.queryByRole('group', { name: /how should sahoda approach it/i })).toBeNull()
     const inComposer = screen.getByLabelText(/add a picture to match/i)
     expect(inComposer.getAttribute('accept')).toBe(uploadAccept())
 
     // The full picker, with its own sentence and legend, lives behind the
     // Match pill — a DIFFERENT name, so a screen reader can say which is
-    // which — and is not present until that pill is opened.
+    // which — and is not present until that pill is opened again.
     expect(screen.queryByLabelText(/add a picture from this device/i)).toBeNull()
     await openMatch(user)
     const inSettings = screen.getByLabelText(/add a picture from this device/i)
@@ -1488,37 +1601,38 @@ describe('first run: nothing made yet', () => {
   /**
    * ── NEVER A VOID, NEVER INVENTED PICTURES ─────────────────────────────────
    * The old screen simply ended after the composer before a first picture
-   * existed. The redesign replaces the grid with the starters, centred, under
-   * a line stating the claim plainly — never a blank stretch of page and never
-   * a sample picture this workspace did not make.
+   * existed. The redesign replaces the grid with a line stating the claim
+   * plainly — never a blank stretch of page and never a sample picture this
+   * workspace did not make.
    */
-  test('the grid is replaced by starters under a line saying nothing has been made', () => {
+  test('the grid is replaced by a line saying nothing has been made, with no invented picture', () => {
     const { container } = open(LIBRARY, [])
     expect(screen.getByText(/nothing made yet/i)).toBeTruthy()
-    const starters = container.querySelector('[data-guide="studio-empty-starters"]') as HTMLElement
-    expect(starters).not.toBeNull()
-    expect(within(starters).getAllByRole('button').length).toBeGreaterThan(2)
+    const empty = container.querySelector('[data-guide="studio-empty"]') as HTMLElement
+    expect(empty).not.toBeNull()
     // Never invented sample pictures: no img in the empty-run block.
-    expect(within(starters).queryAllByRole('img')).toHaveLength(0)
+    expect(within(empty).queryAllByRole('img')).toHaveLength(0)
   })
 
-  /** Pressing one fills the prompt, the same as the in-bar starters — nothing is spent. */
-  test('pressing a starter here fills the prompt rather than spending anything', async () => {
-    // Reset rather than trust the running total: other tests in this file
-    // exercise `queueGeneration` earlier, and this assertion is about what
-    // THIS press does, not the file's cumulative call count.
-    vi.mocked(queueGeneration).mockClear()
-    const user = userEvent.setup()
+  /**
+   * RETARGETED. The starters used to render a SECOND time here — the same
+   * five chips the bar already shows above whenever the prompt is empty,
+   * which on a fresh workspace is always true at the same moment as this
+   * block. The bar keeps them; this block states its claim in words and does
+   * not open a second copy of the same control.
+   */
+  test('the empty-run block does not repeat the bar’s own starter chips', () => {
     const { container } = open(LIBRARY, [])
-    const starters = container.querySelector('[data-guide="studio-empty-starters"]') as HTMLElement
-    const first = within(starters).getAllByRole('button')[0]!
-    const words = first.textContent
-    await user.click(first)
+    const barStarters = container.querySelector('[data-guide="studio-starters"]') as HTMLElement
+    expect(barStarters).not.toBeNull()
+    expect(within(barStarters).getAllByRole('button').length).toBeGreaterThan(2)
 
-    expect(
-      (screen.getByLabelText(/what should the picture show/i) as HTMLTextAreaElement).value,
-    ).toBe(words)
-    expect(queueGeneration).not.toHaveBeenCalled()
+    const empty = container.querySelector('[data-guide="studio-empty"]') as HTMLElement
+    // The empty-run block carries no control of its own: no second set of
+    // starter buttons duplicating the bar's.
+    expect(within(empty).queryAllByRole('button')).toHaveLength(0)
+    // And the whole screen offers each starter's own words exactly once.
+    expect(container.querySelectorAll('[data-guide="studio-starters"]')).toHaveLength(1)
   })
 
   test('the empty-run block disappears once a picture exists', () => {

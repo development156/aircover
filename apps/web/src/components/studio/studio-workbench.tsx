@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { Fragment, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { ChevronDown, ImageIcon, Lock, Minus, Plus, Sparkles, Stamp } from 'lucide-react'
+import { ChevronDown, ImageIcon, Loader2, Lock, Minus, Plus, Sparkles, Stamp } from 'lucide-react'
 import {
   DEFAULT_STAMP_OPTIONS,
   IMAGE_TIER_ACTION,
@@ -24,7 +24,6 @@ const DrawModal = dynamic(() =>
   import('@/components/studio/draw-modal').then((mod) => mod.DrawModal),
 )
 
-import { Button } from '@/components/ui/button'
 import { ModelPicker } from '@/components/studio/model-picker'
 import { PictureActions } from '@/components/studio/picture-actions'
 import { PictureViewer } from '@/components/studio/picture-viewer'
@@ -72,13 +71,34 @@ import { describeInsufficient, describePartial } from '@/lib/studio/refusal-copy
  * Whether a mode may run, how many references it takes, and the sentence when
  * it may not, all come from one module the server action asks as well.
  *
- * ── NOTHING INVERTS ──────────────────────────────────────────────────────
- * `data-surface="inverse"` painted the old composer as a permanent dark panel
- * regardless of theme. This screen never does that: every panel follows the
- * page theme, and separation comes from `surface-ring` and elevation rather
- * than a fill. The old composer's custom button existed only because `--ink`
- * was white inside that inverse scope; outside it the shared `Button` is
- * exactly correct, so this screen uses it.
+ * ── EXACTLY ONE OBJECT INVERTS: THE BAR ──────────────────────────────────
+ * Founder ruling. Dropping `data-surface="inverse"` entirely removed the
+ * three-panel zebra this screen used to have, but it also left the bar
+ * painted with `bg-surface` at the SAME value as the page in dark theme
+ * (`#171717` on `#0d0d0d`, 1.30:1) — barely separated from the ground it
+ * sits on. The zebra came from three panels disagreeing with each other and
+ * with the page, not from any one of them being dark. So exactly one element
+ * on this screen carries the scope: the composer bar (the `data-guide=
+ * "studio-bar"` div, below). Nothing else does — not "Will send", not the
+ * result bar, not the work grid, not the empty state.
+ *
+ * ── THE TRAP THIS HAS ALREADY BITTEN ONCE ─────────────────────────────────
+ * Inside `data-surface="inverse"`, `--ink` is WHITE (in light theme; it
+ * flips to black when the scope nests under `[data-theme="dark"]`, which is
+ * the point — see tokens.css's own header on the inverse surface). The
+ * shared `Button`'s primary variant hovers to `bg-ink` with a literal white
+ * label, which paints white on white the moment `--ink` is white. `Draw it`
+ * is therefore a CUSTOM button again, hovering through the `--pstrong` /
+ * `--pstrong-fg` pair instead (see the button's own className below) — the
+ * pair the inverse scope solves for exactly this control, and which already
+ * flips correctly with the scope in both themes (tokens.css lines 703–742,
+ * 856–863). Every other control inside the bar (the pills, the stepper, the
+ * locked "N more", the reference tiles) resolves `--ink`, `--line`, `--s2`
+ * and `--surface-3` through the same scope and needed no change: those
+ * tokens are the six aliases the scope re-declares on its own element, so a
+ * descendant using `bg-s2` or `text-muted` already picks up the dark ladder
+ * correctly (tokens.css's own comment on `--brand-deep` is the trap this
+ * would otherwise repeat).
  */
 /**
  * The controls this screen is designed for and does not have.
@@ -431,18 +451,32 @@ export function StudioWorkbench({
   }
 
   return (
-    // ── CONTENT-LED, NOT ONE CAPPED COLUMN ─────────────────────────────────
+    // ── CONTENT-LED, WITH ONE SHARED LEFT EDGE ─────────────────────────────
     // The old screen capped and centred the whole page at the 720px composer's
-    // own width. The bar keeps a measure of its own (820px, capped and
-    // centred below); the work underneath runs the page's own width, because a
-    // grid of pictures wants room and a line of text does not.
+    // own width. The bar keeps a measure of its own (820px, capped) below —
+    // but it is LEFT-aligned, not centred: the title above this component
+    // (`PageTitle`, in `page.tsx`) sits flush at the page's own gutter, and a
+    // centred bar drifted away from it the moment the page was wider than
+    // 820px + 2x whatever margin centring produced. Dropping `mx-auto` here
+    // means the bar's left edge, "Will send"'s left edge and the title's left
+    // edge are the SAME x, because all three now start at the container's own
+    // edge rather than two of them being recomputed by `auto` margins. The
+    // work grid stays full width below — that is the one thing that should
+    // break the column, and `max-w-[820px]` alone (no `mx-auto`) still caps
+    // the bar's own measure so the prompt never runs 1400px wide on a big
+    // screen.
     <div className="flex w-full flex-col gap-6" data-guide="studio-workbench">
       <section aria-labelledby="studio-make" className="flex flex-col gap-3">
         <h2 id="studio-make" className="sr-only">
           Make a picture
         </h2>
 
-        <div className="mx-auto flex w-full max-w-[820px] flex-col gap-3">
+        <div className="flex w-full max-w-[820px] flex-col gap-3">
+          {/* ── THE READOUT RELATES TO THE BAR IT SITS ON ─────────────────────
+              Right-aligned inside the SAME capped, left-aligned column as the
+              bar below it, so its right edge is the bar's own right edge
+              rather than a number floating above whatever the centred column
+              happened to be that render. */}
           {balance === null ? null : (
             <div className="flex justify-end">
               <span className="type-sm text-muted" data-guide="studio-balance">
@@ -454,15 +488,18 @@ export function StudioWorkbench({
             </div>
           )}
 
-          {/* ── THE BAR: ONE OBJECT, PROMPT LEFT, PRICED PRIMARY RIGHT ─────────
+          {/* ── THE BAR: THE ONE OBJECT THAT INVERTS ────────────────────────────
               Row 1 is the prompt and the priced primary. Row 2 is every control,
-              each the same 32px pill shape. Nothing here paints a colour of its
-              own: `bg-surface` and `surface-ring` follow whichever theme the
-              page is in, which is the whole point of removing the inverse
-              scope. */}
+              each the same 32px pill shape. `data-surface="inverse"` is scoped
+              to this element ALONE (see this file's header): everything inside
+              it — the pills, the stepper, the reference tiles — resolves
+              `--ink`/`--line`/`--s2`/`--surface-3` through this scope's own
+              re-declared aliases, which is why none of them needed a literal
+              colour change to read correctly. */}
           <div
             className="surface-ring flex flex-col gap-3 rounded-xl bg-surface p-3 shadow-lg"
             data-guide="studio-bar"
+            data-surface="inverse"
           >
             <div className="flex items-start gap-4">
               <label className="flex min-w-0 flex-1 flex-col gap-1">
@@ -478,35 +515,51 @@ export function StudioWorkbench({
                   // The prompt is the loudest thing on the bar and does not need
                   // a box drawn round it: it already sits on the bar's own
                   // surface. `bg-transparent` keeps that fill rather than
-                  // stacking a second one at the same value.
-                  className="border-0 bg-transparent px-0 py-0 type-h3 font-[400] shadow-none focus-visible:outline-none"
+                  // stacking a second one at the same value. `min-h-0`
+                  // overrides the shared Textarea's own `min-h-[74px]`: that
+                  // floor is correct for a form field sized on purpose, but it
+                  // fights `autoGrow` here — the box measures its own content
+                  // via `scrollHeight` and sets an inline height, and a CSS
+                  // min-height above that inline value wins anyway, which is
+                  // the ~80px of dead space that used to open the bar before
+                  // anything was typed.
+                  className="min-h-0 border-0 bg-transparent px-0 py-0 type-h3 font-[400] shadow-none focus-visible:outline-none"
                 />
               </label>
 
-              {/* ── THE PRICE IS ON THE PRIMARY ────────────────────────────────
+              {/* ── THE PRICE IS ON THE PRIMARY, AND THE BUTTON IS CUSTOM ────────
                   `Draw it` carries the total as its own second line. The price
                   and the press are one decision, and a cost floating beside the
-                  button on its own row read as unrelated to it. The shared
-                  `Button` is correct here now that nothing inverts: its primary
-                  variant already hovers to ink and disables to the recessed
-                  `bg-s2` pair the rest of the product uses. */}
-              <Button
+                  button on its own row would read as unrelated to it.
+                  A CUSTOM button, not the shared `Button`: `Button`'s primary
+                  variant hovers to `bg-ink`, which is correct on the page and
+                  wrong in here — inside `data-surface="inverse"`, `--ink` IS
+                  white (in light theme), so that hover would paint white text
+                  on a white fill. `--pstrong`/`--pstrong-fg` are the pair this
+                  scope solves for exactly this control: the fill LIFTS on
+                  hover rather than darkening toward the panel behind it, and
+                  the pair already flips correctly per theme (this file's own
+                  header). */}
+              <button
                 type="button"
-                variant="primary"
                 onClick={generate}
-                disabled={!ready}
-                loading={busy}
+                disabled={!ready || busy}
+                aria-busy={busy || undefined}
                 data-guide="studio-generate"
-                className="h-[56px] shrink-0 flex-col items-start justify-center gap-0 rounded-lg px-5"
+                className="inline-flex h-[56px] shrink-0 flex-col items-start justify-center gap-0 rounded-lg bg-primary px-5 text-primary-foreground transition-micro hover:bg-primary-strong hover:text-primary-strong-foreground active:translate-y-[0.5px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:bg-s2 disabled:text-muted disabled:opacity-100 disabled:shadow-[inset_0_0_0_1px_var(--line)]"
               >
                 <span className="flex items-center gap-1.5 type-sm font-[650]">
-                  {busy ? null : <Sparkles className="size-[15px]" aria-hidden />}
+                  {busy ? (
+                    <Loader2 className="size-[15px] animate-spin" aria-hidden />
+                  ) : (
+                    <Sparkles className="size-[15px]" aria-hidden />
+                  )}
                   Draw it
                 </span>
                 <span className="num type-sm font-[500] opacity-75">
                   {total} {creditWord(total)}
                 </span>
-              </Button>
+              </button>
             </div>
 
             {/* ── SOMETHING TO TRY ──────────────────────────────────────────────
@@ -535,7 +588,16 @@ export function StudioWorkbench({
                 because the photograph on the phone in somebody's hand should
                 not need a panel opened first. The numeral on each thumbnail is
                 the pick ORDER, not a tick: `signReferences` sends them in that
-                order and the first weighs most. */}
+                order and the first weighs most.
+
+                ── ONE DOOR TO "ADD A PICTURE", NOT TWO ──────────────────────────
+                This row used to render even with nothing picked, inviting a
+                picture right beside the Match pill in Row 2 below — the same
+                door twice, adjacent. The Match pill is the way IN now (it
+                reads better in the control row, and its own panel carries a
+                full `ReferenceUpload`); this row appears only once a picture
+                has actually been picked, because the numbered thumbnails are
+                worth showing and the empty invitation twice is not. */}
             {picked.length > 0 ? (
               <ul className="flex flex-wrap items-center gap-2">
                 {picked.map((assetId, at) => {
@@ -578,12 +640,7 @@ export function StudioWorkbench({
                   <span className="num">{picked.length}</span> to match, in order
                 </li>
               </ul>
-            ) : (
-              <div className="flex items-center gap-2">
-                <ReferenceUpload compact disabled={false} onAdded={addReference} />
-                <span className="type-sm text-muted">Add a picture to match, if you have one</span>
-              </div>
-            )}
+            ) : null}
 
             {/* ── ROW 2: ONE CONTROL SHAPE FOR EVERY PILL ───────────────────────
                 Match, a divider, then Model, Approach and Size — each a bare
@@ -678,13 +735,19 @@ export function StudioWorkbench({
 
               <div className="grow" />
 
-              {/* ── NAMED, NOT A DOOR ───────────────────────────────────────────
+              {/* ── NAMED, NOT A DOOR, AND LEGIBLE ───────────────────────────────
                   A `<span>`, never a button: nothing behind it opens, because
                   these four are designed and not built. `design-lint.mjs` rule 3
                   refuses a disabled button paired with coming-soon copy for
                   exactly this reason — a screen reader still announces a
-                  disabled button as an action the reader could take. */}
-              <span className="flex items-center gap-1.5 type-sm text-muted opacity-70">
+                  disabled button as an action the reader could take.
+                  No `opacity-70` here, on purpose: this is a promise about
+                  what is coming, not chrome, and dimming it on top of
+                  `text-muted`'s own lighter weight read as disabled rather
+                  than as a label worth reading. The lock icon still says it
+                  is not a door; the text no longer looks like it is fading
+                  out of the control row. */}
+              <span className="flex items-center gap-1.5 type-sm text-muted">
                 <Lock className="size-[12px]" aria-hidden />
                 <span className="num">{COMING_SOON.length}</span> more
               </span>
@@ -959,13 +1022,21 @@ export function StudioWorkbench({
             )}
           </div>
 
-          {/* ── "WILL SEND": ONE WRAPPING ROW, NOT A CARD ───────────────────────
-              A brand fact used to live in a whole second card beside "Not
-              built". The redesign is content-led even here: a row of
-              dot-label-value groups that wraps like text, because it IS a
-              sentence about what the next press will carry, not an object of
-              its own visual weight. */}
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2" data-guide="studio-signals">
+          {/* ── "WILL SEND": A LABEL COLUMN AND A VALUE COLUMN, NOT A PARAGRAPH ──
+              This used to be one `flex-wrap` row of dot-label-value groups,
+              which read fine for two short facts and became a paragraph the
+              moment a real workspace had five: the eyebrow stayed inline with
+              the first pair, later labels started wherever the previous
+              value's wrap happened to end, and "Character Mentor" (a business
+              name) ran three times longer than "Warm cream, deep brown, one
+              orange" and dragged the whole row to the right edge with it.
+              `grid-cols-[auto_1fr]` gives every row the SAME two columns: the
+              label column sizes itself to the widest label and never wraps
+              (`whitespace-nowrap`), so every value starts at the same x, and
+              the value itself is `line-clamp-2` rather than left to keep
+              growing — the long value's WORDS are unchanged, only how many
+              lines it may claim before truncating. */}
+          <div className="flex flex-col gap-1.5" data-guide="studio-signals">
             <span className="type-eyebrow text-muted">Will send</span>
             {signals === null ? (
               <p className="type-sm text-muted">
@@ -978,44 +1049,50 @@ export function StudioWorkbench({
                 business rather than generic.
               </p>
             ) : (
-              signals.map((signal) => {
-                // The one leaf that is colour, and the reason this screen
-                // exists: `signal.value` here is raw theme notation
-                // (`oklch(...)`, comma-joined), and printing it is the exact
-                // defect being fixed. A colour is painted, never spelled.
-                const swatches = colourValuesOf(signal)
-                return (
-                  <span key={signal.field} className="inline-flex items-baseline gap-1.5">
-                    <span
-                      aria-hidden
-                      className={`size-[6px] shrink-0 rounded-full ${
-                        signal.certainty === 'confirmed' ? 'bg-primary' : 'surface-ring-firm'
-                      }`}
-                    />
-                    <span className="type-sm text-muted">{labelFor(signal.field)}</span>
-                    {swatches === null ? (
-                      <span className="type-sm text-ink">{signal.value}</span>
-                    ) : (
-                      <span className="flex items-center gap-1">
-                        {swatches.map((colour, at) => (
-                          <span
-                            key={`${colour}-${at}`}
-                            aria-hidden
-                            style={{ background: colour }}
-                            className="surface-ring size-[13px] shrink-0 rounded-sm"
-                          />
-                        ))}
-                        <span className="sr-only">{colorNames(swatches).join(', ')}</span>
-                      </span>
-                    )}
-                    <span className="sr-only">
-                      {signal.certainty === 'confirmed'
-                        ? ', which you confirmed'
-                        : ', which Sahoda guessed'}
-                    </span>
-                  </span>
-                )
-              })
+              <dl className="grid grid-cols-[auto_1fr] items-baseline gap-x-3 gap-y-1.5">
+                {signals.map((signal) => {
+                  // The one leaf that is colour, and the reason this screen
+                  // exists: `signal.value` here is raw theme notation
+                  // (`oklch(...)`, comma-joined), and printing it is the exact
+                  // defect being fixed. A colour is painted, never spelled.
+                  const swatches = colourValuesOf(signal)
+                  return (
+                    <Fragment key={signal.field}>
+                      <dt className="flex items-center gap-1.5 whitespace-nowrap type-sm text-muted">
+                        <span
+                          aria-hidden
+                          className={`size-[6px] shrink-0 rounded-full ${
+                            signal.certainty === 'confirmed' ? 'bg-primary' : 'surface-ring-firm'
+                          }`}
+                        />
+                        {labelFor(signal.field)}
+                      </dt>
+                      <dd className="flex min-w-0 items-baseline gap-1.5">
+                        {swatches === null ? (
+                          <span className="line-clamp-2 type-sm text-ink">{signal.value}</span>
+                        ) : (
+                          <span className="flex flex-wrap items-center gap-1">
+                            {swatches.map((colour, at) => (
+                              <span
+                                key={`${colour}-${at}`}
+                                aria-hidden
+                                style={{ background: colour }}
+                                className="surface-ring size-[13px] shrink-0 rounded-sm"
+                              />
+                            ))}
+                            <span className="sr-only">{colorNames(swatches).join(', ')}</span>
+                          </span>
+                        )}
+                        <span className="sr-only">
+                          {signal.certainty === 'confirmed'
+                            ? ', which you confirmed'
+                            : ', which Sahoda guessed'}
+                        </span>
+                      </dd>
+                    </Fragment>
+                  )
+                })}
+              </dl>
             )}
           </div>
 
@@ -1062,31 +1139,22 @@ export function StudioWorkbench({
       {/* ── THE WORK: CONTENT-LED, FULL PAGE WIDTH ────────────────────────────
           Nothing here is capped at the bar's 820px measure: a grid of pictures
           wants room and a line of text does not. Before a first picture exists
-          the grid is replaced by the starters, centred, under a line saying
-          nothing has been made yet — never a void, never invented sample
-          pictures. */}
+          the grid is replaced by a line saying nothing has been made yet —
+          never a void, never invented sample pictures.
+
+          ── ONE OWNER FOR THE STARTERS, NOT TWO ─────────────────────────────
+          This block used to repeat the bar's own five starter chips, about
+          400px below the identical five chips the bar already shows whenever
+          the prompt is empty — which, on a fresh workspace, is always true at
+          the same time as this block being shown. The bar keeps them: that is
+          the box they FILL. This block states the claim plainly and points up
+          at the box that is already open and waiting, rather than opening a
+          second copy of the same five buttons. */}
       {pictures.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-6" data-guide="studio-empty">
+        <div className="flex flex-col items-center gap-2 py-6" data-guide="studio-empty">
           <p className="type-sm text-muted">
-            Nothing made yet. Try one of these, then change the words.
+            Nothing made yet. Use an idea from the box above, or write your own, then press Draw it.
           </p>
-          <ul
-            className="flex flex-wrap justify-center gap-2"
-            style={{ maxWidth: 820 }}
-            data-guide="studio-empty-starters"
-          >
-            {PROMPT_STARTERS.map((starter) => (
-              <li key={starter}>
-                <button
-                  type="button"
-                  onClick={() => setWanted(starter)}
-                  className="surface-ring rounded-pill bg-s2 px-3 py-1.5 text-left type-sm text-muted transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                >
-                  {starter}
-                </button>
-              </li>
-            ))}
-          </ul>
         </div>
       ) : (
         <section aria-labelledby="studio-canvas" className="flex flex-col gap-4">
