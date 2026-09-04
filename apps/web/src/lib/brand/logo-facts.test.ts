@@ -391,6 +391,83 @@ describe('malformed input is refused', () => {
  * only arrangement where the two rules give different answers, once for each
  * fact that depends on the background sample.
  */
+describe('meanInkLuminance: the SECOND luminance, linearised WCAG, not the band-sorting one', () => {
+  it('is null when there is no ink, never a fabricated 0 that would read as black', async () => {
+    const img = await build(100, 100, 4, TRANSPARENT, [])
+    const facts = logoFactsFromRaw(img.raw, img.width, img.height, img.channels)
+    expect(facts.trim).toBeNull()
+    expect(facts.meanInkLuminance).toBeNull()
+    expect(facts.darkInkShare).toBe(0)
+    expect(facts.lightInkShare).toBe(0)
+  })
+
+  it('is the LINEARISED mean for a flat mid-grey mark, not the raw byte mean', async () => {
+    // RGB 80,80,80: a raw byte mean would read 80/255 = 0.3137. The true
+    // WCAG linear luminance is 0.0802, the same divergence `stamp.test.ts`
+    // documents for its own mid-shadow fixture. If this ever regresses to a
+    // raw byte average, this is the assertion that catches it.
+    const MID_GREY = { r: 80, g: 80, b: 80 }
+    const img = await build(160, 160, 4, TRANSPARENT, [
+      { left: 20, top: 20, width: 120, height: 120, color: { ...MID_GREY, alpha: 255 } },
+    ])
+    const facts = logoFactsFromRaw(img.raw, img.width, img.height, img.channels)
+    // RGB 80's raw luma (80) sits just below `DARK_INK_MAX_LUMA` (89.25), so
+    // this is a `dark`-banded mark: the point of THIS fixture is the mean
+    // formula itself, which is exercised identically whatever the polarity is.
+    expect(facts.inkPolarity).toBe('dark')
+    expect(facts.meanInkLuminance).not.toBeNull()
+    expect(facts.meanInkLuminance!).toBeCloseTo(0.0802, 3)
+    expect(facts.meanInkLuminance!).toBeLessThan(80 / 255)
+  })
+
+  it('is the linearised mean for a single mid-blue mark, the real mixed-but-mid-tone case', async () => {
+    const MID_BLUE = { r: 40, g: 120, b: 200 }
+    const img = await build(160, 160, 4, TRANSPARENT, [
+      { left: 20, top: 20, width: 120, height: 120, color: { ...MID_BLUE, alpha: 255 } },
+    ])
+    const facts = logoFactsFromRaw(img.raw, img.width, img.height, img.channels)
+    expect(facts.inkPolarity).toBe('mixed')
+    expect(facts.meanInkLuminance!).toBeCloseTo(0.1805, 3)
+    expect(facts.darkInkShare).toBe(0)
+    expect(facts.lightInkShare).toBe(0)
+  })
+
+  it('reports substantial dark AND light shares for a genuinely bipolar mark', async () => {
+    // Same fixture `inkPolarity: mixed` already pins as bipolar: half the ink
+    // pure black, half pure white. Neither share is noise from anti-aliasing;
+    // both are the whole point of the mark.
+    const img = await build(160, 160, 4, TRANSPARENT, [
+      { left: 10, top: 10, width: 70, height: 140, color: { r: 0, g: 0, b: 0, alpha: 255 } },
+      { left: 90, top: 10, width: 70, height: 140, color: { r: 255, g: 255, b: 255, alpha: 255 } },
+    ])
+    const facts = logoFactsFromRaw(img.raw, img.width, img.height, img.channels)
+    expect(facts.inkPolarity).toBe('mixed')
+    expect(facts.darkInkShare!).toBeGreaterThan(0.4)
+    expect(facts.lightInkShare!).toBeGreaterThan(0.4)
+  })
+
+  it('weights a partially transparent ink pixel proportionally, not as a full opaque one', async () => {
+    // A half-opaque near-white patch over a transparent canvas: fully counted
+    // as ink pixel (alpha 200 clears MIN_INK_ALPHA=128), but its CONTRIBUTION
+    // to the luminance mean must be scaled by its own alpha, exactly the way
+    // `stamp.ts`'s `meanLuminance` weights a partially covered backdrop pixel.
+    const HALF_WHITE = { r: 250, g: 250, b: 250, alpha: 200 }
+    const img = await build(100, 100, 4, TRANSPARENT, [
+      { left: 20, top: 20, width: 60, height: 60, color: HALF_WHITE },
+    ])
+    const facts = logoFactsFromRaw(img.raw, img.width, img.height, img.channels)
+    expect(facts.trim).toEqual({ x: 20, y: 20, width: 60, height: 60 })
+    // The pixel's own linear luminance is near 1 (near-white); the weighted
+    // mean equals that same value regardless of alpha, because a UNIFORM
+    // patch is weighted uniformly — the alpha only matters when it varies
+    // pixel to pixel, and this fixture exists to prove the weight is applied
+    // at all rather than silently dropped (which would still, by coincidence,
+    // pass a uniform-alpha fixture — so this is a smoke check, not the whole
+    // claim; `stamp.test.ts` carries the case with mixed coverage).
+    expect(facts.meanInkLuminance!).toBeGreaterThan(0.9)
+  })
+})
+
 describe('the background sample is the whole border ring, not one corner', () => {
   it('still calls the background transparent when the mark covers the top-left corner', async () => {
     // Three of the four edges are clear transparent canvas and the mark bleeds

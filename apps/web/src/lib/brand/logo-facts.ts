@@ -47,6 +47,7 @@
 import {
   isDarkLuma,
   isLightLuma,
+  linearLuminance,
   polarityOf,
   relativeLuminance,
   shapeOf,
@@ -63,6 +64,42 @@ export interface LogoFacts {
   trim: TrimBox | null
   inkPolarity: InkPolarity
   shapeClass: ShapeClass
+  /**
+   * The ink's own linearised WCAG relative luminance (0-1), alpha-weighted over
+   * every ink pixel exactly the way `stamp.ts`'s `meanLuminance` weights a
+   * picture's backdrop, so the two are the same quantity and a comparison
+   * between them means something. `null` means "there is no ink to have a
+   * luminance" (`inkPixels === 0`) — never "unknown" and never "assume mid
+   * grey": a fabricated 0 would read as pitch black to anything that used it.
+   *
+   * This is a DIFFERENT number from the `luma` this same scan uses to band a
+   * pixel dark or light for `darkInkShare`/`lightInkShare` below: that one is a
+   * raw 0-255 sum with no gamma step, tuned only to sort a pixel into a band,
+   * and averaging IT would not be the WCAG quantity `needsPlate`'s contrast
+   * thresholds are solved from.
+   *
+   * Optional as well as nullable: an old cached `LogoFacts`, a hand-built test
+   * fixture, or any object literal that predates this field simply lacks it,
+   * `undefined` rather than `null`. `needsPlate` treats an absent measurement
+   * exactly like a `null` one, so today's callers keep today's behaviour
+   * without being taught a convention to follow.
+   */
+  meanInkLuminance?: number | null
+  /**
+   * Share of ink pixels in the dark band (`darkPixels / inkPixels`), 0 when
+   * there is no ink. Alongside `lightInkShare`, this is what lets `needsPlate`
+   * tell a genuinely two-toned mark (substantial ink at BOTH extremes, whose
+   * mean is a lie) apart from a mid-tone one (most ink sits in the gap between
+   * the bands, so the mean IS the mark). See `logo-placement.ts`'s
+   * `plateDecisionFor`.
+   *
+   * Optional for the same reason `meanInkLuminance` is: absence must read as
+   * "cannot be measured", never as permission to treat a mark as safely
+   * mid-tone.
+   */
+  darkInkShare?: number
+  /** Share of ink pixels in the light band (`lightPixels / inkPixels`), 0 when there is no ink. */
+  lightInkShare?: number
 }
 
 /** A byte of 255 is the only fully opaque alpha, so anything below it is alpha in use. */
@@ -206,6 +243,15 @@ export function logoFactsFromRaw(
   let inkPixels = 0
   let darkPixels = 0
   let lightPixels = 0
+  // ── THE SECOND SUM, ALONGSIDE THE FIRST ─────────────────────────────────
+  // `luma` above is the raw 0-255 band-sorting quantity. This is a completely
+  // different one: the linearised WCAG luminance, alpha-weighted so a
+  // partially transparent ink pixel contributes proportionally rather than as
+  // a whole opaque one. Computed in the same loop because the loop already
+  // visits every ink pixel once; a second pass over the same pixels would
+  // cost the same and read as though the two luminances were unrelated.
+  let inkLuminanceSum = 0
+  let inkLuminanceWeight = 0
 
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
@@ -228,6 +274,14 @@ export function logoFactsFromRaw(
       const luma = relativeLuminance(r, g, b)
       if (isDarkLuma(luma)) darkPixels += 1
       else if (isLightLuma(luma)) lightPixels += 1
+
+      // `useAlpha` is what `readBackground` used to decide ink from background,
+      // so it is also the honest signal for whether THIS pixel's own alpha
+      // means partial coverage. A 3-channel image (or a 4-channel one with no
+      // meaningful alpha) has every ink pixel fully opaque by definition.
+      const weight = background.useAlpha ? raw[offset + 3]! / OPAQUE_ALPHA : 1
+      inkLuminanceSum += weight * linearLuminance(r, g, b)
+      inkLuminanceWeight += weight
     }
   }
 
@@ -240,5 +294,11 @@ export function logoFactsFromRaw(
     trim,
     inkPolarity: polarityOf(inkPixels, darkPixels, lightPixels),
     shapeClass: shapeOf(trim),
+    // `inkLuminanceWeight` cannot be 0 here when `inkPixels > 0`: every ink
+    // pixel counted by the alpha branch cleared `MIN_INK_ALPHA` (128 of 255),
+    // so its weight is at least ~0.5, and the non-alpha branch always weighs 1.
+    meanInkLuminance: inkPixels === 0 ? null : inkLuminanceSum / inkLuminanceWeight,
+    darkInkShare: inkPixels === 0 ? 0 : darkPixels / inkPixels,
+    lightInkShare: inkPixels === 0 ? 0 : lightPixels / inkPixels,
   }
 }

@@ -60,6 +60,37 @@ export function relativeLuminance(r: number, g: number, b: number): number {
   return LUMA_R * r + LUMA_G * g + LUMA_B * b
 }
 
+const MAX_CHANNEL = 255
+
+/**
+ * One sRGB byte to its linear-light value, the sRGB electro-optical transfer
+ * function exactly as WCAG 2.1 defines it for relative luminance.
+ *
+ * This is a DIFFERENT quantity from `relativeLuminance` above: that one is a raw
+ * 0-255 weighted sum with no gamma step, used only to band a pixel dark or light.
+ * This one, composed with `LUMA_R/G/B` on its OUTPUT, is the 0-1 linearised WCAG
+ * luminance that `needsPlate`'s contrast thresholds are solved from, and it is
+ * exported from here rather than duplicated because `stamp.ts` needs the exact
+ * same curve to measure a picture's backdrop: comparing a mark's luminance
+ * against a backdrop's only means anything when both were measured the same way.
+ */
+export function linearise(byte: number): number {
+  const c = byte / MAX_CHANNEL
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+}
+
+/**
+ * The 0-1 linearised WCAG relative luminance of one sRGB pixel: `linearise`
+ * per channel, then the same `LUMA_R/G/B` weights `relativeLuminance` uses.
+ * Exported as one function, not three constants, so every caller (this file's
+ * own scan, `stamp.ts`'s backdrop measurement) composes the transfer function
+ * and the weights in the one order WCAG defines rather than each re-deriving
+ * it from parts.
+ */
+export function linearLuminance(r: number, g: number, b: number): number {
+  return LUMA_R * linearise(r) + LUMA_G * linearise(g) + LUMA_B * linearise(b)
+}
+
 /** Which side of the two bands one ink pixel falls on. Mid greys count for neither. */
 export function isDarkLuma(luma: number): boolean {
   return luma <= DARK_INK_MAX_LUMA

@@ -529,6 +529,169 @@ describe('stampLogo: the plate is decided from the backdrop under the mark', () 
   })
 })
 
+/** A picture with no per-pixel wobble at all, for backdrops close enough to a threshold that noise would matter. */
+async function makeFlatPicture(base: Rgb): Promise<Uint8Array> {
+  const raw = Buffer.alloc(PICTURE.width * PICTURE.height * 3)
+  for (let i = 0; i < PICTURE.width * PICTURE.height; i += 1) {
+    raw[i * 3] = base.r
+    raw[i * 3 + 1] = base.g
+    raw[i * 3 + 2] = base.b
+  }
+  const png = await sharp(raw, {
+    raw: { width: PICTURE.width, height: PICTURE.height, channels: 3 },
+  })
+    .png()
+    .toBuffer()
+  return new Uint8Array(png)
+}
+
+const NEAR_BLACK_BACKDROP = { r: 0, g: 0, b: 0 }
+const NEAR_WHITE_BACKDROP = { r: 255, g: 255, b: 255 }
+const MID_BACKDROP = { r: 154, g: 154, b: 154 } // linearised luminance ≈ 0.35
+
+/**
+ * A single mid-tone mark (`darkInkShare`/`lightInkShare` both 0, so nothing
+ * pushes `plateDecisionFor` to `'bipolar'`), luminance chosen at ≈0.1791: the
+ * point that maximises the WORSE of its two contrasts against pure black and
+ * pure white at once (`20L+1 = 1.05/(L+.05)`), giving ~4.58:1 either way.
+ */
+const MID_TONE_FACTS: LogoFacts = {
+  hasAlpha: true,
+  transparentBackground: true,
+  trim: TRIM,
+  inkPolarity: 'mixed',
+  shapeClass: 'wide',
+  meanInkLuminance: 0.1791,
+  darkInkShare: 0,
+  lightInkShare: 0,
+}
+
+/** Same shape as `MID_TONE_FACTS`, but a mean the fixture's own comment computes as failing. */
+const MID_TONE_FAILS_FACTS: LogoFacts = {
+  ...MID_TONE_FACTS,
+  meanInkLuminance: 0.3,
+}
+
+/** Genuinely two-toned: black-and-white in real proportion, not a rounding artefact. */
+const BIPOLAR_FACTS: LogoFacts = {
+  ...MID_TONE_FACTS,
+  meanInkLuminance: 0.5,
+  darkInkShare: 0.45,
+  lightInkShare: 0.45,
+}
+
+/** No ink at all: the fixture the fix must never treat as "safe to skip the plate". */
+const NO_INK_MIXED_FACTS: LogoFacts = {
+  ...MID_TONE_FACTS,
+  meanInkLuminance: null,
+  darkInkShare: 0,
+  lightInkShare: 0,
+}
+
+describe('stampLogo: a MIXED mark, measured, is no longer plated unconditionally', () => {
+  it('a mid-tone mark on a near-black backdrop needs no plate: the whole reason this fix exists', async () => {
+    const result = await stampLogo({
+      picture: await makeFlatPicture(NEAR_BLACK_BACKDROP),
+      logo: await makeLogo(),
+      facts: MID_TONE_FACTS,
+      anchor: 'bottom-right',
+      plate: PLATE,
+    })
+    expect(result.ok, result.ok ? '' : result.reason).toBe(true)
+    if (!result.ok) return
+    expect(result.plated).toBe(false)
+  })
+
+  it('the SAME mid-tone mark on a near-white backdrop also needs no plate: it clears 4.5:1 both ways', async () => {
+    const result = await stampLogo({
+      picture: await makeFlatPicture(NEAR_WHITE_BACKDROP),
+      logo: await makeLogo(),
+      facts: MID_TONE_FACTS,
+      anchor: 'bottom-right',
+      plate: PLATE,
+    })
+    expect(result.ok, result.ok ? '' : result.reason).toBe(true)
+    if (!result.ok) return
+    expect(result.plated).toBe(false)
+  })
+
+  it('a mid-tone mark whose contrast genuinely fails against a similarly mid backdrop is still plated', async () => {
+    const result = await stampLogo({
+      picture: await makeFlatPicture(MID_BACKDROP),
+      logo: await makeLogo(),
+      facts: MID_TONE_FAILS_FACTS,
+      anchor: 'bottom-right',
+      plate: PLATE,
+    })
+    expect(result.ok, result.ok ? '' : result.reason).toBe(true)
+    if (!result.ok) return
+    expect(result.plated).toBe(true)
+  })
+
+  it('a bipolar (genuinely two-toned) mark still plates on a near-black backdrop, unchanged', async () => {
+    const result = await stampLogo({
+      picture: await makeFlatPicture(NEAR_BLACK_BACKDROP),
+      logo: await makeLogo(),
+      facts: BIPOLAR_FACTS,
+      anchor: 'bottom-right',
+      plate: PLATE,
+    })
+    expect(result.ok, result.ok ? '' : result.reason).toBe(true)
+    if (!result.ok) return
+    expect(result.plated).toBe(true)
+  })
+
+  it('a bipolar mark still plates on a near-white backdrop too, unchanged', async () => {
+    const result = await stampLogo({
+      picture: await makeFlatPicture(NEAR_WHITE_BACKDROP),
+      logo: await makeLogo(),
+      facts: BIPOLAR_FACTS,
+      anchor: 'bottom-right',
+      plate: PLATE,
+    })
+    expect(result.ok, result.ok ? '' : result.reason).toBe(true)
+    if (!result.ok) return
+    expect(result.plated).toBe(true)
+  })
+
+  it('a mixed mark with no ink measured plates unconditionally, never read as "safe to skip"', async () => {
+    const result = await stampLogo({
+      picture: await makeFlatPicture(NEAR_BLACK_BACKDROP),
+      logo: await makeLogo(),
+      facts: NO_INK_MIXED_FACTS,
+      anchor: 'bottom-right',
+      plate: PLATE,
+    })
+    expect(result.ok, result.ok ? '' : result.reason).toBe(true)
+    if (!result.ok) return
+    expect(result.plated).toBe(true)
+  })
+
+  it('an old-shaped mixed LogoFacts with no meanInkLuminance field at all still plates unconditionally', async () => {
+    // The literal has no `meanInkLuminance`, `darkInkShare` or `lightInkShare`
+    // keys, not just `undefined` values: this is what a cached record from
+    // before this change, or a hand-built fixture that never learned about the
+    // new fields, actually looks like.
+    const oldShapeFacts: LogoFacts = {
+      hasAlpha: true,
+      transparentBackground: true,
+      trim: TRIM,
+      inkPolarity: 'mixed',
+      shapeClass: 'wide',
+    }
+    const result = await stampLogo({
+      picture: await makeFlatPicture(NEAR_BLACK_BACKDROP),
+      logo: await makeLogo(),
+      facts: oldShapeFacts,
+      anchor: 'bottom-right',
+      plate: PLATE,
+    })
+    expect(result.ok, result.ok ? '' : result.reason).toBe(true)
+    if (!result.ok) return
+    expect(result.plated).toBe(true)
+  })
+})
+
 describe('stampLogo: the plate radius never exceeds half the plate’s own shorter side', () => {
   /**
    * A tall, narrow trim (2px wide, 400px tall inside a 410x410 file) drives

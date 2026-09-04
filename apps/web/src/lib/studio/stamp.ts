@@ -7,6 +7,7 @@ import sharp, { type OverlayOptions, type Sharp } from 'sharp'
 
 import type { StampSizeStep } from '@sahoda/shared'
 
+import { linearLuminance } from '../brand/logo-facts-classify'
 import type { InkPolarity, LogoFacts } from '../brand/logo-facts'
 import { pickLogoVariant } from '@/lib/brand/logo-variant-pick'
 import {
@@ -63,26 +64,20 @@ import { roundedRectPng } from './rounded-rect'
 
 /** Sharp's ceiling on decoded pixels: the defence against a small file that decodes to gigabytes. */
 const MAX_PIXELS = 100_000_000
-/** Rec. 709 relative luminance weights, the same ones `logo-facts-classify` uses. */
-const LUMA_R = 0.2126
-const LUMA_G = 0.7152
-const LUMA_B = 0.0722
-
 const MAX_CHANNEL = 255
 
 /**
- * One sRGB byte to its linear-light value, the sRGB electro-optical transfer
- * function exactly as WCAG 2.1 defines it for relative luminance.
- *
- * The same curve `lib/brand/oklch.ts` already applies in this tree. It is here
- * rather than imported from there because that module is about colour SPACES
- * and this one needs a single scalar; the constants are the specification's,
- * not either module's, so the two cannot drift into disagreeing.
+ * `linearLuminance` (linearise-then-weight, the sRGB electro-optical transfer
+ * function WCAG 2.1 defines for relative luminance, composed with Rec. 709's
+ * weights) now lives in `logo-facts-classify.ts` and is imported above, not
+ * redefined here: `logoFactsFromRaw` needs the identical curve to measure a
+ * MIXED mark's own luminance, and comparing that against this function's
+ * `meanLuminance` backdrop only means anything if both were computed the same
+ * way. The same curve `lib/brand/oklch.ts` applies too; that module is about
+ * colour SPACES and neither of these needs a whole space, just the one scalar,
+ * so all three share one implementation rather than each keeping a copy that
+ * can drift.
  */
-function linearise(byte: number): number {
-  const c = byte / MAX_CHANNEL
-  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
-}
 
 interface Rgb {
   r: number
@@ -245,11 +240,7 @@ async function meanLuminance(picture: Uint8Array, region: Rect): Promise<number 
     for (let at = 0; at < data.length; at += channels) {
       const alpha = alphaAt === -1 ? 1 : data[at + alphaAt]! / MAX_CHANNEL
       if (alpha === 0) continue
-      total +=
-        alpha *
-        (LUMA_R * linearise(data[at]!) +
-          LUMA_G * linearise(data[at + 1]!) +
-          LUMA_B * linearise(data[at + 2]!))
+      total += alpha * linearLuminance(data[at]!, data[at + 1]!, data[at + 2]!)
       covered += alpha
     }
     // Nothing under the mark at all: the picture is transparent there and will
@@ -383,7 +374,16 @@ export async function stampLogo(input: StampInput): Promise<StampResult> {
     }
   }
 
-  const plated = needsPlate(luminance, input.facts.inkPolarity)
+  // `meanInkLuminance` is optional on `LogoFacts`, so it is normalised to
+  // `null` (never left `undefined`) before it reaches `needsPlate`: `null` is
+  // what `plateDecisionFor` reads as "no ink was measured", exactly the answer
+  // an absent field should give, without `needsPlate` having to special-case
+  // `undefined` on top of `null`.
+  const plated = needsPlate(luminance, input.facts.inkPolarity, {
+    meanInkLuminance: input.facts.meanInkLuminance ?? null,
+    darkInkShare: input.facts.darkInkShare ?? 0,
+    lightInkShare: input.facts.lightInkShare ?? 0,
+  })
 
   const layers: OverlayOptions[] = []
   if (plated) {

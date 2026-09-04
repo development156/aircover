@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import { needsPlate, placeLogo, type Anchor, type Placement, type Rect } from './logo-placement'
+import {
+  needsPlate,
+  placeLogo,
+  plateDecisionFor,
+  type Anchor,
+  type MixedInkMeasurement,
+  type Placement,
+  type Rect,
+} from './logo-placement'
 
 /**
  * Pins the contract for `placeLogo` and `needsPlate`, pure functions that have
@@ -553,6 +561,70 @@ describe('needsPlate: whether the mark needs a plate behind it on a given backdr
 
   it('mixed ink needs a plate on a light backdrop too, for the same reason at the other extreme', () => {
     expect(needsPlate(1, 'mixed')).toBe(true)
+  })
+})
+
+describe('plateDecisionFor: which of the three mixed cases a measurement lands in', () => {
+  it('is unmeasured when no measurement is given at all, so mixed keeps plating by default', () => {
+    expect(plateDecisionFor(undefined)).toEqual({ kind: 'unmeasured' })
+  })
+
+  it('is unmeasured when the mark has no ink to measure', () => {
+    const mark: MixedInkMeasurement = { meanInkLuminance: null, darkInkShare: 0, lightInkShare: 0 }
+    expect(plateDecisionFor(mark)).toEqual({ kind: 'unmeasured' })
+  })
+
+  it('is bipolar when both shares clear the minority threshold, whatever the mean says', () => {
+    const mark: MixedInkMeasurement = { meanInkLuminance: 0.5, darkInkShare: 0.4, lightInkShare: 0.4 }
+    expect(plateDecisionFor(mark)).toEqual({ kind: 'bipolar' })
+  })
+
+  it('is NOT bipolar when only one share clears the threshold', () => {
+    const mark: MixedInkMeasurement = { meanInkLuminance: 0.18, darkInkShare: 0.9, lightInkShare: 0 }
+    expect(plateDecisionFor(mark)).toEqual({ kind: 'measured', markLuminance: 0.18 })
+  })
+
+  it('is measured, carrying the mean, for a genuinely mid-tone mark', () => {
+    const mark: MixedInkMeasurement = { meanInkLuminance: 0.18, darkInkShare: 0, lightInkShare: 0 }
+    expect(plateDecisionFor(mark)).toEqual({ kind: 'measured', markLuminance: 0.18 })
+  })
+})
+
+describe('needsPlate: a mixed mark measured as mid-tone is judged on its own contrast', () => {
+  // meanInkLuminance ~0.1791 is the point that maximises the WORSE of its two
+  // contrasts against pure black and pure white at once: 20L+1 = 1.05/(L+.05)
+  // solves to L ≈ 0.1791, giving ~4.58:1 either way, comfortably over 4.5:1
+  // without leaning on a sliver narrower than any real measurement.
+  const MID_TONE: MixedInkMeasurement = {
+    meanInkLuminance: 0.1791,
+    darkInkShare: 0,
+    lightInkShare: 0,
+  }
+
+  it('does not plate a mid-tone mark on a near-black backdrop, unlike the old unconditional rule', () => {
+    expect(needsPlate(0, 'mixed', MID_TONE)).toBe(false)
+  })
+
+  it('does not plate the SAME mid-tone mark on a near-white backdrop either', () => {
+    expect(needsPlate(1, 'mixed', MID_TONE)).toBe(false)
+  })
+
+  it('plates a mid-tone mark whose contrast genuinely fails against a similarly mid backdrop', () => {
+    // Mark at 0.3 against a backdrop at 0.35: two close-together mid-tones,
+    // (0.35+.05)/(0.3+.05) ≈ 1.14:1, nowhere near 4.5:1.
+    const mark: MixedInkMeasurement = { meanInkLuminance: 0.3, darkInkShare: 0, lightInkShare: 0 }
+    expect(needsPlate(0.35, 'mixed', mark)).toBe(true)
+  })
+
+  it('still plates unconditionally when the same mid-tone luminance is reported bipolar', () => {
+    const bipolar: MixedInkMeasurement = { meanInkLuminance: 0.1791, darkInkShare: 0.4, lightInkShare: 0.4 }
+    expect(needsPlate(0, 'mixed', bipolar)).toBe(true)
+    expect(needsPlate(1, 'mixed', bipolar)).toBe(true)
+  })
+
+  it('plates unconditionally when mark info is passed but unmeasured (no ink)', () => {
+    const noInk: MixedInkMeasurement = { meanInkLuminance: null, darkInkShare: 0, lightInkShare: 0 }
+    expect(needsPlate(0, 'mixed', noInk)).toBe(true)
   })
 })
 

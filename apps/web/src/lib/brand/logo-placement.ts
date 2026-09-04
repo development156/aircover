@@ -344,27 +344,108 @@ export function placeLogo(input: {
 }
 
 /**
+ * What `needsPlate` was told about a `mixed` mark's own ink, beyond the enum.
+ * Everything here is optional and every field can independently be `undefined`
+ * or `null`: a caller that has not measured a mark (an old `LogoFacts`, a hand
+ * built test fixture) passes nothing at all, and `plateDecisionFor` treats that
+ * exactly like today's unconditional plate.
+ */
+export interface MixedInkMeasurement {
+  /** The mark's own linearised WCAG mean luminance, 0-1. `null` means no ink was measured. */
+  meanInkLuminance: number | null
+  /** Share of the mark's ink pixels in the dark band, 0-1. */
+  darkInkShare: number
+  /** Share of the mark's ink pixels in the light band, 0-1. */
+  lightInkShare: number
+}
+
+/**
+ * Share of a `mixed` mark's ink one polarity must hold, on ITS OWN, before the
+ * mark is called bipolar rather than mid-tone.
+ *
+ * `mixed` already means neither polarity reached `DOMINANT_INK_SHARE` (0.75) in
+ * `logo-facts-classify.ts`, so everything below is ink that failed to dominate.
+ * That is not the same claim as "ink at both extremes": a mark can be 74% dark
+ * and 26% neither-dark-nor-light and land here with essentially no light ink at
+ * all, and averaging its luminance is honest. What makes averaging DISHONEST is
+ * substantial ink at BOTH extremes at once, where the mean describes a colour
+ * that exists nowhere on the mark.
+ *
+ * 0.1 is chosen so a handful of anti-aliased edge pixels that stray into the
+ * opposite band cannot alone flip a mid-tone mark to bipolar (a smooth curve on
+ * a single-colour mark can shed a few percent of its ink into the wrong band
+ * purely from blending against the canvas), while any mark whose SECOND colour
+ * is a real, deliberate feature, not edge noise, clears it easily: a logo with
+ * a black wordmark and even a small white accent puts far more than a tenth of
+ * its ink at the opposite extreme. Below this share in EITHER band, that band's
+ * ink is treated as noise around a single mid-tone colour rather than as a
+ * second colour the mean needs to represent.
+ */
+const BIPOLAR_MINORITY_SHARE = 0.1
+
+export type MixedPlateDecision =
+  | { kind: 'unmeasured' }
+  | { kind: 'bipolar' }
+  | { kind: 'measured'; markLuminance: number }
+
+/**
+ * Which of the three cases a `mixed` mark is in, from the measurement alone.
+ *
+ * Kept as its own function, returning a discriminated union rather than a
+ * boolean, so `needsPlate` never has to re-derive "was this even measured" from
+ * threading four raw numbers through a conditional: the three cases are read
+ * off the `kind` and nothing else has to be rechecked at the call site.
+ */
+export function plateDecisionFor(mark: MixedInkMeasurement | undefined): MixedPlateDecision {
+  if (mark === undefined || mark.meanInkLuminance === null) return { kind: 'unmeasured' }
+  if (mark.darkInkShare >= BIPOLAR_MINORITY_SHARE && mark.lightInkShare >= BIPOLAR_MINORITY_SHARE) {
+    return { kind: 'bipolar' }
+  }
+  return { kind: 'measured', markLuminance: mark.meanInkLuminance }
+}
+
+/**
  * Whether the mark needs a plate painted behind it to stay legible.
  *
  * `backdropLuminance` is relative luminance from 0 to 1, measured by the caller
  * over the region the mark will actually cover. A value outside that range lands
  * on the far side of a threshold, which is the same answer the endpoint gives.
  *
- * `mixed` always needs a plate. A mixed mark has ink on both sides of the
- * luminance bands, so the dark parts fail on a dark backdrop and the light parts
- * fail on a light one. There is a sliver between the two thresholds, roughly
- * 0.175 to 0.183, where both halves would technically clear 4.5:1, but it is
- * eight thousandths wide and the input is an average over thousands of pixels
- * whose error is far larger than that. Claiming a mark is safe inside a window
- * narrower than the measurement is not a judgement worth making.
+ * `dark` and `light` are UNCHANGED: both model the ink at a worst-case luminance
+ * of 0 or 1 respectively rather than measuring it, deliberately, and this
+ * function still never measures either.
+ *
+ * `mixed` defaults to always needing a plate, exactly as before, UNLESS `mark`
+ * measures it as mid-tone (`plateDecisionFor` returns `'measured'`), in which
+ * case the actual WCAG contrast ratio between the mark's own mean luminance and
+ * the backdrop decides it. A mark `plateDecisionFor` calls `'unmeasured'` or
+ * `'bipolar'` plates unconditionally, same as a mark with no `mark` argument at
+ * all: absence of a safe measurement is never read as permission to skip the
+ * plate.
+ *
+ * The old "always plate" comment about the 0.175-0.183 sliver still applies
+ * once a mark IS being measured: the input is an average over thousands of
+ * pixels, so a contrast ratio that clears 4.5:1 by less than the measurement's
+ * own error is not a judgement worth trusting either way, and `< TARGET_CONTRAST`
+ * (not `<=`) plates on a tie rather than gambling on it.
  */
-export function needsPlate(backdropLuminance: number, ink: InkPolarity): boolean {
+export function needsPlate(
+  backdropLuminance: number,
+  ink: InkPolarity,
+  mark?: MixedInkMeasurement,
+): boolean {
   switch (ink) {
     case 'dark':
       return backdropLuminance < DARK_INK_MIN_BACKDROP
     case 'light':
       return backdropLuminance > LIGHT_INK_MAX_BACKDROP
-    case 'mixed':
-      return true
+    case 'mixed': {
+      const decision = plateDecisionFor(mark)
+      if (decision.kind !== 'measured') return true
+      const lighter = Math.max(decision.markLuminance, backdropLuminance)
+      const darker = Math.min(decision.markLuminance, backdropLuminance)
+      const contrast = (lighter + CONTRAST_OFFSET) / (darker + CONTRAST_OFFSET)
+      return contrast < TARGET_CONTRAST
+    }
   }
 }
