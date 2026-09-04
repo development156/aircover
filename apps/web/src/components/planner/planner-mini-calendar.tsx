@@ -121,18 +121,39 @@ export function PlannerMiniCalendar({
               className={cn(
                 'group relative grid aspect-square place-items-center rounded-sm transition-micro',
                 'focus-visible:z-10',
-                isSelected ? 'surface-ring-firm bg-brand-wash' : 'hover:bg-s2',
+                !isSelected && 'hover:bg-s2',
                 isToday && !isSelected && 'surface-ring',
               )}
             >
+              {/* ── THE PICKED DAY IS A SMALL FILLED ORANGE CIRCLE ────────────
+                  It was a tinted square with a firm ring, which is the same
+                  shape "today" wears one tint weaker — two states told apart by
+                  a wash, on a 35px cell. The circle is unmistakable at that size
+                  and it is the mark the founder's reference draws.
+
+                  BLACK on the orange, via `--brand-ink`, which is the token for
+                  exactly this and measures 7.15:1. NOT white: white on #ff6600
+                  is roughly 2.9:1 and fails at every size. The reference image
+                  shows a white numeral; the reference image is wrong about that
+                  one pixel and this product's own token is right.
+
+                  `size-7` — 28px — and that is a MEASUREMENT, not a taste.
+                  `accent-budget.spec.ts` treats an opaque brand box of 1000px²
+                  or more inside a link as a primary action competing to be the
+                  screen's one solid fill. The cell itself is about 35px square
+                  (~1218px²) and would cross that line; 28px is 784px² and stays
+                  a mark. The one primary on this route is the Plan my week
+                  button, and a date picker must never be mistaken for it. */}
               <span
                 className={cn(
-                  'num type-meta',
-                  isSelected || isToday ? 'font-[650]' : '',
-                  // NOT `text-accent` on the wash: MEASURED 2.75:1 in light,
-                  // below the 4.5:1 floor. The ground and the ring carry the
-                  // "picked" reading; the date itself stays legible.
-                  isSelected ? 'text-ink' : inMonth ? 'text-ink' : 'text-ink-mute',
+                  'num type-meta grid size-7 place-items-center rounded-pill transition-micro',
+                  isSelected
+                    ? 'bg-brand font-[650] text-brand-ink'
+                    : isToday
+                      ? 'font-[650] text-ink'
+                      : inMonth
+                        ? 'text-ink'
+                        : 'text-ink-mute',
                 )}
               >
                 {istDayOfMonth(bucket.date)}
@@ -140,13 +161,20 @@ export function PlannerMiniCalendar({
 
               {/* The marks sit BELOW the numeral inside the cell, never over it:
                   a dot on top of a digit costs the digit its legibility, and the
-                  date is the thing the reader is actually looking for. */}
-              <span aria-hidden className="absolute inset-x-0 bottom-1 flex justify-center gap-1">
-                {scheduled > 0 ? <span className="size-1 rounded-pill bg-brand" /> : null}
-                {other > 0 ? (
-                  <span className="size-1 rounded-pill bg-transparent shadow-[inset_0_0_0_1px_var(--line-firm)]" />
-                ) : null}
-              </span>
+                  date is the thing the reader is actually looking for.
+
+                  They are hidden on the PICKED day, where a 28px circle leaves
+                  no room under it. Nothing is lost: picking a day filters the
+                  plan beside this calendar to that day, so what the dot claims
+                  in shorthand is on screen in full, one column across. */}
+              {!isSelected ? (
+                <span aria-hidden className="absolute inset-x-0 bottom-0 flex justify-center gap-1">
+                  {scheduled > 0 ? <span className="size-1 rounded-pill bg-brand" /> : null}
+                  {other > 0 ? (
+                    <span className="size-1 rounded-pill bg-transparent shadow-[inset_0_0_0_1px_var(--line-firm)]" />
+                  ) : null}
+                </span>
+              ) : null}
             </Link>
           )
         })}
