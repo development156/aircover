@@ -11,6 +11,8 @@ import {
 } from 'lucide-react'
 
 import { ObservationNote } from '@/components/brain/observation-note'
+import { CHANNEL_LABELS } from '@/components/posts/channel-label'
+import { metricInWords } from '@/lib/report/strings'
 import { AtAGlanceCard, CreditsCard, InsightPromiseCard } from '@/components/report/insights'
 import { ReportModule } from '@/components/report/module'
 import { PageTitle } from '@/components/page-title'
@@ -262,8 +264,8 @@ export default async function ReportPage() {
               >
                 <p className="type-body max-w-[68ch] text-ink">{ranking.top.title}</p>
                 <p className="type-sm mt-1 text-muted">
-                  <span className="num">{ranking.top.value}</span> {ranking.top.metric} on{' '}
-                  {ranking.top.channel}.
+                  <span className="num">{ranking.top.value}</span>{' '}
+                  {metricInWords(ranking.top.metric)} on {CHANNEL_LABELS[ranking.top.channel]}.
                 </p>
               </ReportModule>
               <ReportModule
@@ -274,8 +276,9 @@ export default async function ReportPage() {
               >
                 <p className="type-body max-w-[68ch] text-ink">{ranking.bottom.title}</p>
                 <p className="type-sm mt-1 text-muted">
-                  <span className="num">{ranking.bottom.value}</span> {ranking.bottom.metric} on{' '}
-                  {ranking.bottom.channel}.
+                  <span className="num">{ranking.bottom.value}</span>{' '}
+                  {metricInWords(ranking.bottom.metric)} on {CHANNEL_LABELS[ranking.bottom.channel]}
+                  .
                 </p>
                 {/* NO REASON IS GIVEN, and its absence is deliberate. Every
                     candidate reason would be Sahoda asserting a CAUSE, and

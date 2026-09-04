@@ -3,7 +3,7 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { BANNED_WORDS, REPORT } from './strings'
+import { BANNED_WORDS, REPORT, metricInWords } from './strings'
 
 /**
  * THE JARGON BAN, ENFORCED ON THE FILES THAT REACH A READER.
@@ -47,10 +47,16 @@ const SCANNED = [join(HERE, 'strings.ts'), join(HERE, 'verdict.ts')]
  * list itself. Neither renders. Only what a reader could see counts.
  */
 function stripComments(source: string): string {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\/\/.*$/gm, '')
-    .replace(/export const BANNED_WORDS[\s\S]*?\] as const/, '')
+  return (
+    source
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '')
+      .replace(/export const BANNED_WORDS[\s\S]*?\] as const/, '')
+      // The METRIC_WORDS lookup KEYS are storage vocabulary by definition — that
+      // is the whole reason the map exists. Its VALUES are copy and are scanned
+      // by their own test below, which reads them rather than the source text.
+      .replace(/const METRIC_WORDS[\s\S]*?\n\}/, '')
+  )
 }
 
 function offendersIn(text: string): string[] {
@@ -88,5 +94,68 @@ describe('the report speaks plainly', () => {
 
   it('keeps the principle line, which is the trust feature', () => {
     expect(REPORT.principle).toContain('strong enough to stand behind')
+  })
+})
+
+/**
+ * THE PAGE ITSELF, WHICH THIS SCAN HAD NEVER READ.
+ *
+ * ── THE BLIND SPOT, CLOSED ───────────────────────────────────────────────────
+ * The header above admits two of them: "a word assembled from pieces at
+ * runtime", and copy living outside `components/report`. `/report/page.tsx` sat
+ * in both. It rendered `{ranking.top.metric}` and `{ranking.top.channel}`
+ * straight from the metric store, so the live sentence read "610 impressions on
+ * gbp." — with `impressions` on BANNED_WORDS the whole time, and the word never
+ * appearing in any file this scan was pointed at.
+ *
+ * A value scan cannot reach it either: `metric` is a DEFAULT PARAMETER on
+ * `readRanking`, so nothing in the copy modules holds the string. So this is a
+ * shape gate on the LEAK rather than on the sentence: it refuses the raw
+ * interpolation and leaves the wording free to change.
+ */
+describe('the report page never prints storage vocabulary at the reader', () => {
+  const PAGE = join(HERE, '..', '..', 'app', '(app)', 'report', 'page.tsx')
+
+  it('interpolates no raw metric key and no raw channel enum', () => {
+    const source = stripComments(readFileSync(PAGE, 'utf8'))
+
+    expect(source).not.toMatch(/\{ranking\.(top|bottom)\.metric\}/)
+    expect(source).not.toMatch(/\{ranking\.(top|bottom)\.channel\}/)
+  })
+
+  it('carries no banned word of its own', () => {
+    expect(offendersIn(stripComments(readFileSync(PAGE, 'utf8')))).toEqual([])
+  })
+})
+
+describe('metricInWords', () => {
+  it('renders no banned word for any key it maps', () => {
+    // The VALUES are copy. Every one is checked, so a future entry cannot
+    // reintroduce the storage word this map exists to replace.
+    for (const key of ['impressions', 'reach', 'engagement', 'clicks']) {
+      expect(offendersIn(metricInWords(key)), key).toEqual([])
+    }
+  })
+
+  it('turns the stored key into something a shop owner reads', () => {
+    expect(metricInWords('impressions')).toBe('times it was seen')
+    expect(offendersIn(metricInWords('impressions'))).toEqual([])
+  })
+
+  /**
+   * Impressions and reach are DIFFERENT measurements. Rendering the first as
+   * "people reached" would be a bigger claim than the data supports, which is
+   * the defect this whole file exists to stop, arriving as a fix.
+   */
+  it('keeps two different measurements different', () => {
+    expect(metricInWords('impressions')).not.toBe(metricInWords('reach'))
+    expect(metricInWords('reach')).toBe('people reached')
+  })
+
+  it('invents no label for a key it does not know', () => {
+    // Falling through unchanged is the honest answer. The page guard above is
+    // what stops an unmapped key reaching a reader, so a new metric shows up as
+    // a missing entry rather than as a confident wrong sentence.
+    expect(metricInWords('saves')).toBe('saves')
   })
 })

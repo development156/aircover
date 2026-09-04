@@ -185,7 +185,7 @@ beforeEach(() => {
   // a half-populated one.
   vi.mocked(readBrain).mockResolvedValue({ status: 'no-brain' })
   vi.mocked(listConnections).mockResolvedValue([])
-  vi.mocked(readLedger).mockResolvedValue({ entries: [], skipped: 0 })
+  vi.mocked(readLedger).mockResolvedValue({ entries: [], skipped: 0, unreadable: false })
   vi.mocked(readSpend).mockResolvedValue(EMPTY_SPEND)
   vi.mocked(readPostCounts).mockResolvedValue(EMPTY_COUNTS)
   vi.mocked(readPublishSummary).mockResolvedValue(EMPTY_PUBLISH)

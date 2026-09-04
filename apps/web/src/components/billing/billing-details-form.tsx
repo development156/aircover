@@ -77,7 +77,7 @@ export function BillingDetailsForm({ profile }: { profile: BillingProfile | null
   return (
     <SettingCard
       title="Billing details"
-      hint="These go on every invoice Sahoda issues from now on. Invoices already issued do not change. A tax invoice cannot be edited, and a correction is a separate credit note."
+      hint="The name and tax details on every invoice Sahoda issues from now on. Invoices already issued do not change. A tax invoice cannot be edited, and a correction is a separate credit note."
       data-guide="plan.billing-details"
     >
       <fieldset disabled={pending} className="space-y-4 py-4">
@@ -185,6 +185,13 @@ export function BillingDetailsForm({ profile }: { profile: BillingProfile | null
           </div>
         ) : null}
 
+        {/* ── THE ONE FIELD THAT DOES NOT REACH AN INVOICE ────────────────
+            `billing_profiles.address` has a column and no destination:
+            `InvoiceDraft` and the `invoices` table carry no recipient address,
+            so there is nothing to print it into. That is not pending wiring,
+            it is a missing column, and the card hint above used to promise all
+            six fields reach an invoice. "Optional" made it worse by reading as
+            "optional ON your invoice". Its own sentence, saying what is true. */}
         <div className="space-y-1.5">
           <Label className="block" htmlFor="billing-address">
             Address
@@ -193,9 +200,11 @@ export function BillingDetailsForm({ profile }: { profile: BillingProfile | null
             id="billing-address"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            placeholder="Optional"
             autoComplete="street-address"
           />
+          <p className="type-sm text-muted">
+            Kept on your account. It is not printed on invoices yet.
+          </p>
         </div>
       </fieldset>
 

@@ -58,25 +58,27 @@ export const TASK_TIER: Record<MeshTaskName, ModelTier> = {
    * That path fires only when OpenRouter is unreachable, and brand_guidelines
    * is the one task with a demo-fallback safety net underneath it.
    *
-   * ── AND IT NEVER TOOK EFFECT. READ THIS BEFORE ACTING ON THE TABLE ABOVE ───
+   * ── IT DID NOT TAKE EFFECT FOR THREE WEEKS, AND NOW IT HAS ──────────────────
    * MEASURED 2026-09-03: the bake-off's conclusion was written HERE, and this
    * table is read by nothing at runtime. `MeshTaskDef.tier` is the source (this
-   * file's own header says so), and `tasks/brand-guidelines.ts` has said
-   * `standard` since the file was created — `git log -L48,48` on it shows one
-   * commit, the creating one. So brand_guidelines has run on sonnet-5 the whole
-   * time, and the 5.7x cost saving the bake-off measured has never been taken.
+   * file's own header says so), and `tasks/brand-guidelines.ts` said `standard`
+   * from the day it was created — `git log -L48,48` on it showed one commit, the
+   * creating one. So brand_guidelines ran on sonnet-5 the whole time and the 5.7x
+   * saving was never taken.
    *
-   * The value here now matches what actually runs, so the two cannot disagree
-   * again: `agrees with every task definition` below asserts it per task, and
-   * it fails if either side moves. Correcting the SYMPTOM only — no route
-   * changed, no customer sees anything different.
+   * APPLIED 2026-09-04, founder's decision. The task definition now says
+   * `economy` and this table says the same, and `agrees with every task
+   * definition` below asserts the two per task — it caught this very change when
+   * only one side had moved, which is the drift that hid the problem in the first
+   * place.
    *
-   * WHETHER TO APPLY THE BAKE-OFF IS A DECISION, NOT A CLEANUP, and it is open.
-   * Applying it means editing `tasks/brand-guidelines.ts`. The bake-off's own
-   * caveat above was never discharged: haiku returned signal_lock 'strong' on
-   * all three runs, and that wants re-measuring on a THIN intake first.
+   * THE CAVEAT REMAINS UNDISCHARGED, so it stays written down rather than being
+   * quietly dropped now that the decision went the other way: haiku returned
+   * signal_lock 'strong' on all three runs where sonnet said 'moderate', and a
+   * model that always says strong would make that field worthless. Re-measure on
+   * a THIN intake.
    */
-  brand_guidelines: 'standard',
+  brand_guidelines: 'economy',
   // Standard, not economy: this one reads adversarial customer-supplied text and
   // has to keep telling instruction from evidence over several pages. It is also
   // the cheapest place in the product to be wrong — a bad extraction becomes the

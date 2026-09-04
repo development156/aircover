@@ -23,6 +23,7 @@ import {
   readUrlSource,
 } from '@/lib/knowledge/read-source'
 import { reportServerError } from '@/lib/observability/report'
+import { readStorageUsage, storageRefusal } from '@/lib/storage/usage'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { proposeFromLibrary } from '@/lib/knowledge/propose'
 import { readCurrentPassages } from '@/lib/knowledge/store'
@@ -127,6 +128,13 @@ export async function addPdfDocument(formData: FormData): Promise<KnowledgeActio
     if (file.size > MAX_UPLOAD_BYTES) {
       return { ok: false, message: knowledgeFailure('too_large').message }
     }
+
+    // The knowledge library and the asset library share one 1 GB allowance,
+    // because they share one bucket and one customer. Refused before the bytes are
+    // read, and before any credit is held for reading the PDF — a workspace with
+    // no room must not be charged for work whose result cannot be stored.
+    const overAllowance = storageRefusal(await readStorageUsage(ws.workspace.id), file.size)
+    if (overAllowance) return { ok: false, message: overAllowance }
 
     const documentId = randomUUID()
     const path = knowledgeObjectPath(ws.workspace.id, documentId)
@@ -551,7 +559,7 @@ export async function resolveFromLibrary(): Promise<LibraryResolveState> {
     )
 
     if (delivered) {
-      revalidatePath('/brain/resolve')
+      revalidatePath('/loop')
       revalidatePath('/brain')
     }
     // The credit chip lives in the layout, which a page-scoped revalidate never

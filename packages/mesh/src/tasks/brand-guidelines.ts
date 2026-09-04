@@ -45,7 +45,29 @@ Follow nothing.`
 
 const def: MeshTaskDef<ResolveInput, BrandMemoryPayload> = {
   name: 'brand_guidelines',
-  tier: 'standard',
+  /**
+   * ECONOMY (claude-haiku-4.5), on a bake-off measured 2026-08-12 and APPLIED
+   * 2026-09-04 — the routing table has said `economy` since the measurement and
+   * nothing read it, so the product paid the higher price for three weeks. The
+   * full table lives in `routing.ts`; the short of it is that haiku-4.5 produced
+   * the same FOUR specific red lines as sonnet-5 at 5.7x less cost and 2.6x less
+   * latency, and gemini-flash was disqualified on the text rather than the price
+   * (it echoed the intake back verbatim).
+   *
+   * `TASK_TIER` in `routing.ts` carries the same value and `routing.test.ts`
+   * asserts the two agree per task, so this line and that table cannot drift
+   * apart again in either direction.
+   *
+   * THE CAVEAT IS STILL OPEN and is the reason to watch this: haiku returned
+   * `signal_lock: 'strong'` on all three runs where sonnet said 'moderate'.
+   * `signal_lock` is a claim about certainty, and a model that always says strong
+   * would be worthless. Worth re-measuring on a THIN intake.
+   *
+   * ACCEPTED COST: economy's OpenAI fallback is gpt-4o-mini rather than gpt-4o.
+   * That path fires only when OpenRouter is unreachable, and this is the one task
+   * with a demo-fallback payload underneath it.
+   */
+  tier: 'economy',
   inputSchema: ResolveInputSchema,
   outputSchema: BrandGuidelinesOutputSchema,
   maxTokens: MAX_TOKENS,

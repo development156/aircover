@@ -170,3 +170,35 @@ export const REPORT = {
     workspace: 'Finish setting up your workspace and your reports appear here.',
   },
 } as const
+
+/**
+ * A STORED METRIC KEY, IN WORDS A SHOP OWNER READS.
+ *
+ * ── WHY THIS EXISTS ──────────────────────────────────────────────────────────
+ * `readRanking` returns `metric` as the raw column vocabulary and the report
+ * page interpolated it: "610 impressions on gbp." Both halves of that sentence
+ * were storage words. `impressions` is on BANNED_WORDS precisely because it is a
+ * real value in the metric store and must never reach a reader, and the scan
+ * beside this file could not catch it — its own header lists this blind spot:
+ * "a word assembled from pieces at runtime", and the page was not in the scanned
+ * directory at all.
+ *
+ * ── AND WHY IT DOES NOT INVENT A WORD IT DOES NOT HAVE ───────────────────────
+ * "Impressions" and "reach" are different measurements, so rendering the first
+ * as "people reached" would be a smaller claim than the truth in one direction
+ * and a larger one in the other. Each key gets the phrase that is actually true
+ * of it. An unrecognised key falls through unchanged rather than being given a
+ * confident label nobody measured, and the guard on the page catches the leak
+ * itself, so a new metric shows up as a missing entry here rather than silently
+ * becoming a wrong sentence.
+ */
+const METRIC_WORDS: Readonly<Record<string, string>> = {
+  impressions: 'times it was seen',
+  reach: 'people reached',
+  engagement: 'reactions',
+  clicks: 'clicks',
+}
+
+export function metricInWords(metric: string): string {
+  return METRIC_WORDS[metric] ?? metric
+}

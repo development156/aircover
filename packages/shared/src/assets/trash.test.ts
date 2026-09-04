@@ -122,26 +122,82 @@ describe('describeBulkTrash counts files rather than naming posts', () => {
 
 describe('describeEmptyTrash states BOTH numbers', () => {
   it('the ordinary case names only what went', () => {
-    expect(describeEmptyTrash(3, 0)).toBe('Deleted 3 files for good.')
-    expect(describeEmptyTrash(1, 0)).toBe('Deleted 1 file for good.')
+    expect(describeEmptyTrash(3, 0, false)).toBe('Deleted 3 files for good.')
+    expect(describeEmptyTrash(1, 0, false)).toBe('Deleted 1 file for good.')
   })
 
   // ── The half a single number would hide ────────────────────────────────────
   it('a file the gate refused is REPORTED, not folded into the total', () => {
     // "Deleted 10" when two were kept is a lie a person cannot detect until
     // they look. Nothing failed, so it is not an error either.
-    const message = describeEmptyTrash(8, 2)
+    const message = describeEmptyTrash(8, 2, false)
     expect(message).toMatch(/Deleted 8 files for good/)
     expect(message).toMatch(/2 files stayed/)
     expect(message).toMatch(/still use them/)
   })
 
   it('says so plainly when the gate refused everything', () => {
-    expect(describeEmptyTrash(0, 3)).toMatch(/^Nothing was deleted\./)
-    expect(describeEmptyTrash(0, 3)).toMatch(/3 files stayed/)
+    expect(describeEmptyTrash(0, 3, false)).toMatch(/^Nothing was deleted\./)
+    expect(describeEmptyTrash(0, 3, false)).toMatch(/3 files stayed/)
   })
 
   it('reads correctly for exactly one kept', () => {
-    expect(describeEmptyTrash(2, 1)).toMatch(/1 file stayed, because a post that cannot lose it/)
+    expect(describeEmptyTrash(2, 1, false)).toMatch(
+      /1 file stayed, because a post that cannot lose it/,
+    )
+  })
+})
+
+/**
+ * THE THIRD NUMBER, WHICH IS THE ONE NOBODY WAS TOLD.
+ *
+ * `readTrashedAssets` reads at most 200 rows and hands back `capped` when it hit
+ * that ceiling. `emptyTrash` walked the 200 it was given and reported "Deleted
+ * 200 files for good", full stop — a claim that the trash is now empty, made
+ * about a trash that still held 300 files. The flag existed the whole time and
+ * nothing consumed it.
+ *
+ * So `more` is a REQUIRED argument rather than an optional one. An optional
+ * third parameter would let the next call site forget it in exactly the way this
+ * one did, and the compiler would say nothing.
+ */
+describe('describeEmptyTrash when the trash held more than one pass could reach', () => {
+  it('never claims the trash is empty when it is not', () => {
+    const message = describeEmptyTrash(200, 0, true)
+    expect(message).toMatch(/Deleted 200 files for good/)
+    expect(message).toMatch(/still in the trash/i)
+  })
+
+  /**
+   * The remedy has to be one that WORKS. Pressing again reads the next 200, so
+   * naming the button is a real instruction rather than a shrug. A reload would
+   * not be: it shows the same trash and deletes nothing.
+   */
+  it('names a remedy that actually works, which is pressing it again', () => {
+    expect(describeEmptyTrash(200, 0, true)).toMatch(/again/i)
+    expect(describeEmptyTrash(200, 0, true)).not.toMatch(/reload|refresh/i)
+  })
+
+  it('invents no number it does not have', () => {
+    // We know there is MORE. We do not know how much more, and a figure here
+    // would be the same defect in the other direction.
+    const message = describeEmptyTrash(200, 0, true)
+    const numbers = (message.match(/\d+/g) ?? []).map(Number)
+    expect(numbers).toEqual([200])
+  })
+
+  it('says both halves when the gate also refused some', () => {
+    const message = describeEmptyTrash(180, 20, true)
+    expect(message).toMatch(/Deleted 180 files for good/)
+    expect(message).toMatch(/20 files stayed/)
+    expect(message).toMatch(/still in the trash/i)
+  })
+
+  it('adds nothing when the whole trash fitted in one pass', () => {
+    expect(describeEmptyTrash(3, 0, false)).toBe('Deleted 3 files for good.')
+  })
+
+  it('carries no em dash, which is the standing ruling for prose', () => {
+    expect(describeEmptyTrash(200, 20, true)).not.toMatch(/[—–]/)
   })
 })
