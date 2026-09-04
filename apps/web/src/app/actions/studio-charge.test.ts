@@ -329,27 +329,37 @@ describe('the hold is priced by the model that draws, before anything is held', 
   const heldAction = () => (withCredits.mock.calls[0]?.[0] as { action: string }).action
 
   /**
+   * RETARGETED, NOT WEAKENED. `google/gemini-2.5-flash-image` is the only
+   * `routed: true` model in the catalogue today (docs/43, `models.ts`'s own
+   * header) — the other three were page-verified, never generation-verified,
+   * and 400 on every press. So the switching claim this block used to drive
+   * through the action ("premium model in, `image_premium` held") can no
+   * longer be exercised by naming a model here: `describeModelBlock` now
+   * refuses every one of those three before any hold, which is correct and is
+   * its own guard below.
+   *
+   * The per-tier pricing claim itself is NOT dropped — it moved to
+   * `models.test.ts`'s "what each model costs the person" block, which prices
+   * `imageTierFor` / `imageActionFor` / `creditCost` directly over the whole
+   * catalogue, unrouted models included, and needs no live press to do it.
+   *
+   * RESTORE, when a second model is routed: bring back a test here that asks
+   * with that model's id and asserts `heldAction()` is its tier's action.
+   * `models.test.ts`'s "something is reachable at all" /
+   * "every choosable model is one the allow-list routes as itself" tests are
+   * what will move first — when routedModels() carries more than one entry,
+   * that is the signal this note is waiting for.
+   *
    * MUTATION: put `const action = MESH_TASK_ACTION.image_generate` back at the
-   * top of `queueGeneration` (or set gemini's `tier` to 'draft' in `models.ts`)
-   * and this goes red. That is the defect: every model was held at the flat 6
-   * credits, including the two the catalogue calls "billed by what it draws",
-   * so each premium press was sold below what the provider charged for it.
+   * top of `queueGeneration` (or set gemini-2.5-flash-image's `tier` to
+   * 'finish' in `models.ts`) and the second assertion below goes red. That is
+   * the defect this test still catches: the ONE routed model must be held at
+   * its OWN tier's price, not a hardcoded one.
    */
-  it('holds the premium price for the best one', async () => {
-    const out = await ask({ modelId: 'google/gemini-3-pro-image' })
+  it('holds the standard price for the one model actually routed', async () => {
+    const out = await ask({ modelId: 'google/gemini-2.5-flash-image' })
 
     expect(out.ok).toBe(true)
-    expect(heldAction()).toBe('image_premium')
-    expect(creditCost(heldAction() as 'image_premium')).toBe(creditCost('image_premium'))
-  })
-
-  it('holds the premium price for words and detail too', async () => {
-    await ask({ modelId: 'openai/gpt-image-1' })
-    expect(heldAction()).toBe('image_premium')
-  })
-
-  it('holds the standard price for the everyday model', async () => {
-    await ask({ modelId: 'bytedance-seed/seedream-5-0-lite' })
     expect(heldAction()).toBe('image_standard')
     expect(creditCost(heldAction() as 'image_standard')).toBe(creditCost('image_standard'))
   })
@@ -373,26 +383,57 @@ describe('the hold is priced by the model that draws, before anything is held', 
   })
 
   /**
-   * Four premium pictures are four premium holds. One press at the dear price
-   * and three at the cheap one would be the same undercharge in a new coat.
+   * NEW GUARD, replacing "holds the premium price for the best one" /
+   * "...for words and detail too". This is the exact behaviour the incident
+   * demanded: a press naming a model the mesh cannot yet reach must be
+   * refused BEFORE any hold, never spend a credit on a call that would 400.
+   * `describeModelBlock` is what enforces it, ahead of `imageActionFor`.
+   *
+   * MUTATION, watched fail: let `describeModelBlock` return `null` for an
+   * unrouted model (e.g. drop the `!model.routed` branch in
+   * `describeModelBlockFor`) and every assertion below goes red — `out.ok`
+   * flips true, and `withCredits`/`runImage` are both called.
+   */
+  it.each([
+    ['the best one', 'google/gemini-3-pro-image'],
+    ['words and detail too', 'openai/gpt-image-1'],
+    ['the everyday matching-set model', 'bytedance-seed/seedream-5-0-lite'],
+  ])('refuses %s before any hold, because it is not routed yet', async (_label, modelId) => {
+    const out = await ask({ modelId })
+
+    expect(out.ok).toBe(false)
+    expect(withCredits).not.toHaveBeenCalled()
+    expect(runImage).not.toHaveBeenCalled()
+  })
+
+  /**
+   * Every picture of a press is priced identically. Two presses at the one
+   * routed model, both at its tier: one hold priced differently from the rest
+   * would be the same undercharge shape the incident produced, just at the
+   * standard tier instead of the premium one.
    */
   it('prices every picture of a press at the chosen tier', async () => {
-    await ask({ modelId: 'openai/gpt-image-1', count: 3 })
+    await ask({ modelId: 'google/gemini-2.5-flash-image', count: 3 })
 
     const actions = withCredits.mock.calls.map((call) => (call[0] as { action: string }).action)
-    expect(actions).toEqual(['image_premium', 'image_premium', 'image_premium'])
+    expect(actions).toEqual(['image_standard', 'image_standard', 'image_standard'])
   })
 
   /**
    * The row records the tier it was charged at, in the column the migration
-   * made for exactly this and nothing had ever written. A row that only carries
-   * the model id cannot say what it cost once the routing table has moved on.
+   * made for exactly this and nothing had ever written. A row that only
+   * carries the model id cannot say what it cost once the routing table has
+   * moved on.
+   *
+   * RESTORE alongside the note above: once a second, `finish`-tier model is
+   * routed, add a case here that presses it and asserts `image_tier: 'finish'`
+   * on the row, so this claim is proven at both tiers again rather than one.
    */
   it('records the tier on the row, alongside the model', async () => {
-    await ask({ modelId: 'google/gemini-3-pro-image' })
+    await ask({ modelId: 'google/gemini-2.5-flash-image' })
 
     const queued = writes.find((w) => w.table === 'studio_generations' && w.op === 'insert')
-    expect(queued?.row?.model_id).toBe('google/gemini-3-pro-image')
-    expect(queued?.row?.image_tier).toBe('finish')
+    expect(queued?.row?.model_id).toBe('google/gemini-2.5-flash-image')
+    expect(queued?.row?.image_tier).toBe('draft')
   })
 })

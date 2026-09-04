@@ -1,9 +1,9 @@
-import { cleanup, render, within } from '@testing-library/react'
+import { cleanup, render } from '@testing-library/react'
 import { creditCost } from '@sahoda/shared'
 import { afterEach, describe, expect, test } from 'vitest'
 
 import { ModelPicker } from '@/components/studio/model-picker'
-import { defaultModelId, imageActionFor, routedModels } from '@/lib/studio/models'
+import { STUDIO_MODELS, defaultModelId, imageActionFor, routedModels } from '@/lib/studio/models'
 
 /**
  * THE PRICE ON THE CARD.
@@ -19,12 +19,15 @@ afterEach(cleanup)
 
 const open = () => render(<ModelPicker modelId={defaultModelId()} onChoose={() => {}} />)
 
+// A card is a `<li>`, whether it wraps a choosable `<button>` (routed models) or
+// a locked "Not connected yet" entry (waiting models). Searching buttons alone
+// would miss the locked cards, which still show a price.
 function cardFor(picker: HTMLElement, label: string): HTMLElement {
-  const card = within(picker)
-    .getAllByRole('button')
-    .find((button) => button.textContent?.includes(label))
+  const card = Array.from(picker.querySelectorAll('li')).find((li) =>
+    li.textContent?.includes(label),
+  )
   if (!card) throw new Error(`no card labelled ${label}`)
-  return card
+  return card as HTMLElement
 }
 
 describe('what each model costs, on its card', () => {
@@ -60,11 +63,16 @@ describe('what each model costs, on its card', () => {
     expect(cardFor(picker, 'Everyday').textContent).not.toContain(premium)
   })
 
-  /** A price is a figure a person is accountable for, so it is set in tabular figures. */
+  /**
+   * A price is a figure a person is accountable for, so it is set in tabular
+   * figures. EVERY card carries one, the locked "Not connected yet" cards
+   * included, so the count tracks the whole catalogue rather than only the
+   * choosable rows.
+   */
   test('the figure is tabular', () => {
     const { container } = open()
     const picker = container.querySelector('[data-guide="studio-model"]') as HTMLElement
     const figures = picker.querySelectorAll('.num')
-    expect(figures.length).toBe(routedModels().length)
+    expect(figures.length).toBe(STUDIO_MODELS.length)
   })
 })

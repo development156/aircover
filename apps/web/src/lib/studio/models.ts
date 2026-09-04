@@ -71,48 +71,64 @@ export type StudioModel = {
 }
 
 /**
- * THREE MODELS, ONE FOR EACH KIND OF JOB.
+ * ONE MODEL WE HAVE MEASURED WORKING, AND THREE THAT ARE NOT YET REACHABLE.
  *
- * The best available from each family rather than a long list: a picker with
- * eight options is a decision a shop owner cannot make, and every extra row is
- * another set of figures to keep true.
+ * ── WHAT "ROUTED" MEANS, AND WHY ONLY ONE CARRIES IT ────────────────────────
+ * `routed: true` is a claim that the mesh can draw with this model. It is not a
+ * claim about a docs page or a price list; it is a claim about a real
+ * generation. The ONLY id this product has ever completed a generation against
+ * is `google/gemini-2.5-flash-image`: MEASURED on production `ai_provider_logs`,
+ * six `ok` rows on 2026-08-30 with real latencies of 6.5 to 11.8 seconds.
  *
- * ── EVERY FIGURE MEASURED ON OPENROUTER'S OWN MODEL PAGE, 2026-08-31 ────────
- * Each id below was fetched individually and its numbers compared against
- * docs/43 §3, which had been through an adversarial refutation pass. Where the
- * two agreed the figure is doubly sourced; where the page said something docs/43
- * had left blank, the page wins and the difference is noted.
+ * The three below were added on 2026-08-31 (commit bb117725) as "each verified
+ * and each actually routed". That was WRONG in one exact way: they were verified
+ * by loading a model page, NOT by making a generation call, and the difference
+ * is the whole defect. Every press against them since has returned HTTP_400 from
+ * OpenRouter's `/api/v1/images` (three days of failures, zero successes). A model
+ * page loading is not a model drawing, and the `routed` flag is about drawing.
  *
- *   google/gemini-3-pro-image
- *     $2.00/M input, $120.00/M image output. 14 references. Images per request
- *     NOT STATED on the page; docs/43 records 1 for the Gemini image family, and
- *     1 is also the safe reading, so 1 is what the rules use.
+ * So they stay in the catalogue as a record of the intention and are marked
+ * `routed: false`: the picker lists them as "Not connected yet", with the
+ * reason, rather than offering a press that 400s. When someone confirms a real
+ * generation against one of them (a call, not a page), that is the deliberate
+ * act that flips its flag to true.
  *
- *   openai/gpt-image-1
- *     $5.00/M text input, $40.00/M image output. **10 images per request and 16
- *     references** — both were "—" in docs/43, so this is NEW and it changes the
- *     product: a matching set is no longer Seedream's alone.
+ * ── THE FIGURES BELOW ARE STILL FROM DOCS/43 §3, WHICH IS PAGE-SOURCED ──────
+ * They are kept because they are the record of what was researched; they are NOT
+ * a claim the model works. The prices and reference bounds came from each id's
+ * own OpenRouter model page on 2026-08-31, compared against docs/43 §3 after its
+ * adversarial refutation pass. `google/gemini-2.5-flash-image` takes 3
+ * references and draws 1 per call (docs/43 §3).
  *
- *   bytedance-seed/seedream-5-0-lite
- *     $0.035 flat per image, 4 per request, 14 references. All three matched
- *     docs/43 exactly. It is the LATEST Seedream on OpenRouter: there is no
- *     `bytedance-seed/seedream-5-0`, which returns not found.
- *
- * The ids are also the mesh's `ALLOWED_IMAGE_MODELS`. A model that is in one and
- * not the other is a defect, and a test asserts they match.
+ * The ids here are also the mesh's `ALLOWED_IMAGE_MODELS`. A model that is in one
+ * and not the other is a defect, and a test asserts they match.
  */
 export const STUDIO_MODELS: readonly StudioModel[] = [
   {
-    id: 'bytedance-seed/seedream-5-0-lite',
+    id: 'google/gemini-2.5-flash-image',
     label: 'Everyday',
     goodAt:
-      'Food, shopfronts and people, at one flat price however big the picture. The one to use while you are still working out what you want.',
+      'Food, shopfronts and people, quick and cheap. The one to use while you are still working out what you want.',
+    unlocks: null,
+    maxPerPress: 1,
+    maxReferences: 3,
+    costNote: 'A flat everyday price per picture',
+    tier: 'draft',
+    // The one id with real successful generations behind it. See the header.
+    routed: true,
+  },
+  {
+    id: 'bytedance-seed/seedream-5-0-lite',
+    label: 'Everyday, a matching set',
+    goodAt:
+      'Food, shopfronts and people, at one flat price however big the picture, and it can draw a matching set.',
     unlocks: 'Up to 4 pictures in one go, all matching, and up to 14 to match against.',
     maxPerPress: 4,
     maxReferences: 14,
-    costNote: 'A flat price per picture, the cheapest of the three',
+    costNote: 'A flat price per picture',
     tier: 'draft',
-    routed: true,
+    // Page-verified, never generation-verified: 400s on every press. See header.
+    routed: false,
   },
   {
     id: 'openai/gpt-image-1',
@@ -124,19 +140,21 @@ export const STUDIO_MODELS: readonly StudioModel[] = [
     maxReferences: 16,
     costNote: 'Billed by what it draws, so a large picture costs more',
     tier: 'finish',
-    routed: true,
+    // Page-verified, never generation-verified: 400s on every press. See header.
+    routed: false,
   },
   {
     id: 'google/gemini-3-pro-image',
     label: 'The best one',
     goodAt:
-      'The most careful of the three. Use it for the one picture that has to be right, not for trying ideas out.',
+      'The most careful of the four. Use it for the one picture that has to be right, not for trying ideas out.',
     unlocks: 'Up to 14 pictures to match against.',
     maxPerPress: 1,
     maxReferences: 14,
     costNote: 'The dearest, billed by what it draws',
     tier: 'finish',
-    routed: true,
+    // Page-verified, never generation-verified: 400s on every press. See header.
+    routed: false,
   },
 ]
 

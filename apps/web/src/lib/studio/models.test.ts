@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { ALLOWED_IMAGE_MODELS } from '@sahoda/mesh'
+import { ALLOWED_IMAGE_MODELS, isAllowedImageModel } from '@sahoda/mesh'
 import { IMAGE_TIER_ACTION, MESH_TASK_ACTION, creditCost } from '@sahoda/shared'
 
 import {
@@ -32,6 +32,40 @@ describe('what is on offer', () => {
    */
   test('the default is a model we can actually reach', () => {
     expect(modelById(defaultModelId())?.routed).toBe(true)
+  })
+
+  /**
+   * THE INVARIANT THAT BROKE STUDIO GENERATION FOR THREE DAYS.
+   *
+   * The default flipped to an id (`bytedance-seed/seedream-5-0-lite`) that was
+   * in the allow-list and marked `routed`, but that OpenRouter's `/api/v1/images`
+   * rejects with HTTP_400 on every press. No CI test can prove a provider serves
+   * an id, and this one does not pretend to. What it guards is the pair that has
+   * to hold for a press to even reach the provider with the model the row
+   * records: the default must be `routed`, AND the router's spending allow-list
+   * must actually carry it, so `chooseImageModel` sends it as itself rather than
+   * silently falling back to the tier default.
+   *
+   * MUTATION, watched fail: set `routed: false` on `google/gemini-2.5-flash-image`
+   * in `models.ts` (which points the default at an unrouted id, since it is the
+   * only routed entry) and the first assertion goes red.
+   */
+  test('the default is routed AND the spending allow-list carries it', () => {
+    const id = defaultModelId()
+    expect(modelById(id)?.routed).toBe(true)
+    expect(isAllowedImageModel(id)).toBe(true)
+  })
+
+  /**
+   * Every model a person can CHOOSE must be one the mesh will address as itself,
+   * never an aspirational entry that would silently route elsewhere. The waiting
+   * ("Not connected yet") models are exempt on purpose: they are shown as locked,
+   * not choosable, exactly so an unrouted id never becomes a press.
+   */
+  test('every choosable model is one the allow-list routes as itself', () => {
+    for (const model of routedModels()) {
+      expect(isAllowedImageModel(model.id), model.id).toBe(true)
+    }
   })
 
   test('something is reachable at all, or the Studio cannot draw', () => {
@@ -200,24 +234,39 @@ describe('the catalogue and the router agree', () => {
   })
 
   /**
-   * A model that is offered but not routed would be refused by the screen and
-   * silently swapped by the router. With three models all reachable, there is
-   * no such state, and this asserts it rather than assuming it.
+   * RETARGETED. This asserted "three models all reachable", which was the state
+   * that let the default point at a model that 400s on every press. The claim
+   * that survives is the one that keeps money honest: everything routed is
+   * addressable, and everything NOT routed is shown as waiting rather than
+   * offered. One id is generation-verified today; the other three are page-only
+   * and wait for a real call before their flag flips.
    */
-  test('all three are reachable, so nothing is offered that cannot be drawn', () => {
-    expect(routedModels()).toHaveLength(STUDIO_MODELS.length)
-    expect(unroutedModels()).toHaveLength(0)
+  test('the routed set and the waiting set together are the whole catalogue', () => {
+    expect(routedModels().length + unroutedModels().length).toBe(STUDIO_MODELS.length)
+    expect(routedModels().length).toBeGreaterThan(0)
+    // A waiting model is a real, honest state here rather than a defect: it is
+    // how a page-verified id is carried until a generation confirms it.
+    expect(unroutedModels().length).toBeGreaterThan(0)
+    for (const model of unroutedModels()) {
+      expect(
+        routedModels().map((m) => m.id),
+        model.id,
+      ).not.toContain(model.id)
+    }
   })
 })
 
 describe('one model for each kind of job', () => {
-  test('there are exactly three, one per family', () => {
-    expect(STUDIO_MODELS).toHaveLength(3)
-    const families = STUDIO_MODELS.map((model) => model.id.split('/')[0])
-    expect(new Set(families).size).toBe(3)
+  test('the catalogue matches the allow-list in size, so neither grows unnoticed', () => {
+    expect(STUDIO_MODELS).toHaveLength(ALLOWED_IMAGE_MODELS.length)
+    // At least two families, so the picker is never a single-vendor list by
+    // accident. Two google entries (the 2.5 workhorse and the 3-pro finish) mean
+    // the family count is below the model count, which is expected.
+    const families = new Set(STUDIO_MODELS.map((model) => model.id.split('/')[0]))
+    expect(families.size).toBeGreaterThanOrEqual(2)
   })
 
-  test('the families are the three that were asked for', () => {
+  test('the families that were asked for are all present', () => {
     const ids = STUDIO_MODELS.map((model) => model.id).join(' ')
     expect(ids).toMatch(/openai\//)
     expect(ids).toMatch(/google\//)
