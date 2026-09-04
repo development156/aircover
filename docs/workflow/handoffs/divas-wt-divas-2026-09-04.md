@@ -1,10 +1,11 @@
 # Handoff — divas — wt-divas — 2026-09-04
 
-**Branch** `wt-divas` at `7aabb93b`. Lane `wt-divas`. Pushed: **yes**. The lane had
-already been merged into `wt-core`, so this began by fast-forwarding onto
-`3a89e60f` and building from there.
+**Branch** `wt-divas` at `2ba397e0` (+ this handoff). Lane `wt-divas`. Pushed:
+**yes**. The lane had already been merged into `wt-core`, so this began by
+fast-forwarding onto `3a89e60f` and building from there. **Two sessions are
+recorded here** — the second starts at "Session 2" below.
 
-**Preview:** <https://sahodalabs-git-wt-divas-development-4417s-projects.vercel.app/radar>
+**Preview:** <https://sahodalabs-git-wt-divas-development-4417s-projects.vercel.app/analytics>
 **Live:** not promoted.
 
 The job was a 39-item QA register published against `wt-core`, with the
@@ -138,6 +139,88 @@ read.
 3. **`asset-library.test.tsx`** — see the gate note below.
 4. **The three repository secrets.** Still the reason the end-to-end suite has
    never run automatically.
+
+## Session 2 — the fourteen, the analytics read, and two decisions taken
+
+Everything below happened after `a7836f8d` and is on `wt-divas` through
+`2ba397e0`.
+
+### Asked to connect 14 unreachable components. Almost none was un-wired work.
+
+Mapping every one first — three agents, then a resolved import-graph walk —
+found that most are the OLD version of something that deliberately replaced
+them. Mounting them as asked would have reinstated up to **24 live Zernio calls
+per analytics render** (removed in `af3c20cc`), put two "By channel" headings on
+one page, and re-added the onboarding colour picker the 29 August ruling removed.
+The founder chose: delete the superseded ones.
+
+| Component | Verdict | Successor |
+| --------- | ------- | --------- |
+| `ChannelBrowser` | deleted | `ConnectionMarketplace` — better keying, glyphs, responsive rail |
+| `ColorField` (+ `palette.ts`, 266 lines of CSS) | deleted | `visual-step.tsx` + `extractPalette`, founder's ruling 2026-08-29 |
+| `SurfaceNotice` | deleted | `ThreadPlaceholder` |
+| `InertColumn` / `InertToggle` | deleted | `leads/board.tsx` · `FestivalForm` + `Blocked` |
+| `Stagger` | deleted, cascade | the ratchet named it when its last call sites went |
+| `ReportBody` + all of `lib/report/` | deleted (session 2) | the numbered briefing that ships |
+| `ChannelTable`, `PostTable`, `WeekCard` | left in the baseline | their capability gap is closed instead — see below |
+| `DRAWN_KINDS`, `THEME_SCRIPT_SOURCE` | left | test seams; declared false positives |
+| `OnboardingFlow`, `WeekGrid`, `DropZone` | left in the baseline | genuinely unresolved, see below |
+
+**Retargeting the deleted tests found three live regressions.**
+`SurfaceNotice`'s 17 tests moved onto `ThreadPlaceholder`, which had none of its
+own. Six then failed on behaviour the three-pane rework had dropped: `unresolved`
+had lost its connect CTA, the "which accounts did not answer" list was rendered
+nowhere for `could_not_ask`, and `data-surface-state` was gone. All restored.
+
+### Two decisions, taken because they were left to me
+
+**The CMO Report is the numbered briefing.** `87abe541` replaced the page with
+it and `af3c20cc` deleted the five readers the rival design needed as dead code.
+Mounting `report-body.tsx` was never a missing import — it was rebuilding a data
+layer removed on purpose to reinstate a design replaced on purpose. Deleted 11
+modules and 4 test files, verified a CLOSED cluster first: every product consumer
+of all eleven was inside the eleven. The reasoning is recorded on the surviving
+page and names the commits.
+
+**`asset_logo_facts` keeps its GDPR entry and its `readable` flag** — the list's
+promise is completeness and the policy claim is true. The SENTENCE was the false
+part, and it now says the measurements are worked out per draw and not kept,
+instead of implying an empty table means we measured nothing.
+
+### /analytics shows impressions and engagement
+
+Never for want of data: `post_metric_snapshots` has stored all three since it was
+created and the nightly job captures all three. The read asked for
+`.eq('metric', 'reach')`.
+
+Three things had to be right at once, and each is a note in the code:
+
+- **The shared age still comes from reach alone.** Feeding all three to
+  `commonAge` would pick the day SOME metric was recorded and shift every reach
+  figure a customer has already seen, as a side effect of adding two columns.
+- **The cap is `ROW_CAP * SNAPSHOT_METRICS.length`.** Tripling the rows for the
+  same history would push a busy workspace over and report the whole page
+  unreadable — a regression that looks like a database fault.
+- **The absence does NOT reuse `MetricAvailability`.** Its `never-measured` copy
+  reads "{Platform} has not reported metrics for this post", which blames the
+  channel for our own collecting job missing a night.
+
+Shown in `PostRows` as two sortable columns and in `ChannelCards` per channel,
+each with its OWN coverage count.
+
+### The measurement worth inheriting
+
+A resolved **import-graph walk from every route** found **74 unreachable
+modules**; the text-matching guard finds 8. It also corrected a deletion my grep
+had got wrong — `grep "report/read'"` claimed six live consumers by matching
+sibling `./read` imports elsewhere; there is one.
+
+It has its own false positives (framework entry points, dynamic imports,
+test-only modules), so it is NOT shipped as a gate rule. The script is
+`scratchpad/reach.mjs` in this session and is 30 lines. **Turning it into the
+guard, with a triaged baseline, is the highest-value work left here.** The
+striking cluster is 17 files under `components/onboarding/` — the whole
+pre-`stage/` flow, `OnboardingFlow` among them.
 
 ## Gate
 
