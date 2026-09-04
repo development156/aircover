@@ -962,9 +962,21 @@ export function StudioWorkbench({
       {/* ── THE CANVAS ──────────────────────────────────────────────────────── */}
       <section aria-labelledby="studio-canvas" className="flex flex-col gap-2">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 id="studio-canvas" className="type-h2">
-            The canvas
-          </h2>
+          <div className="flex flex-wrap items-baseline gap-3">
+            <h2 id="studio-canvas" className="type-h2">
+              The canvas
+            </h2>
+            {/* Shape and age, both real facts about the ACTIVE picture rather
+                than the chosen format: switching through the strip can land
+                on a picture drawn at a size nobody has selected since. */}
+            {active === null || active.width === null || active.height === null ? null : (
+              <span className="type-sm text-muted" data-guide="studio-canvas-meta">
+                <span className="num">{active.width}</span> ×{' '}
+                <span className="num">{active.height}</span>
+                {active.madeAgo === null ? null : <> · {active.madeAgo}</>}
+              </span>
+            )}
+          </div>
           {active === null ? null : (
             <PictureActions
               picture={active}
@@ -1066,9 +1078,41 @@ export function StudioWorkbench({
               </div>
             ) : null}
 
-            <div className="flex min-w-[24ch] flex-1 flex-col gap-0.5">
-              <span className="type-sm font-[550] text-ink">{note_.title}</span>
-              <span className="type-sm text-muted">{note_.body}</span>
+            {/* ── WHICH FRAME THIS IS, IN ONE WORD ────────────────────────────
+                `active.url` is always the model's own output, untouched,
+                whichever version is on screen. That is true and shown plainly.
+                The exact placed size and clear space are true only of the
+                STAMPED frame and are not recorded per picture: `stamp`
+                choices are read from the composer's current controls and
+                never written to `studio_generation_images`, so this screen
+                cannot say what a picture made last week was actually placed
+                at. Locked rather than guessed. */}
+            <span className="type-sm text-muted" data-guide="studio-frame-note">
+              {bothVersions && showing === 'stamped' ? (
+                <span className="inline-flex items-center gap-1 opacity-70">
+                  <Lock className="size-[11px]" aria-hidden />
+                  Exact placement: coming soon
+                </span>
+              ) : (
+                'As the model drew it'
+              )}
+            </span>
+
+            <div className="flex min-w-[24ch] flex-1 items-baseline gap-2">
+              {/* Filled only for `stamped`: the one answer where the logo is
+                  actually on the picture. Same filled/hollow convention the
+                  signals list above uses for confirmed vs guessed, so a
+                  reader learns the shape once and reuses it here. */}
+              <span
+                aria-hidden
+                className={`size-[7px] shrink-0 rounded-full ${
+                  note_.dotFilled ? 'bg-primary' : 'surface-ring-firm'
+                }`}
+              />
+              <div className="flex flex-col gap-0.5">
+                <span className="type-sm font-[550] text-ink">{note_.title}</span>
+                <span className="type-sm text-muted">{note_.body}</span>
+              </div>
             </div>
 
             {/* A remedy is offered ONLY when one exists. `remedy: null` is the

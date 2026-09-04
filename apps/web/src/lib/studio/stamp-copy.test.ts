@@ -104,3 +104,12 @@ describe('two versions exist for exactly one answer', () => {
     }
   })
 })
+
+describe('the status dot is filled only where the logo is actually on the picture', () => {
+  test('stamped is the one filled dot', () => {
+    expect(stampNote('stamped').dotFilled).toBe(true)
+    for (const outcome of [...StampOutcomeSchema.options, null].filter((o) => o !== 'stamped')) {
+      expect(stampNote(outcome).dotFilled, String(outcome)).toBe(false)
+    }
+  })
+})
