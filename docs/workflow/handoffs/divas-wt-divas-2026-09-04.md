@@ -1,9 +1,16 @@
 # Handoff — divas — wt-divas — 2026-09-04
 
-**Branch** `wt-divas` at `2ba397e0` (+ this handoff). Lane `wt-divas`. Pushed:
-**yes**. The lane had already been merged into `wt-core`, so this began by
-fast-forwarding onto `3a89e60f` and building from there. **Two sessions are
-recorded here** — the second starts at "Session 2" below.
+**Branch** `wt-divas` at `884577ac`. Lane `wt-divas`. Pushed: **yes**. **Two
+sessions are recorded here** — the second starts at "Session 2" below.
+
+**The SHAs in this file are not all reachable.** The lane began by
+fast-forwarding onto `3a89e60f`, and near the end `origin/wt-divas` was REWRITTEN
+by an integration that rebased this lane's work onto newer `wt-core` commits. My
+local history and the remote then held the same changes under different SHAs. A
+`git rebase origin/wt-divas` started replaying OTHER lanes' commits and was
+aborted; the two commits the remote genuinely lacked were cherry-picked onto it
+instead, re-gated, and pushed. Any SHA below that `git show` cannot find is from
+before that rewrite — the CHANGE is on the branch, under a different name.
 
 **Preview:** <https://sahodalabs-git-wt-divas-development-4417s-projects.vercel.app/analytics>
 **Live:** not promoted.
