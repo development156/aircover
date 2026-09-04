@@ -1,10 +1,11 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest'
 
 import type { BrandSignal } from '@sahoda/shared'
 
 import { queueGeneration, startPostFromPicture } from '@/app/actions/studio'
+import { refineStudioPrompt } from '@/app/actions/studio-prompt'
 import { StudioWorkbench } from '@/components/studio/studio-workbench'
 import type { CanvasPicture } from '@/lib/studio/canvas'
 import { stampNote } from '@/lib/studio/stamp-copy'
@@ -35,6 +36,22 @@ vi.mock('@/app/actions/studio', () => ({
   startPostFromPicture: vi.fn(),
 }))
 vi.mock('@/app/actions/assets', () => ({ uploadAsset: vi.fn() }))
+vi.mock('@/app/actions/studio-prompt', () => ({ refineStudioPrompt: vi.fn() }))
+
+beforeAll(() => {
+  // `<dialog>` is not implemented in jsdom and `Modal` only ever calls these
+  // two. Same stub `picture-viewer.test.tsx` uses, for the same reason: the
+  // reference thumbnail preview (`reference-preview.tsx`) is built on the same
+  // `Modal`.
+  HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
+    this.open = true
+  })
+  HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) {
+    this.open = false
+  })
+  Element.prototype.setPointerCapture = vi.fn()
+  Element.prototype.releasePointerCapture = vi.fn()
+})
 
 afterEach(cleanup)
 
@@ -1088,6 +1105,17 @@ describe('a second press cannot reach the action while the first is in flight', 
     // a lock the first press forgot to release.
     fireEvent.click(button)
     expect(queueGeneration).toHaveBeenCalledTimes(2)
+
+    // ── SETTLED, NOT LEFT DANGLING ─────────────────────────────────────────
+    // A transition `start()`ed on THIS press and never resolved before the
+    // test ends leaves React's own act queue believing work is still
+    // outstanding, which can stall a LATER test's `act`/`waitFor` calls that
+    // have nothing to do with this one — measured against
+    // `prompt-refine-control`'s own double-press test, which hung
+    // indefinitely only when this test ran first and left its second press
+    // unresolved.
+    resolve!({ ok: true, generationId: 'g2', balanceAfter: 4, made: 1, asked: 1 })
+    await waitFor(() => expect(button).not.toBeDisabled())
   })
 
   /**
@@ -1859,5 +1887,337 @@ describe('the work grid: full page width, with a filter row', () => {
     const { container } = open(LIBRARY, SHAPES)
     const grid = container.querySelector('[data-guide="studio-strip"]') as HTMLElement
     expect(grid.className).not.toMatch(/max-w-\[820px\]/)
+  })
+})
+
+/** Picks the given library thumbnails, in order, via the Match panel. */
+async function pickReferences(
+  user: ReturnType<typeof userEvent.setup>,
+  container: HTMLElement,
+  indices: number[],
+): Promise<void> {
+  await chooseModeUI(user, /match a picture/i)
+  const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
+  const thumbs = within(picker).getAllByRole('button')
+  for (const at of indices) {
+    // eslint-disable-next-line no-await-in-loop -- picks must land in order.
+    await user.click(thumbs[at]!)
+  }
+}
+
+describe('the composer thumbnail strip is not a dead end', () => {
+  /**
+   * ── CLICK OPENS A PREVIEW, NEVER REMOVES ────────────────────────────────────
+   * The thumbnail used to carry the removal handler directly. Now it opens
+   * `ReferencePreview`, and removal lives only on the small X beside it.
+   */
+  test('clicking a picked thumbnail opens a large preview of it', async () => {
+    const user = userEvent.setup()
+    const { container } = open()
+    await pickReferences(user, container, [0]) // LIBRARY[0] = 'A shopfront'
+
+    const strip = container.querySelector('[data-guide="studio-picked"]') as HTMLElement
+    await user.click(within(strip).getByRole('button', { name: /open a shopfront large/i }))
+
+    // `ReferencePreview` renders the same zoom control `PictureViewer` does,
+    // which only exists once the dialog is actually open and showing an image.
+    expect(screen.getByRole('button', { name: /zoomed to 100%/i })).toBeTruthy()
+  })
+
+  /**
+   * ── THE X IS THE ONLY REMOVAL PATH, AND IT NAMES WHICH ONE ──────────────────
+   * MUTATION: change the X's `onClick` to always drop `picked[0]` and this goes
+   * red on the second assertion (removing 'a2', at index 1, would instead drop
+   * 'a1' and leave 'a2' — the surviving thumbnail's accessible name would read
+   * "picked 1 of 1" but for the wrong picture).
+   */
+  test('the X removes the named reference and renumbers the rest', async () => {
+    const user = userEvent.setup()
+    const { container } = open()
+    // LIBRARY[0]='A shopfront' (a1, picked first), LIBRARY[1]=null-titled (a2,
+    // picked second). The X pressed below belongs to the SECOND thumbnail, so
+    // a mutation that always drops `picked[0]` removes the WRONG one — 'A
+    // shopfront' — and this test would then find it gone instead of kept.
+    await pickReferences(user, container, [0, 1])
+
+    const strip = container.querySelector('[data-guide="studio-picked"]') as HTMLElement
+    expect(
+      within(strip).getByRole('button', { name: /open a shopfront large, picked 1 of 2/i }),
+    ).toBeTruthy()
+    expect(
+      within(strip).getByRole('button', { name: /stop matching this picture, picked 2 of 2/i }),
+    ).toBeTruthy()
+
+    await user.click(
+      within(strip).getByRole('button', { name: /stop matching this picture, picked 2 of 2/i }),
+    )
+
+    // The SECOND of two was removed. 'A shopfront' survives, still first, and
+    // only one thumbnail remains.
+    expect(strip.querySelectorAll('img').length).toBe(1)
+    expect(strip.querySelectorAll('[aria-label^="Stop matching"]')).toHaveLength(1)
+    expect(
+      within(strip).getByRole('button', { name: /open a shopfront large, picked 1 of 1/i }),
+    ).toBeTruthy()
+  })
+
+  /** A genuine `<button>`, named for WHICH reference it drops, never "Remove". */
+  test('the removal control names which reference it removes', async () => {
+    const user = userEvent.setup()
+    const { container } = open()
+    await pickReferences(user, container, [0])
+    const strip = container.querySelector('[data-guide="studio-picked"]') as HTMLElement
+    const removers = within(strip).getAllByRole('button', { name: /stop matching/i })
+    expect(removers).toHaveLength(1)
+    expect(removers[0]!.getAttribute('aria-label')).not.toBe('Remove')
+    expect(removers[0]!.getAttribute('aria-label')).toMatch(/a shopfront/i)
+  })
+})
+
+describe('rewrite for the model', () => {
+  /** The button carries the same total-cost pattern Generate Image uses. */
+  test('shows its price before it is pressed', () => {
+    open()
+    const button = screen.getByRole('button', { name: /rewrite for the model/i })
+    expect(button.textContent).toMatch(/1 credit\b/i)
+  })
+
+  test('is disabled while the prompt is empty', () => {
+    open()
+    expect(screen.getByRole('button', { name: /rewrite for the model/i })).toBeDisabled()
+  })
+
+  test('becomes enabled once something is typed', async () => {
+    const user = userEvent.setup()
+    open()
+    await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
+    expect(screen.getByRole('button', { name: /rewrite for the model/i })).toBeEnabled()
+  })
+
+  /**
+   * MUTATION: delete `if (pressLocked.current) return` (and its paired
+   * `pressLocked.current = true`) from `refine` in `prompt-refine-control.tsx`
+   * and this goes red: `refineStudioPrompt` called more than once.
+   */
+  test('a second click while the first is in flight never reaches refineStudioPrompt twice', async () => {
+    let resolve: ((value: Awaited<ReturnType<typeof refineStudioPrompt>>) => void) | null = null
+    vi.mocked(refineStudioPrompt).mockImplementation(
+      () =>
+        new Promise((res) => {
+          resolve = res
+        }),
+    )
+    const user = userEvent.setup()
+    open()
+    await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
+    const button = screen.getByRole('button', { name: /rewrite for the model/i })
+
+    act(() => {
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    })
+
+    expect(refineStudioPrompt).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      resolve!({
+        ok: true,
+        original: 'a shopfront',
+        refined: 'a warmly lit shopfront, morning light',
+        headline: 'Built from your words alone',
+        body: 'Sahoda read your Brand Brain and found nothing in it that changes an image prompt.',
+        brainState: 'ok',
+        usedSignals: [],
+        balanceAfter: 99,
+        creditsCharged: 1,
+      })
+    })
+    await waitFor(() => expect(button).not.toBeDisabled())
+  })
+
+  /** The original is never lost: accepting a refinement can always be undone. */
+  test('a refined prompt can be reverted back to exactly what was typed', async () => {
+    vi.mocked(refineStudioPrompt).mockResolvedValue({
+      ok: true,
+      original: 'a shopfront',
+      refined: 'a warmly lit shopfront, morning light',
+      headline: 'Built from your words alone',
+      body: 'Sahoda read your Brand Brain and found nothing in it that changes an image prompt.',
+      brainState: 'ok',
+      usedSignals: [],
+      balanceAfter: 99,
+      creditsCharged: 1,
+    })
+    const user = userEvent.setup()
+    open()
+    const prompt = screen.getByLabelText(/what should the picture show/i) as HTMLTextAreaElement
+    await user.type(prompt, 'a shopfront')
+    await user.click(screen.getByRole('button', { name: /rewrite for the model/i }))
+
+    await waitFor(() => expect(prompt.value).toBe('a warmly lit shopfront, morning light'))
+
+    await user.click(screen.getByRole('button', { name: /get your own words back/i }))
+    expect(prompt.value).toBe('a shopfront')
+  })
+
+  /**
+   * ── THREE STATES, EACH ITS OWN SENTENCE ──────────────────────────────────
+   * MUTATION: hardcode one Brand Brain sentence for all three states in
+   * `prompt-refine-control.tsx` (render `result.headline` as a fixed string)
+   * and every assertion below but the first goes red.
+   */
+  test.each([
+    ['unreadable', 'Sahoda could not read your Brand Brain this time'],
+    ['empty', 'Sahoda has nothing about your brand to work from yet'],
+    ['ok', 'Built from your words alone'],
+  ] as const)(
+    "renders the engine's own sentence for the %s Brand Brain state",
+    async (brainState, headline) => {
+      vi.mocked(refineStudioPrompt).mockResolvedValue({
+        ok: true,
+        original: 'a shopfront',
+        refined: 'a warmly lit shopfront',
+        headline,
+        body: 'placeholder body',
+        brainState,
+        usedSignals: [],
+        balanceAfter: 99,
+        creditsCharged: 1,
+      })
+      const user = userEvent.setup()
+      open()
+      await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
+      await user.click(screen.getByRole('button', { name: /rewrite for the model/i }))
+
+      expect(await screen.findByText(new RegExp(headline, 'i'))).toBeTruthy()
+    },
+  )
+
+  test('an insufficient balance names both numbers, never a generic refusal', async () => {
+    vi.mocked(refineStudioPrompt).mockResolvedValue({
+      ok: false,
+      insufficient: true,
+      required: 1,
+      available: 0,
+    })
+    const user = userEvent.setup()
+    open()
+    await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
+    await user.click(screen.getByRole('button', { name: /rewrite for the model/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/1 credit.*0 credits/i)
+  })
+})
+
+/**
+ * `scrollHeight` is not implemented by jsdom's layout engine (there is no
+ * layout engine), so `Textarea`'s own `fit()` — which reads it to decide how
+ * tall to grow — always sees 0 unless a test supplies one. This stub answers
+ * with a height proportional to the number of lines in the field's OWN value,
+ * which is enough to prove the grow-then-cap behaviour without needing a real
+ * browser: an empty field reports its `rows={3}` rest height, and a field with
+ * many lines reports something taller than the ceiling.
+ */
+function stubScrollHeightByLineCount(): () => void {
+  const original = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight')
+  Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
+    configurable: true,
+    get(this: HTMLElement) {
+      const value = this instanceof HTMLTextAreaElement ? this.value : ''
+      const lines = Math.max(3, value.split('\n').length)
+      return lines * 18
+    },
+  })
+  return () => {
+    if (original) Object.defineProperty(HTMLElement.prototype, 'scrollHeight', original)
+  }
+}
+
+describe('the prompt is a generous, growing textarea', () => {
+  /**
+   * ── THREE LINES AT REST, NOT ONE ───────────────────────────────────────────
+   * The founder's own complaint: a single-line box on a screen whose entire
+   * purpose is describing a picture.
+   */
+  test('rests at three lines, not one', () => {
+    open()
+    const prompt = screen.getByLabelText(/what should the picture show/i)
+    expect(prompt).toHaveAttribute('rows', '3')
+  })
+
+  /**
+   * MUTATION: change `maxRows={8}` to `maxRows={3}` on the prompt in
+   * `studio-workbench.tsx` and this goes red — the box would cap at its own
+   * rest height and never grow at all.
+   */
+  test('grows past three lines as content is typed, then stops and scrolls', () => {
+    const restore = stubScrollHeightByLineCount()
+    try {
+      open()
+      const prompt = screen.getByLabelText(/what should the picture show/i) as HTMLTextAreaElement
+
+      fireEvent.input(prompt, { target: { value: Array(5).fill('a line').join('\n') } })
+      const grown = Number.parseFloat(prompt.style.height)
+      expect(grown).toBeGreaterThan(3 * 18)
+      expect(prompt.style.overflowY).toBe('hidden')
+
+      // Comfortably past the 8-line ceiling.
+      fireEvent.input(prompt, { target: { value: Array(20).fill('a line').join('\n') } })
+      const capped = Number.parseFloat(prompt.style.height)
+      expect(capped).toBe(8 * 18)
+      expect(prompt.style.overflowY).toBe('auto')
+    } finally {
+      restore()
+    }
+  })
+
+  /** Enter is unchanged: it inserts a newline and spends nothing. */
+  test('Enter inserts a newline rather than submitting', async () => {
+    vi.mocked(queueGeneration).mockClear()
+    const user = userEvent.setup()
+    open()
+    const prompt = screen.getByLabelText(/what should the picture show/i) as HTMLTextAreaElement
+    await user.type(prompt, 'a shopfront{Enter}at dawn')
+
+    expect(prompt.value).toBe('a shopfront\nat dawn')
+    expect(queueGeneration).not.toHaveBeenCalled()
+  })
+
+  /**
+   * ── THE ADDED AFFORDANCE ────────────────────────────────────────────────
+   * MUTATION: remove the `(event.metaKey || event.ctrlKey) &&` check so a
+   * bare Enter also submits, and this goes red together with the test above:
+   * Enter alone would then call `queueGeneration`.
+   */
+  test('Ctrl+Enter submits when the prompt is ready', async () => {
+    vi.mocked(queueGeneration).mockClear()
+    vi.mocked(queueGeneration).mockResolvedValue({
+      ok: true,
+      generationId: 'g1',
+      balanceAfter: 10,
+      made: 1,
+      asked: 1,
+    })
+    const user = userEvent.setup()
+    open()
+    const prompt = screen.getByLabelText(/what should the picture show/i)
+    await user.type(prompt, 'a shopfront')
+    await user.type(prompt, '{Control>}{Enter}{/Control}')
+
+    expect(queueGeneration).toHaveBeenCalledTimes(1)
+  })
+
+  /** The same readiness rule the button's own `disabled` enforces. */
+  test('Ctrl+Enter does nothing while the prompt is empty', async () => {
+    // Cleared, not asserted from zero: an earlier test in this file may have
+    // already called `queueGeneration` for an unrelated press, and this test
+    // is about calls made from THIS press alone.
+    vi.mocked(queueGeneration).mockClear()
+    const user = userEvent.setup()
+    open()
+    const prompt = screen.getByLabelText(/what should the picture show/i)
+    await user.type(prompt, '{Control>}{Enter}{/Control}')
+
+    expect(queueGeneration).not.toHaveBeenCalled()
   })
 })

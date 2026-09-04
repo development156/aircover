@@ -4,7 +4,17 @@ import { Fragment, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { ChevronDown, ImageIcon, Loader2, Lock, Minus, Plus, Sparkles, Stamp } from 'lucide-react'
+import {
+  ChevronDown,
+  ImageIcon,
+  Loader2,
+  Lock,
+  Minus,
+  Plus,
+  Sparkles,
+  Stamp,
+  X,
+} from 'lucide-react'
 import {
   DEFAULT_STAMP_OPTIONS,
   IMAGE_TIER_ACTION,
@@ -27,6 +37,8 @@ const DrawModal = dynamic(() =>
 import { ModelPicker } from '@/components/studio/model-picker'
 import { PictureActions } from '@/components/studio/picture-actions'
 import { PictureViewer } from '@/components/studio/picture-viewer'
+import { PromptRefineControl } from '@/components/studio/prompt-refine-control'
+import { ReferencePreview } from '@/components/studio/reference-preview'
 import { ReferenceUpload } from '@/components/studio/reference-upload'
 import { Textarea } from '@/components/ui/textarea'
 import type { CanvasPicture } from '@/lib/studio/canvas'
@@ -246,6 +258,17 @@ export function StudioWorkbench({
   const [activeId, setActiveId] = useState<string | null>(null)
   const [viewing, setViewing] = useState<CanvasPicture | null>(null)
   const [drawing, setDrawing] = useState<CanvasPicture | null>(null)
+  /**
+   * Which reference thumbnail is expanded large, or none. A reference asset is
+   * not a `CanvasPicture` (see `reference-preview.tsx`'s own header for why),
+   * so this is kept apart from `viewing` above rather than widening that state
+   * to accept a shape it was never built for.
+   */
+  const [viewingReference, setViewingReference] = useState<{
+    assetId: string
+    url: string | null
+    title: string | null
+  } | null>(null)
   const [busy, start] = useTransition()
   /**
    * ── THE SECOND PRESS THAT `busy` ALONE CANNOT STOP ────────────────────────
@@ -549,10 +572,42 @@ export function StudioWorkbench({
                 <Textarea
                   value={wanted}
                   autoGrow
-                  rows={1}
+                  // ── THREE LINES AT REST, NOT ONE ─────────────────────────────
+                  // Founder's own complaint against an earlier build: a
+                  // single-line box on a screen whose entire purpose is
+                  // describing a picture read as an afterthought beside the
+                  // starter chips beneath it, each about as tall as the field
+                  // itself. `rows={3}` is what `autoGrow`'s own `fit()` measures
+                  // FROM on an empty box (no inline height has been set yet, so
+                  // `scrollHeight` reports the natural three-row size), so the
+                  // rest height is exactly the same "primary object" size the
+                  // founder asked for, not a separate constant to keep in step.
+                  rows={3}
+                  // Grows to roughly eight lines, then scrolls inside itself —
+                  // the composer bar must not push the page around without
+                  // limit. `Textarea`'s own `fit()` caps `scrollHeight` at
+                  // `line-height * maxRows` and switches to an internal
+                  // scrollbar past it, so this is the one number to change if
+                  // that ceiling ever needs to move.
+                  maxRows={8}
                   maxLength={1000}
                   placeholder={promptHintFor(mode)}
                   onChange={(event) => setWanted(event.target.value)}
+                  onKeyDown={(event) => {
+                    // ── ENTER STILL INSERTS A NEWLINE, UNCHANGED ────────────────
+                    // A `<textarea>` already does this natively and nothing here
+                    // intercepts a bare Enter — a multi-line prompt needs to be
+                    // typeable a sentence at a time without every line break
+                    // firing a paid press. Cmd/Ctrl+Enter is ADDED as the
+                    // keyboard submit, a new affordance rather than a changed
+                    // one, mirroring the same `ready && !busy` gate the button's
+                    // own `disabled` attribute enforces — a keydown handler that
+                    // called `generate` unconditionally would bypass it.
+                    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+                      event.preventDefault()
+                      if (ready && !busy) generate()
+                    }
+                  }}
                   data-guide="studio-prompt"
                   // The prompt is the loudest thing on the bar and does not need
                   // a box drawn round it: it already sits on the bar's own
@@ -562,10 +617,9 @@ export function StudioWorkbench({
                   // floor is correct for a form field sized on purpose, but it
                   // fights `autoGrow` here — the box measures its own content
                   // via `scrollHeight` and sets an inline height, and a CSS
-                  // min-height above that inline value wins anyway, which is
-                  // the ~80px of dead space that used to open the bar before
-                  // anything was typed.
-                  className="min-h-0 border-0 bg-transparent px-0 py-0 type-h3 font-[400] shadow-none focus-visible:outline-none"
+                  // min-height above that inline value wins anyway. The visible
+                  // floor now comes from `rows={3}` above, not from this class.
+                  className="min-h-0 resize-none border-0 bg-transparent px-0 py-0 type-h3 font-[400] shadow-none focus-visible:outline-none"
                 />
               </label>
 
@@ -622,6 +676,15 @@ export function StudioWorkbench({
               </button>
             </div>
 
+            {/* ── REWRITE FOR THE MODEL, PRICED BEFORE THE PRESS ──────────────────
+                What the founder asked for: a control that takes what somebody
+                typed and rewrites it in terms of how the picture should be made.
+                Its own file (`prompt-refine-control.tsx`) owns the press-lock,
+                the price and the reversibility; this screen only hands it the
+                prompt and the setter, the same contract `wanted`/`setWanted`
+                already are. */}
+            <PromptRefineControl wanted={wanted} onChange={setWanted} />
+
             {/* ── SOMETHING TO TRY ──────────────────────────────────────────────
                 A box nobody knows what to put in stays empty. These FILL the box
                 rather than generating, so nothing is spent by trying one and the
@@ -659,15 +722,28 @@ export function StudioWorkbench({
                 has actually been picked, because the numbered thumbnails are
                 worth showing and the empty invitation twice is not. */}
             {picked.length > 0 ? (
-              <ul className="flex flex-wrap items-center gap-2">
+              <ul className="flex flex-wrap items-center gap-2" data-guide="studio-picked">
                 {picked.map((assetId, at) => {
                   const picture = libraryPictures.find((one) => one.assetId === assetId) ?? null
+                  const named = picture?.title ?? 'this picture'
                   return (
-                    <li key={assetId}>
+                    <li key={assetId} className="relative">
+                      {/* ── CLICK OPENS A LARGE PREVIEW, NEVER REMOVES ──────────────
+                          `toggleReference` used to live on THIS button, so the only
+                          way to see a reference large was back into the Match
+                          panel and the only way to drop one was the same click that
+                          somebody might have meant as "show me this bigger". The X
+                          below is now the one and only removal path. */}
                       <button
                         type="button"
-                        onClick={() => toggleReference(assetId)}
-                        aria-label={`Stop matching ${picture?.title ?? 'this picture'}, picked ${at + 1} of ${picked.length}`}
+                        onClick={() =>
+                          setViewingReference({
+                            assetId,
+                            url: picture?.url ?? null,
+                            title: picture?.title ?? null,
+                          })
+                        }
+                        aria-label={`Open ${named} large, picked ${at + 1} of ${picked.length}`}
                         className="surface-ring relative block size-[44px] overflow-hidden rounded-sm transition-micro hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                       >
                         {picture?.url == null ? (
@@ -685,6 +761,21 @@ export function StudioWorkbench({
                         <span className="absolute bottom-0 left-0 flex size-[16px] items-center justify-center rounded-pill bg-primary type-sm text-primary-foreground">
                           <span className="num">{at + 1}</span>
                         </span>
+                      </button>
+                      {/* ── THE ONE REMOVAL PATH, NAMED ─────────────────────────────
+                          `toggleReference` is the same function the Match panel's
+                          own grid uses to unpick a picture — never a second removal
+                          path. Removing an earlier entry re-slices `picked`, and
+                          because the numeral above is read from THIS array's own
+                          index (`at + 1`), the remaining thumbnails renumber for
+                          free: no separate renumbering step to keep in step. */}
+                      <button
+                        type="button"
+                        onClick={() => toggleReference(assetId)}
+                        aria-label={`Stop matching ${named}, picked ${at + 1} of ${picked.length}`}
+                        className="surface-ring absolute -right-1.5 -top-1.5 flex size-[16px] items-center justify-center rounded-full bg-surface-3 text-ink transition-micro hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                      >
+                        <X className="size-[10px]" aria-hidden />
                       </button>
                     </li>
                   )
@@ -1476,6 +1567,8 @@ export function StudioWorkbench({
       )}
 
       <PictureViewer picture={viewing} onClose={() => setViewing(null)} />
+
+      <ReferencePreview picture={viewingReference} onClose={() => setViewingReference(null)} />
 
       <DrawModal
         open={drawing !== null}
