@@ -19,7 +19,20 @@
     // threaded into a component that had stopped reading it.
     //
     // `apps/web` has no ESLint, so nothing else in this repository looks for
-    // this. Turning these on is the check that finds the next four.
+    // this. Turning these on is the check that finds the next four OF THAT
+    // SHAPE — and the shape is narrower than it reads.
+    //
+    // All four above are the CONSUMER side: a symbol arrives in a file and is
+    // not used, so there is an unused local for the compiler to point at. The
+    // PRODUCER side is invisible to it. TypeScript never reports an exported
+    // symbol that nobody imports, so a component written, exported, tested and
+    // mounted nowhere compiles clean for ever — there is no unused import
+    // anywhere, because there is no import at all.
+    //
+    // That is not hypothetical: the same review found 14 files, about 2,000
+    // lines, unreachable from any screen, and this check could not have seen one
+    // of them. `scripts/lib/unmounted-components.test.mjs` is the half that can,
+    // as a ratchet over `apps/web/src/components`.
     //
     // Both honour the leading-underscore convention, so a parameter that must
     // exist for its position is written `_ctx` and a Playwright fixture that
