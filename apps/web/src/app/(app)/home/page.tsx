@@ -445,7 +445,7 @@ export default async function HomePage() {
               action={{ href: '/wallet', label: 'View all' }}
               flush
             >
-              <ActivityFeed entries={ledger.entries.slice(0, 4)} />
+              <ActivityFeed entries={ledger.entries.slice(0, 4)} unreadable={ledger.unreadable} />
             </HomeSection>
           </StaggerItem>
 

@@ -142,7 +142,11 @@ describe('wallet reads with no active workspace', () => {
   })
 
   test('readLedger returns empty without querying', async () => {
-    await expect(readLedger()).resolves.toEqual({ entries: [], skipped: 0 })
+    // `unreadable: false` and not true. There is no workspace to read a ledger
+    // FOR, which is a different answer from a read that was attempted and
+    // failed — and the screen above already returns before it could offer a
+    // reload here.
+    await expect(readLedger()).resolves.toEqual({ entries: [], skipped: 0, unreadable: false })
     expect(state.queries).toEqual([])
   })
 
@@ -169,6 +173,50 @@ describe('a balance that genuinely could not be read stays unreadable', () => {
     }
 
     await expect(readBalance()).resolves.toEqual({ status: 'unreadable' })
+  })
+})
+
+/**
+ * THE SAME SPLIT, ON THE LEDGER, WHICH NEVER GOT IT.
+ *
+ * `readBalance` was fixed for this and its reasoning is twelve lines above
+ * `readLedger` in the same file. `readSpend`, which reads the same
+ * `credit_ledger` table for Home's other card, carries the rule verbatim:
+ * "`unreadable` is NOT the same claim and must never render as an empty chart,
+ * which would tell the user they spent nothing when we simply could not look."
+ *
+ * `readLedger` was left behind. Every failure returned `{ entries: [] }`, which
+ * both callers read as "nothing has ever happened" — the wallet printed "No
+ * credit activity yet" and Home printed "Nothing has happened yet", each a
+ * confident statement about somebody's money made from a question that never
+ * got an answer.
+ */
+describe('a credit history that could not be read is not an empty one', () => {
+  test('a PostgREST error says so, rather than reporting an empty ledger', async () => {
+    state.error = { code: 'PGRST301', message: 'connection failed' }
+
+    await expect(readLedger()).resolves.toEqual({ entries: [], skipped: 0, unreadable: true })
+  })
+
+  test('a thrown read says so too', async () => {
+    state.workspace = {
+      get id(): string {
+        throw new Error('cookies() outside a request')
+      },
+    }
+
+    await expect(readLedger()).resolves.toEqual({ entries: [], skipped: 0, unreadable: true })
+  })
+
+  /**
+   * The other half, and the one that keeps the fix honest: a workspace that has
+   * genuinely never spent anything must still read as empty. A flag that were
+   * always true would replace one wrong sentence with another.
+   */
+  test('a ledger that really is empty stays empty', async () => {
+    state.rows = []
+
+    await expect(readLedger()).resolves.toEqual({ entries: [], skipped: 0, unreadable: false })
   })
 })
 

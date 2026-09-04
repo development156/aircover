@@ -34,6 +34,38 @@ import type { InboxSurfaceKey } from './emptiness'
  * the thing keeping tenants apart.
  */
 
+/** How many stored messages one thread render reads. Matches the list's page. */
+const STORED_THREAD_PAGE = 200
+
+/**
+ * Zernio's platform vocabulary, restored from our channel column. The same two
+ * spellings `conversations.ts` maps, for the same reason: every other channel is
+ * already Zernio's own name and falls through.
+ */
+const STORED_PLATFORM: Readonly<Record<string, string>> = {
+  x: 'twitter',
+  gbp: 'googlebusiness',
+}
+
+function storedPlatform(channel: string): string {
+  return STORED_PLATFORM[channel] ?? channel
+}
+
+/**
+ * A stored message in the shape the thread already speaks. Structurally a
+ * `ZernioMessage`; declared here rather than imported so this module keeps no
+ * dependency on the publishing package.
+ */
+export interface StoredThreadMessage {
+  id: string
+  conversationId: string
+  accountId: string
+  platform: string
+  message: string
+  direction: string
+  createdAt: string
+}
+
 /** One conversation, as the list renders it. */
 export interface StoredConversation {
   id: string
@@ -221,5 +253,73 @@ export async function readStoredThreads(
       historyAvailable: options.historyAvailable,
       historyRows: options.historyRows,
     }),
+  }
+}
+
+/**
+ * One conversation's MESSAGES, from the store.
+ *
+ * ── WHY THE LIST HAD THIS AND THE THREAD DID NOT ─────────────────────────────
+ * The webhook receiver files DMs into `inbox_threads` AND `inbox_messages`, and
+ * the list was migrated to read the store. The thread was not: `readThread`
+ * resolved messages exclusively through Zernio, so opening a stored conversation
+ * went back to the network for data this database already held. On the day
+ * Zernio is unwell — the case the store exists for, and the case the list's own
+ * tests exercise — the list offered rows whose destination rendered zero
+ * messages under "Sahoda could not reach your connected accounts". A list whose
+ * rows lead nowhere is the impossible-remedy rule failing at the link.
+ *
+ * ── SHAPED AS `ZernioMessage` ON PURPOSE ─────────────────────────────────────
+ * So the thread has ONE message type and one set of helpers. `direction` passes
+ * through unchanged because `messageDirection` already accepts our column's
+ * `inbound`/`outbound` spelling; the platform comes from the thread's channel
+ * through the same map the list uses.
+ *
+ * Returns `[]` for every failure and never throws. A thread that could not be
+ * read from the store is not a thread with no messages, and the CALLER decides
+ * what to say about that — this function has no business guessing.
+ */
+export async function readStoredThreadMessages(
+  platformThreadId: string,
+): Promise<StoredThreadMessage[]> {
+  const workspaceId = await activeWorkspaceId()
+  if (workspaceId === null) return []
+
+  try {
+    const supabase = createServerSupabase()
+    const { data: thread, error: threadError } = await supabase
+      .from('inbox_threads')
+      .select('id, channel')
+      .eq('workspace_id', workspaceId)
+      .eq('platform_thread_id', platformThreadId)
+      .maybeSingle()
+
+    if (threadError || !thread) return []
+
+    const { data, error } = await supabase
+      .from('inbox_messages')
+      .select('id, direction, body, platform_message_id, sent_at, created_at')
+      .eq('workspace_id', workspaceId)
+      .eq('thread_id', thread.id as string)
+      .order('created_at', { ascending: true })
+      .limit(STORED_THREAD_PAGE)
+
+    if (error || !data) return []
+
+    return data.map((row) => ({
+      id: row.id as string,
+      conversationId: platformThreadId,
+      // The store has no Zernio account id and inventing one would be a claim.
+      // Nothing on the thread render path reads it.
+      accountId: '',
+      platform: storedPlatform(thread.channel as string),
+      message: (row.body as string | null) ?? '',
+      direction: row.direction as string,
+      // `sent_at` is when the platform says it happened; `created_at` is when we
+      // filed it. The first is the truth when we have it.
+      createdAt: (row.sent_at as string | null) ?? (row.created_at as string),
+    }))
+  } catch {
+    return []
   }
 }

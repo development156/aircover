@@ -17,6 +17,14 @@
  * screen moves you off the mode rather than leaving you on a dead end. The copy
  * says all this because it is true, and the rules move with it.
  *
+ * ── ONE CLAIM WAS REMOVED FROM THIS FILE, AND WHY ───────────────────────────
+ * Two cards used to read "Up to N pictures in one go, all matching". That was
+ * true of the PROVIDER and false of this product: `ImageGenerateInputSchema`
+ * carries no count and `ImageGenerateOutput` returns one picture, so a set is
+ * delivered as N separate calls with the same prompt. `maxPerPress` stays here
+ * as the measured provider fact that `modes.ts` will read again when the mesh
+ * can carry a count; it is no longer sold on the card.
+ *
  * ── AND WHAT IS NOT A MODEL FEATURE ─────────────────────────────────────────
  * Drawing on a picture, layers, annotation and masking are things THIS PRODUCT
  * does, in `draw-objects.ts` and `draw-render.ts`, before anything is sent. No
@@ -107,7 +115,7 @@ export const STUDIO_MODELS: readonly StudioModel[] = [
     label: 'Everyday',
     goodAt:
       'Food, shopfronts and people, at one flat price however big the picture. The one to use while you are still working out what you want.',
-    unlocks: 'Up to 4 pictures in one go, all matching, and up to 14 to match against.',
+    unlocks: 'Up to 14 pictures to match against.',
     maxPerPress: 4,
     maxReferences: 14,
     costNote: 'A flat price per picture, the cheapest of the three',
@@ -119,7 +127,7 @@ export const STUDIO_MODELS: readonly StudioModel[] = [
     label: 'Words and detail',
     goodAt:
       'Pictures with writing in them, and anything where small details have to survive. Worth it when the picture is going somewhere public.',
-    unlocks: 'Up to 10 pictures in one go, all matching, and up to 16 to match against.',
+    unlocks: 'Up to 16 pictures to match against.',
     maxPerPress: 10,
     maxReferences: 16,
     costNote: 'Billed by what it draws, so a large picture costs more',

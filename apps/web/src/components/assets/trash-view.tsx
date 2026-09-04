@@ -93,9 +93,12 @@ function EmptyTrashButton({ count }: { count: number }) {
         setOutcome(result.message)
         return
       }
-      // BOTH numbers. A file the gate refused stays in the trash, and reporting
-      // only the deleted count would be a claim the person cannot check.
-      setOutcome(describeEmptyTrash(result.deleted, result.kept))
+      // ALL THREE. A file the gate refused stays in the trash, and reporting only
+      // the deleted count would be a claim the person cannot check. `more` is the
+      // third: one press reads at most 200 rows, so a bigger trash is emptied a
+      // batch at a time and the sentence has to say so rather than imply it is
+      // now clear.
+      setOutcome(describeEmptyTrash(result.deleted, result.kept, result.more))
       router.refresh()
     })
   }

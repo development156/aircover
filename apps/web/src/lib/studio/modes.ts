@@ -13,15 +13,19 @@ import { defaultModelId, modelById } from './models'
  *
  * ── AND ONE MODE IS DELIBERATELY NOT OFFERED YET ────────────────────────────
  * `series` means N slides that BELONG TOGETHER, and the only honest way to make
- * them is a model that generates the whole set in one call with consistency
- * locked. MEASURED (docs/43 §3): the model this product routes to today,
- * `google/gemini-2.5-flash-image`, reports `max n = 1`. Seedream 4.5 reports 10
- * and is on OpenRouter, but nothing routes to it yet.
+ * them is one call that draws the whole set with consistency locked.
  *
- * So Series is REPORTED AS NOT READY rather than faked with N separate calls.
- * N calls would cost N times as much and produce N unrelated pictures, which is
- * the opposite of what the word promises. A carousel is one call, and until the
- * routing does that, saying so is the honest answer.
+ * The limit is OURS, not any model's, and this note said otherwise for a while.
+ * It read the routed model's `max n` and concluded the mode would open as soon
+ * as a multi-image model was routed. Three were, the mode opened, and it was
+ * still a fake: `ImageGenerateInputSchema` carries no count and
+ * `ImageGenerateOutput` returns exactly one picture, so the delivery path was
+ * `count` separate calls with the same prompt. N calls cost N times as much and
+ * produce N unrelated pictures, which is the opposite of what the word promises.
+ *
+ * So Series is REPORTED AS NOT READY, and it stays that way until the mesh can
+ * carry a count. `ruleFor` reads the model's ability again on that day; the
+ * guard in `modes.test.ts` is bound to the schema so it flips by itself.
  *
  * Pure: no I/O, no clock, no database.
  */
@@ -146,16 +150,14 @@ export function baseRuleFor(mode: GenerationMode): ModeRule {
 }
 
 /**
- * ── THE MODEL DECIDES WHAT A MODE CAN DO ──────────────────────────────────
- * `series` was refused outright because the routed model draws ONE picture per
- * call, and N separate calls cost N times as much and produce N unrelated
- * pictures. That was never a fact about the mode; it was a fact about the
- * model. So choosing a model that draws a whole set in one go is what makes a
- * matching set possible, and this function is where that becomes true rather
- * than a sentence somebody wrote.
+ * ── THE MODEL DECIDES WHAT A MODE CAN DO, WITHIN WHAT WE CAN ASK ───────────
+ * The reference ceiling is the model's: 14 on Gemini 3 Pro and Seedream 5.0
+ * Lite, 16 on GPT Image 1, all from `models.ts`, which took them from each
+ * model's own OpenRouter page.
  *
- * The reference ceiling moves the same way: 3 on the everyday model, 14 on
- * Seedream. Both come from `models.ts`, which took them from docs/43.
+ * `series` is the one that is NOT the model's to decide. See the header: the
+ * request shape carries no count, so no model can be asked for a set however
+ * many it could draw.
  */
 export function ruleFor(mode: GenerationMode, modelId: string = defaultModelId()): ModeRule {
   const base = baseRuleFor(mode)
@@ -164,9 +166,21 @@ export function ruleFor(mode: GenerationMode, modelId: string = defaultModelId()
 
   return {
     ...base,
-    // A set needs a model that draws the whole set in ONE call. Anything else
-    // is N unrelated pictures wearing the word "set".
-    ready: base.mode === 'series' ? model.maxPerPress > 1 : base.ready,
+    // ── GATED ON WHAT THIS PRODUCT CAN ASK FOR, NOT ON WHAT A MODEL COULD DO ─
+    // This read `model.maxPerPress > 1`, which is a measured fact about the
+    // PROVIDER and the wrong question. `ImageGenerateInputSchema` carries no
+    // count, `ImageGenerateOutput` returns exactly one picture, and the Studio
+    // action says so itself: "slides is Phase 2 and is deliberately not faked
+    // here: `requested_count` stays at 1". So the delivery path for a set is
+    // `count` separate calls with the same prompt, which is N unrelated
+    // pictures wearing the word "set" at N times the cost — the exact fake the
+    // header above forbids.
+    //
+    // `maxPerPress` stays in the catalogue as the measured provider fact. This
+    // line reads it again on the day the mesh can carry a count, and the guard
+    // in modes.test.ts is written against the SCHEMA rather than against a
+    // model list, so it flips by itself when that field lands.
+    ready: base.mode === 'series' ? false : base.ready,
     // Never above what the model will look at, and never above what the mode
     // wants: an edit takes one reference whatever the model could accept.
     maxReferences: Math.min(base.maxReferences, model.maxReferences),
@@ -194,7 +208,13 @@ export function describeModeBlock(input: {
   const rule = ruleFor(input.mode, input.modelId)
 
   if (!rule.ready) {
-    return 'A set that matches needs a model that draws every slide in one go, so the slides belong together. The model you have chosen draws one at a time, and making a set that way would cost more and give you pictures that do not match. Choose a model that makes a matching set.'
+    // NAMES NO REMEDY, because there is none to name. The old sentence ended
+    // "Choose a model that makes a matching set", and no model in the catalogue
+    // can: the limit is this product's, not the model's, so switching models
+    // sends somebody round a loop with no exit. Saying plainly that it is not
+    // built yet is the honest answer, and the second half is a thing they can
+    // actually do today.
+    return 'Sahoda cannot make a matching set yet. It asks for one picture at a time, so a set would come back as separate pictures that do not match each other. Ask for several options of one picture instead, then pick the one you want.'
   }
 
   if (input.references < rule.minReferences) {

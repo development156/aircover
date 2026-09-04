@@ -2,6 +2,7 @@ import type { Route } from 'next'
 
 import { PageTitle } from '@/components/page-title'
 import { AccountPanel } from '@/components/analytics/account-panel'
+import { ReadinessLine } from '@/components/analytics/readiness-line'
 import { ChannelCards } from '@/components/analytics/channel-cards'
 import { PerformanceOverTime } from '@/components/analytics/performance-over-time'
 import { PostRows } from '@/components/analytics/post-rows'
@@ -11,6 +12,7 @@ import { ViewControls } from '@/components/analytics/view-controls'
 import { changeFor, type Headline } from '@/lib/analytics/headline'
 import { HeadlineStrip } from '@/components/analytics/headline-strip'
 import { ACCOUNT_READ_TTL_MINUTES } from '@/lib/analytics/account-insights'
+import { analyticsReadiness } from '@/lib/analytics/readiness'
 import { readAnalyticsPage } from '@/lib/analytics/page-data'
 import {
   DEFAULT_DIRECTION,
@@ -88,6 +90,24 @@ export default async function AnalyticsPage({
 
   const label = windowLabel(view)
   const ready = window.kind === 'ready' ? window : null
+
+  /**
+   * ── ONE REASON, COMPUTED ONCE, FOR THE WHOLE SCREEN ───────────────────────
+   * docs/40 §3.4 ruling 1. This mechanism existed, was fully tested, and was
+   * DISCONNECTED by the 2026-08-29 rebuild: the collapse survived only as a
+   * whole-page early return gated on `!hasPublished`, so a workspace one step
+   * further along — posts out, nothing connected, where a beta account sits
+   * after its first hour — got the same apology from five sections at once,
+   * each diagnosing the page's single shared cause on its own.
+   *
+   * `measuredRows` is the only thing that proves measurement: rows carrying a
+   * real number right now, not rows that exist.
+   */
+  const readiness = analyticsReadiness({
+    account,
+    hasPublished,
+    measuredRows: ready ? ready.rows.filter((row) => row.reachAtAge !== null).length : 0,
+  })
 
   /**
    * When the account figures were asked for. A reading is reused for
@@ -215,6 +235,10 @@ export default async function AnalyticsPage({
     <div className="space-y-grid">
       <Header label={label} timezone={window.timezone} view={view} channels={channels} />
 
+      {/* Renders NOTHING once anything on the page has a number. Every section
+          below defers to it rather than re-diagnosing. */}
+      <ReadinessLine readiness={readiness} />
+
       <HeadlineStrip headlines={headlines} windowLabel={label} />
 
       <PerformanceOverTime series={series} />
@@ -263,7 +287,10 @@ export default async function AnalyticsPage({
         <h2 id="account-health" className="type-h3 text-ink">
           Account health
         </h2>
-        <AccountPanel analytics={account} reasonStated={false} />
+        {/* Pinned to `false` by the rebuild, which is how the collapse was
+            lost: the card then re-stated the cause and re-offered the link the
+            line above already carries. */}
+        <AccountPanel analytics={account} reasonStated={readiness.kind !== 'measuring'} />
         {accountReadAt ? (
           <p className="type-meta text-muted tabular-nums">
             Read from Instagram at {accountReadAt}. Sahoda asks again once a reading is{' '}

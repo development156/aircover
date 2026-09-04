@@ -70,11 +70,8 @@ export function ResolveFromLibrary({
             Sahoda reads everything you have added and works out your promise, your voice and who
             you are for, quoting the line it got each one from. It changes nothing on its own. Every
             suggestion waits for your yes on the{' '}
-            <Link
-              href="/brain/resolve"
-              className="font-[550] text-accent underline underline-offset-2"
-            >
-              resolution console
+            <Link href="/loop" className="font-[550] text-accent underline underline-offset-2">
+              What Sahoda noticed
             </Link>
             .
           </p>
@@ -116,7 +113,7 @@ export function ResolveFromLibrary({
             {waiting === null
               ? `Sahoda has read your library before. Reading it again costs ${credits(cost)} and writes a fresh set of suggestions beside any still waiting for you, rather than replacing them.`
               : (waiting ?? 0) > 0
-                ? `You still have ${waiting} ${(waiting ?? 0) === 1 ? 'suggestion' : 'suggestions'} waiting on the resolution console. Reading again costs ${credits(cost)} and adds a second set beside them, rather than replacing them.`
+                ? `You still have ${waiting} ${(waiting ?? 0) === 1 ? 'suggestion' : 'suggestions'} waiting under What Sahoda noticed. Reading again costs ${credits(cost)} and adds a second set beside them, rather than replacing them.`
                 : `You have read your library already in this visit. Reading it again costs ${credits(cost)} and writes another set of suggestions.`}
           </p>
           <div className="flex flex-wrap gap-2">
