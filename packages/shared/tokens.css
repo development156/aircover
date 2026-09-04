@@ -802,6 +802,67 @@
   color: var(--ink-body);
 }
 
+/* ============================================================
+   THE INVERSE SURFACE IN DARK MODE — a LIGHT panel inside a dark document.
+
+   THE DEFECT THIS EXISTS TO CLOSE, MEASURED 2026-09-04 on the running app.
+   `[data-surface='inverse']` and `[data-theme='dark']` declared the SAME SIX
+   values — canvas #0d0d0d, surface #171717, surface-2 #212121, surface-3
+   #292929, ink #ffffff, acc #ff6600. So in dark mode a panel asking to be
+   inverse got painted the colour of the page it sits on: `bg-surface` inside
+   it resolved to #171717 against a #0d0d0d ground, a 1.30:1 step. The Studio
+   composer, its settings tray and the result bar all dissolved into the
+   background at once, and the screen lost its structure rather than one card.
+
+   THE NAME WAS ALWAYS THE SPEC AND THE VALUES ONLY MATCHED IT IN ONE THEME.
+   "Inverse" means inverted RELATIVE TO THE DOCUMENT, not "dark". The block
+   above is the light-theme case and reads as though dark were the point; it is
+   not. A standout object goes the way the page does not — the same reasoning
+   that makes --pstrong DARKEN on light and LIGHTEN on dark, applied one level
+   up, from a control to a surface.
+
+   WHY NO GUARD SAW IT. `own-medicine.test.ts` grades this scope's tokens
+   against EACH OTHER — ink on surface, hover fill on its own ground — and every
+   one of those passed, because internally the scope is a correct dark ladder.
+   Nothing compared it to the ground it actually lands on. A scope is only
+   "inverse" in relation to something else, so a guard that never looks outside
+   it cannot check the one thing the name promises. `inverse-inverts.test.ts`
+   is that comparison.
+
+   THE ALIASES CARRY THEMSELVES HERE, and that is a real difference from the
+   `--brand-deep` trap recorded above, not an oversight. That trap was a
+   DESCENDANT scope failing to reach a `var()` substituted on `:root`. This rule
+   matches THE SAME ELEMENT as the block above, so `--bg: var(--surface)`,
+   `--s1`, `--s2`, `--muted`, `--faint`, `--brand-deep` and `color:
+   var(--ink-body)` all resolve against the values below without being repeated.
+   Re-declaring them would be duplication that can drift, not safety.
+   ============================================================ */
+[data-theme='dark'] [data-surface='inverse'],
+.dark [data-surface='inverse'] {
+  /* The LIGHT ladder, lifted from `:root` rather than re-picked, so the two
+     cannot drift apart. Four rungs, for the reason the block above gives. */
+  --canvas: #fafafa;
+  --surface: #ffffff;
+  --surface-2: #f2f2f3;
+  --surface-3: #e9e9eb;
+  --line: #e9e9ec;
+  --line-firm: rgba(0, 0, 0, 0.28);
+  --line-soft: rgba(0, 0, 0, 0.05);
+  --ink: #000000;
+  --ink-body: #000000;
+  --ink-mute: #57575a;
+  --ink-faint: #8c8c8c;
+
+  /* The primary and its hover, both flipped back to the light-theme pair.
+     --pstrong DARKENS here because the ground is now light: the control still
+     moves AWAY from the page, which is the rule the value encodes. Its label
+     goes white, the pair light already ships. Getting this wrong is how a
+     primary button becomes a hole in the panel at the moment somebody reaches
+     for it, which is the defect --pstrong was added to fix. */
+  --pstrong: #000000;
+  --pstrong-fg: #ffffff;
+}
+
 /* ---------- GLOBAL FOCUS — one treatment, no per-component overrides ----------
    TWO-TONE, and that is a requirement rather than a flourish. WCAG 1.4.11 asks
    3:1 of a focus indicator against what surrounds it, and the brand orange
