@@ -1,12 +1,12 @@
 # Handoff — divas — wt-divas2 — 2026-09-03
 
-**Branch** `wt-divas2` at `0c7e8075`. Lane `wt-divas2`. Pushed: yes.
+**Branch** `wt-divas2` at `9cb0e831`. Lane `wt-divas2`. Pushed: yes.
 
 Worked the Sahoda System Map artifact end to end. **Six of its seventeen findings
 were already fixed** on current `wt-core`, including two of the three it names as
-launch blockers. Seven were real and are fixed here. Three remain, each with a
-verified root cause and a written fix. One is a founder decision and one was not
-a defect at all.
+launch blockers. **Ten were real and all ten are fixed here.** One is a founder
+decision and one was not a defect at all, so nothing on the map is left
+unaccounted for.
 
 In plain terms: the map is a few days old and the product has moved. It says the
 business cannot take a customer's payment; it can. What was genuinely broken was
@@ -24,11 +24,14 @@ of those overclaims was mine from earlier in this lane.
 | The one paid Brand Brain button linked to a screen that cannot show what it bought | `/brain/resolve` never queries `memory_events`; only `/loop` does | `resolve-from-library.test.tsx` (+3) |
 | The CMO report printed "610 impressions on gbp." | `report/page.tsx` interpolated the metric key and the channel enum | `strings.test.ts` (+6) |
 | The billing Address field promised an invoice line that has no column | `InvoiceDraft` and `invoices` carry no recipient address | `billing-details-form.test.tsx` (5, new file) |
+| A website could never be deleted, so a bad first attempt was permanent on Starter | `generateSite` was the only mutation; the gate counts drafts | `site-delete.test.ts` (6) + `site-delete.test.tsx` (6), both new |
+| Five Analytics sections each apologised for the same one cause | the rebuild disconnected `analyticsReadiness`; `reasonStated` pinned to `false` | `readiness-line.test.tsx` (6, new file) |
+| A stored Inbox conversation could not be opened | `readThread` resolved messages only through Zernio, while the list read the store | `read-thread.test.ts` (7, new file) |
 
 Also corrected two sentences in `roadmap-figures-scan.spec.ts` that were the
 inverse of the truth about which guard owns which route. Comment only.
 
-**MEASURED**: eight commits, `8325ed45` through `0c7e8075`.
+**MEASURED**: twelve commits, `8325ed45` through `9cb0e831`.
 
 ## What was NOT done, and why
 
@@ -37,10 +40,6 @@ inverse of the truth about which guard owns which route. Comment only.
   step still exits in under a second because the three Clerk and Supabase names
   read empty as repository secrets AND as variables. That is a settings problem
   and the rules say report it, so it is reported and not worked around.
-- **Three findings verified and left for the next session.** Each has a root
-  cause quoted from source and a named fix; none is a guess. They are listed
-  under "What the next session should pick up" with enough detail to start cold.
-  I stopped here rather than half-doing them.
 - **`SAHODA_HOLD_SWEEP_MODE` untouched.** It is a founder decision about real
   money, written up below.
 - **`p_billing_email` left in place.** An RPC argument the form never fills, so
@@ -64,6 +63,10 @@ inverse of the truth about which guard owns which route. Comment only.
 | `apps/web` `metricInWords` | **new export** from `lib/report/strings.ts` | nobody; additive |
 | `apps/web` `ActivityFeed` | gained an OPTIONAL `unreadable` prop | nobody |
 | `apps/web` `ruleFor('series', …)` | now false for every model | any lane assuming Series is offered. Nothing outside the Studio reads it |
+| `apps/web` `SitePreview` | gained a **required** `siteId` prop | one call site, updated |
+| `apps/web` `deleteSite` | **new server action** | nobody; additive |
+| `apps/web` `readStoredThreadMessages` | **new export** from `lib/inbox/store-read.ts` | nobody; additive |
+| `apps/web` `ReadinessLine` | **restored** from `6a4fda80^`, unchanged | nobody; it had no callers to break |
 
 No migration, no price, no ledger change. `packages/shared` changed in one
 function signature; the schemas are untouched.
@@ -98,11 +101,29 @@ suite run, and the red watched.
 | `resolve-from-library.test.tsx` | point the link back at `/brain/resolve` | RED, 2 |
 | `strings.test.ts` | restore `{ranking.top.metric}` | RED, 1 |
 | `billing-details-form.test.tsx` | restore the blanket invoice claim | RED, 2 |
+| `site-delete.test.ts` | remove the zero-row branch | RED, 2 |
+| `site-delete.test.tsx` | delete on the first press | RED, 4 |
+| `readiness-line.test.tsx` | pin `reasonStated` to `false` again | RED, 1 |
+| `readiness-line.test.tsx` | stop the panel deferring | RED, 2 |
+| `read-thread.test.ts` | remove both store fallbacks | RED, 2 |
+| `read-thread.test.ts` | report a failure decision over rendered messages | RED, 1 |
 
-**One mutation was rejected as proof and re-done.** The first planner run went
-red with `dayColumn is not a function`, which is an absent symbol rather than a
-behavioural regression. It was re-run after the fix existed, restoring the exact
-old expression, and four tests went red on the behaviour.
+**Three of my own guards were rejected and re-done.** This is the part of the
+session most worth reading, because each was green and worthless.
+
+1. The first planner mutation went red with `dayColumn is not a function`, which
+   is an absent symbol rather than a behavioural regression. Re-run after the fix
+   existed, restoring the exact old expression: four tests red on behaviour.
+2. The Analytics "offers the remedy once" test counted links NAMED "Connect a
+   channel". The panel's own link reads "Open connections", so breaking the
+   collapse left it matching exactly one link while TWO were on screen. It counts
+   the `href` now, which is the property, and then it failed correctly.
+3. `read-thread.test.ts` spied on the exported `scopedAccount`. `readThread`
+   calls the module-LOCAL binding, so the real one ran, got `{}` for its reads,
+   and **six of seven tests passed while every one of them hit the catch arm**.
+   The fake moved to the reader, where the network actually is. A fourth
+   assertion in the same file read a `kind` field that does not exist on
+   `SurfaceDecision`; it asserts `showList`, which is what the screen branches on.
 
 ## Anything retracted
 
@@ -137,41 +158,36 @@ old expression, and four tests went red on the behaviour.
 
 ## What the next session in THIS lane should pick up
 
-1. **Inbox: a stored conversation cannot be opened.** `readThread` still resolves
-   messages only through `scoped.reads.listMessages`, so it goes back to Zernio
-   for data the database already holds; the LIST was migrated to the store and
-   the THREAD was not. When Zernio is unreachable the thread renders zero
-   messages. Fix: `readStoredThreadMessages(platformThreadId)` in
-   `lib/inbox/store-read.ts`, used in `readThread` when the live read throws or
-   returns nothing. Risk: medium.
-2. **Analytics shows five apologies at once.** `analyticsReadiness` and
-   `ReadinessLine` implemented docs/40 §3.4 ruling 1 and the 2026-08-29 rebuild
-   replaced them with a whole-page early return, so five sections each diagnose
-   the same shared cause. `readiness.ts` and its tests are still in the tree with
-   no importer. Fix is a page-file change reusing code that already exists;
-   `readiness-line.tsx` is recoverable from `6a4fda80^`. Risk: medium.
-3. **Websites cannot be deleted.** `generateSite` is the only mutation and the
-   entitlements gate counts drafts, so on Starter the first generation is the
-   last and the only remedy offered is a bigger plan. Members already hold a
-   `t_delete` policy and the cascade exists. Fix: a `deleteSite` action modelled
-   on `deletePost`, with `.select()` so a zero-row delete is not reported as
-   success. Risk: low, but it is a destructive customer-facing action.
-4. **Then the smoke suite**, if the secrets ever land.
+Every finding on the map is now closed, so this lane has no inherited queue.
+
+1. **The smoke suite, if the secrets ever land.** It is the only thing about
+   this lane that is unverified end to end, and it has been unverified for three
+   sessions running.
+2. **Watch `/sites` for the delete.** It is the one CUSTOMER-DESTRUCTIVE control
+   added here. It asks first, states what is lost and what survives, and refuses
+   rather than reporting a deletion that did not happen — but it has never been
+   exercised against the real database, only against a faked client.
+3. **`/analytics` and `/inbox` deserve a look on the preview**, for the same
+   reason: both changes are about what a screen says when a read fails, and that
+   is exactly the state a unit test simulates rather than reproduces.
+4. **The founder decision on `SAHODA_HOLD_SWEEP_MODE`** is still open.
 
 ## Gate
 
-MEASURED 2026-09-03 on `wt-divas2` at `0c7e8075`, `--force` on every leg, not
-piped.
+MEASURED 2026-09-03 on `wt-divas2` at `9cb0e831`, `--force` on every leg, not
+piped. Re-run in full after the last three fixes.
 
 | Leg | Result |
 | --- | --- |
 | `turbo run typecheck lint test --force` | **PASS — 27 of 27 tasks** |
-| `@sahoda/web` | PASS — 633 files / 8178 tests (3 files, 13 tests skipped) |
+| `@sahoda/web` | PASS — 8204 passed / 13 skipped |
 | `@sahoda/db` | PASS — 966 passed / 198 skipped |
 | `@sahoda/jobs` | PASS — 472 passed (41 files) |
 | `@sahoda/sites` | PASS — 1566 passed |
 | `@sahoda/billing` | PASS — 417 passed / 13 skipped |
 | `@sahoda/mesh` | PASS — 235 passed |
+| `@sahoda/publishing` | PASS — 510 passed |
+| `@sahoda/research` | PASS — 195 passed |
 | `prettier --check .` | PASS |
 | `design-lint` | PASS — no new violation in any category |
 | Playwright `@smoke` | **UNRUN** |
