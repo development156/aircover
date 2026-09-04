@@ -23,6 +23,16 @@ import { describe, expect, test } from 'vitest'
  * Supabase tables in parallel, and mocking all five just to look at whether
  * one import line exists would be a heavier guard than the claim it checks.
  * This asserts the claim directly, against the file the claim is about.
+ *
+ * WHAT IT CANNOT SEE: it reads ONE file as text, so every route to a second
+ * history list that does not spell `RecentGenerations` in `page.tsx` is
+ * invisible to it. A re-export under another name, a dynamic
+ * `import(...)` built from a variable, a barrel file that pulls it in, a child
+ * component that renders it, or a second strip written from scratch rather
+ * than imported would all pass. It also cannot see whether the strip that DOES
+ * survive renders correctly — that is `studio-workbench.test.tsx`'s job. This
+ * closes the door that was actually found open, and says so rather than
+ * implying a wider guarantee.
  */
 describe('the Studio page renders one history list, not two', () => {
   test('does not import or render RecentGenerations', () => {
