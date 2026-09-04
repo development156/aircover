@@ -223,3 +223,141 @@ Item 5 is therefore closed and needs nothing from the next session.
 `c024ba0b` was **not** pushed to `wt-core`. The gate is green and the push is a
 one-liner (`git push origin HEAD:wt-core`), but pushing outside the lane is not
 this session's to decide.
+
+
+---
+---
+
+# Session 2 — same day, after the lane was merged
+
+**Branch** `wt-girija` at `3a89e60f`, which is `wt-core`'s head: another session
+pushed the trunk onto this lane's ref. Lane work above is unchanged and is in
+`wt-core`. Nothing was built this session; it was verification, and it
+**retracts the largest claim in Session 1**.
+
+## What was retracted, with the measurement
+
+**"FOUR migrations remain UNAPPLIED" is WRONG.** All four are applied to
+production, and so are the four `20260902220001-4` that came from `wt-core`.
+MEASURED 2026-09-03 against project `rloztdhzfliyvpvxsgjl` by reading the
+CATALOG, not the migration ledger, because I had edited `20260831150000` after
+its first run and a recorded version says nothing about a later edit:
+
+| Object | State |
+| --- | --- |
+| `workspaces.logo_asset_id`, `.logo_asset_id_dark` | present, `uuid` |
+| `asset_logo_facts` | present, **RLS enabled** |
+| `studio_generation_images.stamped_asset_id`, `.stamp_outcome` | present |
+| `stamp_outcome` check constraint | includes **`skipped`** — my later edit did land |
+| both tenancy triggers, both partial indexes | present |
+
+So the `42703` fallbacks in `studio.ts` and `logo-bytes.ts` are dead paths in
+production now, and the dark mark is live rather than dropped. **Session 1's
+"top item, everything else is smaller" is closed.** I did not run
+`apply_migration` at all — there was nothing left to apply, and re-running DDL
+that is already in place is risk with no upside.
+
+**How the error happened, because it will happen again**: somebody applied them
+between the 09-01 handoff and now, and I repeated "UNAPPLIED" from my own
+earlier report without re-checking. The lesson is the one this project already
+has a rule for: a claim about shared state has to be re-measured at the moment
+it is made, not carried forward.
+
+## The lane merged itself while I was gating
+
+`171de658` is an ancestor of `origin/wt-core`. Another session merged it as
+`46e806ea` "merge wt-girija into wt-core: the Studio composer, logo variants, and
+stamp outcomes", and four more lanes landed after. My `git merge origin/wt-core`
+then **fast-forwarded the local branch onto the trunk**, which would have turned
+the lane into a copy of `wt-core`; I reset to `171de658`. `origin/wt-girija` has
+since been pushed to `3a89e60f` by someone else anyway.
+
+Nothing was lost. Worth recording because a fast-forward is silent and looks
+like a successful merge.
+
+## Studio has still never been seen working
+
+I was asked to check it end to end on preview and **could not**. Two independent
+walls, both MEASURED 2026-09-03:
+
+1. **Vercel deployment protection.** `/studio` on the lane preview returns 302 to
+   `vercel.com/sso-api`. The Vercel MCP fetcher, which exists to carry that auth,
+   gets the same 302 with and without the `_vercel_share` token it mints itself.
+2. **Clerk.** Past that, `/studio` needs a signed-in user, and this sandbox's
+   Chromium cannot complete any outbound HTTPS request.
+
+Keys are present locally, so the blocker is network and SSO, not configuration.
+What I could establish: the `wt-girija` deployment is **READY**, and Vercel
+reports **no runtime errors on the project in 24h**. That is "it built and the
+database can hold the data". It is not "it works", and it must not be written up
+as if it were.
+
+## A guard in `.github/workflows/gate.yml` under-checks — NOT FIXED
+
+**Found, reported, deliberately not changed.** The `smoke` job's guard step
+refuses on three secret names:
+
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, CLERK_SECRET_KEY, NEXT_PUBLIC_SUPABASE_URL
+
+but the run step immediately below passes **six**, adding
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` and
+`SUPABASE_DB_URL`. `scripts/cloud-setup.sh`'s `ENV_REQUIRED` names the first two
+of those as required for the app to boot. So somebody who adds exactly the three
+the guard names will **clear the guard and then die inside the suite** with the
+opaque failure the guard exists to prevent. The guard's own header says it was
+rewritten twice because "add them" was not enough; it is one name-list short of
+being right.
+
+Left alone because `.github` is shared, the founder was about to act on it, and a
+half-understood edit mid-conversation is worse than a clear report. It is a
+small, well-scoped fix for whoever picks it up.
+
+## Two facts about CI that stop a wrong decision
+
+- **`e2e/global-setup.ts` already refuses a `pk_live_` key** and demands
+  `pk_test_`. "Use a Clerk test instance for CI" needs no code change; it is
+  enforced.
+- **A Clerk test instance is not a test database.** The suite mints a user and
+  lets the app create a workspace and a ledger in whatever
+  `NEXT_PUBLIC_SUPABASE_URL` names, and there is one ACTIVE project: production.
+  `lib/testing/e2e-target.ts` documents this as a measured finding — test
+  workspaces have been appearing and vanishing in the customer database on every
+  local run. Enabling CI smoke against production would make that automatic.
+- **`sahoda-staging` (`yoxmzwkxweasfaahhvpj`) exists and is INACTIVE.** Restoring
+  it is the clean answer: `ack_target=yoxmzwkxweasfaahhvpj` and no test workspace
+  ever touches customer data.
+
+## Blocked, needing a person
+
+- **`restore_project` on `yoxmzwkxweasfaahhvpj` was DENIED by the permission
+  classifier.** Not a tool gap, not a Supabase error. Restoring a paused project
+  is billing-affecting, so the refusal is reasonable. A person unpauses it in the
+  dashboard, or grants the permission.
+- **No tool in this session can write a GitHub Actions secret.** The GitHub MCP
+  server exposes workflows, runs, files, PRs and secret *scanning* — no
+  create/update. Writing one needs the repo public key and a libsodium seal.
+  Reading the values out of `apps/web/.env.local` was also correctly denied by
+  the sandbox. This stays a person's job, and
+  **`development156/sahodalabs` is PUBLIC** (MEASURED — `githubRepoVisibility`
+  on every deployment record), which is a reason to use a Clerk test instance
+  rather than the production one.
+
+## What the next session in THIS lane should pick up
+
+1. **Get somebody to open `/studio` and look at it.** Three sessions have now
+   shipped to a screen nobody has seen. Everything else here is smaller.
+2. **Restore `sahoda-staging` and apply the 100 migrations to it**, then point
+   CI at it. I was one permission short of doing this.
+3. **Fix the `gate.yml` guard's name list** — three checked, six needed.
+4. Six repository secrets, on the SECRETS tab, from a Clerk **test** instance.
+5. Build one of the four Coming soon controls, or delete the label.
+6. Re-seed the design canvas: `Main.dc.html` has four states, the code has five.
+7. `packages/db/tests/live-guard.test.ts` still prints a production database URL
+   and password on failure. Open since 2026-08-31.
+
+## Gate
+
+**UNRUN this session, and that is the honest word.** No source file was changed:
+`git diff 171de658..3a89e60f -- ':!docs'` is other lanes' work that arrived by
+fast-forward, already gated by them. The only file this session writes is this
+handoff. Session 1's gate stands as the last measurement of this lane's code.
