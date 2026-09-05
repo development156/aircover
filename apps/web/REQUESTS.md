@@ -2568,3 +2568,22 @@ that break the rule are the ones whose rows nobody wrote.
 `packages/db/tests/asset-folders-rls.test.ts` carries the guard, and it was
 mutation-proven: removing the subtree half makes the refused move return
 `{"rows":[]}` (allowed) and turns two tests red.
+
+## 31 · A Preview environment variable that vanished, and the build that could not notice
+
+MEASURED 2026-09-05, Vercel runtime logs for project `sahodalabs`: from 17:24 UTC
+every preview deployment on every branch threw
+`@sahoda/web: missing or invalid env var(s): NEXT_PUBLIC_SUPABASE_URL` on every
+read, and rendered the honest "Workspace unavailable" states on every section.
+Production (`wt-web`, its own copy of the variable) was untouched the whole time,
+and so was the production database: 34 workspaces, 206 posts, 448 ledger rows,
+nothing created or deleted that day. The Preview row of the variable had been
+lost during an evening of secrets work; it was restored at about 20:48 UTC.
+
+Two things worth keeping from it. **A `NEXT_PUBLIC_` value is inlined at build
+time**, so restoring the variable fixes nothing until a new build runs, and a
+preview built before the fix keeps failing with the old value for as long as it
+is served. **And an empty commit does not produce that build**: the project's
+ignored-build step cancels a deployment whose diff touches nothing under
+`apps/web`, which is exactly what `git commit --allow-empty` produces. This
+section exists partly to be that diff.
