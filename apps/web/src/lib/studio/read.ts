@@ -1,11 +1,14 @@
 import 'server-only'
 
-import type { StampOutcome } from '@sahoda/shared'
+import type { StampAnchor, StampAnchorMoveReason, StampOutcome } from '@sahoda/shared'
 import {
+  StampAnchorMoveReasonSchema,
+  StampAnchorSchema,
   StudioGenerationImageSchema,
   StudioGenerationRowSchema,
   type StudioGeneration,
 } from '@sahoda/shared'
+import { z } from 'zod'
 
 import { signMediaPreviews } from '@/lib/posts/media-url'
 import { createServerSupabase } from '@/lib/supabase/server'
@@ -61,6 +64,55 @@ export type GenerationPicture = {
    * and must never be rendered as a failure.
    */
   stampOutcome: StampOutcome | null
+  /**
+   * The corner the mark actually landed in, or null when it was not recorded.
+   * Null covers a row drawn before this shipped, a deploy where the column is
+   * not applied, and a picture that carries no mark. `lib/studio/anchor-note.ts`
+   * turns this and `stampAnchorMovedReason` into the sentence the customer reads,
+   * and null is never rendered as "stamped where asked".
+   *
+   * Optional so a hand-built fixture, and a component built before the result
+   * screen was wired, need not carry it; the read path always sets it, to a
+   * value or to null. An absent field reads exactly like null: not recorded.
+   */
+  stampAnchor?: StampAnchor | null
+  /**
+   * Why the mark landed somewhere other than the corner asked for, or null when
+   * it did not move. Only ever set alongside a non-null `stampAnchor`. Optional
+   * for the same reason as `stampAnchor`.
+   */
+  stampAnchorMovedReason?: StampAnchorMoveReason | null
+}
+
+/**
+ * The two anchor columns, read straight from the raw row.
+ *
+ * ── WHY THIS BYPASSES `StudioGenerationImageSchema` ─────────────────────────
+ * `20260904160000` adds `stamped_anchor` and `stamp_anchor_moved_reason`. The
+ * shared row schema in `packages/db`'s sibling `@sahoda/shared` does not yet
+ * carry them, and another lane owns that file, so this reads the two columns off
+ * the raw PostgREST row with the SHARED enums rather than redefining the row
+ * shape. A `select *` omits a column that is not yet applied, so an absent column
+ * arrives as `undefined`, parses through `.nullish()`, and lands as null: the
+ * "not recorded" case, never a guessed placement. A value the check constraint
+ * would have refused (it cannot reach here) parses to null the same honest way.
+ */
+const StampAnchorColumnsSchema = z.object({
+  id: z.uuid(),
+  stamped_anchor: StampAnchorSchema.nullish(),
+  stamp_anchor_moved_reason: StampAnchorMoveReasonSchema.nullish(),
+})
+
+export function stampAnchorFromImageRow(row: unknown): {
+  stampAnchor: StampAnchor | null
+  stampAnchorMovedReason: StampAnchorMoveReason | null
+} {
+  const parsed = StampAnchorColumnsSchema.safeParse(row)
+  if (!parsed.success) return { stampAnchor: null, stampAnchorMovedReason: null }
+  return {
+    stampAnchor: parsed.data.stamped_anchor ?? null,
+    stampAnchorMovedReason: parsed.data.stamp_anchor_moved_reason ?? null,
+  }
 }
 
 export type GenerationCard = {
@@ -165,6 +217,14 @@ async function picturesFor(
     .filter((parsed) => parsed.success)
     .map((parsed) => parsed.data)
 
+  // The anchor columns, keyed by image id, read from the RAW rows because the
+  // shared schema above does not carry them yet. See `stampAnchorFromImageRow`.
+  const anchorByImageId = new Map<string, ReturnType<typeof stampAnchorFromImageRow>>()
+  for (const row of data) {
+    const id = (row as { id?: unknown }).id
+    if (typeof id === 'string') anchorByImageId.set(id, stampAnchorFromImageRow(row))
+  }
+
   // BOTH the original and its stamped copy, because the screen offers a choice
   // between them and a choice needs two links. One extra id per stamped image,
   // through the same two round trips rather than a third.
@@ -199,6 +259,10 @@ async function picturesFor(
 
   for (const image of images) {
     const list = grouped.get(image.generation_id) ?? []
+    const anchor = anchorByImageId.get(image.id) ?? {
+      stampAnchor: null,
+      stampAnchorMovedReason: null,
+    }
     list.push({
       imageId: image.id,
       idx: image.idx,
@@ -212,6 +276,8 @@ async function picturesFor(
       stampedUrl:
         image.stamped_asset_id === null ? null : (urls.get(image.stamped_asset_id) ?? null),
       stampOutcome: image.stamp_outcome,
+      stampAnchor: anchor.stampAnchor,
+      stampAnchorMovedReason: anchor.stampAnchorMovedReason,
     })
     grouped.set(image.generation_id, list)
   }

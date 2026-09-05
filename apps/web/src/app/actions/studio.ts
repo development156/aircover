@@ -11,6 +11,8 @@ import {
   StudioGenerationRowSchema,
   StudioGenerationSchema,
   type BrandSignal,
+  type StampAnchor,
+  type StampAnchorMoveReason,
   type WithCreditsFn,
 } from '@sahoda/shared'
 import { revalidatePath } from 'next/cache'
@@ -39,7 +41,7 @@ import {
 } from '@/lib/studio/models'
 import { ReferenceIdsSchema } from '@/lib/studio/reference-ids'
 import { conditionPrompt } from '@/lib/studio/prompt'
-import { stampGeneratedPicture } from '@/lib/studio/stamp-generated'
+import { stampGeneratedPicture, type StampResult } from '@/lib/studio/stamp-generated'
 import { attachAssetToPost } from '@/app/actions/assets'
 import { createPost } from '@/app/actions/posts'
 import { createServerSupabase } from '@/lib/supabase/server'
@@ -172,6 +174,31 @@ const REFUSALS = {
    */
   tooManyReferences: `Pick at most ${MAX_REFERENCES} pictures for Sahoda to match.`,
 } as const
+
+/**
+ * The two anchor columns for one image row, from what the renderer did.
+ *
+ * `stamped_anchor` is where the mark LANDED; `stamp_anchor_moved_reason` is why,
+ * when it differs from the corner asked for. An `as_chosen` result carries no
+ * anchor of its own (the renderer kept the customer's choice), so the corner it
+ * landed in IS the chosen one, and that is the single value this file holds that
+ * `stampGeneratedPicture` does not. Anything other than a placed mark (no logo,
+ * skipped, a stamp that failed) has no corner at all, so both are null and the
+ * result screen stays silent about placement rather than inventing one.
+ */
+function stampAnchorColumns(
+  stamped: StampResult | { outcome: 'skipped' },
+  chosen: StampAnchor,
+): { stamped_anchor: StampAnchor | null; stamp_anchor_moved_reason: StampAnchorMoveReason | null } {
+  if (stamped.outcome !== 'stamped') {
+    return { stamped_anchor: null, stamp_anchor_moved_reason: null }
+  }
+  const choice = stamped.anchorChoice
+  if (choice.kind === 'moved') {
+    return { stamped_anchor: choice.to, stamp_anchor_moved_reason: choice.reason }
+  }
+  return { stamped_anchor: chosen, stamp_anchor_moved_reason: null }
+}
 
 /**
  * Ask for one image.
@@ -532,21 +559,17 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
           }
 
           // ── DEPLOY-SAFE, THE SAME WAY `assets.ts` IS ──────────────────────
-          // `stamped_asset_id` arrives with a migration a human applies, and
-          // this code ships before that happens. It goes in the SAME insert
-          // rather than a follow-up update because this table is append-only:
-          // it carries `block_mutations` and has no UPDATE policy, so a second
-          // statement could never land. On `42703` (undefined column) the row
-          // is written again without it, so a missing column costs the LINK and
-          // never the record of a generation somebody paid for.
+          // These columns arrive with migrations a human applies, and this code
+          // ships before that happens. They go in the SAME insert rather than a
+          // follow-up update because this table is append-only: it carries
+          // `block_mutations` and has no UPDATE policy, so a second statement
+          // could never land.
           //
-          // Both fields are ALWAYS present, one shape either way, so the person
-          // turning the stamp off does not create a second row shape to
-          // maintain. When it is off, `stamped` is `null` and both land as
-          // literal `null`: the same bytes on the wire as a row from before
-          // this feature shipped, which is exactly the "never attempted" case
-          // the column's own migration comment names.
-          let image = await supabase.from('studio_generation_images').insert({
+          // The link and the outcome are in migration `20260831150000`, applied
+          // in production. When the stamp is off, `stamped` is the `skipped`
+          // result and both land as: `stamped_asset_id` null,
+          // `stamp_outcome` 'skipped'.
+          const stampRow = {
             ...imageRow,
             stamped_asset_id:
               stamped !== null && stamped.outcome === 'stamped' ? stamped.assetId : null,
@@ -555,8 +578,26 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
             // screen has to tell them apart; the migration's step 5 carries
             // the reasoning.
             stamp_outcome: stamped === null ? null : stamped.outcome,
-          })
+          }
+          // WHERE the mark landed and WHY, in the LATER migration `20260904160000`.
+          const anchorCols = stampAnchorColumns(stamped, stampOptions.anchor)
 
+          let image = await supabase
+            .from('studio_generation_images')
+            .insert({ ...stampRow, ...anchorCols })
+
+          // ── DEGRADE IN TWO STEPS, THE NEWEST COLUMNS FIRST ─────────────────
+          // `stamped_anchor` / `stamp_anchor_moved_reason` are a LATER migration
+          // than the link and the outcome. On `42703` (undefined column) drop
+          // ONLY that pair, so a deploy missing just this file keeps recording
+          // the logo link that is already applied in production. Only if the
+          // link+outcome write ALSO 42703s (the older stamped_asset migration is
+          // unapplied too) fall back to the bare row. A missing column then costs
+          // the placement note or the link, never the record of a generation
+          // somebody paid for.
+          if (image.error?.code === '42703') {
+            image = await supabase.from('studio_generation_images').insert(stampRow)
+          }
           if (image.error?.code === '42703') {
             image = await supabase.from('studio_generation_images').insert(imageRow)
           }

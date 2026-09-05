@@ -236,6 +236,18 @@ describe('stampGeneratedPicture', () => {
     expect(state.removed).toEqual([])
   })
 
+  it('carries out what the renderer did with the chosen corner', async () => {
+    // The picture is flat, so the mark stays where it was asked. The FACT still
+    // travels: the caller records it, and the result screen reads it. A stamped
+    // result that dropped `anchorChoice` would leave the screen unable to say a
+    // mark had moved, which is the silent-override this exists to close.
+    const result = await run()
+
+    expect(result.outcome).toBe('stamped')
+    if (result.outcome !== 'stamped') throw new Error('expected a stamped result')
+    expect(result.anchorChoice).toEqual({ kind: 'as_chosen' })
+  })
+
   it('never gives the stamped copy a title, so it can never become the workspace logo', async () => {
     await run()
     // `readBrandLogo` finds the logo by the title `Logo`. A titled stamped copy

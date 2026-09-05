@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import {
   DEFAULT_STAMP_OPTIONS,
+  STAMP_ANCHOR_MOVE_REASONS,
+  StampAnchorMoveReasonSchema,
   StampAnchorSchema,
   StampOptionsSchema,
   StampSizeStepSchema,
@@ -57,5 +59,18 @@ describe("StampOptionsSchema: an absent field is exactly today's behaviour", () 
     for (const sizeStep of ['small', 'medium', 'large']) {
       expect(StampSizeStepSchema.safeParse(sizeStep).success, sizeStep).toBe(true)
     }
+  })
+})
+
+describe('StampAnchorMoveReasonSchema: exactly two reasons a mark moves corner', () => {
+  it('accepts busy and unreadable and nothing else', () => {
+    for (const reason of STAMP_ANCHOR_MOVE_REASONS) {
+      expect(StampAnchorMoveReasonSchema.safeParse(reason).success, reason).toBe(true)
+    }
+    expect(STAMP_ANCHOR_MOVE_REASONS).toEqual(['busy', 'unreadable'])
+    // The database check constraint lists the same two literals; a third word
+    // added here without one there would let a row store a reason no screen speaks.
+    expect(StampAnchorMoveReasonSchema.safeParse('crowded').success).toBe(false)
+    expect(StampAnchorMoveReasonSchema.safeParse('as_chosen').success).toBe(false)
   })
 })

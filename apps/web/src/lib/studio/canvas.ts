@@ -1,4 +1,9 @@
-import type { GenerationMode, StampOutcome } from '@sahoda/shared'
+import type {
+  GenerationMode,
+  StampAnchor,
+  StampAnchorMoveReason,
+  StampOutcome,
+} from '@sahoda/shared'
 
 import { relativeAge } from '@/lib/ops/session-pulse'
 
@@ -64,6 +69,18 @@ export type CanvasPicture = {
    */
   stampOutcome: StampOutcome | null
   /**
+   * The corner the mark actually landed in, and why it moved when it did. Both
+   * null when nothing was recorded. `lib/studio/anchor-note.ts` turns the pair
+   * into the sentence the customer reads about a logo that is not in the corner
+   * they chose; null stays silent rather than claiming "stamped where asked".
+   *
+   * Optional so a fixture, and a component built before the result screen was
+   * wired to read these, need not carry them; `canvasPictures` always sets both,
+   * to a value or to null. An absent field reads exactly like null: not recorded.
+   */
+  stampAnchor?: StampAnchor | null
+  stampAnchorMovedReason?: StampAnchorMoveReason | null
+  /**
    * How long ago it was made, ALREADY RENDERED, and that is the point.
    *
    * A relative age computed in the browser is computed at hydration, against a
@@ -118,6 +135,8 @@ export function canvasPictures(
         referenceAssetIds: [...card.generation.reference_asset_ids],
         stampedUrl: picture.stampedUrl,
         stampOutcome: picture.stampOutcome,
+        stampAnchor: picture.stampAnchor ?? null,
+        stampAnchorMovedReason: picture.stampAnchorMovedReason ?? null,
         madeAgo: relativeAge(card.generation.created_at, now),
       })
     }

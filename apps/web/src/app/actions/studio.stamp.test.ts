@@ -1,3 +1,4 @@
+import { STAMP_ANCHORS, StampAnchorSchema } from '@sahoda/shared'
 import sharp from 'sharp'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -184,6 +185,33 @@ async function pictureBase64(): Promise<string> {
   return png.toString('base64')
 }
 
+/**
+ * A 1080x1080 picture that is flat white except for a high-contrast checkerboard
+ * filling the bottom-right quadrant, where the default mark lands. The chosen
+ * corner then reads as busy (large luminance spread) while the other three are
+ * flat, so the renderer moves the mark off it for `busy`.
+ */
+async function busyBottomRightBase64(): Promise<string> {
+  const size = 1080
+  const raw = Buffer.alloc(size * size * 3, 255)
+  for (let y = 600; y < size; y += 1) {
+    for (let x = 600; x < size; x += 1) {
+      // 8px checkerboard: alternating black and white, a large spread.
+      const dark = (Math.floor(x / 8) + Math.floor(y / 8)) % 2 === 0
+      if (dark) {
+        const at = (y * size + x) * 3
+        raw[at] = 0
+        raw[at + 1] = 0
+        raw[at + 2] = 0
+      }
+    }
+  }
+  const png = await sharp(raw, { raw: { width: size, height: size, channels: 3 } })
+    .png()
+    .toBuffer()
+  return png.toString('base64')
+}
+
 /** A 20x10 knockout PNG whose dark 4x4 mark sits at (4, 2). */
 async function logoPng(): Promise<Uint8Array> {
   const width = 20
@@ -275,6 +303,43 @@ describe('a generation that stamps', () => {
     expect(withStamp).toEqual(withoutStamp)
     // Stated absolutely as well, so the pair cannot agree by both being wrong.
     expect(withStamp).toEqual({ calls: 1, cost: 1 })
+  })
+})
+
+describe('the corner the mark actually landed in', () => {
+  it('records the chosen corner, in the shared hyphen vocabulary, when nothing moved', async () => {
+    // The default picture is flat, so every corner is equally quiet and the mark
+    // stays in the corner the customer chose (bottom-right, the default).
+    await queueGeneration(REQUEST)
+
+    const row = imageRow().row
+    expect(STAMP_ANCHORS).toContain(row.stamped_anchor)
+    // The value stored is the SHARED spelling (hyphens), which `StampAnchorSchema`
+    // is the arbiter of. A mutation writing an underscore or squashed form fails
+    // here rather than reaching a row a screen cannot read.
+    expect(StampAnchorSchema.safeParse(row.stamped_anchor).success).toBe(true)
+    expect(row.stamped_anchor).toBe('bottom-right')
+    // Nothing moved, so there is no reason and the screen stays silent.
+    expect(row.stamp_anchor_moved_reason).toBeNull()
+  })
+
+  it('records the destination corner and the reason when the chosen corner is busy', async () => {
+    const flat = state.base64
+    state.base64 = await busyBottomRightBase64()
+    try {
+      const result = await queueGeneration(REQUEST)
+      expect(result).toMatchObject({ ok: true, made: 1 })
+
+      const row = imageRow().row
+      // The mark moved OFF the busy chosen corner, to a quieter one, and said why.
+      expect(row.stamped_anchor).not.toBe('bottom-right')
+      expect(STAMP_ANCHORS).toContain(row.stamped_anchor)
+      expect(row.stamp_anchor_moved_reason).toBe('busy')
+    } finally {
+      // The base64 is shared and `beforeEach` only repopulates a falsy one, so
+      // hand the flat picture back rather than stranding the busy one.
+      state.base64 = flat
+    }
   })
 })
 
@@ -382,11 +447,45 @@ describe('the stamped_asset_id column before its migration is applied', () => {
 
     expect(result).toMatchObject({ ok: true, made: 1 })
     const attempts = state.inserted.filter((one) => one.table === 'studio_generation_images')
-    expect(attempts).toHaveLength(2)
+    // THREE attempts now: the full row (link, outcome and the anchor pair) is
+    // refused for naming `stamped_asset_id`, so is the link+outcome retry, and
+    // the bare row lands. The middle step exists so a deploy missing only the
+    // LATER anchor migration keeps the link; here the link column is missing too.
+    expect(attempts).toHaveLength(3)
     expect(attempts[0]!.row).toHaveProperty('stamped_asset_id')
-    // The retry carries the record and nothing that cannot be written.
-    expect(attempts[1]!.row).not.toHaveProperty('stamped_asset_id')
-    expect(attempts[1]!.row.asset_id).toBe(assetRows()[0]!.row.id)
+    expect(attempts[0]!.row).toHaveProperty('stamped_anchor')
+    // The middle retry drops the anchor pair but still names the link, so it too
+    // is refused when it is the link column that is absent.
+    expect(attempts[1]!.row).toHaveProperty('stamped_asset_id')
+    expect(attempts[1]!.row).not.toHaveProperty('stamped_anchor')
+    // The bare row carries the record and nothing that cannot be written.
+    expect(attempts[2]!.row).not.toHaveProperty('stamped_asset_id')
+    expect(attempts[2]!.row).not.toHaveProperty('stamped_anchor')
+    expect(attempts[2]!.row.asset_id).toBe(assetRows()[0]!.row.id)
+  })
+
+  /**
+   * ── THE NEW COLUMNS MISSING, THE OLD ONES PRESENT ─────────────────────────
+   * The expected deploy for THIS change: `stamped_asset_id` and `stamp_outcome`
+   * are applied in production, the anchor pair's migration is not. The full row
+   * 42703s, and the retry MUST keep the logo link rather than dropping it with
+   * the anchor pair. Dropping it would regress the stamped-copy link for every
+   * generation until a human runs the migration.
+   */
+  it('keeps the logo link and outcome when only the anchor columns are missing', async () => {
+    state.insertErrors.studio_generation_images = { code: '42703', message: 'no such column' }
+    state.insertErrorWhen.studio_generation_images = (row) => 'stamped_anchor' in row
+
+    const result = await queueGeneration(REQUEST)
+
+    expect(result).toMatchObject({ ok: true, made: 1 })
+    const attempts = state.inserted.filter((one) => one.table === 'studio_generation_images')
+    expect(attempts).toHaveLength(2)
+    expect(attempts[0]!.row).toHaveProperty('stamped_anchor')
+    expect(attempts[1]!.row).not.toHaveProperty('stamped_anchor')
+    // The link that IS applied in production survives the degrade, on the retry.
+    expect(attempts[1]!.row.stamped_asset_id).toBe(assetRows()[1]!.row.id)
+    expect(attempts[1]!.row.stamp_outcome).toBe('stamped')
   })
 
   /**
@@ -408,7 +507,8 @@ describe('the stamped_asset_id column before its migration is applied', () => {
     const result = await queueGeneration(REQUEST)
 
     const attempts = state.inserted.filter((one) => one.table === 'studio_generation_images')
-    expect(attempts).toHaveLength(2)
+    // All three attempts 42703 (full, link+outcome, bare), then the rollback.
+    expect(attempts).toHaveLength(3)
     expect(result).toMatchObject({ ok: false })
     expect(state.deleted).toContain(`assets:${assetRows()[0]!.row.id as string}`)
   })
@@ -440,6 +540,12 @@ describe('a generation rolled back after its picture was already stamped', () =>
     const original = assetRows()[0]!.row.id as string
     const stampedId = assetRows()[1]!.row.id as string
     expect(stampedId).not.toBe(original)
+
+    // A PLAIN rejection is not a missing column, so it is NOT retried: exactly
+    // one image-row attempt, then a rollback. Widening the `=== '42703'` catch to
+    // swallow every error would retry this and turn a hard failure into two more
+    // doomed writes before the same rollback.
+    expect(state.inserted.filter((one) => one.table === 'studio_generation_images')).toHaveLength(1)
 
     // Both are undone. The stamped one is the one a person would have SEEN.
     expect(state.deleted).toContain(`assets:${stampedId}`)

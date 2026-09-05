@@ -16,6 +16,7 @@ import { assetObjectPath } from '@/lib/posts/media-path'
 import { sniffImage } from '@/lib/posts/sniff-image'
 import type { createServerSupabase } from '@/lib/supabase/server'
 
+import type { AnchorChoice } from './corner-choice'
 import { stampLogo } from './stamp'
 
 /**
@@ -76,6 +77,15 @@ export interface StampedPicture {
   assetId: string
   /** Whether a plate was drawn behind the mark, for a screen that wants to say so. */
   plated: boolean
+  /**
+   * What the renderer did with the customer's chosen corner: kept it, or moved
+   * the mark to a quieter or more legible one. Carried out of `stampLogo`
+   * unchanged so the CALLER can record it beside the pointer, and the result
+   * screen can say so rather than showing a mark in a corner nobody chose. The
+   * caller is the only place that also knows the corner the customer ASKED for,
+   * which is what an `as_chosen` result needs to name the anchor at all.
+   */
+  anchorChoice: AnchorChoice
   /**
    * Where the bytes landed, so the CALLER can undo this write.
    *
@@ -279,7 +289,13 @@ export async function stampGeneratedPicture(input: StampGeneratedInput): Promise
       return { outcome: 'failed' }
     }
 
-    return { outcome: 'stamped', assetId, plated: stamped.plated, objectPath }
+    return {
+      outcome: 'stamped',
+      assetId,
+      plated: stamped.plated,
+      objectPath,
+      anchorChoice: stamped.anchorChoice,
+    }
   } catch {
     // A thrown transport failure, a `MediaPathError`, anything at all. If the
     // object made it to storage before the throw, it is removed on the way out:

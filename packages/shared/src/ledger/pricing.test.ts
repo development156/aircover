@@ -25,7 +25,11 @@ describe('pricing', () => {
 
   it('every configured action is a positive number', () => {
     const entries = Object.entries(PRICING.actions)
-    expect(entries.length).toBe(18)
+    // 19 since 2026-09-04, when `studio_prompt_refine` was priced at 1 to match
+    // `caption_rewrite`. The count is the point of this line: it is the tripwire
+    // that makes adding a priced action a deliberate act, so it is RETARGETED
+    // when one lands and never deleted.
+    expect(entries.length).toBe(19)
     for (const [k, v] of entries) {
       expect(v, k).toBeGreaterThan(0)
     }

@@ -148,6 +148,17 @@ create trigger studio_generations_remix_same_tenant
 -- The anchor and size vocabularies are `STAMP_ANCHORS` and `STAMP_SIZE_STEPS`
 -- in packages/shared/src/studio/generation.ts. The constraint repeats them
 -- because the database is the other producer and TypeScript never sees a row.
+--
+-- REPEATING A VOCABULARY IS HOW IT DRIFTS, AND THIS ONE DID. Until 2026-09-04
+-- this constraint read 'top_left', 'top_right', 'bottom_left', 'bottom_right',
+-- with UNDERSCORES, while `STAMP_ANCHORS` has always been hyphenated. The two
+-- lines directly above claimed the constraint repeated the constant and it did
+-- not, so the first write of a real anchor would have been rejected by a check
+-- constraint whose comment said it would pass. Caught while adding
+-- `studio_generation_images.stamped_anchor` (20260904160000), whose own
+-- constraint is hyphenated, by an agent that went to look rather than trusting
+-- the claim in this comment. The file was still unapplied, so this is a fix to
+-- an unapplied migration and not a rewrite of history.
 alter table studio_generations
   add column if not exists stamp_enabled boolean,
   add column if not exists stamp_anchor text,
@@ -158,7 +169,7 @@ alter table studio_generations
 alter table studio_generations
   add constraint studio_generations_stamp_anchor_check
   check (stamp_anchor is null or stamp_anchor in
-    ('top_left', 'top_right', 'bottom_left', 'bottom_right'));
+    ('top-left', 'top-right', 'bottom-left', 'bottom-right'));
 
 alter table studio_generations
   drop constraint if exists studio_generations_stamp_size_step_check;
