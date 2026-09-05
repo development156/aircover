@@ -315,6 +315,21 @@ jobs:
             fi
           done
 
+          # SHAPE, not just presence, for the two values with an obvious wrong
+          # shape. MEASURED 2026-09-05, run 33968304482: E2E_SUPABASE_URL had
+          # been re-saved with a value that was not an https address, so every
+          # Supabase read in the app and in the fixtures threw "Invalid
+          # supabaseUrl" and the suite ran an hour waiting for buttons that
+          # could never render. A prefix test echoes nothing.
+          case "$SECRET_NEXT_PUBLIC_SUPABASE_URL" in
+            ""|https://*) ;;
+            *) echo "::error::E2E_SUPABASE_URL is set but is not an https:// address. It must be the staging project URL from Supabase -> Settings -> API -> Project URL, not a connection string."; exit 1 ;;
+          esac
+          case "$SECRET_SUPABASE_DB_URL" in
+            ""|postgres://*|postgresql://*) ;;
+            *) echo "::error::E2E_SUPABASE_DB_URL is set but is not a postgres:// connection string. It must be the staging session pooler string from Supabase -> Settings -> Database."; exit 1 ;;
+          esac
+
           if [ -n "$missing" ]; then
             echo "::error::Not readable as repository secrets:$missing"
             if [ -n "$found_as_vars" ]; then
