@@ -71,3 +71,20 @@ then `0d51aaba` (test retarget) and `ae64d58b` (baseline + LEARNINGS).
 - Delete `PictureViewer` and `RecentGenerations` now that the wall replaced them (girija).
 - Port wt-jiban's brand card / brain link into wt-girija's composer, or drop it (jiban + girija).
 - Apply the three unapplied migrations.
+
+## Session 3, same day: the four decisions, executed
+
+Founder's instruction: "execute all the decisions". Done, in `209e502c` and the commit after it.
+
+| Decision | What was done | Proof |
+| --- | --- | --- |
+| Draw on it | Re-mounted on the viewer, loaded on the press; offered only when the picture's size is recorded; a saved mark-up re-seeds the composer to Edit with it picked | `viewer-screen.test.tsx` ×2, mutations 2/2 red |
+| Delete the two replaced components | `PictureViewer`, `RecentGenerations` and `picture-viewer.test.tsx` deleted; a FOURTH orphan surfaced (`DiscardGeneration`, mounted only by the deleted list) and is on the viewer now with an `onRemoved` that leaves to /studio | baseline 11 → 8; mutation 1/1 red |
+| wt-jiban's brand card | The link only. "Will send" stays the closed disclosure the founder ruled for on 09-04; "Open your Brand Brain" is offered inside it for a brain with guesses or an empty one, withheld after a failed read | `composer.test.tsx` ×3, mutation 1/1 red |
+| Apply the three migrations | Applied to production through the session pooler, one transaction each, and verified: 5 columns, 8 indexes, 1 trigger present; all three recorded | probe output in this session |
+
+Also MEASURED: `20260904120000_workspace_storage_bytes_revoke_anon` is applied on prod under version `20260904174811` (the MCP apply on 09-04 named it differently). The file is UNRECORDED by its own version and should not be pushed again; the REVOKE would be a no-op anyway.
+
+Gate after the code change: 27/27 forced, exit 0. Build: js-budget ok, 83 routes. The viewer needed the dialog split out first (first build: +9.8 kB over).
+
+Not done: the screens were not looked at; smoke UNRUN. The worktree's `apps/web/.env.local` holds a STALE database password; the root `.env` holds the live one.
