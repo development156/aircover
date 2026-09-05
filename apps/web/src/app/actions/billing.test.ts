@@ -28,6 +28,12 @@ import { planChangeOrderId } from '@/lib/billing/plan-change-order'
 
 const WORKSPACE = '33333333-3333-4333-8333-333333333333'
 
+// `currentNewId` is module-level and reassigned by the `createCashfreeProvider` mock below,
+// which is only correct because every test here awaits one `startPlanUpgrade` call at a
+// time. A future test that fires two calls concurrently (`Promise.all`) would have the
+// second provider construction clobber the first's closure before its `createCheckout`
+// reads it — sequential-only, by construction of this fake, not by anything real code
+// guarantees.
 const state = vi.hoisted(() => ({
   orders: new Map<string, { status: string; paymentSessionId: string | null }>(),
   currentNewId: (): string => 'unset',
@@ -216,6 +222,25 @@ describe('startPlanUpgrade — an order that already exists but cannot be paid',
     expect(result.reused).toBe(false)
     // The fresh order must NOT collide with the dead one's id.
     expect(result.url).not.toContain(deadOrderId)
+  })
+})
+
+describe('startPlanUpgrade — the pre-check itself fails', () => {
+  it('still opens the upgrade rather than blocking it on an unconfirmed status code', async () => {
+    // Cashfree's not-found shape for GET /orders/{id} is not verified against a live
+    // account (see the report). A failure here that is NOT "no order yet" — a timeout, an
+    // auth blip — must still fall through to `createCheckout` rather than reading the
+    // uncertainty as a reason to fail the whole upgrade.
+    fetchOrder.mockImplementationOnce(async () => {
+      const err = new Error('cashfree get order failed (401): auth failed')
+      Object.assign(err, { status: 401, transient: false })
+      throw err
+    })
+
+    const result = await startPlanUpgrade('growth')
+
+    expect(createCheckout).toHaveBeenCalledTimes(1)
+    expect(result.ok).toBe(true)
   })
 })
 

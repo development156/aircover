@@ -26,7 +26,6 @@ import type {
 import { checkoutFailureMessage } from '@/lib/billing/checkout-failure-copy'
 import {
   planChangeOrderId,
-  isOrderNotFound,
   isDuplicateOrder,
   reusedCheckoutState,
 } from '@/lib/billing/plan-change-order'
@@ -268,15 +267,21 @@ export async function startPlanUpgrade(planId: unknown): Promise<UpgradeCheckout
     // Q-06: a second `startPlanUpgrade` for the SAME upgrade must land on the order the
     // first call opened, not a new one. Checked BEFORE `createCheckout`, because Cashfree
     // rejects a duplicate `order_id` outright rather than replaying — reading the order
-    // back is the recovery path, not the primary one. `isOrderNotFound` bets on Cashfree
-    // answering 404 for an id nothing was created against; if that bet is wrong, ANY other
-    // failure shape here would otherwise block the very first upgrade of every workspace,
-    // so it is rethrown rather than swallowed.
+    // back is the recovery path, not the primary one.
+    //
+    // Any failure here — 404 for an id nothing was created against, a timeout, a bad
+    // secret — is read as "no reusable order yet" and falls through to create. Cashfree's
+    // not-found shape for `GET /orders/{id}` is NOT confirmed against a live account this
+    // session has no access to (see the report for this change), so the direction of the
+    // guess matters: reading a REAL outage as "not found" costs one missed dedup and one
+    // wasted create call, which then throws its own correct error — reading a genuine
+    // not-found as a real failure would block the very first upgrade of every workspace on
+    // an unverified status code, which is worse than the defect this guard exists to fix.
     let openOrder: Awaited<ReturnType<typeof rail.fetchOrder>> | null = null
     try {
       openOrder = await rail.fetchOrder(fullOrderId)
-    } catch (error) {
-      if (!isOrderNotFound(error)) throw error
+    } catch {
+      openOrder = null
     }
 
     const appBaseUrl = env.NEXT_PUBLIC_APP_URL as string

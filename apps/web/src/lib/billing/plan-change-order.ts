@@ -35,18 +35,6 @@ export function planChangeOrderId(workspaceId: string, planId: string, period: s
 }
 
 /**
- * Cashfree's `GET /orders/{id}` answers 404 for an id nothing has ever been created
- * against — the expected shape of the FIRST attempt at any given upgrade. Anything else
- * (401, 5xx, a timeout) is a real failure and must still reach `checkoutFailureMessage`,
- * not be read as "no order yet" and papered over with a fresh create.
- */
-export function isOrderNotFound(error: unknown): boolean {
-  return (
-    typeof error === 'object' && error !== null && (error as { status?: unknown }).status === 404
-  )
-}
-
-/**
  * `POST /orders` under an `order_id` that already exists — the shape a GENUINELY
  * concurrent pair of `startPlanUpgrade` calls can still hit: both see `isOrderNotFound`
  * on the pre-check (neither order exists yet) and both call `createCheckout` with the
