@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import type { BrandSignal } from '@sahoda/shared'
 
-import { DiscardGeneration } from '@/components/studio/discard-generation'
 import { PictureActions } from '@/components/studio/picture-actions'
 import { ViewerComposer } from '@/components/studio/viewer-composer'
 import { ViewerDetails } from '@/components/studio/viewer-details'
@@ -26,6 +25,16 @@ import type { ViewerVersions } from '@/lib/studio/viewer-read'
  */
 const DrawModal = dynamic(() =>
   import('@/components/studio/draw-modal').then((mod) => mod.DrawModal),
+)
+
+/**
+ * Also split out, for a smaller reason: it is one underlined line and a
+ * confirmation dialog, and the dialog primitive was the only thing putting
+ * `ui/modal` on this route's first load. MEASURED 2026-09-05: mounting it
+ * statically took `/studio/[id]` 9.8 kB past the budget `d319d778` set.
+ */
+const DiscardGeneration = dynamic(() =>
+  import('@/components/studio/discard-generation').then((mod) => mod.DiscardGeneration),
 )
 
 /**

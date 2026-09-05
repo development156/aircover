@@ -164,7 +164,7 @@ describe('remove this from the list', () => {
     discardGeneration.mockResolvedValue({ ok: true })
     open()
 
-    await user.click(screen.getByRole('button', { name: /remove this from the list/i }))
+    await user.click(await screen.findByRole('button', { name: /remove this from the list/i }))
     await user.click(screen.getByRole('button', { name: /remove the request/i }))
 
     await waitFor(() => expect(discardGeneration).toHaveBeenCalledWith('gen-1'))
@@ -179,7 +179,7 @@ describe('remove this from the list', () => {
     })
     open()
 
-    await user.click(screen.getByRole('button', { name: /remove this from the list/i }))
+    await user.click(await screen.findByRole('button', { name: /remove this from the list/i }))
     await user.click(screen.getByRole('button', { name: /remove the request/i }))
 
     expect(await screen.findByRole('alert')).toBeTruthy()
