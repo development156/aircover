@@ -96,3 +96,29 @@ allowance; needs a server read.
 
 Smoke: still blocked on staging's Clerk third-party auth (probe script
 `staging-auth-probe.mjs` answers 401 `PGRST301` for staging, 200 for prod).
+
+## Session 4, midnight: the smoke leg ran for real
+
+Founder added Clerk as a third-party auth provider on staging (probe: 200).
+Two dispatches were cancelled by teammates' pushes (shared concurrency group);
+`1a4f8fd5` gives a dispatched run its own group. **Run 33985674352 ran the
+suite 58 minutes on `1a4f8fd5`** (staging: thousands of 200s, one 401) and was
+stopped by the 60-minute limit before finishing. No pass total; 24 failures,
+each ×3, read from the 210 MB trace artifact:
+
+| Cause | Tests | Detail |
+| --- | --- | --- |
+| 390 px sideways scroll, no-workspace state | 10 | `/home /wallet /inbox /posts /planner /connections /settings /settings/{profile,plan,integrations}`: 432 px of content, same 42 px on all → the shared topbar; composer 64 px at 360 |
+| Topbar split control 1 px overlap | 4 | 390/430/700/1440: dot ends at 110, chevron starts at 109 (known since 09-04) |
+| Expected headings/tabs missing | 3 | `/playbooks` no h1 "Playbooks"; Brand Brain tabs guard; Marketing Brain heading |
+| Stale suite expectations | 2 | connections-widths expects 8 tiles, catalogue has 12; `/analytics` 0.868% vs 0.81% ceiling |
+| Timeouts / missing sentence | 5 | composer two-body (300 s), palette-legibility (60 s), analytics-history, campaigns |
+
+The trunk moved 82 commits between the morning sweep (`cff2231b`) and this
+run, including `b6cc50a1 fix(shell): the topbar collapsed onto its own search
+field`. The 390 overflow is in the NO-workspace state, which the morning sweep
+did not cover at phone width. Test users purged; staging and production 0 rows.
+
+Next for the smoke leg: fix the topbar (two causes, 14 tests), retarget the
+two stale guards, then re-dispatch; consider `--shard` or a 90-minute limit so a
+2-vCPU runner can finish 118 tests.
