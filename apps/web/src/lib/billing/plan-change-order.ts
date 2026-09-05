@@ -1,4 +1,7 @@
 import { createHash } from 'node:crypto'
+import type { PaymentMode, ProviderOrder } from '@sahoda/billing'
+import type { PlanId } from '@sahoda/shared'
+import type { UpgradeCheckoutState } from './plan-state'
 
 /**
  * Server-side idempotency for `startPlanUpgrade` — audit finding Q-06.
@@ -44,6 +47,21 @@ export function isOrderNotFound(error: unknown): boolean {
 }
 
 /**
+ * `POST /orders` under an `order_id` that already exists — the shape a GENUINELY
+ * concurrent pair of `startPlanUpgrade` calls can still hit: both see `isOrderNotFound`
+ * on the pre-check (neither order exists yet) and both call `createCheckout` with the
+ * same deterministic id; the loser gets this instead of a fresh order. 409 rather than a
+ * Cashfree error code, because `index.ts`'s own idempotency-key comment already names 409
+ * as what a duplicate `order_id` raises, and no narrower shape is confirmed against a live
+ * account (see the report for this change).
+ */
+export function isDuplicateOrder(error: unknown): boolean {
+  return (
+    typeof error === 'object' && error !== null && (error as { status?: unknown }).status === 409
+  )
+}
+
+/**
  * Mirrors the bridge URL `createCashfreeProvider.createCheckout` builds internally. Needed
  * only for a REUSED order, whose session was read back via `fetchOrder` rather than just
  * returned from `createCheckout` — `ProviderOrder` carries no `url`, only the pieces
@@ -52,4 +70,48 @@ export function isOrderNotFound(error: unknown): boolean {
 export function checkoutBridgeUrl(appBaseUrl: string, orderId: string): string {
   const base = appBaseUrl.endsWith('/') ? appBaseUrl.slice(0, -1) : appBaseUrl
   return `${base}/billing/checkout/${encodeURIComponent(orderId)}`
+}
+
+/**
+ * The `UpgradeCheckoutState` for an order someone else already opened — from the pre-check
+ * finding it, or from `createCheckout` colliding with it and `fetchOrder` reading it back.
+ * Both recovery paths in `startPlanUpgrade` return exactly this, so the two callers cannot
+ * drift into two different shapes of "reused".
+ *
+ * `null` when the order Cashfree/`fetchOrder` describes is not one this can safely hand
+ * back — no `payment_session_id` means it is no longer payable (EXPIRED, TERMINATED, …),
+ * and returning it anyway would send a customer to a checkout page with nothing to pay with.
+ */
+export function reusedCheckoutState(
+  mode: PaymentMode,
+  order: ProviderOrder,
+  fullOrderId: string,
+  planId: PlanId,
+  amountDuePaise: number,
+  appBaseUrl: string,
+): UpgradeCheckoutState | null {
+  if (order.status !== 'ACTIVE' || !order.paymentSessionId) return null
+
+  // `sessionId` is the ORDER id here, matching the freshly-created branch in
+  // `startPlanUpgrade` — never Cashfree's `payment_session_id` token, which the checkout
+  // bridge page reads for itself off the order once redirected there.
+  if (mode !== 'live') {
+    return {
+      ok: true,
+      simulated: true,
+      mode,
+      sessionId: fullOrderId,
+      planId,
+      amountDuePaise,
+      reused: true,
+    }
+  }
+  return {
+    ok: true,
+    simulated: false,
+    mode: 'live',
+    sessionId: fullOrderId,
+    url: checkoutBridgeUrl(appBaseUrl, fullOrderId),
+    reused: true,
+  }
 }

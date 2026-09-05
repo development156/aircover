@@ -27,7 +27,8 @@ import { checkoutFailureMessage } from '@/lib/billing/checkout-failure-copy'
 import {
   planChangeOrderId,
   isOrderNotFound,
-  checkoutBridgeUrl,
+  isDuplicateOrder,
+  reusedCheckoutState,
 } from '@/lib/billing/plan-change-order'
 
 /**
@@ -250,20 +251,27 @@ export async function startPlanUpgrade(planId: unknown): Promise<UpgradeCheckout
 
     const period = currentBillingPeriod(now)
     const orderId = planChangeOrderId(ws.workspace.id, parsed.data, period)
+    const fullOrderId = `sah_${orderId}`
 
-    // Deterministic order id in, always — see `planChangeOrderId`. `provider()` normally
-    // mints a random one; this call site is the one place that must not.
-    const rail = provider(() => orderId)
+    // The id `createCheckout` actually creates under. Deterministic by default — see
+    // `planChangeOrderId` — but flipped to a fresh one below if `fullOrderId` turns out to
+    // name an order that is DEAD rather than absent: reusing a dead order's id would have
+    // `createCheckout` collide with it for the rest of the billing period, which is worse
+    // than the double-order defect this guards against. A function, not a value, because
+    // `provider()` captures it once and `createCheckout` calls it lazily.
+    let useFreshId = false
+    const rail = provider(() => (useFreshId ? randomUUID() : orderId))
     if (!rail) {
       return { ok: false, message: 'Card payments are not connected yet. Nothing was charged.' }
     }
 
-    const fullOrderId = `sah_${orderId}`
-
     // Q-06: a second `startPlanUpgrade` for the SAME upgrade must land on the order the
     // first call opened, not a new one. Checked BEFORE `createCheckout`, because Cashfree
     // rejects a duplicate `order_id` outright rather than replaying — reading the order
-    // back is the recovery path, not the primary one.
+    // back is the recovery path, not the primary one. `isOrderNotFound` bets on Cashfree
+    // answering 404 for an id nothing was created against; if that bet is wrong, ANY other
+    // failure shape here would otherwise block the very first upgrade of every workspace,
+    // so it is rethrown rather than swallowed.
     let openOrder: Awaited<ReturnType<typeof rail.fetchOrder>> | null = null
     try {
       openOrder = await rail.fetchOrder(fullOrderId)
@@ -271,51 +279,60 @@ export async function startPlanUpgrade(planId: unknown): Promise<UpgradeCheckout
       if (!isOrderNotFound(error)) throw error
     }
 
-    // Reuse only a still-payable order. The id is stable for the whole billing period, so
-    // reusing one that has EXPIRED or been TERMINATED would lock the customer out of
-    // upgrading again until the period rolls over — a worse defect than the one being fixed.
-    if (openOrder && openOrder.status === 'ACTIVE' && openOrder.paymentSessionId) {
-      // `sessionId` here is the ORDER id, matching `session.id` below and the freshly
-      // created branch further down — never Cashfree's `payment_session_id` token, which
-      // the checkout bridge page reads for itself off the order once redirected there.
-      if (rail.mode !== 'live') {
-        return {
-          ok: true,
-          simulated: true,
-          mode: rail.mode,
-          sessionId: fullOrderId,
-          planId: parsed.data,
-          amountDuePaise: proration.amountDuePaise,
-          reused: true,
-        }
-      }
-      return {
-        ok: true,
-        simulated: false,
-        mode: 'live',
-        sessionId: fullOrderId,
-        url: checkoutBridgeUrl(env.NEXT_PUBLIC_APP_URL as string, fullOrderId),
-        reused: true,
-      }
+    const appBaseUrl = env.NEXT_PUBLIC_APP_URL as string
+
+    if (openOrder) {
+      const reused = reusedCheckoutState(
+        rail.mode,
+        openOrder,
+        fullOrderId,
+        parsed.data,
+        proration.amountDuePaise,
+        appBaseUrl,
+      )
+      if (reused) return reused
+      // Found something, but it is no longer payable (EXPIRED, TERMINATED, …). Do not
+      // create the fresh order under the SAME id — see the comment on `useFreshId` above.
+      useFreshId = true
     }
 
     // ABSOLUTE, not '/settings/plan'. This becomes Cashfree's `order_meta.return_url`, which
     // it hands to a browser on another origin — a relative path there resolves against
     // Cashfree's own host and sends the paying customer to a page that is not ours.
-    const returnUrl = new URL('/settings/plan', env.NEXT_PUBLIC_APP_URL as string).toString()
+    const returnUrl = new URL('/settings/plan', appBaseUrl).toString()
 
-    const session = await rail.createCheckout({
-      workspaceId: ws.workspace.id,
-      planId: parsed.data,
-      period,
-      successUrl: returnUrl,
-      cancelUrl: returnUrl,
-      planChange: {
-        changeId: randomUUID(),
-        amountPaise: proration.amountDuePaise,
-        credits: proration.creditsGranted,
-      },
-    })
+    let session: Awaited<ReturnType<typeof rail.createCheckout>>
+    try {
+      session = await rail.createCheckout({
+        workspaceId: ws.workspace.id,
+        planId: parsed.data,
+        period,
+        successUrl: returnUrl,
+        cancelUrl: returnUrl,
+        planChange: {
+          changeId: randomUUID(),
+          amountPaise: proration.amountDuePaise,
+          credits: proration.creditsGranted,
+        },
+      })
+    } catch (error) {
+      // A GENUINELY concurrent second call: both saw `isOrderNotFound` above (neither order
+      // existed yet) and both reached here under the same deterministic id. `useFreshId`
+      // guarantees this can only be OUR id colliding with itself, never the dead order's, so
+      // the recovery is always "read the order the other call just created".
+      if (useFreshId || !isDuplicateOrder(error)) throw error
+      const winner = await rail.fetchOrder(fullOrderId)
+      const reused = reusedCheckoutState(
+        rail.mode,
+        winner,
+        fullOrderId,
+        parsed.data,
+        proration.amountDuePaise,
+        appBaseUrl,
+      )
+      if (!reused) throw error
+      return reused
+    }
 
     // Guard the LABEL rather than trusting the provider id: anything that is not a real
     // charge must reach the UI marked as such. The live branch returns `session.url`, which

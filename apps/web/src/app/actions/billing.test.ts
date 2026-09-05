@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { planChangeOrderId } from '@/lib/billing/plan-change-order'
 
 /**
  * `startPlanUpgrade` — audit finding Q-06.
@@ -194,5 +195,63 @@ describe('startPlanUpgrade — a second call for the same upgrade', () => {
     const [firstOrderId] = fetchOrder.mock.calls[0]!
     const [secondOrderId] = fetchOrder.mock.calls[1]!
     expect(secondOrderId).toBe(firstOrderId)
+  })
+})
+
+describe('startPlanUpgrade — an order that already exists but cannot be paid', () => {
+  it('does not reuse an EXPIRED order, and creates the fresh one under a DIFFERENT id', async () => {
+    // The id `startPlanUpgrade` derives is deterministic and stable for the whole billing
+    // period, so reusing a dead order under it would lock this workspace out of upgrading
+    // to `growth` for the rest of September — the failure mode a fixed order id creates if
+    // nothing guards against it.
+    const deadOrderId = `sah_${planChangeOrderId(WORKSPACE, 'growth', '2026-09')}`
+    state.orders.set(deadOrderId, { status: 'EXPIRED', paymentSessionId: null })
+
+    const result = await startPlanUpgrade('growth')
+
+    expect(createCheckout).toHaveBeenCalledTimes(1)
+    expect(result.ok).toBe(true)
+    if (!result.ok || result.simulated) return
+
+    expect(result.reused).toBe(false)
+    // The fresh order must NOT collide with the dead one's id.
+    expect(result.url).not.toContain(deadOrderId)
+  })
+})
+
+describe('startPlanUpgrade — two genuinely concurrent calls', () => {
+  it('recovers from the 409 Cashfree raises for the loser, rather than failing it', async () => {
+    const sharedOrderId = `sah_${planChangeOrderId(WORKSPACE, 'growth', '2026-09')}`
+
+    // The pre-check races ahead of the winner's write: this call's `fetchOrder` still sees
+    // nothing, exactly like the winner's did a moment earlier.
+    fetchOrder.mockImplementationOnce(async () => {
+      const err = new Error('cashfree get order failed (404): NOT_FOUND')
+      Object.assign(err, { status: 404, transient: false })
+      throw err
+    })
+
+    // By the time THIS call reaches `createCheckout`, the winner has already created the
+    // order under the same deterministic id — Cashfree answers with a duplicate-order 409
+    // instead of a fresh order.
+    createCheckout.mockImplementationOnce(async () => {
+      const err = new Error('cashfree create order failed (409): order already exists')
+      Object.assign(err, { status: 409, transient: false })
+      throw err
+    })
+    state.orders.set(sharedOrderId, {
+      status: 'ACTIVE',
+      paymentSessionId: `session_${sharedOrderId}`,
+    })
+
+    const result = await startPlanUpgrade('growth')
+
+    expect(result.ok).toBe(true)
+    if (!result.ok || result.simulated) return
+
+    // Read the winner's order back rather than surfacing "on Sahoda to fix" for money the
+    // winner already has a valid checkout target for.
+    expect(result.reused).toBe(true)
+    expect(result.sessionId).toBe(sharedOrderId)
   })
 })
