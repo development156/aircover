@@ -75,3 +75,24 @@ selected "Plan & credits" nav item is the likely fill. Not fixed here.
 
 Clerk test users minted by the three runs were purged (34 + 34 + this run's);
 18 older `sahoda.e2e.*` users from before today remain on the dev instance.
+
+## Session 4, last: Q-01 closed and proven live
+
+`102c54e4`: `resolveOnboarding` parks every real result in Upstash for a day
+and hands it back on the next press before reading the limit, the active
+version or the model; `saveBrandMemory` clears it. Not a `draft` row, because
+every `brand_memory` write goes through a definer RPC that only mints active
+versions and a new RPC is a migration production must apply first.
+
+**LIVE, production build, real model, 22:50 IST:** build (10 s), browser
+killed at the reveal; return, press Build → reveal in 596 ms, no overlay;
+killed again; return, press Build → 579 ms; Enter Sahoda → one active
+`brand_memory` row, source `resolved`. `ai_provider_logs` for the workspace:
+**1 row across three presses.** QA workspace and user deleted afterwards.
+
+Q-02 half-closed: the limit refusal is `kind: 'limit'` and offers no Retry
+(mutation-proven). The "Free the first time" tag still shows after the
+allowance; needs a server read.
+
+Smoke: still blocked on staging's Clerk third-party auth (probe script
+`staging-auth-probe.mjs` answers 401 `PGRST301` for staging, 200 for prod).
