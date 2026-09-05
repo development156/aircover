@@ -10,8 +10,10 @@ import { describe, it, expect } from 'vitest'
  * Four surfaces said "every caption, campaign and reply is written from these
  * fields". MEASURED on 2026-08-30: no mesh task writes a reply — the eight are
  * listed in `packages/shared/src/mesh/tasks.ts` and none of them is one — and
- * the inbox's `draftReply` never calls the mesh at all, it inserts the text a
- * person typed. A campaign is a folder of posts with no generation step of its
+ * the inbox's send actions (`actions/inbox-send.ts`) never call the mesh at
+ * all, they forward the text a person typed. (The measurement named
+ * `draftReply`, deleted 2026-09-06 as an action nothing called; the claim is
+ * unchanged.) A campaign is a folder of posts with no generation step of its
  * own. So two thirds of a three-part promise named things the Brand Brain does
  * not reach.
  *
