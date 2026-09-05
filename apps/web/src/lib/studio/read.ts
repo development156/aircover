@@ -195,7 +195,7 @@ export async function readGenerations(limit = 24): Promise<GenerationsRead> {
  * asked and what it cost, and that is worth showing even when the file behind it
  * cannot be reached this second.
  */
-async function picturesFor(
+export async function picturesFor(
   workspaceId: string,
   generationIds: readonly string[],
 ): Promise<Map<string, GenerationPicture[]>> {
