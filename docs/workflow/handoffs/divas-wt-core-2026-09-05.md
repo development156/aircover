@@ -24,3 +24,24 @@ Onboarding's Brand Brain build is not persisted until the reveal's confirm. MEAS
 ## Open, unchanged from 2026-09-04
 
 Rotate the prod DB password · re-run @smoke · promote `wt-core` → `wt-web` · Supabase MCP unauthorised.
+
+## Session 4, same day: the three decisions from the audit, executed
+
+Founder: "i have applied the secrets, start executing all the decisions".
+
+| Decision | What happened | Proof |
+| --- | --- | --- |
+| Apply the FK-index migration | Already on production: session 3 applied it under `20260905100000 fk_indexes_for_deletes` before this session started | Supabase MCP `list_migrations`, MEASURED |
+| Move the plan modal off the first dashboard | `planOfferDecision` takes `{ hasStarted }` (the `workspaceHasStarted` verdict) and answers `silent / not-started`; the empty dashboard gets no offer | `7a8036ae`; the home test that pinned the opposite retargeted; 80 tests green |
+| Run the smoke leg on CI | Dispatched with the six production secrets: the guard passed for the first time ever, then the suite refused `refused-production` in 9 s (`e2e-target.ts` no longer accepts production; staging `yoxmzwkxweasfaahhvpj` is the only target). Rewired the job to `E2E_SUPABASE_*` secrets so the nightly production jobs keep theirs; brought staging level (3 migrations applied via MCP); set the two public values | `fb73e00f`; runs 33961015055 and 33962162511 |
+
+**Blocked on two values only a person holds.** Run 33962162511 refuses naming
+exactly `E2E_SUPABASE_SERVICE_ROLE_KEY` and `E2E_SUPABASE_DB_URL` (staging's
+service-role key and pooler URL, Supabase dashboard → sahoda-staging → Settings
+→ API / Database). Then:
+
+    gh workflow run gate.yml -R development156/aircover --ref wt-core -f ack_target=yoxmzwkxweasfaahhvpj
+
+Also noticed: staging carries `20260820144500 variant_formats_story_thread`
+under a different version than production's unnamed `20260820144500`; a
+name-only drift, not investigated.
