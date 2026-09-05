@@ -7,6 +7,7 @@ import type { BrandSignal } from '@sahoda/shared'
 import { queueGeneration, startPostFromPicture } from '@/app/actions/studio'
 import { StudioWorkbench } from '@/components/studio/studio-workbench'
 import type { CanvasPicture } from '@/lib/studio/canvas'
+import { PROMPT_STARTERS } from '@/lib/studio/prompt'
 import { stampNote } from '@/lib/studio/stamp-copy'
 import { generatableFormats } from '@/lib/studio/formats'
 import { STUDIO_MODELS, routedModels, unroutedModels } from '@/lib/studio/models'
@@ -644,17 +645,32 @@ describe('something to try, for a box nobody knows what to put in', () => {
     expect(within(starters).getAllByRole('button').length).toBeGreaterThan(2)
   })
 
+  /**
+   * ── THE CHIP SHOWS A SUBJECT, THE BOX GETS THE SENTENCE ───────────────────
+   * The chip carries a short label so five of them sit on one line above the
+   * box. This test used to read the chip's own text and expect it back out of
+   * the textarea, which pinned the two to the same string. The CLAIM was never
+   * that they were the same string: it is that pressing a chip fills the box
+   * with the starter it stands for and spends nothing. So the assertion moved
+   * onto `PROMPT_STARTERS`, and the second one keeps the chip honest — its
+   * tooltip must be exactly the sentence the box is about to get, so a person
+   * can see the whole thing before pressing.
+   */
   test('pressing one FILLS the box rather than spending anything', async () => {
     const user = userEvent.setup()
     const { container } = open()
     const starters = container.querySelector('[data-guide="studio-starters"]') as HTMLElement
     const first = within(starters).getAllByRole('button')[0]!
-    const words = first.textContent
+    const starter = PROMPT_STARTERS[0]!
+
+    expect(first.textContent).toBe(starter.label)
+    expect(first.getAttribute('title')).toBe(starter.prompt)
+
     await user.click(first)
 
     expect(
       (screen.getByLabelText(/what should the picture show/i) as HTMLTextAreaElement).value,
-    ).toBe(words)
+    ).toBe(starter.prompt)
     expect(queueGeneration).not.toHaveBeenCalled()
   })
 
