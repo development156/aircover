@@ -78,7 +78,11 @@ test.describe('@smoke the Marketing Brain', () => {
     await expect(page.getByRole('heading', { name: 'CMO Report', level: 1 })).toBeVisible({
       timeout: 30_000,
     })
-    const block = page.getByRole('heading', { name: 'What I noticed on my own' })
+    // "What Sahoda noticed", not "What I noticed on my own": Sahoda speaks in the
+    // third person (CLAUDE.md, Copy style), and the report page has said so since
+    // the voice sweep. MEASURED stale on the first CI smoke run to reach this spec
+    // (2026-09-05, run 33985674352).
+    const block = page.getByRole('heading', { name: 'What Sahoda noticed' })
     await expect(block).toBeVisible()
     // It names the FLOOR, so the reader knows what would change it.
     // The floor sentence, so the reader knows what would change it. The string

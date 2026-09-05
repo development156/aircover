@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures/seeded-user'
+import { CATALOGUE } from '../src/lib/connections/catalogue'
 import { bootstrapWorkspace } from './fixtures/compose'
 
 /**
@@ -47,8 +48,14 @@ const TILE = '[data-channel][data-connected]'
 
 /** Every channel in the catalogue gets a tile, built or not. Zero tiles is the
  *  other way this page renders (no workspace, or a failed read), and a suite
- *  that loops over zero tiles is green for the wrong reason. */
-const TILES = 8
+ *  that loops over zero tiles is green for the wrong reason.
+ *
+ *  Read from the catalogue, not retyped: this was `8` while the catalogue held
+ *  12, and the first CI smoke run to reach this spec (2026-09-05, run
+ *  33985674352) failed on "expected 8, received 12" at every width — a guard
+ *  refusing the product for growing. Zero is still refused below, because a
+ *  derived count of 0 would make the loop green for the wrong reason. */
+const TILES = CATALOGUE.length
 
 /**
  * What counts as a defect, evaluated in the page. Kept as a string — an arrow
@@ -173,6 +180,7 @@ test.describe('connections names survive every width @smoke', () => {
 
       // The guard that makes everything after it mean something. It also covers
       // the failed-read branch, which is the other zero-tile render.
+      expect(TILES, 'the catalogue is empty, so this guard could not fail').toBeGreaterThan(0)
       await expect(
         page.locator(`#main ${TILE}`),
         `width ${width}: every channel in the catalogue has a tile`,
