@@ -38,7 +38,7 @@
   "/(auth)/layout": 617709,
   "/(auth)/error": 639243,
   "/(auth)/sign-in/[[...sign-in]]": 763883,
-  "/(app)/studio": 779776,
+  "/(app)/studio": 784551,
   "/(auth)/sign-up/[[...sign-up]]": 763883,
   "/(app)/remix": 746152,
   "/(onboarding)/error": 639498,

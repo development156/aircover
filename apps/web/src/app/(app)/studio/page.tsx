@@ -79,8 +79,19 @@ export default async function StudioPage() {
   // question.
   const pictures = recent.status === 'ok' ? canvasPictures(recent.cards) : []
 
+  /**
+   * ── ONE WIDE COLUMN, WITH ROOM ROUND IT ───────────────────────────────────
+   * Founder's ruling, 2026-09-05, against a reference: the Studio is a
+   * workspace, not a form. It was a 420px controls rail beside a canvas, which
+   * made both halves narrow and neither of them the thing you look at first.
+   *
+   * `max-w-[1100px]` rather than the band's full 1320: the composer is a line
+   * of text somebody reads back to themselves, and a prompt set across 1,300
+   * pixels is one line the eye has to track back along. It is a MAXIMUM, so
+   * every narrower viewport is unaffected.
+   */
   return (
-    <div className="space-y-grid">
+    <div className="mx-auto flex max-w-[1100px] flex-col gap-8">
       <PageTitle sub="Describe a picture and Sahoda draws it, using what it knows about your brand.">
         Studio
       </PageTitle>

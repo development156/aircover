@@ -170,12 +170,29 @@ export function describeConditioning(input: {
  * They fill the box rather than generating, so nothing is spent by trying one
  * and the words can be edited first.
  *
+ * ── WHY EACH ONE HAS A SHORT LABEL AS WELL AS A SENTENCE ────────────────────
+ * A row of five full sentences is not a row, it is four lines of prose wearing
+ * chip borders. The label is what the chip says; the sentence is what pressing
+ * it writes, and the person then sees the whole thing in the box and can edit
+ * it. Both live here, in one object per starter, so a chip can never advertise
+ * one idea and write another.
+ *
  * Pure: no I/O, no clock, no database.
  */
-export const PROMPT_STARTERS: readonly string[] = [
-  'A plate of fresh samosas on a wooden counter, morning light',
-  'The shopfront at dusk with the lights just on',
-  'Hands wrapping an order in paper, close up',
-  'A cup of chai beside a rain-streaked window',
-  'The counter laid out for a festival, seen from above',
+export type PromptStarter = {
+  /** What the chip says. Short enough to sit in a row of five. */
+  readonly label: string
+  /** What pressing it writes into the box. The full, editable sentence. */
+  readonly text: string
+}
+
+export const PROMPT_STARTERS: readonly PromptStarter[] = [
+  {
+    label: 'Samosas on a counter',
+    text: 'A plate of fresh samosas on a wooden counter, morning light',
+  },
+  { label: 'Shopfront at dusk', text: 'The shopfront at dusk with the lights just on' },
+  { label: 'Wrapping an order', text: 'Hands wrapping an order in paper, close up' },
+  { label: 'Chai by the window', text: 'A cup of chai beside a rain-streaked window' },
+  { label: 'Festival counter', text: 'The counter laid out for a festival, seen from above' },
 ]

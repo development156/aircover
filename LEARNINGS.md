@@ -293,3 +293,4 @@ main
   Asserting `git merge-base --is-ancestor origin/<lane> wt-core` for all twelve
   before pushing caught three lanes that moved mid-session, twice. Each was
   merged rather than forced, and every reset stayed a fast-forward.
+- Splitting a screen into an orchestrator plus presentational files is safe for RULES and dangerous for SENTENCES: the size select's "1080 by 1080 pixels, for 3 of your channels" became a pill and the sentence was simply not carried across, and no test had ever asserted it. Moving a required control behind a default-collapsed disclosure has the same shape — "Match a picture" refused with "pick one picture" while the picker was hidden. Both were found by an adversarial read of the diff, not by a red test. When markup moves, list every CLAIM the old markup made and check each one lands somewhere.

@@ -11,6 +11,7 @@ import { stampNote } from '@/lib/studio/stamp-copy'
 import { generatableFormats } from '@/lib/studio/formats'
 import { routedModels, unroutedModels } from '@/lib/studio/models'
 import type { LibraryPicture, LibraryRead } from '@/lib/studio/read'
+import { PROMPT_STARTERS } from '@/lib/studio/prompt'
 import { uploadAccept } from '@/lib/studio/upload'
 import {
   MAX_TRIES_PER_PRESS,
@@ -135,9 +136,30 @@ function modeButton(name: RegExp): HTMLElement {
   )
 }
 
+/**
+ * OPEN THE TRAY BEHIND "More", WHICH IS NOW SHUT ON ARRIVAL.
+ *
+ * ── WHY THIS CALL APPEARED IN TWENTY-FIVE TESTS AT ONCE ─────────────────────
+ * The tray used to be open on arrival, because every control lived inside it
+ * and a shut tray was a screen with nothing on it. The control row now carries
+ * the look, the size, how many and whether a logo is stamped, so the tray holds
+ * only the three choices that need a paragraph each: the model, the pictures to
+ * match, and where the logo sits. Opening it on arrival would put a model
+ * catalogue and a library grid between somebody and the box they came to type
+ * in.
+ *
+ * So a test about one of those three now says so out loud. Nothing about what
+ * they ASSERT changed; the step that reaches them did.
+ */
+async function openMore(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: /more settings/i }))
+}
+
 describe('choosing which model draws it', () => {
-  test('the reachable models are offered by what they are good at, never by id', () => {
+  test('the reachable models are offered by what they are good at, never by id', async () => {
+    const user = userEvent.setup()
     const { container } = open()
+    await openMore(user)
     const picker = container.querySelector('[data-guide="studio-model"]') as HTMLElement
     expect(picker).not.toBeNull()
 
@@ -336,9 +358,45 @@ describe('matching a picture', () => {
   test('a mode that ignores references says what picking one will do', async () => {
     const user = userEvent.setup()
     open()
+    await openMore(user)
     await user.click(screen.getByRole('button', { name: /explore/i }))
     expect(screen.queryByText(/which picture should Sahoda match/i)).toBeNull()
     expect(screen.getByText(/moves you to match a picture/i)).toBeTruthy()
+  })
+
+  /**
+   * ── A REFUSAL MAY NOT NAME A CONTROL THAT IS NOT ON SCREEN ────────────────
+   * THE DEFECT THIS PINS, found in review rather than by a test. The tray
+   * behind "More" is shut on arrival, and the library grid lives in it. Choosing
+   * "Match a picture" refuses with "Pick one picture for Sahoda to match" —
+   * so with the tray shut the screen was telling somebody to do a thing with
+   * nothing on screen to do it with. That is the impossible remedy
+   * `no-impossible-remedy.spec.ts` forbids, wearing a refusal.
+   *
+   * MUTATION: delete the `minReferences > 0` line in `chooseMode` and this goes
+   * red while every other test in this file stays green.
+   */
+  test('choosing a look that NEEDS a picture opens the tray the pictures are in', async () => {
+    const user = userEvent.setup()
+    const { container } = open()
+    expect(container.querySelector('[data-guide="studio-references"]')).toBeNull()
+
+    await user.click(modeButton(/match a picture/i))
+
+    const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
+    expect(picker, 'the refusal names a picker that is not on screen').not.toBeNull()
+    expect(within(picker).getAllByRole('button').length).toBeGreaterThan(0)
+  })
+
+  /**
+   * And NOT for a look that merely accepts one. Flinging a model catalogue open
+   * under somebody who only wanted to change the look is its own defect.
+   */
+  test('a look that only accepts a picture leaves the tray alone', async () => {
+    const user = userEvent.setup()
+    const { container } = open()
+    await user.click(modeButton(/on brand/i))
+    expect(container.querySelector('[data-guide="studio-references"]')).toBeNull()
   })
 
   test('matching asks for a picture before it will run', async () => {
@@ -352,6 +410,7 @@ describe('matching a picture', () => {
   test('picking one clears the block', async () => {
     const user = userEvent.setup()
     open()
+    await openMore(user)
     await user.click(modeButton(/match a picture/i))
     await user.type(screen.getByLabelText(/what should the picture show/i), 'a cup of chai')
     await user.click(screen.getAllByRole('button', { pressed: false })[3]!)
@@ -366,6 +425,7 @@ describe('matching a picture', () => {
   test('the selection cannot grow past what the model will look at', async () => {
     const user = userEvent.setup()
     const { container } = open()
+    await openMore(user)
     await user.click(modeButton(/match a picture/i))
 
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
@@ -384,6 +444,7 @@ describe('matching a picture', () => {
   test('switching to a mode that ignores references clears them, rather than leaving a contradiction', async () => {
     const user = userEvent.setup()
     const { container } = open()
+    await openMore(user)
     await user.click(modeButton(/match a picture/i))
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     await user.click(within(picker).getAllByRole('button')[0]!)
@@ -400,6 +461,7 @@ describe('matching a picture', () => {
   test('a picture with no preview is still offered, not hidden', async () => {
     const user = userEvent.setup()
     const { container } = open()
+    await openMore(user)
     await user.click(modeButton(/match a picture/i))
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     expect(within(picker).getAllByRole('button')).toHaveLength(LIBRARY.length)
@@ -409,6 +471,7 @@ describe('matching a picture', () => {
   test('an empty library says how to fill it rather than showing nothing', async () => {
     const user = userEvent.setup()
     open([])
+    await openMore(user)
     await user.click(modeButton(/match a picture/i))
     expect(screen.getByText(/you have no pictures yet/i)).toBeTruthy()
   })
@@ -425,6 +488,7 @@ describe('matching a picture', () => {
   test('a library that could not be read says so, and never claims it is empty', async () => {
     const user = userEvent.setup()
     open({ status: 'unreadable' })
+    await openMore(user)
     await user.click(screen.getByRole('button', { name: /match a picture/i }))
     expect(screen.getByText(/sahoda could not read your pictures/i)).toBeTruthy()
     expect(screen.queryByText(/no pictures yet/i)).toBeNull()
@@ -434,6 +498,7 @@ describe('matching a picture', () => {
   test('a failed read still offers the device, which works regardless of the read', async () => {
     const user = userEvent.setup()
     open({ status: 'unreadable' })
+    await openMore(user)
     await user.click(screen.getByRole('button', { name: /match a picture/i }))
     expect(screen.getByText(/sahoda could not read your pictures/i).textContent).toMatch(
       /from this device/i,
@@ -446,10 +511,35 @@ describe('matching a picture', () => {
   test('no workspace is a third answer, not an empty library and not a failure', async () => {
     const user = userEvent.setup()
     open({ status: 'no-workspace' })
+    await openMore(user)
     await user.click(screen.getByRole('button', { name: /match a picture/i }))
     expect(screen.queryByText(/no pictures yet/i)).toBeNull()
     expect(screen.queryByText(/could not read/i)).toBeNull()
     expect(screen.getByText(/no workspace/i)).toBeTruthy()
+  })
+})
+
+describe('a library that could not be read', () => {
+  /**
+   * ── THE CLAIM MUST REACH SOMEBODY WHO NEVER OPENS THE TRAY ────────────────
+   * The three answers for "why are there no pictures to match" live beside the
+   * grid, and the grid is behind a shut tray. An EMPTY library and a missing
+   * workspace can wait to be found. A read that FAILED cannot: it means
+   * somebody with thirty pictures is shown none of them, and nothing on the
+   * screen would send them to the tray to find out why.
+   *
+   * MUTATION: drop the `libraryUnreadable` block from the composer and this
+   * goes red while the tray's own three-answer tests stay green.
+   */
+  test('says so on arrival, without the tray being opened', () => {
+    open({ status: 'unreadable' })
+    expect(screen.getByText(/could not read your pictures/i)).toBeTruthy()
+  })
+
+  test('and an EMPTY library is not announced there, because it is not a fault', () => {
+    open([])
+    expect(screen.queryByText(/could not read your pictures/i)).toBeNull()
+    expect(screen.queryByText(/you have no pictures yet/i)).toBeNull()
   })
 })
 
@@ -464,6 +554,7 @@ describe('a press that changes nothing must say why', () => {
   test('a pick beyond the limit is explained rather than ignored', async () => {
     const user = userEvent.setup()
     const { container } = open()
+    await openMore(user)
     await user.click(modeButton(/match a picture/i))
 
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
@@ -483,6 +574,7 @@ describe('a press that changes nothing must say why', () => {
   test('the sentence is the one the action would refuse with, not a second wording', async () => {
     const user = userEvent.setup()
     const { container } = open()
+    await openMore(user)
     await user.click(screen.getByRole('button', { name: /change a picture/i }))
 
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
@@ -509,6 +601,7 @@ describe('adding a picture from this device', () => {
   test('the way in is a real file control, reachable by name', async () => {
     const user = userEvent.setup()
     open()
+    await openMore(user)
     await user.click(modeButton(/match a picture/i))
     expect(screen.getByLabelText(/add a picture from this device/i)).toBeTruthy()
   })
@@ -521,6 +614,7 @@ describe('adding a picture from this device', () => {
   test('it is an input, not a drop target pretending to be one', async () => {
     const user = userEvent.setup()
     open()
+    await openMore(user)
     await user.click(modeButton(/match a picture/i))
     const control = screen.getByLabelText(/add a picture from this device/i)
     expect(control.tagName).toBe('INPUT')
@@ -530,6 +624,7 @@ describe('adding a picture from this device', () => {
   test('what it offers is the proven list, so it cannot drift from the server', async () => {
     const user = userEvent.setup()
     open()
+    await openMore(user)
     await user.click(modeButton(/match a picture/i))
     const control = screen.getByLabelText(/add a picture from this device/i)
     expect(control.getAttribute('accept')).toBe(uploadAccept())
@@ -538,6 +633,7 @@ describe('adding a picture from this device', () => {
   test('the empty library points at this device rather than at a library trip', async () => {
     const user = userEvent.setup()
     open([])
+    await openMore(user)
     await user.click(modeButton(/match a picture/i))
     expect(screen.getByText(/add one from this device/i)).toBeTruthy()
   })
@@ -611,6 +707,7 @@ describe('asking for the same thing again', () => {
   test('a picture made in match mode brings its references back with it', async () => {
     const user = userEvent.setup()
     const { container } = open(LIBRARY, MADE)
+    await openMore(user)
     const strip = container.querySelector('[data-guide="studio-strip"]') as HTMLElement
     await user.click(within(strip).getAllByRole('button')[1]!)
     await user.click(screen.getByRole('button', { name: /use these words again/i }))
@@ -634,17 +731,57 @@ describe('something to try, for a box nobody knows what to put in', () => {
     expect(within(starters).getAllByRole('button').length).toBeGreaterThan(2)
   })
 
-  test('pressing one FILLS the box rather than spending anything', async () => {
+  /**
+   * RETARGETED, and the retarget is the point. This read the chip's own text
+   * back out of the box, which was exact while a chip WAS the sentence. A chip
+   * is now a short label and pressing it writes the longer sentence, so reading
+   * the label back would assert the two are the same string — the very thing
+   * that stopped being true.
+   *
+   * The CLAIM is unchanged and is now checked properly: the chip a person
+   * pressed writes ITS OWN sentence, from `PROMPT_STARTERS`, and spends nothing.
+   *
+   * MUTATION: write `PROMPT_STARTERS[1].text` for every chip and this goes red;
+   * reading the label back would not have noticed.
+   */
+  /**
+   * ── EVERY CHIP, NOT ONLY THE FIRST ────────────────────────────────────────
+   * THE HOLE THIS CLOSES, found in audit rather than by a test. The test below
+   * checks chip one. A mutation that left chip one honest and made chips two
+   * to five each write a DIFFERENT starter's sentence passed 408 tests: nothing
+   * asserted the pairing for the other four, and `prompt.test.ts` does not
+   * mention `PROMPT_STARTERS` at all.
+   *
+   * MUTATION: `onWanted(PROMPT_STARTERS[(i + 1) % 5].text)` and this goes red
+   * four times over.
+   */
+  test('every chip writes ITS OWN sentence, and none is a sentence itself', async () => {
+    const user = userEvent.setup()
+    for (const starter of PROMPT_STARTERS) {
+      const { container } = open()
+      const starters = container.querySelector('[data-guide="studio-starters"]') as HTMLElement
+      await user.click(within(starters).getByRole('button', { name: starter.label }))
+      expect(
+        (screen.getByLabelText(/what should the picture show/i) as HTMLTextAreaElement).value,
+        starter.label,
+      ).toBe(starter.text)
+      cleanup()
+    }
+  })
+
+  test('pressing one FILLS the box with its own sentence, and spends nothing', async () => {
     const user = userEvent.setup()
     const { container } = open()
     const starters = container.querySelector('[data-guide="studio-starters"]') as HTMLElement
-    const first = within(starters).getAllByRole('button')[0]!
-    const words = first.textContent
-    await user.click(first)
+    const first = PROMPT_STARTERS[0]!
+    const chip = within(starters).getByRole('button', { name: first.label })
+    // The chip is SHORT. A row of five full sentences is four lines of prose.
+    expect(chip.textContent).not.toContain(first.text)
+    await user.click(chip)
 
     expect(
       (screen.getByLabelText(/what should the picture show/i) as HTMLTextAreaElement).value,
-    ).toBe(words)
+    ).toBe(first.text)
     expect(queueGeneration).not.toHaveBeenCalled()
   })
 
@@ -665,6 +802,7 @@ describe('picking a picture in a mode that ignores one', () => {
   test('moves to the mode that uses it, and says so', async () => {
     const user = userEvent.setup()
     const { container } = open()
+    await openMore(user)
     await user.click(screen.getByRole('button', { name: /explore/i }))
 
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
@@ -677,6 +815,7 @@ describe('picking a picture in a mode that ignores one', () => {
   test('the picture that was picked is the one that is now selected', async () => {
     const user = userEvent.setup()
     const { container } = open()
+    await openMore(user)
     await user.click(screen.getByRole('button', { name: /explore/i }))
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     await user.click(within(picker).getAllByRole('button')[1]!)
@@ -694,6 +833,7 @@ describe('which picture is which', () => {
   test('a picked reference shows its position, not just that it is picked', async () => {
     const user = userEvent.setup()
     const { container } = open()
+    await openMore(user)
     await user.click(modeButton(/match a picture/i))
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     const thumbs = within(picker).getAllByRole('button')
@@ -708,6 +848,7 @@ describe('which picture is which', () => {
   test('the position is announced, not only drawn', async () => {
     const user = userEvent.setup()
     const { container } = open()
+    await openMore(user)
     await user.click(modeButton(/match a picture/i))
     const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
     await user.click(within(picker).getAllByRole('button')[0]!)
@@ -785,6 +926,40 @@ describe('asking for more than one', () => {
   })
 })
 
+describe('what a size actually is', () => {
+  /**
+   * THE CLAIM THAT WENT MISSING IN A REDESIGN AND NOTHING CAUGHT. The old screen
+   * printed the pixel dimensions and how many of this workspace's channels a
+   * size covers, under the size select. The select became a pill in the control
+   * row and the sentence was not carried across — so `Square post` stopped
+   * saying 1080 by 1080 and stopped saying what it is for. It was found by an
+   * adversarial read of the diff, not by a red test, because no test had ever
+   * asserted it.
+   *
+   * Asserted from `generatableFormats()`'s own numbers rather than as a shape,
+   * because "\d+ by \d+" is satisfied by any two numerals including the wrong
+   * ones.
+   */
+  test('names the pixels and how many channels it covers, not only its label', () => {
+    const first = generatableFormats()[0]!
+    open()
+    const said = document.body.textContent ?? ''
+    expect(said).toContain(`${first.width}`)
+    expect(said).toContain(`${first.height}`)
+    expect(said).toMatch(new RegExp(`${first.channels.length}\\s*of your channels`))
+  })
+
+  test('and it follows the chosen size rather than the first one', async () => {
+    const user = userEvent.setup()
+    const other = generatableFormats().find((f) => f.width !== f.height)
+    expect(other, 'no format with a non-square shape to switch to').toBeTruthy()
+
+    open()
+    await user.selectOptions(screen.getByLabelText(/what size/i), other!.id)
+    expect(document.body.textContent).toContain(`${other!.height}`)
+  })
+})
+
 describe('before any spend', () => {
   test('the price is named, from the pricing file rather than a literal', () => {
     open()
@@ -803,6 +978,7 @@ describe('before any spend', () => {
   test('the total follows the chosen model, before the press', async () => {
     const user = userEvent.setup()
     const { container } = open()
+    await openMore(user)
     const picker = container.querySelector('[data-guide="studio-model"]') as HTMLElement
     const best = within(picker)
       .getAllByRole('button')
@@ -831,56 +1007,102 @@ describe('before any spend', () => {
 
 describe('the composer', () => {
   /**
-   * ── THE SCOPE IS THE DESIGN, NOT A COLOUR ─────────────────────────────────
-   * The composer is a dark panel on a light page, and `data-surface="inverse"`
-   * is the only correct way to paint one here. A hand-written dark fill would
-   * look identical in a screenshot and be wrong in every token inside it:
-   * `--ink` is #000000 on light, so `text-ink` would be black on near-black,
-   * and `--pstrong` would be black on black at 1.23:1 the moment somebody
-   * hovered the button they came to press. tokens.css's INVERSE SURFACE header
-   * carries the measurements.
+   * ── RETARGETED WHEN THE COMPOSER WENT LIGHT, NOT DELETED ──────────────────
+   * This asserted the composer was a DARK panel painted with
+   * `data-surface="inverse"`. Founder's ruling, 2026-09-05, against a
+   * reference: the workspace is white and neutral and the accent appears only
+   * on the action that spends, so the dark panel is gone.
    *
-   * This is asserted rather than left to review because the failure is
-   * invisible in the theme most people develop in.
+   * What that old assertion was really protecting is NOT gone, and it is what
+   * this checks now: a panel here must be painted with the SYSTEM'S surfaces,
+   * never with a fill written by hand. The failure it stops is invisible in the
+   * theme most people develop in — a hand-rolled dark fill leaves `--ink` at
+   * #000000, so `text-ink` renders black on near-black, and `--pstrong` renders
+   * black on black at 1.23:1 the moment somebody hovers the button they came to
+   * press. tokens.css's INVERSE SURFACE header carries those measurements.
+   *
+   * So: the composer sits on `bg-surface` with the shared card lift, and NO
+   * element anywhere on this screen carries a bracketed background colour.
+   *
+   * MUTATION: swap `bg-surface` for `bg-[#171717]` on the composer and both
+   * halves go red.
    */
-  test('the composer paints itself with the inverse scope, not a hand-written fill', () => {
+  test('the composer is painted with the system surfaces, never a hand-written fill', () => {
     const { container } = open()
     const prompt = screen.getByPlaceholderText(promptHintFor('on_brand'))
-    expect(prompt.closest('[data-surface="inverse"]')).not.toBeNull()
-    // And the settings sit on the same object, which is a second scope: a CSS
-    // scope does not cross a sibling boundary, so the tray needs its own.
-    expect(container.querySelectorAll('[data-surface="inverse"]').length).toBeGreaterThanOrEqual(2)
+    const panel = prompt.closest('[data-guide="studio-composer"]') as HTMLElement | null
+    expect(panel).not.toBeNull()
+    expect(panel!.className).toContain('bg-surface')
+    expect(panel!.className).toContain('surface-ring-lift')
+
+    // `getAttribute`, not `.className`: on an SVG that property is an
+    // `SVGAnimatedString` object and `toMatch` refuses it, which silently
+    // exempted every icon in the tree from this sweep.
+    for (const element of container.querySelectorAll('[class]')) {
+      const classes = element.getAttribute('class') ?? ''
+      expect(classes, classes).not.toMatch(/\bbg-\[(?:#|rgb|hsl)/)
+    }
   })
 
   /**
-   * The chip row is a SUMMARY of what the press will do. It reads its labels
-   * from `models.ts` and `modes.ts`, the same modules the rules come from, so a
-   * chip cannot name a model the picker no longer offers.
+   * ── RETARGETED FROM A SUMMARY TO THE CONTROL ITSELF ───────────────────────
+   * There used to be a chip row that only SUMMARISED the choices and a tray
+   * below that made them, and this asserted the summary named the right things.
+   * The row is now the control, so "which look is chosen" is `aria-pressed` and
+   * not a string — and the old form, `not.toContain('On brand')`, would fail
+   * against a row that correctly OFFERS every look at all times.
+   *
+   * The claim is the same and is still read from `models.ts` and `modes.ts`,
+   * the modules the rules come from: the row may never name a model the picker
+   * no longer offers.
    */
   test('says which model, look, size and count this press will use', async () => {
     const user = userEvent.setup()
     const { container } = open()
-    const chips = () => container.querySelector('[data-guide="studio-chips"]')!.textContent ?? ''
+    const row = container.querySelector('[data-guide="studio-controls"]') as HTMLElement
+    expect(row).not.toBeNull()
 
-    // Read from `models.ts` and `modes.ts`, the modules the RULES come from, so
-    // a chip cannot name a model the picker no longer offers.
-    expect(chips()).toContain(routedModels()[0]!.label)
-    expect(chips()).toContain(ruleFor('on_brand').label)
+    expect(row.textContent).toContain(routedModels()[0]!.label)
+    expect(modeButton(new RegExp(ruleFor('on_brand').label, 'i'))).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    const counts = container.querySelector('[data-guide="studio-count"]') as HTMLElement
+    expect(within(counts).getByRole('button', { name: '1' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(screen.getByLabelText(/what size/i)).toBeTruthy()
 
     // And it tracks the control rather than the first render.
     await user.click(modeButton(/explore/i))
-    expect(chips()).toContain(ruleFor('explore').label)
-    expect(chips()).not.toContain(ruleFor('on_brand').label)
+    expect(modeButton(new RegExp(ruleFor('explore').label, 'i'))).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(modeButton(new RegExp(ruleFor('on_brand').label, 'i'))).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
   })
 
+  /**
+   * RETARGETED. It used to shut the tray and check the MODE group had gone,
+   * which was right while the modes lived inside the tray. They live on the row
+   * now and must survive — so the thing that goes is the model picker, which is
+   * what the tray is for.
+   */
   test('the settings can be put away, and the composer stays', async () => {
     const user = userEvent.setup()
-    open()
+    const { container } = open()
+    await openMore(user)
+    expect(container.querySelector('[data-guide="studio-model"]')).not.toBeNull()
+
+    await user.click(screen.getByRole('button', { name: /fewer settings/i }))
+
+    expect(container.querySelector('[data-guide="studio-model"]')).toBeNull()
+    // The looks stay: they are a control on the row, not a setting.
     expect(screen.getByRole('group', { name: /how should sahoda approach it/i })).toBeTruthy()
-
-    await user.click(screen.getByRole('button', { name: /hide settings/i }))
-
-    expect(screen.queryByRole('group', { name: /how should sahoda approach it/i })).toBeNull()
     // The thing a person came to do is still there. A composer that folded the
     // prompt away with the settings would be a screen with nothing on it.
     //
@@ -1026,9 +1248,21 @@ describe('the rest of the composer the design asked for', () => {
     expect(screen.queryByText(/\b0\b/)).toBeNull()
   })
 
+  /**
+   * RETARGETED, not weakened. "Tidy my words" left this list and did not leave
+   * the product: it is prompt rewriting, and the composer now names exactly
+   * that — unbuilt — in the place the control will live. Two names for one
+   * absent feature reads as two features nobody has built.
+   *
+   * The CLAIM is unchanged and now covers both places: an unbuilt control is
+   * named as TEXT, never as a button, because a disabled button is still
+   * announced as an action a reader could take.
+   */
   test('names the controls that are designed and not built, as text not buttons', () => {
     open()
-    for (const title of ['Leave out', 'Same again', 'Follow how closely', 'Tidy my words']) {
+    expect(screen.getByText(/rewrite for the model, coming soon/i)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /rewrite for the model/i })).toBeNull()
+    for (const title of ['Leave out', 'Same again', 'Follow how closely']) {
       expect(screen.getByText(title), title).toBeTruthy()
       // A disabled button is still announced as an action a reader could take,
       // which `design-lint.mjs` rule 3 refuses outright. These are spans.
@@ -1040,13 +1274,14 @@ describe('the rest of the composer the design asked for', () => {
   test('a picture can be added without leaving the composer', async () => {
     const user = userEvent.setup()
     open()
+    await openMore(user)
     // Two upload controls exist and they carry DIFFERENT names, so a screen
     // reader — and this query — can say which is which.
     const inComposer = screen.getByLabelText(/add a picture to match/i)
     const inSettings = screen.getByLabelText(/add a picture from this device/i)
     expect(inComposer).not.toBe(inSettings)
     expect(inComposer.getAttribute('accept')).toBe(uploadAccept())
-    await user.click(screen.getByRole('button', { name: /hide settings/i }))
+    await user.click(screen.getByRole('button', { name: /fewer settings/i }))
     // The composer's route survives the settings being put away; the other does
     // not, which is the whole reason the composer has one.
     expect(screen.getByLabelText(/add a picture to match/i)).toBeTruthy()
@@ -1122,8 +1357,9 @@ describe('control over the logo Sahoda stamps', () => {
     })
     const user = userEvent.setup()
     const { container } = open()
+    await openMore(user)
     const logoFieldset = container.querySelector('[data-guide="studio-logo"]') as HTMLElement
-    await user.click(within(logoFieldset).getByRole('button', { name: /leave it off/i }))
+    await user.click(within(logoFieldset).getByRole('button', { name: /^off$/i }))
     await press(user)
 
     expect(queueGeneration).toHaveBeenCalledWith(
@@ -1143,6 +1379,7 @@ describe('control over the logo Sahoda stamps', () => {
     })
     const user = userEvent.setup()
     const { container } = open()
+    await openMore(user)
     const corner = container.querySelector('[data-guide="studio-logo-corner"]') as HTMLElement
     const size = container.querySelector('[data-guide="studio-logo-size"]') as HTMLElement
     await user.click(within(corner).getByRole('button', { name: /top left/i }))
@@ -1159,11 +1396,12 @@ describe('control over the logo Sahoda stamps', () => {
   test('the corner and size controls are disabled once the stamp is off, not hidden', async () => {
     const user = userEvent.setup()
     const { container } = open()
+    await openMore(user)
     const logoFieldset = container.querySelector('[data-guide="studio-logo"]') as HTMLElement
     const corner = container.querySelector('[data-guide="studio-logo-corner"]') as HTMLElement
     for (const button of within(corner).getAllByRole('button')) expect(button).toBeEnabled()
 
-    await user.click(within(logoFieldset).getByRole('button', { name: /leave it off/i }))
+    await user.click(within(logoFieldset).getByRole('button', { name: /^off$/i }))
     for (const button of within(corner).getAllByRole('button')) expect(button).toBeDisabled()
   })
 })
