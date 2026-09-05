@@ -314,8 +314,9 @@ export function useBuild({
       if (!state.ok) {
         setFailure({
           message: state.message,
-          // An insufficient balance is not fixed by pressing the same button.
-          retryable: state.kind !== 'insufficient',
+          // An insufficient balance is not fixed by pressing the same button,
+          // and neither is a daily allowance that returns tomorrow.
+          retryable: state.kind !== 'insufficient' && state.kind !== 'limit',
         })
         return
       }

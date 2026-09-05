@@ -109,7 +109,9 @@ describe('the free build is bounded', () => {
 
     const result = await resolveOnboarding(null, form())
 
-    expect(result).toMatchObject({ ok: false, kind: 'error' })
+    // `limit`, not `error`, since 2026-09-05: the reveal offers "Try again"
+    // for an error, and this sentence says "tomorrow" (docs/51 Q-02).
+    expect(result).toMatchObject({ ok: false, kind: 'limit' })
     if (!result.ok) {
       expect(result.message).toMatch(/3 times today/)
       expect(result.message).toMatch(/nothing was charged/i)

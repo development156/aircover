@@ -26,6 +26,7 @@ import {
 } from '@/lib/brand/resolve-result'
 import { IntakeSchema } from '@/lib/onboarding/intake'
 import { FREE_RESOLVES_PER_DAY, freeResolveAllowed } from '@/lib/onboarding/limits'
+import { readPendingBrain, savePendingBrain } from '@/lib/onboarding/pending-brain'
 import { readActiveBrandMemory } from '@/lib/onboarding/read-brain'
 import { toResolveInput } from '@/lib/onboarding/to-resolve-input'
 import { reportServerError } from '@/lib/observability/report'
@@ -54,7 +55,13 @@ function getWithCredits(): WithCreditsFn {
  * a money surface. The UI branches on the kind and simply shows no ledger line.
  */
 export type OnboardingResolveState =
-  ResolveActionState | { ok: true; kind: 'free'; brain: BrandMemoryPayload }
+  | ResolveActionState
+  /**
+   * `resumed` marks a brain handed back from the server-side park rather than
+   * built on this press: nothing ran, nothing was charged, and the daily free
+   * count did not move. See `lib/onboarding/pending-brain.ts`.
+   */
+  | { ok: true; kind: 'free'; brain: BrandMemoryPayload; resumed?: true }
 
 const FALLBACK_MESSAGE =
   'Showing a sample Brand Brain. The model could not be reached, so nothing was charged. Retry to resolve yours.'
@@ -110,7 +117,10 @@ async function resolveFree({
   input,
 }: ResolveArgs): Promise<OnboardingResolveState> {
   if (!(await freeResolveAllowed(userId, workspaceId))) {
-    return { ok: false, kind: 'error', message: FREE_LIMIT_MESSAGE }
+    // `limit`, not `error`: the reveal offers "Try again" for an error, and a
+    // refusal whose own sentence says "tomorrow" must not offer it. MEASURED
+    // 2026-09-05: it did (docs/51 Q-02).
+    return { ok: false, kind: 'limit', message: FREE_LIMIT_MESSAGE }
   }
 
   const result = await getMesh().runTask(brandGuidelinesTask.def, input, {
@@ -134,6 +144,9 @@ async function resolveFree({
   if ((result as { fallback?: boolean }).fallback === true) {
     return { ok: true, kind: 'fallback', brain: result.data, message: FALLBACK_MESSAGE }
   }
+  // Parked before it is handed to the browser, so a closed tab between here and
+  // the reveal's confirm loses nothing and the next press costs nothing.
+  await savePendingBrain(workspaceId, { brain: result.data, source: 'resolved' })
   return { ok: true, kind: 'free', brain: result.data }
 }
 
@@ -181,6 +194,12 @@ async function resolveCharged({
   // The balance moved, or may have. The chip lives in the layout, so a page
   // revalidate misses it. NOT called on the free path — nothing moved there.
   if (credits.ok || meshOutcome !== null) revalidateBalance()
+  // Parked only once the charge settled: a brain the customer was never
+  // debited for must not come back free on the next press.
+  const settled = meshOutcome as MeshResolveOutcome | null
+  if (credits.ok && settled?.kind === 'real') {
+    await savePendingBrain(workspaceId, { brain: settled.brain, source: 'resolved' })
+  }
 
   if (!credits.ok) {
     reportPaidActionFailure('onboarding-resolve', credits.error)
@@ -262,6 +281,13 @@ export async function resolveOnboarding(
      * as well as the existence, and reading it twice would let the two answers
      * disagree under a concurrent save.
      */
+    // A brain built on an earlier press and never confirmed comes back as it
+    // is: no model call, no charge, no free-count. The alternative was
+    // MEASURED 2026-09-05: three builds lost to closed tabs, then a day's
+    // lockout (docs/51 Q-01).
+    const pending = await readPendingBrain(workspace.id)
+    if (pending) return { ok: true, kind: 'free', brain: pending.brain, resumed: true }
+
     const active = await readActiveBrandMemory(workspace.id)
     if (active.status === 'unreadable') {
       return { ok: false, kind: 'error', message: BRAIN_UNREADABLE_MESSAGE }
