@@ -67,6 +67,19 @@ describe('planOfferDecision', () => {
     },
   )
 
+  it('stays silent until the workspace has done something, so it never covers the first dashboard', () => {
+    // MEASURED 2026-09-05 in a browser: a workspace that had just finished
+    // onboarding was met by this dialog before it had seen its own dashboard.
+    // Founder's ruling the same day: the offer waits for the first action.
+    expect(planOfferDecision({ status: 'ok', data: view() }, { hasStarted: false })).toEqual({
+      kind: 'silent',
+      because: 'not-started',
+    })
+    expect(planOfferDecision({ status: 'ok', data: view() }, { hasStarted: true })).toEqual({
+      kind: 'offer',
+    })
+  })
+
   it('stays silent when there is no workspace, because checkout has nothing to charge for', () => {
     expect(planOfferDecision({ status: 'no-workspace' })).toEqual({
       kind: 'silent',

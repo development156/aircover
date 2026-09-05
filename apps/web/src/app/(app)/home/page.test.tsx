@@ -450,7 +450,8 @@ describe('the plan offer on the dashboard', () => {
    */
   const findOffer = () => screen.findByRole('heading', { name: OFFER })
 
-  test('a workspace on Free is offered the plans', async () => {
+  test('a workspace on Free that has done something is offered the plans', async () => {
+    vi.mocked(listPosts).mockResolvedValue([A_POST])
     render(await HomePage())
 
     expect(await findOffer()).toBeInTheDocument()
@@ -490,11 +491,14 @@ describe('the plan offer on the dashboard', () => {
     expect(offerHeading()).toBeNull()
   })
 
-  test('it rides the empty dashboard too, which is where most Free workspaces are', async () => {
-    // `GetStarted` is an early return with its own JSX, so the offer has to be
-    // added to that branch as well. It was easy to wire only the full dashboard
-    // and never notice, because the account most likely to be weighing a plan is
-    // exactly the one that sees this screen.
+  test('the empty dashboard gets NO offer: a plan is not the first thing a new workspace sees', async () => {
+    // This test used to pin the opposite, and its reasoning is worth keeping:
+    // the account most likely to be weighing a plan is the one on this screen.
+    // MEASURED 2026-09-05 in a real browser, the effect was that a workspace
+    // which had just finished onboarding met a pricing dialog before it had
+    // seen its own dashboard. Founder's ruling the same day: the offer waits
+    // until the workspace has done something. `planOfferDecision` takes
+    // `hasStarted` so the rule lives in the decision, not in this JSX.
     //
     // The balance is set here rather than left to the shared `beforeEach`, which
     // does not set it: `vi.clearAllMocks()` clears CALLS and leaves the
@@ -512,6 +516,7 @@ describe('the plan offer on the dashboard', () => {
     render(await HomePage())
 
     expect(screen.getByTestId('home-get-started')).toBeInTheDocument()
-    expect(await findOffer()).toBeInTheDocument()
+    // Absence needs no wait: a `silent` decision renders no mount at all.
+    expect(offerHeading()).toBeNull()
   })
 })

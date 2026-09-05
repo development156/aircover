@@ -57,7 +57,20 @@ const LIVE_STATUSES: ReadonlySet<SubscriptionView['status']> = new Set(LIVE_SUBS
 export type PlanOfferDecision =
   | { kind: 'offer' }
   /** Named, never a bare `false`. A reason nobody can read is a reason nobody can check. */
-  | { kind: 'silent'; because: 'has-plan' | 'no-workspace' | 'unknown' }
+  | { kind: 'silent'; because: 'has-plan' | 'no-workspace' | 'unknown' | 'not-started' }
+
+export interface PlanOfferContext {
+  /**
+   * Whether the workspace has done anything yet — the same `workspaceHasStarted`
+   * verdict that decides between the empty dashboard and the full one.
+   *
+   * MEASURED 2026-09-05 in a real browser: a workspace that had just finished
+   * onboarding met this dialog before it had seen its own dashboard. Founder's
+   * ruling the same day: the offer waits for the first action. The rule lives
+   * here rather than in the page's JSX so that every mount site inherits it.
+   */
+  hasStarted: boolean
+}
 
 /**
  * The plan a workspace is really being served on, or `null` when the row is
@@ -68,9 +81,13 @@ export function livePlanId(view: SubscriptionView): PlanId | null {
   return LIVE_STATUSES.has(view.status) ? view.planId : null
 }
 
-export function planOfferDecision(read: SettledRead<SubscriptionView>): PlanOfferDecision {
+export function planOfferDecision(
+  read: SettledRead<SubscriptionView>,
+  context: PlanOfferContext = { hasStarted: true },
+): PlanOfferDecision {
   if (read.status === 'no-workspace') return { kind: 'silent', because: 'no-workspace' }
   if (read.status === 'unreadable') return { kind: 'silent', because: 'unknown' }
+  if (!context.hasStarted) return { kind: 'silent', because: 'not-started' }
 
   const live = livePlanId(read.data)
   // `free` is a live plan in the schema — a workspace with no row reads as

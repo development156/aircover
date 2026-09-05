@@ -275,10 +275,10 @@ export default async function HomePage() {
    * converts. The component keeps the props for a caller that wants to pay for
    * them.
    */
-  const offer =
-    session.sessionId !== null && planOfferDecision(subscription).kind === 'offer' ? (
-      <PlanOfferMount sessionKey={session.sessionId} plans={planOfferRows()} />
-    ) : null
+  // Decided below, once `workspaceHasStarted` has spoken: the offer waits for
+  // the workspace's first action, and that verdict is the same one that picks
+  // the empty dashboard over the full one.
+  let offer: React.ReactNode = null
 
   /**
    * ── AND A WORKSPACE THAT EXISTS AND HOLDS NOTHING GETS ITS OWN SCREEN TOO ──
@@ -306,16 +306,24 @@ export default async function HomePage() {
     // shop with an Instagram following has something to report on day one.
     accountReported: instagram.kind === 'ready' && instagram.insights.length > 0,
   }
-  if (!workspaceHasStarted(signals)) {
+  const started = workspaceHasStarted(signals)
+  offer =
+    session.sessionId !== null &&
+    planOfferDecision(subscription, { hasStarted: started }).kind === 'offer' ? (
+      <PlanOfferMount sessionKey={session.sessionId} plans={planOfferRows()} />
+    ) : null
+
+  if (!started) {
     /* The offer rides BOTH dashboard states. A workspace with nothing in it yet
        is still a workspace on Free, and it is the account most likely to be
-       weighing a plan — leaving it out here would mean the offer only ever
-       reached people who had already committed to the product. The one state it
-       does not ride is the branch above: an account with NO workspace cannot
-       check out at all, because `startCheckout` resolves a workspace to charge
-       for, and an offer that cannot be taken up is the "impossible remedy" this
-       codebase has a whole guard about. `planOfferDecision` returns `silent` for
-       it, so that exclusion is in the decision rather than in this JSX. */
+       weighing a plan. It used to ride this branch for that reason. MEASURED
+       2026-09-05 in a real browser, the effect was a pricing dialog over the
+       first dashboard a workspace ever saw, before it had done anything, and
+       the founder ruled the same day that the offer waits for the first action.
+       `planOfferDecision` takes `hasStarted` and returns `silent` here, exactly
+       as it does for an account with NO workspace (which cannot check out at
+       all): both exclusions live in the decision rather than in this JSX, so
+       `{offer}` stays on every branch and is null on the ones it must not reach. */
     return (
       <>
         <GetStarted now={now} steps={startSteps()} />
