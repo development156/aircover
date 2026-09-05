@@ -95,7 +95,13 @@ on:
 # is. On a pull request `ref_name` would be `<n>/merge`, but `head_ref` is
 # non-empty there and wins, so the pair resolves to one string from both events.
 concurrency:
-  group: gate-${{ github.head_ref || github.ref_name }}
+  # A DISPATCHED run gets its own group. MEASURED 2026-09-05, runs 33976216474
+  # and 33984273950: two smoke dispatches were cancelled within seconds by the
+  # push and pull_request runs that a teammate's push to the same branch
+  # started, because all three shared `gate-<branch>`. The suffix is empty for
+  # push and pull_request, so those two still collapse into one exactly as
+  # before; a dispatch is keyed by its own run id and nothing cancels it.
+  group: gate-${{ github.head_ref || github.ref_name }}${{ github.event_name == 'workflow_dispatch' && format('-dispatch-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
 permissions:

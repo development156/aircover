@@ -123,9 +123,20 @@ describe('the CI workflow covers the gate, or says which part it does not', () =
     // matches `head_ref`. Asserted as an exact expression rather than "contains
     // a branch-ish thing", because the whole defect was two expressions that
     // both name the branch and do not match each other.
-    const group = /concurrency:\s*\n\s*group: (.+)/.exec(WORKFLOW)?.[1]
+    // Comments may sit between `concurrency:` and `group:`; skip them.
+    const group = /concurrency:\s*\n(?:\s*#[^\n]*\n)*\s*group: (.+)/.exec(WORKFLOW)?.[1]
     expect(group, 'no concurrency group').toBeDefined()
-    expect(group).toBe('gate-${{ github.head_ref || github.ref_name }}')
+    // The push/pull_request half is exact, as before. Since 2026-09-05 a
+    // dispatched run appends its own run id: MEASURED, two smoke dispatches
+    // were cancelled by a teammate's push seconds later because all three
+    // events shared one group. The suffix must be EMPTY for push and
+    // pull_request (or the pair stops collapsing) and must key on run_id for a
+    // dispatch (or a second dispatch cancels the first).
+    expect(group.startsWith('gate-${{ github.head_ref || github.ref_name }}')).toBe(true)
+    const suffix = group.slice('gate-${{ github.head_ref || github.ref_name }}'.length)
+    expect(suffix).toMatch(/workflow_dispatch/)
+    expect(suffix).toMatch(/run_id/)
+    expect(suffix).toMatch(/\|\| ''/)
     // Named explicitly: `github.ref` carries a `refs/heads/` prefix that
     // `head_ref` does not, so pairing the two can never collapse.
     expect(group).not.toMatch(/github\.ref\s*\}\}/)
