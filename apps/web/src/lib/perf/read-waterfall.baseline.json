@@ -578,7 +578,7 @@
       "read",
       "soft",
       "read",
-      "activeWorkspaceRead"
+      "readPictureForViewer"
     ]
   },
   {

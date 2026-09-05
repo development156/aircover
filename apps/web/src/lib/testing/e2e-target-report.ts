@@ -1,4 +1,10 @@
-import { ACK_VARIABLE, GUARDED_PROJECT_REFS, type TargetDecision, decideTarget } from './e2e-target'
+import {
+  ACK_VARIABLE,
+  GUARDED_PROJECT_REFS,
+  STAGING_PROJECT_REF,
+  type TargetDecision,
+  decideTarget,
+} from './e2e-target'
 
 /**
  * What the runner prints about its own destination, on EVERY run.
@@ -79,26 +85,48 @@ export function refusalMessage(decision: TargetDecision): string {
         '  passing run would leave rows behind in a database nothing is watching.',
       ].join('\n')
 
+    case 'refused-production':
+      return [
+        `REFUSED: this run would write to project ${ref}, which is production.`,
+        '',
+        '  That database holds real workspaces and real customers. The e2e fixtures do not read;',
+        '  they CREATE. Every spec file mints a Clerk user, signs it in, and lets the app create a',
+        '  workspace, a credit ledger and whatever rows the spec exercises, then deletes them',
+        '  again. A run that fails halfway leaves the rest behind.',
+        '',
+        `  ${ACK_VARIABLE} does not unlock this and there is no flag that does. Until 2026-09-04`,
+        '  it did, because production was the only database in this account and refusing outright',
+        '  would have deleted the suite rather than protected anything. There is a second database',
+        '  now, so the acknowledgement is gone: point the run at staging instead.',
+        '',
+        `    NEXT_PUBLIC_SUPABASE_URL=https://${STAGING_PROJECT_REF}.supabase.co \\`,
+        '      SUPABASE_DB_URL=... SUPABASE_SERVICE_ROLE_KEY=... \\',
+        '      pnpm --filter @sahoda/web test:smoke',
+        '',
+        `  Staging is ref ${STAGING_PROJECT_REF} ("sahoda-staging", ap-south-1). It is unguarded`,
+        '  here, so it needs no acknowledgement at all. Every variable in TARGET_VARIABLES has to',
+        '  agree — two of them naming different projects is refused as a split target, which is',
+        '  the mistake to expect when only one gets changed.',
+        '',
+        '  If you believe an e2e run genuinely has to touch production, that is a change to this',
+        '  file and a conversation, not an environment variable.',
+      ].join('\n')
+
     case 'refused-unacknowledged':
       return [
-        `REFUSED: this run would write to project ${ref}.`,
+        `REFUSED: this run would write to project ${ref}, which is guarded.`,
         '',
-        '  That is the ONE Supabase project in this account, and it is production — the database',
-        '  holding real workspaces and real customers. The e2e fixtures do not read; they CREATE.',
-        '  Every spec file mints a Clerk user, signs it in, and lets the app create a workspace,',
-        '  a credit ledger and whatever rows the spec exercises, then deletes them again.',
+        '  The e2e fixtures do not read; they CREATE. Every spec file mints a Clerk user, signs it',
+        '  in, and lets the app create a workspace, a credit ledger and whatever rows the spec',
+        '  exercises, then deletes them again.',
         '',
-        '  There is no second database to point at, so this is not a mistake you can fix by',
-        '  changing a URL. It is a decision, and it has to be made by a person:',
+        '  If that is what you intend, say so by naming the project:',
         '',
         `    ${ACK_VARIABLE}=${ref} pnpm --filter @sahoda/web test:smoke`,
         '',
         `  ${ACK_VARIABLE} must equal the ref exactly. It is declared on the test:smoke task in`,
         '  turbo.json, so it survives strict env mode and joins the cache key — an acknowledged',
         '  run can never be replayed as an unacknowledged one.',
-        '',
-        '  The durable fix is a Supabase BRANCH of this project for testing. A branch has its own',
-        '  ref, so it is unguarded here and needs no acknowledgement at all.',
       ].join('\n')
 
     default:

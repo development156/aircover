@@ -140,14 +140,24 @@ export const IMAGE_ROUTES: Partial<Record<ModelTier, string>> = {
  * the contract: adding a model here is the deliberate act, and everything else
  * (the picker, the price, the rules) reads from it.
  *
- * MEASURED on OpenRouter's own model pages, 2026-08-31, each id fetched and its
- * figures compared against docs/43 §3:
+ * ── PAGE-VERIFIED IS NOT GENERATION-VERIFIED ────────────────────────────────
+ * The three ids added on 2026-08-31 had their FIGURES read off each model's own
+ * OpenRouter page and compared against docs/43 §3. That is a check on the price
+ * and reference bounds, NOT a check that the model draws: every press against
+ * them has returned HTTP_400 from `/api/v1/images` (production `ai_provider_logs`,
+ * 2 and 4 September, zero successes). The allow-list is a SPENDING boundary, so
+ * they stay on it — an id off the list would fall back to the tier default and
+ * spend silently against the wrong model. Whether a listed id actually draws is
+ * the picker's `routed` flag in `apps/web/src/lib/studio/models.ts`, not this
+ * list.
  *
- *   google/gemini-3-pro-image      $2/M in, $120/M image out, 14 references
- *   openai/gpt-image-1             $5/M text in, $40/M image out, 10 per request, 16 references
- *   bytedance-seed/seedream-5-0-lite  $0.035 flat per image, 4 per request, 14 references
+ *   google/gemini-2.5-flash-image     the one id MEASURED drawing (6 ok rows, 2026-08-30)
+ *   google/gemini-3-pro-image         page: $2/M in, $120/M image out, 14 references
+ *   openai/gpt-image-1                page: $5/M text in, $40/M out, 10 per request, 16 references
+ *   bytedance-seed/seedream-5-0-lite  page: $0.035 flat per image, 4 per request, 14 references
  */
 export const ALLOWED_IMAGE_MODELS: readonly string[] = [
+  'google/gemini-2.5-flash-image',
   'google/gemini-3-pro-image',
   'openai/gpt-image-1',
   'bytedance-seed/seedream-5-0-lite',

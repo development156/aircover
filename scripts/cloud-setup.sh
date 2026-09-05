@@ -100,13 +100,22 @@ for v in "${ENV_OPTIONAL[@]}"; do
 done
 
 # ── Fixed values that are not secrets ────────────────────────────────────────
-# SAHODA_E2E_ACK_TARGET is a GUARD, not a knob: Playwright refuses at module
-# scope without it. It exists because this suite wrote to the production
-# database on every gate run for months and minted 12,196 Clerk users.
+# SAHODA_E2E_ACK_TARGET IS NO LONGER WRITTEN, and the reason is the sentence
+# that used to sit here: the guard "exists because this suite wrote to the
+# production database on every gate run for months and minted 12,196 Clerk
+# users" -- and then the next line handed every sandbox a standing
+# acknowledgement of that same database, so the guard was defeated by the script
+# that provisions it. `SAHODA_E2E_ACK_TARGET=1` was rejected as "satisfiable by
+# anyone who wanted the error to go away"; a default is satisfiable by nobody
+# typing anything at all, which is worse.
+#
+# As of 2026-09-04 production cannot be acknowledged at any price
+# (`lib/testing/e2e-target.ts`), so the value would be inert as well as wrong.
+# An operator running the suite against a guarded ref types it for that run.
+#
 # E2E_PORT must be explicit, or turbo's strict env stripping drops it and every
 # sandbox lands on the same default port.
 : "${SUPABASE_PROJECT_REF:=rloztdhzfliyvpvxsgjl}"
-: "${SAHODA_E2E_ACK_TARGET:=rloztdhzfliyvpvxsgjl}"
 : "${E2E_PORT:=3100}"
 
 say "2 · Writing the three .env files"
@@ -120,7 +129,6 @@ write_env() {
     _x=$(val "$v"); [ -n "$_x" ] && printf '%s=%s\n' "$v" "$_x" >> "$target"
   done
   printf 'SUPABASE_PROJECT_REF=%s\n'  "$SUPABASE_PROJECT_REF"  >> "$target"
-  printf 'SAHODA_E2E_ACK_TARGET=%s\n' "$SAHODA_E2E_ACK_TARGET" >> "$target"
   printf 'E2E_PORT=%s\n'              "$E2E_PORT"              >> "$target"
   ok "$target  ($(wc -l < "$target") vars)"
 }

@@ -33,7 +33,7 @@ vi.mock('@/lib/supabase/server', () => ({
   createServerSupabase: () => ({ from: () => chain() }),
 }))
 
-const { readLibraryPictures } = await import('./read')
+const { readLibraryPictures, stampAnchorFromImageRow } = await import('./read')
 
 const WS = '11111111-1111-4111-8111-111111111111'
 
@@ -100,5 +100,51 @@ describe('readLibraryPictures keeps a failed read apart from an empty library', 
         { assetId: 'a2', url: null, title: null },
       ],
     })
+  })
+})
+
+describe('stampAnchorFromImageRow reads the corner columns off the raw row', () => {
+  /**
+   * The two columns arrive in a migration a human applies. `select *` omits a
+   * column that is not yet applied, so the reader must treat an ABSENT column
+   * exactly like NULL: not recorded, never a guessed placement.
+   */
+  it('reads a recorded move, corner and reason together', () => {
+    expect(
+      stampAnchorFromImageRow({
+        id: '11111111-1111-4111-8111-111111111111',
+        stamped_anchor: 'top-left',
+        stamp_anchor_moved_reason: 'busy',
+      }),
+    ).toEqual({ stampAnchor: 'top-left', stampAnchorMovedReason: 'busy' })
+  })
+
+  it('reads a stayed mark as a corner with no reason', () => {
+    expect(
+      stampAnchorFromImageRow({
+        id: '11111111-1111-4111-8111-111111111111',
+        stamped_anchor: 'bottom-right',
+        stamp_anchor_moved_reason: null,
+      }),
+    ).toEqual({ stampAnchor: 'bottom-right', stampAnchorMovedReason: null })
+  })
+
+  it('treats an ABSENT column as null, so a pre-migration deploy stays silent', () => {
+    // A row from before the migration: `select *` never returned these keys.
+    // MUTATION: default the anchor to `bottom-right` here and this goes red while
+    // the screen claims a placement nobody measured.
+    expect(stampAnchorFromImageRow({ id: '11111111-1111-4111-8111-111111111111' })).toEqual({
+      stampAnchor: null,
+      stampAnchorMovedReason: null,
+    })
+  })
+
+  it('treats a value outside the vocabulary as not recorded, never as a corner', () => {
+    expect(
+      stampAnchorFromImageRow({
+        id: '11111111-1111-4111-8111-111111111111',
+        stamped_anchor: 'bottom_right',
+      }),
+    ).toEqual({ stampAnchor: null, stampAnchorMovedReason: null })
   })
 })

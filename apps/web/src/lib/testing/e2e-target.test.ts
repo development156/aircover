@@ -7,6 +7,8 @@ import { describe, expect, it } from 'vitest'
 import {
   ACK_VARIABLE,
   GUARDED_PROJECT_REFS,
+  STAGING_PROJECT_REF,
+  UNACKNOWLEDGEABLE_PROJECT_REFS,
   decideTarget,
   extractProjectRef,
   readTarget,
@@ -81,25 +83,55 @@ describe('the refusals — each one driven to red', () => {
     expect(refusalMessage(decision)).toContain(OTHER)
   })
 
-  it('refuses the guarded project when nothing acknowledges it', () => {
+  it('refuses production, and does not ask for an acknowledgement it will not honour', () => {
     const decision = decideTarget({ NEXT_PUBLIC_SUPABASE_URL: `https://${PROD}.supabase.co` })
-    expect(decision.outcome).toBe('refused-unacknowledged')
-    expect(refusalMessage(decision)).toContain(ACK_VARIABLE)
-    // The operator needs the ref in the message, or they cannot type the override.
-    expect(refusalMessage(decision)).toContain(`${ACK_VARIABLE}=${PROD}`)
+    expect(decision.outcome).toBe('refused-production')
+    // RETARGETED, not deleted. This used to assert `refused-unacknowledged` and
+    // that the message contained `SAHODA_E2E_ACK_TARGET=<prod>` for the reader to
+    // type. Offering that string now would be an impossible remedy: the override
+    // it names no longer exists, and `no-impossible-remedy.spec.ts`'s rule is the
+    // same rule here as it is on a customer screen.
+    const message = refusalMessage(decision)
+    expect(message).not.toContain(`${ACK_VARIABLE}=${PROD}`)
+    // It must still say the variable's name, because a stale one in somebody's
+    // shell is the likeliest reason they are surprised to be reading this.
+    expect(message).toContain(ACK_VARIABLE)
   })
 
-  it('refuses a TRUTHY acknowledgement that does not name the ref', () => {
-    // The whole point of an ack that is a ref: `=1` is what someone types to make
-    // an error go away, and it would keep working after the target changed.
-    for (const ack of ['1', 'true', 'yes', OTHER, '']) {
+  it('names staging, so the refusal is a direction and not only a prohibition', () => {
+    const message = refusalMessage(
+      decideTarget({ NEXT_PUBLIC_SUPABASE_URL: `https://${PROD}.supabase.co` }),
+    )
+    expect(message).toContain(STAGING_PROJECT_REF)
+    expect(STAGING_PROJECT_REF).not.toBe(PROD)
+  })
+
+  it('NO acknowledgement unlocks production, including one that names it exactly', () => {
+    // THE INVERSION THIS CHANGE IS. Until 2026-09-04 the last value in this list
+    // returned `allowed-acknowledged` and the suite ran against the customer
+    // database. `''` and `'1'` are the careless inputs; PROD is the careful one,
+    // and it is refused too, which is the whole point.
+    for (const ack of ['1', 'true', 'yes', OTHER, '', PROD]) {
       expect(
         decideTarget({
           NEXT_PUBLIC_SUPABASE_URL: `https://${PROD}.supabase.co`,
           [ACK_VARIABLE]: ack,
         }).outcome,
-      ).toBe('refused-unacknowledged')
+        `ack=${JSON.stringify(ack)} must not unlock production`,
+      ).toBe('refused-production')
     }
+  })
+
+  it('refuses production even when every variable agrees and is well formed', () => {
+    // A split target is refused earlier, so this is the case where nothing at all
+    // is malformed: the configuration is perfect and the destination is wrong.
+    const decision = decideTarget({
+      NEXT_PUBLIC_SUPABASE_URL: `https://${PROD}.supabase.co`,
+      SUPABASE_DB_URL: `postgresql://postgres.${PROD}:pw@aws-1-ap-south-1.pooler.supabase.com:6543/postgres`,
+      [ACK_VARIABLE]: PROD,
+    })
+    expect(decision.outcome).toBe('refused-production')
+    expect(decision.allowed).toBe(false)
   })
 })
 
@@ -110,14 +142,30 @@ describe('the allowances — narrow, and also driven', () => {
     expect(decision.ref).toBe(OTHER)
   })
 
-  it('allows the guarded project when the acknowledgement names it exactly', () => {
+  it('allows staging with no acknowledgement, because it is not guarded', () => {
+    // The destination the refusal names must actually be reachable, or the remedy
+    // is a dead end. This is the assertion that keeps those two facts together.
     const decision = decideTarget({
-      NEXT_PUBLIC_SUPABASE_URL: `https://${PROD}.supabase.co`,
-      SUPABASE_DB_URL: `postgresql://postgres.${PROD}:pw@aws-1-ap-south-1.pooler.supabase.com:6543/postgres`,
-      [ACK_VARIABLE]: PROD,
+      NEXT_PUBLIC_SUPABASE_URL: `https://${STAGING_PROJECT_REF}.supabase.co`,
+      SUPABASE_DB_URL: `postgresql://postgres.${STAGING_PROJECT_REF}:pw@aws-1-ap-south-1.pooler.supabase.com:6543/postgres`,
     })
-    expect(decision.outcome).toBe('allowed-acknowledged')
+    expect(decision.outcome).toBe('allowed-unguarded')
     expect(decision.allowed).toBe(true)
+    expect(decision.ref).toBe(STAGING_PROJECT_REF)
+  })
+
+  it('every guarded ref is currently unacknowledgeable, so the ack path is dead on purpose', () => {
+    // `refused-unacknowledged` and `allowed-acknowledged` are unreachable today,
+    // because the only guarded ref is production and production cannot be
+    // acknowledged. The mechanism is KEPT for a future guarded-but-not-production
+    // ref, and this assertion is what makes adding one a conscious act: it goes
+    // red, and whoever adds it has to decide whether an ack should unlock it.
+    for (const ref of GUARDED_PROJECT_REFS) {
+      expect(
+        UNACKNOWLEDGEABLE_PROJECT_REFS,
+        `${ref} is guarded but acknowledgeable — decide deliberately`,
+      ).toContain(ref)
+    }
   })
 })
 
@@ -140,7 +188,7 @@ describe('the banner — printed on every run, or the guard is indistinguishable
         lines.push(l),
       ),
     ).toThrow(/REFUSED/)
-    expect(lines.join('\n')).toContain('refused-unacknowledged')
+    expect(lines.join('\n')).toContain('refused-production')
   })
 
   it('names the unidentified variable in the banner, not only in the throw', () => {

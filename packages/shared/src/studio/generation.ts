@@ -257,6 +257,33 @@ export const StampAnchorSchema = z.enum(STAMP_ANCHORS)
 export type StampAnchor = z.infer<typeof StampAnchorSchema>
 
 /**
+ * WHY THE MARK LANDED SOMEWHERE OTHER THAN THE CORNER THE CUSTOMER ASKED FOR.
+ *
+ * The renderer measures all four corners of the finished picture and may place
+ * the mark somewhere other than the chosen corner. `apps/web`'s `corner-choice.ts`
+ * owns that decision and its `AnchorChoice.reason` carries these two words; this is
+ * the SHARED copy of that vocabulary, declared here for the same reason
+ * `STAMP_ANCHORS` is: the two literals are the contract that the database check
+ * constraint, the row read and the customer sentence all agree on, not a shared
+ * TypeScript type reaching across the `apps/web` boundary.
+ *
+ * Two words and no third, because they are two different sentences to a shop
+ * owner and the remedy for each is nothing they can do:
+ *
+ *   busy        the chosen corner had too much going on behind the mark, and a
+ *               quieter corner was used instead. A design call, not a fault.
+ *   unreadable  the mark would not have cleared contrast in the chosen corner, so
+ *               a legible corner was used. Legibility, not preference.
+ *
+ * This is NOT a `StampOutcome`: outcome says whether a mark went on at all, this
+ * says where it went once it did. A picture is `stamped` whichever corner it
+ * landed in, and NULL here (no move) is the ordinary case, not an absence of one.
+ */
+export const STAMP_ANCHOR_MOVE_REASONS = ['busy', 'unreadable'] as const
+export const StampAnchorMoveReasonSchema = z.enum(STAMP_ANCHOR_MOVE_REASONS)
+export type StampAnchorMoveReason = z.infer<typeof StampAnchorMoveReasonSchema>
+
+/**
  * `medium` is today's fixed 14% of the canvas's shorter edge, unchanged.
  * `small` and `large` are new. See `logo-placement.ts` for the exact shares
  * and for why neither the width cap nor the height cap changes behaviour as a

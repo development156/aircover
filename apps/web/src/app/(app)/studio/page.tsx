@@ -1,6 +1,5 @@
 import { PageTitle } from '@/components/page-title'
 import { StudioWorkbench } from '@/components/studio/studio-workbench'
-import { RecentGenerations } from '@/components/studio/recent-generations'
 import { brandSignalsFor } from '@/lib/studio/brand-signals'
 import { canvasPictures } from '@/lib/studio/canvas'
 import { generatableFormats } from '@/lib/studio/formats'
@@ -80,7 +79,14 @@ export default async function StudioPage() {
   const pictures = recent.status === 'ok' ? canvasPictures(recent.cards) : []
 
   return (
-    <div className="space-y-grid">
+    // ── CONTENT-LED, NOT ONE CAPPED COLUMN ─────────────────────────────────
+    // Redesigned: the composer is a bar capped at 820px and centred (which
+    // `StudioWorkbench` does for itself), and everything else — the title,
+    // "Will send", the work grid — runs the page's own width, because a grid
+    // of pictures wants room and a line of text does not. This wrapper used
+    // to cap the WHOLE page at the 720px composer's own width; that cap is
+    // gone, and `StudioWorkbench` owns its own measure internally now.
+    <div className="w-full space-y-grid">
       <PageTitle sub="Describe a picture and Sahoda draws it, using what it knows about your brand.">
         Studio
       </PageTitle>
@@ -92,8 +98,6 @@ export default async function StudioPage() {
         signals={signals}
         balance={balance}
       />
-
-      <RecentGenerations read={recent} />
     </div>
   )
 }

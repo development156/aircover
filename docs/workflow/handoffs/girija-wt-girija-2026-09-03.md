@@ -223,3 +223,8 @@ Item 5 is therefore closed and needs nothing from the next session.
 `c024ba0b` was **not** pushed to `wt-core`. The gate is green and the push is a
 one-liner (`git push origin HEAD:wt-core`), but pushing outside the lane is not
 this session's to decide.
+
+---
+
+**This session continued past midnight UTC.** Everything after it is filed as
+`girija-wt-girija-2026-09-04.md`, which retracts this file's migration claim.

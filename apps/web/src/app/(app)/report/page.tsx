@@ -12,7 +12,7 @@ import {
 
 import { ObservationNote } from '@/components/brain/observation-note'
 import { CHANNEL_LABELS } from '@/components/posts/channel-label'
-import { metricInWords } from '@/lib/report/strings'
+import { metricInWords } from '@/lib/report/metric-words'
 import { AtAGlanceCard, CreditsCard, InsightPromiseCard } from '@/components/report/insights'
 import { ReportModule } from '@/components/report/module'
 import { PageTitle } from '@/components/page-title'

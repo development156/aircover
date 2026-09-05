@@ -194,6 +194,11 @@ describe('readBrandLogoBytes', () => {
       trim: { x: 4, y: 2, width: 4, height: 4 },
       inkPolarity: 'dark',
       shapeClass: 'square',
+      // A flat red block: fully dark-banded, so the mean is exactly its own
+      // linearised luminance and the whole share sits in `darkInkShare`.
+      meanInkLuminance: 0.2126000000000001,
+      darkInkShare: 1,
+      lightInkShare: 0,
     })
   })
 
@@ -219,6 +224,11 @@ describe('readBrandLogoBytes', () => {
       trim: { x: 8, y: 8, width: 8, height: 8 },
       inkPolarity: 'dark',
       shapeClass: 'square',
+      // A pure black block: linearised luminance of 0 is the honest answer,
+      // not a fabricated one, because this mark genuinely HAS ink.
+      meanInkLuminance: 0,
+      darkInkShare: 1,
+      lightInkShare: 0,
     })
   })
 

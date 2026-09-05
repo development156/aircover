@@ -109,6 +109,26 @@ describe('what reaches the canvas', () => {
     expect(out.map((one) => one.imageId)).toEqual(['i1', 'i2'])
   })
 
+  test('the corner the mark landed in, and why it moved, reach the canvas', () => {
+    const out = canvasPictures([
+      {
+        generation: generation(),
+        pictures: [picture({ stampAnchor: 'top-left', stampAnchorMovedReason: 'busy' })],
+      },
+    ])
+    // The result screen reads these off the canvas picture, so they must travel.
+    expect(out[0]!.stampAnchor).toBe('top-left')
+    expect(out[0]!.stampAnchorMovedReason).toBe('busy')
+  })
+
+  test('a picture with no recorded corner reaches the canvas as null, never undefined', () => {
+    // The reader may omit the fields for a pre-migration row; the canvas
+    // normalises the absence to null so a screen never has to tell the two apart.
+    const out = canvasPictures([{ generation: generation(), pictures: [picture()] }])
+    expect(out[0]!.stampAnchor).toBeNull()
+    expect(out[0]!.stampAnchorMovedReason).toBeNull()
+  })
+
   test('isShowable narrows rather than asserting', () => {
     expect(isShowable(picture())).toBe(true)
     expect(isShowable(picture({ url: null }))).toBe(false)

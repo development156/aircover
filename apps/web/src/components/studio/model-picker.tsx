@@ -56,7 +56,7 @@ export function ModelPicker({
               type="button"
               onClick={() => onChoose(model.id)}
               aria-pressed={modelId === model.id}
-              className={`surface-ring flex h-full w-full flex-col gap-1 rounded-card px-3 py-2 text-left transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+              className={`surface-ring flex h-full w-full flex-col gap-0.5 rounded-card px-3 py-1.5 text-left transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
                 modelId === model.id ? 'bg-primary text-primary-foreground' : 'bg-s2 text-muted'
               }`}
             >

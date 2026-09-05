@@ -17,6 +17,8 @@ import {
   type Rect,
 } from '../brand/logo-placement'
 import { sniffImage } from '../posts/sniff-image'
+import { type AnchorChoice, chooseAnchor, meanLuminance } from './corner-choice'
+import { roundedRectPng } from './rounded-rect'
 
 /**
  * STAMPING A WORKSPACE'S LOGO ONTO A PICTURE THE MODEL JUST DREW.
@@ -62,26 +64,6 @@ import { sniffImage } from '../posts/sniff-image'
 
 /** Sharp's ceiling on decoded pixels: the defence against a small file that decodes to gigabytes. */
 const MAX_PIXELS = 100_000_000
-/** Rec. 709 relative luminance weights, the same ones `logo-facts-classify` uses. */
-const LUMA_R = 0.2126
-const LUMA_G = 0.7152
-const LUMA_B = 0.0722
-
-const MAX_CHANNEL = 255
-
-/**
- * One sRGB byte to its linear-light value, the sRGB electro-optical transfer
- * function exactly as WCAG 2.1 defines it for relative luminance.
- *
- * The same curve `lib/brand/oklch.ts` already applies in this tree. It is here
- * rather than imported from there because that module is about colour SPACES
- * and this one needs a single scalar; the constants are the specification's,
- * not either module's, so the two cannot drift into disagreeing.
- */
-function linearise(byte: number): number {
-  const c = byte / MAX_CHANNEL
-  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
-}
 
 interface Rgb {
   r: number
@@ -96,6 +78,17 @@ interface Rgb {
  * under it and light ink a dark one. `mixed` ink works at neither extreme, so it
  * gets the light plate, which is the surface most marks are drawn for.
  */
+/**
+ * The plate's corner radius, as a share of the plate's own height.
+ *
+ * A share rather than a pixel count, for the same reason every other number in
+ * this pair of files is a share: a fixed radius is a soft badge on a 400px
+ * picture and an invisible bevel on a 4000px one. 0.18 is enough curve to read
+ * as a deliberate shape at a glance and far short of the stadium a half-height
+ * radius would produce.
+ */
+const PLATE_RADIUS_SHARE = 0.18
+
 const LIGHT_PLATE: Rgb = { r: 255, g: 255, b: 255 }
 const DARK_PLATE: Rgb = { r: 17, g: 17, b: 17 }
 
@@ -137,7 +130,19 @@ export interface StampInput {
 }
 
 export type StampResult =
-  | { ok: true; png: Uint8Array; placement: Placement; plated: boolean }
+  | {
+      ok: true
+      png: Uint8Array
+      placement: Placement
+      plated: boolean
+      /**
+       * What `chooseAnchor` actually did with the customer's chosen corner, so
+       * a result screen can say so rather than silently doing something other
+       * than what the customer's own setting names — the exact defect this
+       * project's rules exist to prevent.
+       */
+      anchorChoice: AnchorChoice
+    }
   | { ok: false; reason: string }
 
 const refuse = (reason: string): StampResult => ({ ok: false, reason })
@@ -174,80 +179,15 @@ function fitsInside(inner: Rect, outer: { width: number; height: number }): bool
 }
 
 /**
- * Mean RELATIVE luminance of one region of the picture, normalised 0 to 1.
- *
- * Forced to sRGB with alpha so the read is the same three bytes per pixel
- * whatever the source was: a greyscale PNG decodes to one channel and a CMYK
- * JPEG to four, and indexing those as RGB gives a wrong verdict, not an error.
- *
- * ── EACH CHANNEL IS LINEARISED FIRST, AND THAT IS THE WHOLE POINT ───────────
- * This used to weight the raw sRGB BYTES and divide by 255. That is a gamma
- * encoded value, and the thresholds it feeds — `DARK_INK_MIN_BACKDROP` and
- * `LIGHT_INK_MAX_BACKDROP` in `logo-placement.ts` — are solved from WCAG's
- * `(L1 + 0.05) / (L2 + 0.05)`, which is defined over LINEAR relative luminance.
- * Comparing one against the other is comparing two different quantities.
- *
- * MEASURED, black ink on flat grey backdrops:
- *
- *   backdrop   old read   true L   real contrast   old verdict
- *   RGB  60      0.235     0.045      1.90:1        no plate
- *   RGB  80      0.314     0.080      2.60:1        no plate
- *   RGB 100      0.392     0.127      3.55:1        no plate
- *
- * Every one of those is below the 4.5:1 this module exists to guarantee, and
- * every one was passed without a plate. The band runs roughly RGB 45 to 130,
- * which is an ordinary photographic mid-shadow rather than an exotic input.
- *
- * The suite could not see it: its two backdrops are RGB 18 and RGB 235, and
- * both fall on the SAME side of the threshold in either space. A fixture in the
- * band is what makes this fail, and `stamp.test.ts` now carries one.
- *
- * The transfer function is per CHANNEL and per PIXEL. Applying it to the mean
- * afterwards is a different number again, because it is not linear.
+ * Mean relative luminance of a region and its busyness (luminance spread) are
+ * now `corner-choice.ts`'s `regionLuminanceStats`, imported above as
+ * `meanLuminance` for exactly the backdrop measurement this file always made:
+ * that module needs the identical transfer function to compare a candidate
+ * corner's backdrop against this one's, and comparing two differently-computed
+ * "luminance"s is the trap `logo-facts-classify.ts`'s header already warns
+ * about. See that module for the full history of the linear-vs-gamma bug this
+ * measurement exists to avoid.
  */
-async function meanLuminance(picture: Uint8Array, region: Rect): Promise<number | null> {
-  try {
-    const { data, info } = await open(picture)
-      .extract({ left: region.x, top: region.y, width: region.width, height: region.height })
-      .toColourspace('srgb')
-      .ensureAlpha()
-      .raw()
-      .toBuffer({ resolveWithObject: true })
-
-    const channels = info.channels
-    const pixels = data.length / channels
-    if (pixels < 1) return null
-
-    // ── A TRANSPARENT PIXEL IS NOT A BLACK ONE ──────────────────────────────
-    // `ensureAlpha()` adds the channel and this loop read only 0-2, so a
-    // generated PNG with a transparent region under the mark measured its
-    // zeroed RGB as pitch black — plating dark ink that needed no plate, and
-    // refusing to plate light ink over what will composite as white. Weighting
-    // by coverage is what makes the answer the one a reader will see; a fully
-    // transparent region contributes nothing and falls back to white below,
-    // because that is what a transparent PNG composites over in every surface
-    // this product puts a picture on.
-    const alphaAt = channels > 3 ? 3 : -1
-    let total = 0
-    let covered = 0
-    for (let at = 0; at < data.length; at += channels) {
-      const alpha = alphaAt === -1 ? 1 : data[at + alphaAt]! / MAX_CHANNEL
-      if (alpha === 0) continue
-      total +=
-        alpha *
-        (LUMA_R * linearise(data[at]!) +
-          LUMA_G * linearise(data[at + 1]!) +
-          LUMA_B * linearise(data[at + 2]!))
-      covered += alpha
-    }
-    // Nothing under the mark at all: the picture is transparent there and will
-    // composite over white, which is what the caller is really placing ink on.
-    if (covered === 0) return 1
-    return total / covered
-  } catch {
-    return null
-  }
-}
 
 /**
  * Put the mark on the picture.
@@ -352,7 +292,7 @@ export async function stampLogo(input: StampInput): Promise<StampResult> {
     )
   }
 
-  const luminance = await meanLuminance(input.picture, placement.mark)
+  let luminance = await meanLuminance(input.picture, placement.mark)
   if (luminance === null) {
     return refuse(
       'The picture region under the mark could not be read, so no plate decision is possible.',
@@ -371,22 +311,69 @@ export async function stampLogo(input: StampInput): Promise<StampResult> {
     }
   }
 
-  const plated = needsPlate(luminance, input.facts.inkPolarity)
+  // `meanInkLuminance` is optional on `LogoFacts`, so it is normalised to
+  // `null` (never left `undefined`) before it reaches `needsPlate`: `null` is
+  // what `plateDecisionFor` reads as "no ink was measured", exactly the answer
+  // an absent field should give, without `needsPlate` having to special-case
+  // `undefined` on top of `null`.
+  const mixedMeasurement = {
+    meanInkLuminance: input.facts.meanInkLuminance ?? null,
+    darkInkShare: input.facts.darkInkShare ?? 0,
+    lightInkShare: input.facts.lightInkShare ?? 0,
+  }
+
+  // ── THE CORNER CHOICE, AFTER THE INK IS SETTLED, BEFORE THE PLATE DECISION ─
+  // `chooseAnchor` needs the FINAL ink polarity (any variant swap above has
+  // already happened) because the contrast check it runs per corner is keyed
+  // to ink. It replaces `placement` and `luminance` with whichever corner it
+  // lands on; `mark` itself is untouched because every corner's rect is the
+  // same size, only repositioned, so the bytes already cut above are still
+  // the right bytes for wherever this sends them.
+  const choice = await chooseAnchor({
+    picture: input.picture,
+    canvas,
+    logoAspect: trim.width / trim.height,
+    sizeStep: input.sizeStep,
+    anchor: input.anchor,
+    inkPolarity: input.facts.inkPolarity,
+    mark: mixedMeasurement,
+  })
+  if (choice === null) {
+    return refuse(
+      'The picture region under the mark could not be read, so no plate decision is possible.',
+    )
+  }
+  placement = choice.placement
+  luminance = choice.luminance
+
+  const plated = needsPlate(luminance, input.facts.inkPolarity, mixedMeasurement)
 
   const layers: OverlayOptions[] = []
   if (plated) {
     const colour = plateColour ?? defaultPlate(input.facts.inkPolarity)
+    // ── THE PLATE IS `placement.plate`, AND NEVER `placement.clear` ───────────
+    // `clear` is the exclusion zone: the promise that nothing encroaches on the
+    // mark. Painting it was this file's worst defect. It made the plate twice
+    // the mark's height and flush against two of the picture's own edges, which
+    // a founder screenshot showed swallowing the corner of a food photo as an
+    // opaque white slab. `plate` is the mark plus a quarter of its height, so
+    // the exclusion zone stays excluded even where a plate is drawn.
+    //
+    // The radius is what turns the remaining rectangle into a badge rather than
+    // a torn sticker. Clamped to half the shorter side because an SVG `rect`
+    // past that silently becomes a stadium instead of erroring.
+    const radius = Math.min(
+      Math.round(placement.plate.height * PLATE_RADIUS_SHARE),
+      Math.floor(Math.min(placement.plate.width, placement.plate.height) / 2),
+    )
+    // Fully opaque, deliberately: `needsPlate` computed a 4.5:1 guarantee that
+    // assumes the plate is the only colour between the backdrop and the mark.
+    // A translucent plate would let the backdrop bleed back and break the ratio
+    // the caller already decided it needed.
     layers.push({
-      input: {
-        create: {
-          width: placement.clear.width,
-          height: placement.clear.height,
-          channels: 4,
-          background: { ...colour, alpha: 1 },
-        },
-      },
-      left: placement.clear.x,
-      top: placement.clear.y,
+      input: await roundedRectPng(placement.plate.width, placement.plate.height, radius, colour),
+      left: placement.plate.x,
+      top: placement.plate.y,
     })
   }
   // The mark goes on last, so it sits on top of its own plate.
@@ -402,5 +389,11 @@ export async function stampLogo(input: StampInput): Promise<StampResult> {
     return refuse('The picture could not be composited, so nothing was stamped.')
   }
 
-  return { ok: true, png: new Uint8Array(png), placement, plated }
+  return {
+    ok: true,
+    png: new Uint8Array(png),
+    placement,
+    plated,
+    anchorChoice: choice.anchorChoice,
+  }
 }

@@ -140,7 +140,31 @@ export async function Topbar() {
           at every width, including the one where the search is hidden and the
           credit pill has stepped aside. */}
       <div className="mx-auto flex h-full w-full max-w-content items-center gap-3 max-narrow:gap-2">
-        <div className="flex min-w-0 flex-1 basis-0 items-center gap-2">
+        {/* ── THE LEAD CLUSTER KEEPS ITS CONTENT FLOOR BELOW `wide` ────────────
+            `min-w-0` is GATED at `wide` (1180) and is NOT unconditional, and that
+            gate is the fix for an overlap this bar shipped with. The two children
+            below are `shrink-0` (brand mark) and wrap a `shrink-0` control (the
+            switcher). An UNCONDITIONAL `min-w-0` here let this zone shrink below
+            those fixed children while the centre search field stayed pinned at
+            its `max-w-[460px]`: the whole row's deficit fell on this zone, it
+            collapsed toward 0, and its shrink-0 children spilled past its right
+            edge and painted ON TOP of the search field. MEASURED in Chromium
+            against the shipped stylesheet, workspace name visible: at 1120 the
+            switcher (x 93–314) overlapped the search (x 278–738); at 1024 the
+            search began at x=182, fully under the 93–314 switcher — the founder's
+            "green icon and chevron over the search text" report, exactly.
+
+            `min-w-0` is only NEEDED at `wide` and up, because that is the one
+            band where the switcher shows its name and must truncate (the name is
+            `max-wide:sr-only`, so below 1180 this cluster is all fixed widths and
+            has nothing to shrink). Gating it there makes the SEARCH the item that
+            yields — it shrinks from 460 toward 0 as the window narrows — instead
+            of the lead cluster being starved into overflow. Same family as the
+            credit-chip trap: a `min-w-0` slot around a `shrink-0` child spills. */}
+        <div
+          data-slot="topbar-lead"
+          className="flex flex-1 basis-0 items-center gap-2 wide:min-w-0"
+        >
           {/* On a phone the rail is gone entirely, and the brand mark went with
               it — so it reappears here. Hidden ≥768px, where the rail carries
               the full lockup and a second mark would be a duplicate. */}

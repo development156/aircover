@@ -2,7 +2,12 @@ import { describe, expect, test } from 'vitest'
 
 import type { BrandSignal } from '@sahoda/shared'
 
-import { conditionPrompt, describeConditioning } from './prompt'
+import {
+  PROMPT_STARTERS,
+  buildPromptStarters,
+  conditionPrompt,
+  describeConditioning,
+} from './prompt'
 
 /**
  * WHAT THE PROMPT CLAIMS, AND WHAT IT MUST NEVER INVENT.
@@ -146,5 +151,62 @@ describe('describeConditioning', () => {
         expect(describeConditioning({ mode, used })).not.toMatch(/[—–]/)
       }
     }
+  })
+})
+
+describe('buildPromptStarters', () => {
+  test('no signals means the generic five, unchanged', () => {
+    const { starters, source } = buildPromptStarters([])
+    expect(starters).toEqual(PROMPT_STARTERS.map((starter) => starter.prompt))
+    expect(source).toBe('generic')
+  })
+
+  test('always returns exactly five', () => {
+    expect(buildPromptStarters([]).starters).toHaveLength(5)
+    expect(
+      buildPromptStarters([{ field: 'voice', certainty: 'confirmed', value: 'warm and direct' }])
+        .starters,
+    ).toHaveLength(5)
+  })
+
+  /**
+   * THE DEFECT THIS FEATURE EXISTS TO FIX: a workspace that sells software
+   * training must never see samosas or chai in its own starters, because that
+   * is Sahoda asserting a business the Brand Brain never claimed.
+   */
+  test('a known business fact replaces the generic five, and the generic five never leak in', () => {
+    const { starters, source } = buildPromptStarters([
+      {
+        field: 'what the business is',
+        certainty: 'confirmed',
+        value: 'software training for clinics',
+      },
+    ])
+    expect(source).toBe('brand')
+    expect(starters.join(' ')).toContain('software training for clinics')
+    expect(starters.join(' ')).not.toMatch(/samosa|chai|shopfront/i)
+  })
+
+  /**
+   * A brain that holds SOME facts and not others must not invent the missing
+   * ones — every fallback phrase names no product, food, shop or location.
+   */
+  test('a missing leaf falls back to a business-type-free phrase, never a guess', () => {
+    const { starters } = buildPromptStarters([
+      { field: 'feeling', certainty: 'guessed', value: 'reassured' },
+    ])
+    expect(starters.join(' ')).not.toMatch(/samosa|chai|shopfront|café|cafe|bakery|restaurant/i)
+  })
+
+  test('a palette signal is folded into the first starter only when present', () => {
+    const withColour = buildPromptStarters([
+      { field: 'what the business is', certainty: 'confirmed', value: 'a bakery' },
+      { field: 'colours', certainty: 'guessed', value: 'terracotta, cream' },
+    ])
+    const withoutColour = buildPromptStarters([
+      { field: 'what the business is', certainty: 'confirmed', value: 'a bakery' },
+    ])
+    expect(withColour.starters[0]).toContain('terracotta, cream')
+    expect(withoutColour.starters[0]).not.toContain('terracotta')
   })
 })
