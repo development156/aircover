@@ -135,7 +135,12 @@ export default defineConfig({
   // this is not a licence for a slow app, it is Turbopack cold start.
   timeout: 60_000,
   expect: { timeout: 15_000 },
-  reporter: process.env.CI ? [['github'], ['list']] : [['list']],
+  // The json report is what `scripts/smoke-skips.mjs` reads after a CI run: a
+  // skipped @smoke test with the service key present is a guard that did not
+  // run, and Playwright's own exit code cannot say so (docs/51 Q-17).
+  reporter: process.env.CI
+    ? [['github'], ['list'], ['json', { outputFile: 'playwright-report/results.json' }]]
+    : [['list']],
   globalSetup: './e2e/global-setup.ts',
   use: {
     baseURL: BASE_URL,

@@ -394,6 +394,16 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.E2E_SUPABASE_DB_URL }}
         run: pnpm turbo run test:smoke --concurrency=1
 
+      # A skipped @smoke test with the service key present is a guard that did
+      # not run. Eleven specs skip on `adminClient() === null`, which is right on
+      # a laptop and wrong here; Playwright exits 0 over them (docs/51 Q-17).
+      # `always()` so the count is printed even when the suite itself failed.
+      - name: Refuse skipped smoke tests
+        if: always()
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/smoke-skips.mjs apps/web/playwright-report/results.json
+
       # The traces are the only thing worth having from a failed browser run, and
       # they are the first thing lost when a runner is torn down. `always()`, not
       # `failure()`: a CANCELLED job (the 45-minute kill above) is neither, and
