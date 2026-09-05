@@ -19,7 +19,7 @@ import {
 /**
  * ONE REFERENCE PICTURE, LARGE, SO A CHOICE CAN BE JUDGED BEFORE IT IS SPENT.
  *
- * ── WHY THIS IS A SEPARATE COMPONENT FROM `PictureViewer` ────────────────────
+ * ── WHY THIS WAS A SEPARATE COMPONENT FROM `PictureViewer` (deleted 2026-09-05) ──
  * `PictureViewer` takes a `CanvasPicture`: a picture Sahoda ITSELF generated,
  * carrying `imageId`, `prompt`, `mode`, `referenceAssetIds`, `stampOutcome` and
  * `madeAgo` — facts about a GENERATION that produced it. A reference asset

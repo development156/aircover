@@ -26,10 +26,17 @@ import { Modal } from '@/components/ui/modal'
 export function DiscardGeneration({
   generationId,
   prompt,
+  onRemoved,
 }: {
   generationId: string
   /** Named in the confirmation, so nobody removes the wrong one. */
   prompt: string
+  /**
+   * Called once the record is gone. The wall re-reads and the tile vanishes;
+   * the viewer is LOOKING at that record and has to leave, since a reload of
+   * its route would be a 404 wearing a picture.
+   */
+  onRemoved?: () => void
 }) {
   const [asking, setAsking] = useState(false)
   const [note, setNote] = useState<string | null>(null)
@@ -67,6 +74,7 @@ export function DiscardGeneration({
                   const result = await discardGeneration(generationId)
                   if (result.ok) {
                     setAsking(false)
+                    onRemoved?.()
                     return
                   }
                   setNote(result.message)

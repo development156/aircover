@@ -753,6 +753,39 @@ describe('the bar', () => {
     expect(comingSoonFirst()).not.toBeNull()
   })
 
+  /**
+   * ── A REMEDY ONLY WHERE ONE WORKS ─────────────────────────────────────────
+   * The "Will send" disclosure offers "Open your Brand Brain" for the two
+   * answers a person can act on (a brain with guesses to confirm, an empty one
+   * to fill) and withholds it when the read FAILED, because opening the brain
+   * is not what fixes a read that could not be made. wt-jiban's claim, kept
+   * inside the closed disclosure the founder ruled for.
+   */
+  test('will send offers the Brand Brain when it has something, or nothing, to add', async () => {
+    const user = userEvent.setup()
+    open(LIBRARY, [{ field: 'voice', certainty: 'guessed', value: 'warm and direct' }])
+    expect(screen.queryByRole('link', { name: /open your brand brain/i })).toBeNull()
+    await user.click(screen.getByRole('button', { name: /will send/i }))
+    expect(screen.getByRole('link', { name: /open your brand brain/i }).getAttribute('href')).toBe(
+      '/brain',
+    )
+  })
+
+  test('and when the brain is empty, because filling it is the remedy', async () => {
+    const user = userEvent.setup()
+    open(LIBRARY, [])
+    await user.click(screen.getByRole('button', { name: /will send/i }))
+    expect(screen.getByRole('link', { name: /open your brand brain/i })).toBeTruthy()
+  })
+
+  test('but not when the read failed, because opening the brain does not fix a read', async () => {
+    const user = userEvent.setup()
+    open(LIBRARY, null)
+    await user.click(screen.getByRole('button', { name: /will send/i }))
+    expect(screen.getByText(/could not read your brand brain/i)).toBeTruthy()
+    expect(screen.queryByRole('link', { name: /open your brand brain/i })).toBeNull()
+  })
+
   test('no panel is open by default, and the bar stays usable', () => {
     open()
     expect(screen.queryByRole('group', { name: /how should sahoda approach it/i })).toBeNull()

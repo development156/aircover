@@ -1,5 +1,6 @@
 import { Fragment, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
+import Link from 'next/link'
 
 import type { BrandSignal } from '@sahoda/shared'
 
@@ -34,6 +35,22 @@ export function ComposerWillSend({ signals }: { signals: BrandSignal[] | null })
       </button>
       {open ? (
         <div id="studio-signals-detail" className="flex flex-col gap-1.5">
+          {/* ── A REMEDY ONLY WHERE ONE WORKS ──────────────────────────────
+              Offered for the two answers a person can act on: a brain with
+              things in it, where the work is confirming the guesses, and an
+              empty one, where the work is filling it. NOT offered when the
+              read FAILED, because opening the brain is not what fixes a read
+              that could not be made. `no-impossible-remedy.spec.ts` is the
+              standing rule this follows. (wt-jiban's card, kept inside the
+              closed disclosure the founder ruled for on 2026-09-04.) */}
+          {signals === null ? null : (
+            <Link
+              href="/brain"
+              className="w-fit type-sm text-muted underline underline-offset-2 transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              Open your Brand Brain
+            </Link>
+          )}
           {signals === null ? (
             <p className="type-sm text-muted">
               Sahoda could not read your Brand Brain just now, so it cannot show what it would add.
