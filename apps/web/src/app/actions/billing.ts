@@ -24,6 +24,11 @@ import type {
   UpgradeCheckoutState,
 } from '@/lib/billing/plan-state'
 import { checkoutFailureMessage } from '@/lib/billing/checkout-failure-copy'
+import {
+  planChangeOrderId,
+  isOrderNotFound,
+  checkoutBridgeUrl,
+} from '@/lib/billing/plan-change-order'
 
 /**
  * Plan changes, from the screen.
@@ -205,7 +210,9 @@ export async function cancelPlanDowngrade(): Promise<PlanActionState> {
  * The proration is recomputed here rather than accepted from the caller, and the resulting
  * figures travel to the webhook inside `order_tags` — the only carrier a Cashfree webhook
  * has. `changeId` is minted here and becomes the ledger idempotency key, so a redelivery
- * replays and a SECOND upgrade in the same month does not.
+ * replays and a SECOND upgrade in the same month does not — that key is unrelated to the
+ * order id below, which guards a different replay (two ORDERS, not two grants; see
+ * `@/lib/billing/plan-change-order` — Q-06).
  */
 export async function startPlanUpgrade(planId: unknown): Promise<UpgradeCheckoutState> {
   let workspaceId: string | undefined
@@ -241,9 +248,55 @@ export async function startPlanUpgrade(planId: unknown): Promise<UpgradeCheckout
       return { ok: false, message: 'That is not a move up, so there is nothing to pay.' }
     }
 
-    const rail = provider()
+    const period = currentBillingPeriod(now)
+    const orderId = planChangeOrderId(ws.workspace.id, parsed.data, period)
+
+    // Deterministic order id in, always — see `planChangeOrderId`. `provider()` normally
+    // mints a random one; this call site is the one place that must not.
+    const rail = provider(() => orderId)
     if (!rail) {
       return { ok: false, message: 'Card payments are not connected yet. Nothing was charged.' }
+    }
+
+    const fullOrderId = `sah_${orderId}`
+
+    // Q-06: a second `startPlanUpgrade` for the SAME upgrade must land on the order the
+    // first call opened, not a new one. Checked BEFORE `createCheckout`, because Cashfree
+    // rejects a duplicate `order_id` outright rather than replaying — reading the order
+    // back is the recovery path, not the primary one.
+    let openOrder: Awaited<ReturnType<typeof rail.fetchOrder>> | null = null
+    try {
+      openOrder = await rail.fetchOrder(fullOrderId)
+    } catch (error) {
+      if (!isOrderNotFound(error)) throw error
+    }
+
+    // Reuse only a still-payable order. The id is stable for the whole billing period, so
+    // reusing one that has EXPIRED or been TERMINATED would lock the customer out of
+    // upgrading again until the period rolls over — a worse defect than the one being fixed.
+    if (openOrder && openOrder.status === 'ACTIVE' && openOrder.paymentSessionId) {
+      // `sessionId` here is the ORDER id, matching `session.id` below and the freshly
+      // created branch further down — never Cashfree's `payment_session_id` token, which
+      // the checkout bridge page reads for itself off the order once redirected there.
+      if (rail.mode !== 'live') {
+        return {
+          ok: true,
+          simulated: true,
+          mode: rail.mode,
+          sessionId: fullOrderId,
+          planId: parsed.data,
+          amountDuePaise: proration.amountDuePaise,
+          reused: true,
+        }
+      }
+      return {
+        ok: true,
+        simulated: false,
+        mode: 'live',
+        sessionId: fullOrderId,
+        url: checkoutBridgeUrl(env.NEXT_PUBLIC_APP_URL as string, fullOrderId),
+        reused: true,
+      }
     }
 
     // ABSOLUTE, not '/settings/plan'. This becomes Cashfree's `order_meta.return_url`, which
@@ -254,7 +307,7 @@ export async function startPlanUpgrade(planId: unknown): Promise<UpgradeCheckout
     const session = await rail.createCheckout({
       workspaceId: ws.workspace.id,
       planId: parsed.data,
-      period: currentBillingPeriod(now),
+      period,
       successUrl: returnUrl,
       cancelUrl: returnUrl,
       planChange: {
@@ -275,10 +328,18 @@ export async function startPlanUpgrade(planId: unknown): Promise<UpgradeCheckout
         sessionId: session.id,
         planId: parsed.data,
         amountDuePaise: proration.amountDuePaise,
+        reused: false,
       }
     }
 
-    return { ok: true, simulated: false, mode: 'live', sessionId: session.id, url: session.url }
+    return {
+      ok: true,
+      simulated: false,
+      mode: 'live',
+      sessionId: session.id,
+      url: session.url,
+      reused: false,
+    }
   } catch (error) {
     reportServerError(error, { action: 'startPlanUpgrade', workspaceId })
     // Same reasoning as `startCheckout`: a permanent provider refusal must not
@@ -351,8 +412,13 @@ export async function saveBillingDetails(input: unknown): Promise<PlanActionStat
  * A missing Cashfree env is a deployment state, not an exception: the customer must be told
  * card payments are not connected, not shown a generic "try again" for something that will
  * fail identically every time.
+ *
+ * `newId` is optional and defaults to the provider's own `randomUUID()` — `startCheckout`'s
+ * top-up path wants a fresh id every time. `startPlanUpgrade` is the one caller that passes
+ * a deterministic one, so a duplicate order can be found (`fetchOrder`) instead of opened
+ * twice.
  */
-function provider() {
+function provider(newId?: () => string) {
   let cashfree: ReturnType<typeof loadCashfreeEnv>
   try {
     cashfree = loadCashfreeEnv()
@@ -361,5 +427,5 @@ function provider() {
   }
   const appBaseUrl = env.NEXT_PUBLIC_APP_URL
   if (!appBaseUrl) return null
-  return createCashfreeProvider({ env: cashfree, appBaseUrl })
+  return createCashfreeProvider({ env: cashfree, appBaseUrl, ...(newId ? { newId } : {}) })
 }
