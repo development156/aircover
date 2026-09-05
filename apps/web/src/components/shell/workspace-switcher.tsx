@@ -111,7 +111,13 @@ export function WorkspaceSwitcher({
   }
 
   return (
-    <div ref={containerRef} className="relative min-w-0">
+    <div
+      ref={containerRef}
+      // One workspace on a phone has nothing to switch to, and its trigger was
+      // 48px of a 35px overflow (see credit-chip.tsx for the measurement). The
+      // switcher returns the moment there is a second workspace to choose.
+      className={cn('relative min-w-0', workspaces.length === 1 && 'max-narrow:hidden')}
+    >
       <button
         ref={triggerRef}
         type="button"
