@@ -44,32 +44,19 @@ export function StaggerItem({
 }
 
 /**
- * A group whose children arrive one after another.
+ * ── `Stagger` WAS HERE, AND ITS ONE REMAINING CALLER WENT WITH IT ────────────
+ * Removed 2026-09-04, in the same change that deleted `channel-browser.tsx` —
+ * its last four call sites. It wrapped each child in a `StaggerItem` keyed by
+ * INDEX, and `connection-marketplace.tsx` records why that is the wrong shape
+ * for anything filterable: an index key carries a failed control's state onto a
+ * different row when the list changes underneath it. Every list left in the app
+ * either never reorders or keys its own items, so each uses `StaggerItem`
+ * directly.
  *
- * Each child is wrapped, so the wrapper becomes the flex/grid item and the
- * child fills it — `className` is the group's own layout classes, `itemClassName`
- * reaches each wrapper for cases where the item needs to stretch.
+ * The ratchet in `scripts/lib/unmounted-components.test.mjs` is what noticed:
+ * deleting the browser orphaned this, and it refused the commit by name rather
+ * than letting a dead export ride along.
  */
-export function Stagger({
-  className,
-  itemClassName,
-  children,
-}: {
-  className?: string
-  itemClassName?: string
-  children: React.ReactNode
-}) {
-  const items = Array.isArray(children) ? children : [children]
-  return (
-    <div className={className}>
-      {items.flat().map((child, i) => (
-        <StaggerItem key={i} i={i} className={itemClassName}>
-          {child}
-        </StaggerItem>
-      ))}
-    </div>
-  )
-}
 
 /** A single element that arrives, with no sequence. The plain entrance. */
 export function Enter({ className, children }: { className?: string; children: React.ReactNode }) {
