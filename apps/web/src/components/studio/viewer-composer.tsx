@@ -25,7 +25,6 @@ export function ViewerComposer({
   formats,
   library,
   signals,
-  balance,
   initialValues,
   sourceGenerationId,
   remixLocked,
@@ -33,7 +32,6 @@ export function ViewerComposer({
   formats: StudioFormat[]
   library: LibraryRead
   signals: BrandSignal[] | null
-  balance: number | null
   initialValues: ComposerInitialValues
   /** The generation this screen is showing, to link a remix back to. */
   sourceGenerationId: string
@@ -57,7 +55,6 @@ export function ViewerComposer({
         formats={formats}
         library={library}
         signals={signals}
-        balance={balance}
         initialValues={initialValues}
         onGenerated={handleGenerated}
         extraControls={

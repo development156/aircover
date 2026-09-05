@@ -80,14 +80,12 @@ const LIBRARY = [
 const open = (
   library: LibraryPicture[] | LibraryRead = LIBRARY,
   signals: BrandSignal[] | null = [],
-  balance: number | null = null,
 ) =>
   render(
     <Composer
       formats={generatableFormats()}
       library={Array.isArray(library) ? { status: 'ok', pictures: library } : library}
       signals={signals}
-      balance={balance}
     />,
   )
 
@@ -137,20 +135,42 @@ async function chooseModeUI(user: ReturnType<typeof userEvent.setup>, name: RegE
 
 describe('the shape of the bar', () => {
   /**
-   * ── CAPPED AT 820PX AND CENTRED ────────────────────────────────────────
-   * `Wall.dc.html` is the spec for the rebuilt screen and draws the bar with
-   * `margin: 0 auto` — centred, not flush against the page's own left edge.
-   * The wall's compact header no longer needs the bar's left edge to line up
-   * with a title that used to run the page's own width, so the earlier
-   * "capped, not centred" ruling (kept in this file's git history) is
-   * superseded by the new artboard.
+   * ── CAPPED AT THE FORM MEASURE, FLUSH LEFT, NOT CENTRED ──────────────────
+   * REVERSED: this used to assert `max-w-[820px]` and `mx-auto`, a hand-picked
+   * width centred within whatever the wall's own width happened to be — which
+   * is exactly the bug the founder's review named. "Page content sat at
+   * x=120 while the composer's inner content sat at x=136": the title and the
+   * wall both sit flush against this screen's one true left edge, and a
+   * centred bar of a different width never lands on it. `--measure-form`
+   * replaces the magic 820, and `mx-auto` is gone so this wrapper's own left
+   * edge is whatever edge its caller already uses — the same one the credits
+   * row, `ComposerWillSend` and `ComposerNotBuilt` below already sit on.
+   *
+   * MUTATION: put `mx-auto` back on this wrapper and this test goes red.
    */
-  test('is capped at 820px and centred', () => {
+  test('is capped at the form measure, flush left', () => {
     const { container } = open()
     const bar = container.querySelector('[data-guide="studio-bar"]') as HTMLElement
     const wrap = bar.parentElement as HTMLElement
-    expect(wrap.className).toContain('max-w-[820px]')
-    expect(wrap.className).toContain('mx-auto')
+    expect(wrap.className).toContain('max-w-[var(--measure-form)]')
+    expect(wrap.className).not.toMatch(/(^|\s)mx-auto(\s|$)/)
+  })
+
+  /**
+   * ── THE BAR'S OWN PADDING NEVER READS AS A SECOND LEFT EDGE ──────────────
+   * The bar carries `p-3` for its own visual containment, which would sit its
+   * inner content 12px right of the wrapper's edge above. `-ml-3` cancels
+   * exactly that on the left, and `w-[calc(100%+var(--space-3))]` grows the
+   * box by the same amount so the right edge is unaffected.
+   *
+   * MUTATION: delete `-ml-3` from the bar's className in `composer.tsx` and
+   * this goes red.
+   */
+  test("the bar's own left padding is cancelled at the wrapper edge", () => {
+    const { container } = open()
+    const bar = container.querySelector('[data-guide="studio-bar"]') as HTMLElement
+    expect(bar.className).toMatch(/(^|\s)-ml-3(\s|$)/)
+    expect(bar.className).toContain('w-[calc(100%+var(--space-3))]')
   })
 })
 
@@ -647,7 +667,6 @@ describe('a second press cannot reach the action while the first is in flight', 
         formats={generatableFormats()}
         library={{ status: 'ok', pictures: LIBRARY }}
         signals={[]}
-        balance={null}
         onBusyChange={(busy) => seen.push(busy)}
       />,
     )
@@ -822,6 +841,72 @@ describe('what Sahoda will send, shown before the spend', () => {
     expect(value.textContent).toBe(long.value)
   })
 
+  /**
+   * ── ONE COLUMN TOKEN, NOT "AUTO" ──────────────────────────────────────
+   * `auto` sizes the label column to whatever this render's longest label
+   * happens to be, so the value column starts at a different x depending on
+   * which fields a workspace's Brand Brain answered. `--space-20` is fixed,
+   * so every render agrees with itself.
+   *
+   * MUTATION: change `grid-cols-[var(--space-20)_1fr]` back to
+   * `grid-cols-[auto_1fr]` in `composer-will-send.tsx` and this goes red.
+   */
+  test('the label column is a fixed token width, not "auto"', async () => {
+    const user = userEvent.setup()
+    const { container } = open(LIBRARY, [{ field: 'voice', certainty: 'confirmed', value: 'Warm' }])
+    await user.click(screen.getByRole('button', { name: /will send/i }))
+    const dl = container.querySelector('[data-guide="studio-signals"] dl') as HTMLElement
+    expect(dl).not.toBeNull()
+    expect(dl.className).toContain('grid-cols-[var(--space-20)_1fr]')
+    expect(dl.className).not.toMatch(/grid-cols-\[auto/)
+  })
+
+  /**
+   * ── THE DOT'S MEANING, SAID IN WORDS ───────────────────────────────────
+   * A filled vs. hollow mark beside each field is a real distinction
+   * (confirmed vs. guessed), previously spoken only to a screen reader.
+   *
+   * MUTATION: delete the legend paragraph in `composer-will-send.tsx` and
+   * this goes red.
+   */
+  test('says in words what the filled and hollow dots mean', async () => {
+    const user = userEvent.setup()
+    open(LIBRARY, [{ field: 'voice', certainty: 'confirmed', value: 'Warm' }])
+    await user.click(screen.getByRole('button', { name: /will send/i }))
+    expect(screen.getByText(/filled dot means you confirmed it/i)).toBeTruthy()
+    expect(screen.getByText(/hollow one means sahoda guessed it/i)).toBeTruthy()
+  })
+
+  /**
+   * ── EVERY SWATCH CARRIES A RING THAT SHOWS AGAINST WHITE ───────────────
+   * `surface-ring` alone (`--line-soft`, 5% black) is invisible against a
+   * near-white brand colour, which is exactly what the founder's review
+   * found. `--line-firm` is an alpha overlay, so it always darkens or
+   * lightens whatever sits under it rather than trying to out-contrast an
+   * unknown fixed colour.
+   *
+   * MUTATION: drop `shadow-[inset_0_0_0_1px_var(--line-firm)]` from the
+   * swatch's className in `composer-will-send.tsx` and this goes red.
+   */
+  test('every colour swatch carries a ring, even a near-white one', async () => {
+    const colours: BrandSignal = {
+      field: 'colours',
+      certainty: 'guessed',
+      value: 'oklch(0.98 0.01 90), oklch(0.5663 0.16 262.1)',
+    }
+    const user = userEvent.setup()
+    const { container } = open(LIBRARY, [colours])
+    await user.click(screen.getByRole('button', { name: /will send/i }))
+    const signals = container.querySelector('[data-guide="studio-signals"]') as HTMLElement
+    const swatches = Array.from(signals.querySelectorAll('span[style*="background"]'))
+    expect(swatches.length).toBe(2)
+    for (const swatch of swatches) {
+      expect((swatch as HTMLElement).className).toContain(
+        'shadow-[inset_0_0_0_1px_var(--line-firm)]',
+      )
+    }
+  })
+
   test('an empty Brand Brain and an unreadable one are different sentences', async () => {
     const user = userEvent.setup()
     open(LIBRARY, [])
@@ -856,14 +941,21 @@ describe('what Sahoda will send, shown before the spend', () => {
 })
 
 describe('the rest of the composer', () => {
-  test('shows the balance when it was read, and nothing at all when it was not', () => {
-    open(LIBRARY, [], 1240)
-    expect(screen.getByText(/credits left/i).textContent).toMatch(/1,240/)
-    cleanup()
-
-    open(LIBRARY, [], null)
+  /**
+   * ── THE TOPBAR PILL IS THE ONE READOUT, NOT THIS BAR ─────────────────────
+   * REPLACES a test that used to render a `balance` prop and assert this bar
+   * printed "N credits left" of its own. That prop and that sentence are
+   * gone: the founder's review found the same figure floating a second time,
+   * right-aligned and anchored to nothing, while the topbar's own credit
+   * pill (`credit-chip.tsx`) already carries it on every screen this bar can
+   * appear on. See `composer.tsx`'s own header.
+   *
+   * MUTATION: put the deleted balance block back (even without a prop to
+   * feed it, hard-coding a number) and this goes red.
+   */
+  test('never shows a credits balance of its own', () => {
+    open()
     expect(screen.queryByText(/credits left/i)).toBeNull()
-    expect(screen.queryByText(/\b0\b/)).toBeNull()
   })
 
   test('names the controls that are designed and not built, as text not buttons', () => {
@@ -1299,7 +1391,6 @@ describe('starting from an existing generation, for the viewer to reuse', () => 
         formats={generatableFormats()}
         library={{ status: 'ok', pictures: LIBRARY }}
         signals={[]}
-        balance={null}
         initialValues={{
           wanted: 'a plate of samosas',
           mode: 'match',
@@ -1341,7 +1432,6 @@ describe('starting from an existing generation, for the viewer to reuse', () => 
         formats={generatableFormats()}
         library={{ status: 'ok', pictures: LIBRARY }}
         signals={[]}
-        balance={null}
         onGenerated={onGenerated}
       />,
     )
@@ -1354,13 +1444,12 @@ describe('starting from an existing generation, for the viewer to reuse', () => 
   })
 
   test('extraControls renders inside the chip row', () => {
-    const { container } = open(LIBRARY, [], null)
+    const { container } = open(LIBRARY, [])
     render(
       <Composer
         formats={generatableFormats()}
         library={{ status: 'ok', pictures: LIBRARY }}
         signals={[]}
-        balance={null}
         extraControls={<span data-testid="remix-slot">Remix this</span>}
       />,
       { container: document.body.appendChild(document.createElement('div')) },

@@ -35,7 +35,6 @@ export function ViewerScreen({
   formats,
   library,
   signals,
-  balance,
   initialValues,
   sourceGenerationId,
   remixLocked,
@@ -47,7 +46,6 @@ export function ViewerScreen({
   formats: StudioFormat[]
   library: LibraryRead
   signals: BrandSignal[] | null
-  balance: number | null
   initialValues: ComposerInitialValues
   sourceGenerationId: string
   remixLocked: boolean
@@ -108,7 +106,6 @@ export function ViewerScreen({
               formats={formats}
               library={library}
               signals={signals}
-              balance={balance}
               initialValues={initialValues}
               sourceGenerationId={sourceGenerationId}
               remixLocked={remixLocked}

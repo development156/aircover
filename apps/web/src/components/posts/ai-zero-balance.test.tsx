@@ -123,7 +123,6 @@ describe('making a picture, which now lives in the Studio', () => {
         library={{ status: 'ok', pictures: [] }}
         pictures={[]}
         signals={[]}
-        balance={null}
       />,
     )
     // The DEFAULT model is the draft tier, priced at `image_standard` (6) and
@@ -148,7 +147,6 @@ describe('making a picture, which now lives in the Studio', () => {
         library={{ status: 'ok', pictures: [] }}
         pictures={[]}
         signals={[]}
-        balance={null}
       />,
     )
     await userEvent.type(screen.getByPlaceholderText(/plate of fresh samosas/i), 'a cup of chai')

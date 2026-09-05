@@ -8,7 +8,6 @@ import { generatableFormats } from '@/lib/studio/formats'
 import { readLibraryPictures } from '@/lib/studio/read'
 import { initialValuesFromGeneration } from '@/lib/studio/viewer-initial-values'
 import { readPictureForViewer } from '@/lib/studio/viewer-read'
-import { readBalance } from '@/lib/wallet/read'
 import { activeWorkspaceRead } from '@/lib/workspaces'
 
 export const metadata = { title: 'A picture' }
@@ -53,15 +52,17 @@ export default async function StudioViewerPage({ params }: { params: Promise<{ i
   const { picture, generation, lineage, versions } = read
 
   // In parallel: the composer's own reads, exactly as `/studio` fetches them.
-  const [formats, library, signals, wallet] = await Promise.all([
+  // No wallet read here for the same reason `/studio` dropped its own: the
+  // topbar's credit pill already carries that figure, so a second read just
+  // to print it again beside the composer would be a second copy of the same
+  // fact — see `composer.tsx`'s own header.
+  const [formats, library, signals] = await Promise.all([
     Promise.resolve(generatableFormats()),
     readLibraryPictures(),
     activeWorkspaceRead().then((active) =>
       active.status === 'ok' ? brandSignalsFor(active.workspace.id).catch(() => null) : null,
     ),
-    readBalance(),
   ])
-  const balance = wallet.status === 'ok' ? wallet.balance.available : null
 
   const initialValues = initialValuesFromGeneration(generation, lineage)
   const remixLocked = !lineage.columnsApplied
@@ -75,7 +76,6 @@ export default async function StudioViewerPage({ params }: { params: Promise<{ i
       formats={formats}
       library={library}
       signals={signals}
-      balance={balance}
       initialValues={initialValues}
       sourceGenerationId={generation.id}
       remixLocked={remixLocked}

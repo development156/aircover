@@ -55,7 +55,6 @@ function renderComposer(remixLocked: boolean) {
       formats={[]}
       library={{ status: 'ok', pictures: [] }}
       signals={null}
-      balance={null}
       initialValues={{ wanted: 'A plate of fresh samosas' }}
       sourceGenerationId={SOURCE_ID}
       remixLocked={remixLocked}
