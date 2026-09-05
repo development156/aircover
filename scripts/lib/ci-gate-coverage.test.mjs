@@ -188,22 +188,49 @@ describe('the CI workflow covers the gate, or says which part it does not', () =
     // a retyped copy is a third list that can drift from the other two.
     const block = /NEEDED="([^"]+)"/.exec(WORKFLOW)
     expect(block, 'could not find the NEEDED list in the refusal guard').not.toBeNull()
-    const checked = block[1]
+    // Each line is ENV=SECRET since 2026-09-05: the four Supabase values are read
+    // from E2E_-prefixed secrets that name STAGING, because the unprefixed names
+    // are production and three nightly workflows write real customers' metrics
+    // through them. MEASURED, run 33961015055: with the six unprefixed secrets
+    // set, the guard passed and the suite refused `refused-production` in 9s.
+    const pairs = block[1]
       .split('\n')
       .map((line) => line.trim())
       .filter((line) => line !== '')
+      .map((line) => {
+        const [env, secret] = line.split('=')
+        expect(secret, `${line} is not an ENV=SECRET pair`).toBeDefined()
+        return { env, secret }
+      })
+    const checked = pairs.map((p) => p.env)
 
     expect([...checked].sort()).toEqual([...declared].sort())
 
     // And each one must be wired to BOTH namespaces, or the "wrong tab" half of
-    // the message silently stops reporting for that name.
-    for (const name of declared) {
-      expect(WORKFLOW, `${name} has no SECRET_ binding in the guard`).toContain(
-        `SECRET_${name}: \${{ secrets.${name} }}`,
+    // the message silently stops reporting for that name -- and wired to the
+    // SAME secret the run step forwards, or the guard certifies one value while
+    // the suite runs on another.
+    for (const { env, secret } of pairs) {
+      expect(WORKFLOW, `${env} has no SECRET_ binding in the guard`).toContain(
+        `SECRET_${env}: \${{ secrets.${secret} }}`,
       )
-      expect(WORKFLOW, `${name} has no VAR_ binding in the guard`).toContain(
-        `VAR_${name}: \${{ vars.${name} }}`,
+      expect(WORKFLOW, `${env} has no VAR_ binding in the guard`).toContain(
+        `VAR_${env}: \${{ vars.${secret} }}`,
       )
+      // Anchored at a line start: a bare `toContain` here was green under
+      // mutation, because `SECRET_SUPABASE_DB_URL: ...` in the guard block
+      // CONTAINS `SUPABASE_DB_URL: ...`. MEASURED 2026-09-05, first draft.
+      const escaped = (v) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      expect(WORKFLOW, `the run step does not forward ${secret} as ${env}`).toMatch(
+        new RegExp(`\\n\\s+${escaped(env)}: ${escaped(`\${{ secrets.${secret} }}`)}`),
+      )
+    }
+
+    // The four Supabase values must NOT be the production names: the nightly
+    // workflows read those, and the suite refuses production by design.
+    for (const { env, secret } of pairs) {
+      if (env.includes('SUPABASE'))
+        expect(secret, `${env} reads a production secret`).toMatch(/^E2E_/)
     }
   })
 })

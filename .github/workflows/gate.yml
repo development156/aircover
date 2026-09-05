@@ -257,37 +257,55 @@ jobs:
         env:
           SECRET_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           SECRET_CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          SECRET_NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          SECRET_NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SECRET_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          SECRET_SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          # ── THE FOUR SUPABASE VALUES COME FROM E2E_-PREFIXED SECRETS ───────────
+          # MEASURED 2026-09-05, run 33961015055: the founder added all six
+          # secrets, this guard passed for the first time ever, and the suite
+          # refused in 9 seconds with `decision refused-production`. The six
+          # unprefixed names ARE production: metrics-nightly, radar-nightly and
+          # audience-nightly read the same `secrets.SUPABASE_DB_URL` to write
+          # real customers' metrics. `e2e-target.ts` refuses production outright
+          # and names staging (`yoxmzwkxweasfaahhvpj`) as the only target. So
+          # this job reads its own four, forwards them under the names the app
+          # expects, and the nightly jobs keep theirs. The Clerk pair is shared
+          # on purpose: there is one development instance and the suite mints
+          # `+clerk_test` users on it.
+          SECRET_NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          SECRET_NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+          SECRET_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
+          SECRET_SUPABASE_DB_URL: ${{ secrets.E2E_SUPABASE_DB_URL }}
           VAR_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           VAR_CLERK_SECRET_KEY: ${{ vars.CLERK_SECRET_KEY }}
-          VAR_NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
-          VAR_NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          VAR_SUPABASE_SERVICE_ROLE_KEY: ${{ vars.SUPABASE_SERVICE_ROLE_KEY }}
-          VAR_SUPABASE_DB_URL: ${{ vars.SUPABASE_DB_URL }}
+          VAR_NEXT_PUBLIC_SUPABASE_URL: ${{ vars.E2E_SUPABASE_URL }}
+          VAR_NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.E2E_SUPABASE_ANON_KEY }}
+          VAR_SUPABASE_SERVICE_ROLE_KEY: ${{ vars.E2E_SUPABASE_SERVICE_ROLE_KEY }}
+          VAR_SUPABASE_DB_URL: ${{ vars.E2E_SUPABASE_DB_URL }}
         run: |
           # One list, walked twice, so the "is it missing" half and the "is it in
           # the wrong tab" half cannot disagree the way the old six hand-written
           # lines could.
-          NEEDED="NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-          CLERK_SECRET_KEY
-          NEXT_PUBLIC_SUPABASE_URL
-          NEXT_PUBLIC_SUPABASE_ANON_KEY
-          SUPABASE_SERVICE_ROLE_KEY
-          SUPABASE_DB_URL"
+          # Each line is ENV_NAME=SECRET_NAME: the name the app reads, and the
+          # repository secret it is read FROM. They differ for the four Supabase
+          # values (see the env block above), and the message below names the
+          # SECRET, because that is the name a person has to type into Settings.
+          NEEDED="NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+          CLERK_SECRET_KEY=CLERK_SECRET_KEY
+          NEXT_PUBLIC_SUPABASE_URL=E2E_SUPABASE_URL
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=E2E_SUPABASE_ANON_KEY
+          SUPABASE_SERVICE_ROLE_KEY=E2E_SUPABASE_SERVICE_ROLE_KEY
+          SUPABASE_DB_URL=E2E_SUPABASE_DB_URL"
 
           missing=""
           found_as_vars=""
-          for name in $NEEDED; do
+          for pair in $NEEDED; do
+            name="${pair%%=*}"
+            secret="${pair##*=}"
             secret_ref="SECRET_$name"
             var_ref="VAR_$name"
             if [ -z "${!secret_ref}" ]; then
-              missing="$missing $name"
+              missing="$missing $secret"
               # Presence only, never the value.
               if [ -n "${!var_ref}" ]; then
-                found_as_vars="$found_as_vars $name"
+                found_as_vars="$found_as_vars $secret"
               fi
             fi
           done
@@ -307,6 +325,8 @@ jobs:
             fi
             echo "All six are needed: the suite signs in through Clerk and the app it drives"
             echo "reads Supabase with the anon key, the service role key and the pooler URL."
+            echo "The four E2E_SUPABASE_* values belong to STAGING (yoxmzwkxweasfaahhvpj):"
+            echo "the suite refuses production, and the unprefixed names are production."
             exit 1
           fi
 
@@ -322,10 +342,11 @@ jobs:
           SAHODA_E2E_ACK_TARGET: ${{ inputs.ack_target }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          # Staging, under the names the app reads. See the guard step above.
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_DB_URL: ${{ secrets.E2E_SUPABASE_DB_URL }}
         run: pnpm turbo run test:smoke --concurrency=1
 
       # The traces are the only thing worth having from a failed browser run, and
