@@ -2073,10 +2073,16 @@
     gap: 10px;
   }
 
+  /* Q-08: MEASURED 63px at 390px was 38px tall on Build my Brand Brain,
+     Continue and Back, and 28px on Save & exit — all under the product's
+     44px phone touch floor (docs/workflow/01_CONTEXT.md). `min-height`
+     rather than `height`: the used height is clamped to whichever of the
+     two is larger, so this raises the floor without touching the value a
+     wider phone or the desktop rule reads. */
   .cta-row .btn {
     flex: 1;
     justify-content: center;
-    height: 38px;
+    min-height: 44px;
     border-radius: var(--r-sm, 6px);
     font-size: 13px;
   }
@@ -2085,7 +2091,17 @@
   }
   .cta-row .btn--ghost {
     flex: 0 0 auto;
-    height: 38px;
+    min-height: 44px;
+  }
+
+  /* Same floor, same reasoning, for the two phone controls the CTA row does
+     not own: the header's "Save & exit" (measured 98×28) and every chip this
+     stylesheet draws — the business-type picks on step 02 and the
+     Website/Instagram/Google Business Profile competitor-kind picks on the
+     rivals step (measured 39px tall), both built from the one `.chip` rule. */
+  .nav__exit,
+  .chip {
+    min-height: 44px;
   }
 
   .more__grid {

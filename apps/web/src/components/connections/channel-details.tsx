@@ -72,7 +72,12 @@ export function ChannelDetails({
         aria-label={`What Sahoda does with ${label}`}
         aria-haspopup="dialog"
         data-channel-details={label}
-        className="inline-flex items-center gap-1.5 rounded-sm text-muted transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--acc)]"
+        /* Q-08: MEASURED 63×18 at 390px, well under the 44px phone touch
+           floor. `max-narrow:min-h-[44px]` only fires below the `narrow`
+           breakpoint (700px, globals.css), so the desktop 18px row this
+           sits beside is untouched — the same pattern the rail already
+           uses (`settings-nav.tsx`). */
+        className="inline-flex items-center gap-1.5 rounded-sm text-muted transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--acc)] max-narrow:min-h-[44px]"
       >
         <Info aria-hidden className="size-3.5" />
         <span className="type-sm">Details</span>

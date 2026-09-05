@@ -17,6 +17,7 @@ import { ProgressBar } from './progress-bar'
 import { readSite } from './read-site'
 import { useBuild } from './use-build'
 import { useOrb } from './use-orb'
+import { useStepFocus } from './use-step-focus'
 import { useStepHistory } from './use-step-history'
 import {
   canAdvance,
@@ -116,6 +117,12 @@ export function OnboardingStage({
 
   const orbWrapRef = useRef<HTMLDivElement | null>(null)
   const procSlotRef = useRef<HTMLDivElement | null>(null)
+  const paneRef = useRef<HTMLDivElement | null>(null)
+
+  // Q-03: move focus onto the new step's own heading. See `use-step-focus.ts`
+  // for why `#pane` is the right container and why intro is deliberately left
+  // alone.
+  useStepFocus(step, paneRef)
 
   const patch = useCallback((next: Partial<OnboardingData>) => {
     setData((current) => ({ ...current, ...next }))
@@ -500,7 +507,7 @@ export function OnboardingStage({
         <ProgressBar step={step} />
 
         <main className="frame">
-          <div className="pane" id="pane">
+          <div className="pane" id="pane" ref={paneRef}>
             {/* Keyed so the entry animation restarts on every move — the source
                 strips the class, forces a reflow and re-adds it; a remount is
                 the same thing without touching the DOM by hand. */}
