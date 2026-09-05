@@ -1473,6 +1473,43 @@ describe('the result screen: which version, and why there is only one', () => {
     expect(screen.queryByText(/exact placement: coming soon/i)).toBeNull()
   })
 
+  /**
+   * ── THE MOVE IS THE ONE OUTCOME THAT MUST NEVER BE SILENT ──────────────────
+   * The renderer measures all four corners and may stamp the mark somewhere
+   * other than the corner the customer set. A control that quietly does
+   * something else is the defect this screen exists to avoid, so these assert
+   * the CLAIM (that a move is reported, and which reason it gives) rather than
+   * the sentence, which `anchor-note.ts` owns and may rewrite freely.
+   */
+  test('says the logo moved, and why, when the chosen corner was busy', () => {
+    open(LIBRARY, [{ ...stamped, stampAnchor: 'top-left', stampAnchorMovedReason: 'busy' }])
+    const note = screen.getByText(/moved the logo/i)
+    expect(note.textContent).toMatch(/top-left/i)
+    expect(note.textContent).toMatch(/busy/i)
+    expect(screen.queryByText(/exact placement: coming soon/i)).toBeNull()
+  })
+
+  test('gives a different reason when the mark would not have been readable', () => {
+    open(LIBRARY, [
+      { ...stamped, stampAnchor: 'bottom-left', stampAnchorMovedReason: 'unreadable' },
+    ])
+    const note = screen.getByText(/moved the logo/i)
+    expect(note.textContent).toMatch(/bottom-left/i)
+    expect(note.textContent).toMatch(/read/i)
+    expect(note.textContent).not.toMatch(/busy/i)
+  })
+
+  /**
+   * Recorded AND stamped where asked is the case with nothing to say. It must
+   * not fall back to the lock: the lock claims the placement was never
+   * recorded, and here it was.
+   */
+  test('says nothing at all when the mark went where it was asked to', () => {
+    open(LIBRARY, [{ ...stamped, stampAnchor: 'bottom-right', stampAnchorMovedReason: null }])
+    expect(screen.queryByText(/moved the logo/i)).toBeNull()
+    expect(screen.queryByText(/exact placement: coming soon/i)).toBeNull()
+  })
+
   test('asks stamp-copy for the sentence rather than writing its own', () => {
     for (const outcome of [null, 'no_logo', 'logo_unreadable', 'failed', 'stamped'] as const) {
       cleanup()
@@ -1547,13 +1584,33 @@ describe('the rest of the composer the design asked for', () => {
 
   test('names the controls that are designed and not built, as text not buttons', () => {
     open()
-    for (const title of ['Leave out', 'Same again', 'Follow how closely', 'Tidy my words']) {
+    for (const title of ['Leave out', 'Same again', 'Follow how closely']) {
       expect(screen.getByText(title), title).toBeTruthy()
       // A disabled button is still announced as an action a reader could take,
       // which `design-lint.mjs` rule 3 refuses outright. These are spans.
       expect(screen.queryByRole('button', { name: title }), title).toBeNull()
     }
     expect(screen.getByText(/nothing here changes what a press does today/i)).toBeTruthy()
+  })
+
+  /**
+   * ── A NAME LEAVES THIS ROW THE DAY IT SHIPS ───────────────────────────────
+   * "Tidy my words" stayed in `COMING_SOON` after the refiner shipped, so this
+   * row showed a lock beside a control that was rendering, working and
+   * charging a credit a few hundred pixels above it. The guard is about the
+   * CLASS of defect rather than that one string: nothing may be named as
+   * missing while a working control for it sits on the same screen.
+   *
+   * WHAT IT CANNOT SEE: it checks this row against the refiner alone. Another
+   * name going stale the same way, for a control this test does not query,
+   * would pass.
+   */
+  test('does not name the prompt refiner as missing while the refiner is on screen', () => {
+    open()
+    const refiner = screen.getByRole('button', { name: /rewrite|refine|tidy/i })
+    expect(refiner).toBeTruthy()
+    const row = screen.getByText(/not built yet/i).parentElement as HTMLElement
+    expect(row.textContent).not.toMatch(/tidy my words/i)
   })
 
   /**

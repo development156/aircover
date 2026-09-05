@@ -41,6 +41,7 @@ import { PromptRefineControl } from '@/components/studio/prompt-refine-control'
 import { ReferencePreview } from '@/components/studio/reference-preview'
 import { ReferenceUpload } from '@/components/studio/reference-upload'
 import { Textarea } from '@/components/ui/textarea'
+import { anchorNote } from '@/lib/studio/anchor-note'
 import type { CanvasPicture } from '@/lib/studio/canvas'
 import { aspectRatioLabel, type StudioFormat } from '@/lib/studio/formats'
 import {
@@ -122,12 +123,19 @@ import { describeInsufficient, describePartial } from '@/lib/studio/refusal-copy
  * They render as spans. `design-lint.mjs` rule 3 refuses `<button disabled>`
  * beside a coming-soon label, and it is right: a disabled button is still
  * announced as an action.
+ *
+ * ── A NAME LEAVES THIS LIST THE DAY IT SHIPS ───────────────────────────────
+ * "Tidy my words" sat here after the refiner shipped, so the screen carried a
+ * lock beside a control that was rendering, working and charging a credit a
+ * few hundred pixels above it. A list of what is missing is only useful while
+ * it is true, and a stale entry here is the same defect as a stale number
+ * anywhere else in this product: delete the name in the commit that builds
+ * the thing.
  */
 const COMING_SOON = [
   { title: 'Leave out' },
   { title: 'Same again' },
   { title: 'Follow how closely' },
-  { title: 'Tidy my words' },
 ] as const
 
 /**
@@ -1430,15 +1438,43 @@ export function StudioWorkbench({
                   </div>
                 ) : null}
 
+                {/* ── WHERE THE MARK LANDED, IN THE SLOT THAT USED TO SAY IT COULD
+                    NOT BE KNOWN ────────────────────────────────────────────────
+                    This span carried "Exact placement: coming soon" behind a
+                    lock for one reason: nothing recorded the corner. The
+                    renderer now measures all four and may move the mark off the
+                    chosen one, and `studio_generation_images.stamped_anchor`
+                    records where it went, so for a picture that HAS a record
+                    the lock is no longer the truth.
+
+                    Three outcomes, and they stay three because they are three
+                    different facts:
+                      moved       say so, and why. The customer set a corner and
+                                  got another one, which is the case that must
+                                  never be silent
+                      as_chosen   say nothing. The mark is where they asked and
+                                  there is nothing to announce
+                      unrecorded  keep the lock. The column is not applied yet,
+                                  or the row predates it, and "we did not record
+                                  this" is exactly what the lock has always
+                                  meant */}
                 <span className="type-sm text-muted" data-guide="studio-frame-note">
-                  {bothVersions && showing === 'stamped' ? (
-                    <span className="inline-flex items-center gap-1 opacity-70">
-                      <Lock className="size-[11px]" aria-hidden />
-                      Exact placement: coming soon
-                    </span>
-                  ) : (
-                    'As the model drew it'
-                  )}
+                  {bothVersions && showing === 'stamped'
+                    ? (() => {
+                        const placement = anchorNote({
+                          anchor: active.stampAnchor ?? null,
+                          reason: active.stampAnchorMovedReason ?? null,
+                        })
+                        if (placement.moved) return placement.body
+                        if (placement.reason === 'as_chosen') return null
+                        return (
+                          <span className="inline-flex items-center gap-1 opacity-70">
+                            <Lock className="size-[11px]" aria-hidden />
+                            Exact placement: coming soon
+                          </span>
+                        )
+                      })()
+                    : 'As the model drew it'}
                 </span>
 
                 <div className="flex min-w-[24ch] flex-1 items-baseline gap-2">

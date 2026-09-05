@@ -45,13 +45,22 @@ import type { StampAnchor, StampAnchorMoveReason } from '@sahoda/shared'
  * Pure: no I/O, no clock, no database, no React.
  */
 
-/** A corner in words a shop owner reads, never the stored `bottom-right` key. */
-const CORNER_WORDS: Readonly<Record<StampAnchor, string>> = {
-  'bottom-right': 'bottom-right',
-  'bottom-left': 'bottom-left',
-  'top-right': 'top-right',
-  'top-left': 'top-left',
-}
+/**
+ * The stored key IS the readable form here, so there is no lookup table.
+ *
+ * This was a `Record<StampAnchor, string>` mapping each key to itself, under a
+ * comment promising "words a shop owner reads, never the stored key". It
+ * returned the stored key. An identity map that claims to translate is worse
+ * than no map: it reads as a solved problem and hides that nobody checked.
+ *
+ * Nothing needs translating, because these four keys are already ordinary
+ * English in the one position they are used: "the top-left corner". The hyphen
+ * is a compound modifier before a noun and is correct typography, not a
+ * leaked identifier. `bottom_right` with an underscore WOULD need converting,
+ * which is what the original comment was guarding against, and no such
+ * spelling exists in this vocabulary. If one is ever added, this is where the
+ * conversion belongs.
+ */
 
 export type AnchorNote =
   | {
@@ -92,7 +101,7 @@ export function anchorNote(input: {
     return { moved: false, reason: 'as_chosen' }
   }
 
-  const corner = CORNER_WORDS[input.anchor]
+  const corner = input.anchor
   if (input.reason === 'busy') {
     return {
       moved: true,
