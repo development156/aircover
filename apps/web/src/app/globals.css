@@ -591,7 +591,7 @@
    font-semibold` and every chip after it copied the literal. That is the same
    drift `type-h3` was added to stop, one rung further down. Uppercase is the only
    thing separating this from `type-eyebrow`, and it is exactly the wrong thing on
-   a chip whose label is a sentence fragment ("Not proven live"). */
+   a chip whose label is a sentence fragment ("Not yet confirmed live"). */
 @utility type-chip {
   font: var(--t-chip);
   font-weight: var(--tw-font-weight, 600);

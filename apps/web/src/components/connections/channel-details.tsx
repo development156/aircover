@@ -11,7 +11,7 @@ import { Drawer } from '@/components/ui/drawer'
  * ── WHY A DRAWER AND NOT MORE TILE ───────────────────────────────────────────
  * A tile answers one question: will this carry a post, and is it linked. Everything
  * a person asks NEXT — what Sahoda can publish here, how long the link lasts, what
- * it costs, why this one says "Not proven live" — is a second question, and eight
+ * it costs, why this one says "Not yet confirmed live" — is a second question, and eight
  * tiles that each answered both would be eight walls of text on a screen whose job
  * is to be scanned.
  *

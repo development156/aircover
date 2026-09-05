@@ -105,14 +105,14 @@ describe('the two axes', () => {
     // a reader must be able to get either without decoding the other.
     render(<ChannelTile entry={ENTRY.instagram} connections={[connection()]} now={NOW} />)
 
-    expect(screen.getByText('Publishes today')).toBeInTheDocument()
+    expect(screen.getByText('Ready to publish')).toBeInTheDocument()
     expect(screen.getByText('Connected')).toBeInTheDocument()
   })
 
   it('does not let an unproven channel look connected', () => {
     const { container } = render(<ChannelTile entry={ENTRY.x} connections={[]} now={NOW} />)
 
-    expect(screen.getByText('Not proven live')).toBeInTheDocument()
+    expect(screen.getByText('Not yet confirmed live')).toBeInTheDocument()
     expect(screen.getByText('Not connected')).toBeInTheDocument()
     expect(container.querySelector('[data-connected]')).toHaveAttribute('data-connected', 'false')
   })
@@ -129,7 +129,7 @@ describe('the two axes', () => {
       />,
     )
 
-    expect(screen.getByText('Publishes today')).toBeInTheDocument()
+    expect(screen.getByText('Ready to publish')).toBeInTheDocument()
     expect(screen.getByText('Needs you')).toBeInTheDocument()
   })
 })

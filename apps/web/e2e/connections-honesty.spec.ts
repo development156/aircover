@@ -127,13 +127,16 @@ test.describe('connections is honest about every channel @smoke', () => {
       // Readiness is a claim about Sahoda; connection is a claim about the
       // customer. Both must be present as WORDS, on the same screen.
       const text = (await main.innerText()).replace(/\s+/g, ' ')
+      // RETARGETED 2026-09-06 with the capability rewrite of `READINESS_LABEL`:
+      // "Publishes today" became "Ready to publish", "Not proven live" became
+      // "Not yet confirmed live". The claims are unchanged; the words moved.
       expect(text, `width ${width}: readiness stated`).toMatch(
-        /Publishes today|Not proven live|Coming soon/,
+        /Ready to publish|Not yet confirmed live|Coming soon/,
       )
       expect(text, `width ${width}: connection stated`).toMatch(/Not connected|Connected|Needs you/)
 
       // Both unproven channels say so, and neither claims to have been verified.
-      expect(text).toContain('Not proven live')
+      expect(text).toContain('Not yet confirmed live')
       expect(text).not.toMatch(/verified live/i)
 
       // ── 4 · EVERY CHANNEL WE OFFER IS NAMED, IN WORDS ─────────────────────
