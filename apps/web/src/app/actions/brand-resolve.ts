@@ -13,6 +13,7 @@ import { pruneBlankListEntries } from '@/lib/brand/prune-blank-entries'
 import { readBrain } from '@/lib/brand/read-brain'
 import { mapSaveBrandError } from '@/lib/brand/save-brand-error'
 import { reportServerError } from '@/lib/observability/report'
+import { clearPendingBrain } from '@/lib/onboarding/pending-brain'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { getActiveWorkspace } from '@/lib/workspaces'
 
@@ -155,6 +156,8 @@ export async function saveBrandMemory(
       p_source: source,
     })
     if (error || !data) return { ok: false, message: mapSaveBrandError(error) }
+    // The parked build, if this save came from a reveal, is now an active row.
+    await clearPendingBrain(workspace.id)
 
     const result = ResolveBrandMemoryResultSchema.safeParse(data)
     if (!result.success) {

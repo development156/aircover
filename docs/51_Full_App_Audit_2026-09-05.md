@@ -16,6 +16,8 @@
 
 **Overall recommendation:** ship-able for a supervised beta once the onboarding persistence defect is closed. Nothing found is a data-loss or cross-tenant risk.
 
+**Update, same evening (22:50 IST):** the onboarding persistence defect is **closed and proven live** (`102c54e4`, §Q-01): build, kill the browser, return, press Build → the same brain back in under 600 ms with no second model call; confirm → one active row. The plan modal no longer covers the first dashboard (`7a8036ae`). The smoke leg has run on CI three times and is one staging setting away from a verdict (§F, §P).
+
 **In plain terms:** the app is solid and truthful. One screen can throw away work a customer just watched it make, three times, then lock them out for a day. Fix that screen first.
 
 ---
@@ -90,7 +92,8 @@
 | Reload mid-edit | composer state survives |
 | Refresh mid-build | onboarding: brain lost (§Q-01) |
 | Sign out | redirect to `/sign-in`; protected route redirects |
-| BLOCKED | publishing to a real channel (no OAuth completion in a headless harness), payment completion (Cashfree refuses), the @smoke suite (see §P) |
+| BLOCKED | publishing to a real channel (no OAuth completion in a headless harness), payment completion (Cashfree refuses) |
+| @smoke on CI | Three dispatches the same evening, each one step further: 45-min limit on the dev server; `Invalid supabaseUrl` from a mis-saved secret; then sign-in and rendering working and **every read answered 401 by staging**, which does not yet trust Clerk's tokens (251 × 401 in staging's API log; production 1,630 × 200 with the same Clerk instance). One dashboard setting away; see the handoff |
 
 ## G. Frontend audit
 
@@ -173,7 +176,7 @@ No P0/P1/P2. Verified end to end: Clerk webhook requires verified email + 5-minu
 ## P. Testing audit
 
 - **Gate leg 1 (typecheck · lint · test):** 27/27 tasks, exit 0, 3m26s; apps/web 8,251 passed / 13 skipped; db 978 passed / 198 skipped (live-only). MEASURED this lane.
-- **Smoke leg:** UNRUN. It writes to production and needs `SAHODA_E2E_ACK_TARGET` typed by a person; CI cannot run it because no repository secrets exist (run 981, CLAUDE.md).
+- **Smoke leg:** ran on CI three times after the secrets were added (runs 33965242498, 33968304482, 33976271461); the first two failed on environment, the third reached real assertions and was masked by staging refusing Clerk tokens. Not yet a verdict. The job now builds the app, starts it with `next start`, reads staging through `E2E_*` secrets, checks their shape, and keeps traces on cancellation.
 - 11 `@smoke` tests skip silently when `SUPABASE_SERVICE_ROLE_KEY` is absent; the gate's exit code does not notice.
 - Zero coverage: `/`, `/admin/{applications,brain,jobs}`, `/inbox/comments/[a]/[b]`, `/api/privacy/export` glue, `/api/cron/radar` handler, 7 server actions incl. `startPlanUpgrade` (only ever mocked).
 - 27 tests assert `ok === false` with no sentence and no side-effect check.
@@ -183,8 +186,8 @@ No P0/P1/P2. Verified end to end: Clerk webhook requires verified email + 5-minu
 
 | ID | Sev | Category | Location | Finding | Evidence | Root cause | Best fix | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Q-01 | **P1** | Reliability · UX · Product | `use-build.ts:310–420`, `onboarding-resolve.ts` | Brain build result lives only in client memory until the reveal's confirm; close/refresh/drop discards it; 3 free/day then 24 h lockout | 3 `ai_provider_logs` ok rows, 0 `brand_memory` rows, lockout message rendered (MEASURED) | Resolve action returns the brain instead of persisting it; free-limit counts attempts, not persisted brains | Persist a `draft` `brand_memory` row (status column already allows `draft`) inside `resolveOnboarding`; reveal reads the draft; confirm promotes it; count free resolves on drafts that reached a reveal. Alternative: don't count an attempt whose output was never saved | OPEN |
-| Q-02 | P2 | UX · Copy | processing overlay failure card | "Try again" offered when the sentence says "try again tomorrow"; "Free the first time" still shown after the allowance | frame `onb5-fourth-build` (MEASURED) | `retryable` derives only from `kind !== 'insufficient'` | Return a `kind: 'limit'` and set `retryable=false`; hide the "free" tag once `freeResolveAllowed` is false | OPEN |
+| Q-01 | **P1** | Reliability · UX · Product | `use-build.ts:310–420`, `onboarding-resolve.ts` | Brain build result lives only in client memory until the reveal's confirm; close/refresh/drop discards it; 3 free/day then 24 h lockout | 3 `ai_provider_logs` ok rows, 0 `brand_memory` rows, lockout message rendered (MEASURED) | Resolve action returns the brain instead of persisting it; free-limit counts attempts, not persisted brains | Park the result server-side at resolve time and hand it back on the next press. Done as a one-day Upstash entry (`lib/onboarding/pending-brain.ts`) rather than a `draft` row, because every `brand_memory` write goes through a definer RPC that only mints active versions and a new RPC is a migration production must apply first. **LIVE-VERIFIED 2026-09-05 22:50 IST:** build, kill the browser, return, press Build → reveal in 579 ms with no model call (1 `ai_provider_logs` row across three presses), Enter Sahoda → 1 active `brand_memory` row | **FIXED** `102c54e4` |
+| Q-02 | P2 | UX · Copy | processing overlay failure card | "Try again" offered when the sentence says "try again tomorrow"; "Free the first time" still shown after the allowance | frame `onb5-fourth-build` (MEASURED) | `retryable` derives only from `kind !== 'insufficient'` | `kind: 'limit'` from the action, `retryable=false` on the card (mutation-proven). The "free" tag is unchanged | **FIXED** `102c54e4` (button); tag OPEN |
 | Q-03 | P3 | Accessibility | onboarding step transitions | focus drops to `<body>` | `document.activeElement` after Continue (MEASURED) | no focus management on step change | move focus to the new step's `h2` | OPEN |
 | Q-04 | P2 | UX · Product | `/home` first visit with a brain | plan upsell modal covers the dashboard | frame `brain_home` (MEASURED) | intentional prompt, wrong moment | show it on the second visit or after the first successful action; never over the first dashboard | OPEN |
 | Q-05 | P2 | Reliability | `packages/publishing/src/transport.ts` | no fetch timeout on the publish path | code (VERIFIED by agent) | `fetch` has no default deadline | `AbortSignal.timeout(30_000)` | **FIXED**, mutation-proven |
