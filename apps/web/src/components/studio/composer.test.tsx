@@ -8,7 +8,7 @@ import { queueGeneration } from '@/app/actions/studio'
 import { refineStudioPrompt } from '@/app/actions/studio-prompt'
 import { Composer } from '@/components/studio/composer'
 import { generatableFormats } from '@/lib/studio/formats'
-import { routedModels, unroutedModels } from '@/lib/studio/models'
+import { STUDIO_MODELS, routedModels, unroutedModels } from '@/lib/studio/models'
 import type { LibraryPicture, LibraryRead } from '@/lib/studio/read'
 import { uploadAccept } from '@/lib/studio/upload'
 import { PROMPT_STARTERS } from '@/lib/studio/prompt'
@@ -187,13 +187,25 @@ describe('choosing which model draws it', () => {
     }
   })
 
-  test('a matching set is refused for a model that draws one at a time', () => {
-    expect(readyModes('google/gemini-3-pro-image').map((r) => r.mode)).not.toContain('series')
-  })
-
-  test('and offered for a model that draws the whole set in one call', () => {
-    expect(readyModes('openai/gpt-image-1').map((r) => r.mode)).toContain('series')
-    expect(readyModes('bytedance-seed/seedream-5-0-lite').map((r) => r.mode)).toContain('series')
+  /**
+   * RETARGETED. This pair asserted that the offer TRACKS the model: refused for
+   * one that draws a single picture, offered for one that draws four. Both
+   * halves read a measured fact about the provider, and that was the wrong
+   * question — the mesh can only ask for one picture whatever the model can
+   * draw, so offering the mode delivered separate pictures sold as a set.
+   *
+   * What the screen must hold now is that no model reaches it, which is the
+   * claim `modes.test.ts` binds to the schema. (4ec68060 retargeted this in
+   * `studio-workbench.test.tsx`; wt-girija had moved the pair here, and the
+   * 2026-09-05 merge carried the retarget across.)
+   */
+  test('a matching set is offered by no model, because none of them can be asked', () => {
+    for (const model of STUDIO_MODELS) {
+      expect(
+        readyModes(model.id).map((r) => r.mode),
+        model.id,
+      ).not.toContain('series')
+    }
   })
 
   test('the model also decides how many pictures may be matched against', () => {
