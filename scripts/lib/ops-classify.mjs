@@ -102,6 +102,55 @@ export function stripAnsi(text) {
   return String(text ?? '').replace(/\[[0-9;]*[A-Za-z]/g, '')
 }
 
+/** Replacement marker, the same one `lib/observability/redaction-patterns.ts` uses. */
+const REDACTED = '[redacted]'
+
+/**
+ * Credential SHAPES that must never reach a QA row.
+ *
+ * On 2026-08-31 a red run of `live-guard.test.ts` printed the production
+ * Postgres URL in its assertion diff, `details` copied the tail verbatim into
+ * `ops/state/qa.pending.json` (tracked, on a public repository) and the same
+ * row was POSTed to `/api/admin/devops/ingest`. The password had to be rotated.
+ *
+ * Ported from `apps/web/src/lib/observability/redaction-patterns.ts`, which is
+ * TypeScript and cannot be imported by a hook that runs under bare node. Same
+ * rules, same bounded quantifiers, same order (the URI rule before anything
+ * that could eat the userinfo). The scheme and host of a URL survive, because
+ * "which database refused us" is the diagnostic value of the line.
+ */
+const SECRET_SHAPES = [
+  { re: /\bBearer\s{1,8}[A-Za-z0-9._~+/=-]{16,4096}/gi, with: `Bearer ${REDACTED}` },
+  {
+    re: /\b([a-z][a-z0-9+.-]{1,15}):\/\/[^:/?#\s]{1,256}:[^@/?#\s]{1,256}@/gi,
+    with: `$1://${REDACTED}@`,
+  },
+  {
+    re: /eyJ[A-Za-z0-9_-]{4,4096}\.[A-Za-z0-9_-]{4,4096}\.[A-Za-z0-9_-]{4,4096}/gi,
+    with: REDACTED,
+  },
+  {
+    re: /\b(?:[a-z]{2}_(?:live|test)_[A-Za-z0-9]{8,256}|whsec_[A-Za-z0-9]{8,256}|gh[pousr]_[A-Za-z0-9]{16,256}|sk-[A-Za-z0-9_-]{16,256}|sb_(?:secret|publishable)_[A-Za-z0-9_-]{8,256})/gi,
+    with: REDACTED,
+  },
+  {
+    re: /(^|[?&#;\s"'{,])([A-Za-z0-9_.[\]-]{0,64}(?:access_token|refresh_token|id_token|client_secret|api_?key|token|secret|password|passwd|signature|sig|ticket|credential))=[^&\s"'#]{1,4096}/gi,
+    with: `$1$2=${REDACTED}`,
+  },
+  {
+    re: /("[A-Za-z0-9_.[\]-]{0,48}(?:password|passwd|secret|token|api_?key|credential|authorization|cookie|session)[A-Za-z0-9_.[\]-]{0,48}"\s{0,8}:\s{0,8})"[^"]{0,4096}"/gi,
+    with: `$1"${REDACTED}"`,
+  },
+]
+
+/** Strip every credential shape above out of a run's output. Pure, no I/O. */
+export function redactSecrets(text) {
+  return SECRET_SHAPES.reduce(
+    (acc, { re, with: replacement }) => acc.replace(re, replacement),
+    String(text ?? ''),
+  )
+}
+
 /**
  * How many tests, when the runner says so — for the summary line, never the verdict.
  *
@@ -190,8 +239,11 @@ export function classifyBashRuns({ command, output, exitCode, durationMs }) {
           .filter(Boolean)
           .join(', ')})`
 
-  // Tail only: a full turbo run is tens of kilobytes and the useful part is the end.
-  const details = stripAnsi(output).slice(-4000)
+  // Redact FIRST, then take the tail. The other order lets the cut land between
+  // `Bearer ` and its token, or between `://user:` and the password, and the
+  // bare value that is left matches no rule. A full turbo run is tens of
+  // kilobytes and the useful part is the end.
+  const details = redactSecrets(stripAnsi(output)).slice(-4000)
   const duration_ms =
     typeof durationMs === 'number' && durationMs >= 0 ? Math.round(durationMs) : null
 

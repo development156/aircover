@@ -7,7 +7,6 @@ import { LibrarySearch } from '@/components/knowledge/library-search'
 import { ResolveFromLibrary } from '@/components/knowledge/resolve-from-library'
 import { WhatToGive } from '@/components/knowledge/what-to-give'
 import { EmptyState } from '@/components/empty-state'
-import { buttonVariants } from '@/components/ui/button'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
 import { countPendingLibrarySuggestions, readLibrary, searchLibrary } from '@/lib/knowledge/store'
 import { creditCost, MESH_TASK_ACTION } from '@sahoda/shared'
@@ -191,7 +190,9 @@ function Shell({ children, action = false }: { children: React.ReactNode; action
     <div className="space-y-grid">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="type-h1">Knowledge</h1>
+          {/* An h2: the page already has its h1 ("Brand Brain") from the section
+              layout above. MEASURED 2026-09-05: two h1 elements on /brain/knowledge. */}
+          <h2 className="type-h1">Knowledge</h2>
           {/* CAPABILITY, NOT MECHANISM. This paragraph used to name the parts:
               documents, passages, searching, resolving. A shop owner does not
               want passages, and "resolve your Brand Brain" is a sentence only

@@ -1,7 +1,23 @@
-import { PlannerHeroArt } from '@/components/planner/planner-hero-art'
+import { WarmBand } from '@/components/planner/warm-band'
 
 /**
  * The planner's header band.
+ *
+ * ── IT GOT SHORTER AND QUIETER, AND THAT IS THE POINT ────────────────────────
+ * docs/37 §2.3 measures /planner at **2.883% saturated pixels — the worst
+ * screen in the product**, 55x the quietest, and §16 quotes the founder naming
+ * the cause: "a 1032px orange band holding two words". This band was it.
+ *
+ * The redesign brief asks for this hero AND a second wide gradient band for
+ * "Plan my week", and asks that Plan my week be "the obvious next action". Both
+ * bands cannot be the loudest thing; adding the second while keeping the first
+ * at full strength buys a louder page and no hierarchy, which is the exact
+ * failure §16 was written after.
+ *
+ * So the accent is TRADED rather than added. Here: the padding drops a step
+ * (24 -> 20 vertical at `narrow`), the sentence loses a clause, and the art
+ * renders at 70%. The band keeps its warmth and stops being the loudest object
+ * on the route. What it gives up, the one paid action below it spends.
  *
  * ── THE HEADING IS STILL EXACTLY "Planner" ───────────────────────────────────
  * `every-section-loads.spec.ts:54` asserts `/^Planner$/` against this page's
@@ -46,27 +62,26 @@ export function PlannerHero({
 }) {
   return (
     <section className="surface-ring relative isolate overflow-hidden rounded-card bg-surface">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 max-narrow:hidden"
-        style={{
-          maskImage:
-            'linear-gradient(to right, transparent 0%, transparent 34%, black 72%, black 100%)',
-          WebkitMaskImage:
-            'linear-gradient(to right, transparent 0%, transparent 34%, black 72%, black 100%)',
-        }}
-      >
-        <PlannerHeroArt />
-      </div>
+      {/* `quiet`, and that is the accent trade this header's docblock describes:
+          the sweep runs at `--t50` rather than `--t100` and the streaks at 55%,
+          so the loudest warm object on the route is the paid action below and
+          not the title bar. See `warm-band.tsx` for why the illustration that
+          used to sit here is gone — it was cropped through the middle at every
+          real width, including before this redesign. */}
+      <WarmBand strength="quiet" />
 
-      <div className="relative flex flex-wrap items-end justify-between gap-4 p-5 narrow:p-6">
+      <div className="relative flex flex-wrap items-center justify-between gap-4 px-5 py-4 narrow:px-6 narrow:py-5">
         <div className="min-w-0">
           <h1 className="type-h1 text-ink">Planner</h1>
-          {/* Capped at 42ch. Uncapped it runs under the illustration at 1440,
-              which is where a decorative background stops being decorative. */}
+          {/* Three clauses, one line, capped at 42ch — uncapped it runs under
+              the illustration at 1440, which is where a decorative background
+              stops being decorative.
+
+              "watch it go OUT", not the brief's "watch it go". "Go out" is
+              publishing; "go" is anything. The shorter line is the founder's
+              own, and the one word that carries the claim is restored. */}
           <p className="mt-1 max-w-[42ch] type-sm text-muted">
-            Everything for your content week, in one place. Plan it, approve it, and watch it go
-            out.
+            Plan it. Approve it. Watch it go out.
           </p>
           {/* No wrapper div. `context` is always a JSX element, so a
               `{context !== undefined ? <div className="mt-3">…` rendered an
@@ -77,7 +92,16 @@ export function PlannerHero({
           {context}
         </div>
 
-        {children !== undefined ? <div className="shrink-0">{children}</div> : null}
+        {/* `max-narrow:w-full` so the view control gets a row of its own on a
+            phone. MEASURED at 390 before this: the group is wider than what is
+            left beside the title, `shrink-0` refused to give, and the last
+            segment ("List") was clipped at the card's edge — which
+            `no-truncated-labels.spec.ts` exists to catch and could not, because
+            the page has never been opened at 390 in a browser that could reach
+            the sign-in service. Given the full width it wraps instead. */}
+        {children !== undefined ? (
+          <div className="shrink-0 max-narrow:w-full">{children}</div>
+        ) : null}
       </div>
     </section>
   )

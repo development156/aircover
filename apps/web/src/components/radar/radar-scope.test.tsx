@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { render } from '@testing-library/react'
 
-import { RadarScope } from './radar-scope'
+import { RadarScope, SWEEP_SECONDS, markDelaySeconds } from './radar-scope'
 
 /**
  * The radar is decoration, and decoration on this product still may not say
@@ -48,9 +48,24 @@ describe('RadarScope', () => {
   })
 
   it('times each mark to the beam that passes it', () => {
-    // The brightening is a negative animation delay equal to the mark's own
-    // angle as a fraction of the turn — no timer, no state, and the peak lands
-    // on the frame the sweep is over it. A missing or positive delay makes
+    // ── THIS USED TO STATE THE CLAIM AND ASSERT SOMETHING ELSE ──────────────
+    // The old body checked that the delays were negative and distinct. Both are
+    // true of the MIRRORED timing as well, so it passed while eight of the ten
+    // marks brightened when the beam was at `360 - angle`. The claim is a
+    // coincidence between two moments, so the test has to compute both.
+    //
+    // `radar-ping`'s 0% is the bright frame, and a negative delay of `d` starts
+    // the cycle `d` in — so the next 0% is at `SWEEP - d`.
+    for (const angle of [0, 36, 90, 144, 180, 216, 270, 324]) {
+      const d = -markDelaySeconds(angle)
+      const brightAt = (((SWEEP_SECONDS - d) % SWEEP_SECONDS) + SWEEP_SECONDS) % SWEEP_SECONDS
+      const beamAt = (angle / 360) * SWEEP_SECONDS
+      expect(brightAt).toBeCloseTo(beamAt, 6)
+    }
+  })
+
+  it('still sets a negative, per-mark delay on the rendered marks', () => {
+    // The wiring, kept from the old test: a missing or positive delay makes
     // every mark flash together, which reads as a blinking light rather than a
     // detection.
     const { container } = render(<RadarScope marks={4} scanning />)
@@ -58,10 +73,7 @@ describe('RadarScope', () => {
       (el) => (el as SVGElement).style.animationDelay,
     )
     expect(delays).toHaveLength(4)
-    for (const delay of delays) {
-      expect(delay).toMatch(/^-\d/)
-    }
-    // And they differ, or the marks share a beam moment.
+    for (const delay of delays) expect(delay).toMatch(/^-\d/)
     expect(new Set(delays).size).toBe(4)
   })
 

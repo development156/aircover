@@ -6,8 +6,10 @@ import {
   readablePageText,
   type RadarSnapshotPayload,
   type SnapshotForDiff,
+  type WithCreditsFn,
 } from '@sahoda/shared'
 
+import { chargeSubscribers, scanWeekKey, type ScanSeen } from './charge'
 import { cheapCheck, contentHashOf, type FetchLike } from './cheap-check'
 import type { DueSource, RadarDb } from './db'
 import { APIFY_PROFILE_ESTIMATE_MICROS, fetchInstagramProfile } from './providers/apify'
@@ -76,6 +78,21 @@ export interface RadarPassOptions {
   fetchPage?: FetchLike
   apifyToken?: string
   zyteApiKey?: string
+  /**
+   * The credit wrapper, and it is REQUIRED on purpose.
+   *
+   * /radar tells a shop owner "One scan per business per week, at 5 credits
+   * each"; until this field existed the pass wrote no ledger row at all and
+   * that price was a number nobody was ever debited. Optional, it would have
+   * been the same defect with a seam: a caller that said nothing would scan for
+   * free and look correct. Required, a runner that cannot reach the ledger
+   * cannot start a pass — which is the honest failure.
+   *
+   * `chargeSubscribers` holds before the read and RELEASES on a page that would
+   * not load, so "a page that will not load is skipped and not charged" stays
+   * true.
+   */
+  withCredits: WithCreditsFn
   /** How many sources to look at. A wall, not a target. */
   batch?: number
   now?: () => Date
@@ -94,6 +111,12 @@ export interface RadarPassReport {
   spendMicros: { measured: number; estimated: number; free: number }
   /** Free checks as a share of everything attempted — the cheap-check hit rate. */
   freeCheckRate: number
+  /**
+   * What the CUSTOMER was charged, which is a different ledger from
+   * `spendMicros` (what Sahoda paid a provider). `unpaid` counts workspaces
+   * whose wallet was short: they were skipped, never held and never charged.
+   */
+  credits: { debited: number; unpaid: number }
 }
 
 const emptyReport = (): RadarPassReport => ({
@@ -106,6 +129,7 @@ const emptyReport = (): RadarPassReport => ({
   changesWritten: 0,
   spendMicros: { measured: 0, estimated: 0, free: 0 },
   freeCheckRate: 0,
+  credits: { debited: 0, unpaid: 0 },
 })
 
 export async function runRadarPass(options: RadarPassOptions): Promise<RadarPassReport> {
@@ -114,25 +138,43 @@ export async function runRadarPass(options: RadarPassOptions): Promise<RadarPass
   const sources = await options.db.dueSources(options.batch ?? 100)
   report.considered = sources.length
 
+  const week = scanWeekKey(now())
+
   for (const source of sources) {
     try {
-      if (source.kind === 'website') {
-        await checkWebsite(source, options, report, now)
-      } else if (source.kind === 'instagram') {
-        await checkInstagram(source, options, report, now)
-      } else {
-        // x / linkedin / facebook have no adapter yet. Recorded as a GAP rather
-        // than skipped silently — "Radar does not cover this yet" and "nothing
-        // happened there" must not look the same on the screen.
-        await recordGap(source, `no adapter for ${source.kind}`, options, report)
+      // WHO PAYS, before anything is read. One source, any number of watching
+      // workspaces, one price each.
+      const workspaces = await options.db.subscribers(source.sourceId)
+      const outcome = await chargeSubscribers({
+        withCredits: options.withCredits,
+        workspaces,
+        competitorId: source.competitorId,
+        week,
+        scan: () => scanSource(source, options, report, now),
+      })
+
+      report.credits.debited += outcome.debited.length
+      report.credits.unpaid += outcome.unpaid.length
+
+      if (outcome.scan === 'threw') {
+        // One competitor's bad night must not end the pass. Classified, counted,
+        // and the source stays unseen so next week retries it.
+        //
+        // A throw inside `withSpend` has ALREADY settled its reservation as
+        // could_not_check, so the gap is in the fetch log either way; this counter
+        // is the pass's own tally, not the record. Every hold taken for this
+        // source has been released by the wrapper.
+        report.couldNotCheck += 1
+      } else if (outcome.scan === 'not_run' && workspaces.length > 0) {
+        // NOBODY could pay, so the page was never fetched. That is a refusal and
+        // NOT a gap: "we could not read it" would be a claim about the
+        // competitor's website, and nothing was tried.
+        const reason = outcome.unpaid.length > 0 ? 'CREDIT_INSUFFICIENT' : 'LEDGER_UNAVAILABLE'
+        report.refused.push({ sourceId: source.sourceId, reason })
+        await recordAttempt(source, `skipped: ${reason}`, options)
       }
     } catch (error) {
-      // One competitor's bad night must not end the pass. Classified, counted,
-      // and the source stays unseen so tomorrow retries it.
-      //
-      // A throw inside `withSpend` has ALREADY settled its reservation as
-      // could_not_check, so the gap is in the fetch log either way; this counter
-      // is the pass's own tally, not the record.
+      // The subscriber read itself, or a throw the charge did not own.
       report.couldNotCheck += 1
       void error
     }
@@ -141,6 +183,30 @@ export async function runRadarPass(options: RadarPassOptions): Promise<RadarPass
   const attempted = report.unchanged + report.changed + report.couldNotCheck
   report.freeCheckRate = attempted === 0 ? 0 : (report.unchanged + report.changed) / attempted
   return report
+}
+
+/**
+ * ONE SOURCE, READ ONCE.
+ *
+ * Called from inside `chargeSubscribers`, which memoises it: however many
+ * workspaces are paying for this competitor, the page is fetched once and every
+ * payer settles against the same answer. The return value is the ONLY thing the
+ * charge looks at — `seen` DEBITs, anything else RELEASES — so it says what
+ * happened to the read and nothing about money.
+ */
+async function scanSource(
+  source: DueSource,
+  options: RadarPassOptions,
+  report: RadarPassReport,
+  now: () => Date,
+): Promise<ScanSeen> {
+  if (source.kind === 'website') return checkWebsite(source, options, report, now)
+  if (source.kind === 'instagram') return checkInstagram(source, options, report, now)
+  // x / linkedin / facebook have no adapter yet. Recorded as a GAP rather than
+  // skipped silently — "Radar does not cover this yet" and "nothing happened
+  // there" must not look the same on the screen.
+  await recordGap(source, `no adapter for ${source.kind}`, options, report)
+  return 'not_seen'
 }
 
 /**
@@ -168,6 +234,42 @@ async function recordGap(
 ): Promise<void> {
   report.couldNotCheck += 1
   await options.db.rememberCheck(source.sourceId, source, false)
+  await recordAttempt(source, why, options)
+}
+
+/**
+ * WE BOTHERED THIS SOURCE TONIGHT — the bare fact, with no claim attached.
+ *
+ * ⚠ THE STARVATION THIS CLOSES, WHICH THE FIRST FIX RE-OPENED ⚠
+ * `dueSources` now orders by the last ATTEMPT, and the attempt is
+ * `radar_fetch_log`. A source whose subscribers all failed to pay never reached
+ * `scanSource`, so it took no reservation, wrote no log row and left
+ * `last_seen_at` NULL — which sorts FIRST, every pass, for ever. One workspace
+ * with an empty wallet watching 100 competitors would have held the whole weekly
+ * batch and no other tenant's competitor would have been read again: the exact
+ * defect the ordering was changed to fix, with a far more ordinary cause than a
+ * pasted list of dead hostnames. Whatever the pass decides about a source, it
+ * writes down that it looked at it.
+ *
+ * The reservation is zero micros: it costs nothing, cannot be refused for price,
+ * and leaves the same row every other outcome leaves.
+ *
+ * ⚠ AND THE OUTCOME WORD IS WRONG FOR THE SKIP CASE, KNOWINGLY ⚠
+ * `radar_fetch_log.outcome` is CHECKed to
+ * (pending | unchanged | changed | could_not_check), so "we did not try, because
+ * nobody could pay" has to be filed as `could_not_check`. That word overstates
+ * it — we never asked the website anything. It is tolerable ONLY because the
+ * table is service-role-only and no customer-facing query reads it (see
+ * `apps/web/src/lib/radar/store.ts`, which states three times that it does not),
+ * so no screen inherits the wrong claim; `detail.why` carries the real one and
+ * `report.refused` keeps the two apart in the pass's own answer. A `skipped`
+ * value on the CHECK is owed to packages/db.
+ */
+async function recordAttempt(
+  source: DueSource,
+  why: string,
+  options: RadarPassOptions,
+): Promise<void> {
   await withSpend(
     options.db,
     {
@@ -194,7 +296,7 @@ async function checkWebsite(
   options: RadarPassOptions,
   report: RadarPassReport,
   now: () => Date,
-): Promise<void> {
+): Promise<ScanSeen> {
   const url = `https://${source.locator}/`
 
   // Rung 1 and 2. Reserved at zero micros so the attempt still appears in the
@@ -230,8 +332,9 @@ async function checkWebsite(
   )
 
   if (isRefusal(free)) {
+    // The cap said stop. Nothing was read, so nothing is charged.
     report.refused.push({ sourceId: source.sourceId, reason: free.reason })
-    return
+    return 'not_seen'
   }
 
   const result = free.value
@@ -239,14 +342,16 @@ async function checkWebsite(
     report.unchanged += 1
     // Seen, and the validators refreshed — so tomorrow's check is free too.
     await options.db.rememberCheck(source.sourceId, result.memory, true)
-    return
+    // A 304 IS a reading: we asked the site and it told us nothing had moved.
+    // That is the scan the screen prices, and the cheapest possible one.
+    return 'seen'
   }
 
   if (result.outcome === 'changed') {
     report.changed += 1
     await options.db.rememberCheck(source.sourceId, result.memory, true)
     await recordWebsite(source, url, result.html, options, report, now)
-    return
+    return 'seen'
   }
 
   // Rung 3. The only place money is spent on a website, and only for the
@@ -256,7 +361,7 @@ async function checkWebsite(
     // the real reason, so the gap is on record. Only the counter is owed here.
     report.couldNotCheck += 1
     await options.db.rememberCheck(source.sourceId, source, false)
-    return
+    return 'not_seen'
   }
 
   const paid = await withSpend(
@@ -284,7 +389,7 @@ async function checkWebsite(
   if (isRefusal(paid)) {
     report.refused.push({ sourceId: source.sourceId, reason: paid.reason })
     report.couldNotCheck += 1
-    return
+    return 'not_seen'
   }
 
   report.changed += 1
@@ -296,6 +401,7 @@ async function checkWebsite(
     true,
   )
   await recordWebsite(source, url, paid.value.html, options, report, now)
+  return 'seen'
 }
 
 async function recordWebsite(
@@ -332,10 +438,10 @@ async function checkInstagram(
   options: RadarPassOptions,
   report: RadarPassReport,
   now: () => Date,
-): Promise<void> {
+): Promise<ScanSeen> {
   if (!options.apifyToken) {
     await recordGap(source, 'APIFY_TOKEN absent', options, report)
-    return
+    return 'not_seen'
   }
 
   const paid = await withSpend(
@@ -371,7 +477,7 @@ async function checkInstagram(
 
   if (isRefusal(paid)) {
     report.refused.push({ sourceId: source.sourceId, reason: paid.reason })
-    return
+    return 'not_seen'
   }
 
   report.changed += 1
@@ -392,6 +498,7 @@ async function checkInstagram(
     report,
     now,
   )
+  return 'seen'
 }
 
 // ── the shared tail: store, then derive ──────────────────────────────────────

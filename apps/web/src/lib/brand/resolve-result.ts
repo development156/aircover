@@ -46,6 +46,8 @@ export type ResolveActionState =
     }
   | { ok: true; kind: 'fallback'; brain: BrandMemoryPayload; message: string }
   | { ok: false; kind: 'insufficient'; message: string; required: number; available: number }
+  /** A daily allowance is spent. Its sentence names the day it returns; a retry button would lie. */
+  | { ok: false; kind: 'limit'; message: string }
   | { ok: false; kind: 'error'; message: string }
 
 const FALLBACK_MESSAGE =

@@ -119,6 +119,8 @@ export function useBuild({
    * says which it still has.
    */
   const logoRef = useRef<File | null>(null)
+  /** The dark-background variant of the logo, held the same way and for the same reason. */
+  const logoDarkRef = useRef<File | null>(null)
   const [wasFree, setWasFree] = useState(false)
   const [fallbackMessage, setFallbackMessage] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -312,8 +314,9 @@ export function useBuild({
       if (!state.ok) {
         setFailure({
           message: state.message,
-          // An insufficient balance is not fixed by pressing the same button.
-          retryable: state.kind !== 'insufficient',
+          // An insufficient balance is not fixed by pressing the same button,
+          // and neither is a daily allowance that returns tomorrow.
+          retryable: state.kind !== 'insufficient' && state.kind !== 'limit',
         })
         return
       }
@@ -331,14 +334,17 @@ export function useBuild({
        * rather than sent — a session saved before this screen asked for one
        * comes back holding them, and `addCompetitor` would refuse them anyway.
        */
-      const [watchNote, sourcesNote, logoNote] = [
+      const [watchNote, sourcesNote, logoNote, logoDarkNote] = [
         await sendWatchList(data.competitors),
         await sendSources(data.sources, data.sourceUrls),
         await sendLogo(logoRef.current),
+        await sendLogoDark(logoDarkRef.current),
       ]
-      // Joined rather than nested: two independent things went wrong or did
-      // not, and the reader needs both sentences, not the first one only.
-      setWatchListNote([watchNote, sourcesNote, logoNote].filter(Boolean).join(' ') || null)
+      // Joined rather than nested: independent things went wrong or did not,
+      // and the reader needs every sentence, not the first one only.
+      setWatchListNote(
+        [watchNote, sourcesNote, logoNote, logoDarkNote].filter(Boolean).join(' ') || null,
+      )
       setWasFree(state.kind === 'free')
       setFallbackMessage(state.kind === 'fallback' ? state.message : null)
 
@@ -458,6 +464,10 @@ export function useBuild({
     takeLogo: (file: File) => {
       logoRef.current = file
     },
+    /** The optional dark-background variant. Held the same way, sent the same way. */
+    takeLogoDark: (file: File) => {
+      logoDarkRef.current = file
+    },
     saving,
     saveError,
     themeError,
@@ -519,16 +529,59 @@ async function sendSources(
 }
 
 /**
- * Keep the logo, in the assets library, like any other file.
+ * What the reader is told when the logo did not land.
+ *
+ * One constant rather than the same sentence written twice, because both arms
+ * have to say the identical thing: a refusal and a thrown request are the same
+ * outcome to the person reading it, which is that the file is not here.
+ *
+ * The COLOURS are saved either way. `data.palette` was read out of the file in
+ * the browser and is held as strings, so it survives this call failing and
+ * reaches `saveWorkspaceTheme` on the next screen regardless. That is why the
+ * sentence can promise it, and it is the reason this sentence stays (below).
+ */
+const LOGO_NOT_KEPT =
+  'Sahoda could not keep your logo file. Your colours are saved. Add it again from Assets.'
+
+/** Same shape as `LOGO_NOT_KEPT`, for the optional dark-background variant. */
+const LOGO_DARK_NOT_KEPT =
+  'Sahoda could not keep your dark-background logo. Your colours are saved. Add it again from Assets.'
+
+/**
+ * Make the file the workspace's logo.
  *
  * The point of asking for a logo rather than three hex fields is that the file
  * is worth having: it belongs in Assets, where a post or a site can use it. A
  * version of this that read the colours and dropped the bytes would be the same
  * defect the colour pickers replaced, wearing a friendlier question.
  *
+ * ── WHY `setBrandLogo` AND NOT `uploadAsset` ────────────────────────────────
+ * `uploadAsset` stores a file. It does not make that file THE logo, and this
+ * call site wanted the second thing all along. It wrote the title `Logo` and
+ * stopped there, so `workspaces.logo_asset_id` was never set by onboarding and
+ * the pointer only ever got written later, by somebody replacing their logo
+ * from the topbar. `setBrandLogo` writes the pointer on both of its paths, and
+ * it also adopts a row the workspace already holds by content hash rather than
+ * refusing it as a duplicate. See `app/actions/brand-logo.ts` for the full
+ * account.
+ *
+ * `title` is still set here, and it is still load-bearing: on the ordinary
+ * upload path `setBrandLogo` hands this same FormData to `uploadAsset`
+ * unchanged, and the title is what `readBrandLogo`'s fallback finds where the
+ * pointer column is not applied yet.
+ *
+ * ── THE ACTION'S OWN MESSAGE IS DISCARDED, DELIBERATELY ─────────────────────
+ * `setBrandLogo` answers `{ ok: false, message }` with sentences written for
+ * the topbar's replace-logo panel ("Pick a logo to use.", "Sign in to set your
+ * logo."). None of them knows the one fact that matters here, which is that the
+ * colours survived, and a remedy aimed at a control the reader is not looking
+ * at is a remedy they cannot follow. So the message is dropped and onboarding
+ * keeps its own sentence, which names both what was lost and what was not.
+ *
  * AFTER the brain, and it cannot fail the build, for the reason the competitors
  * and the sources are sent here too: by this line the expensive half is already
- * paid for.
+ * paid for. The `try` covers the whole call, so a throw out of `setBrandLogo`
+ * becomes the same sentence rather than an unhandled rejection.
  */
 async function sendLogo(file: File | null): Promise<string | null> {
   if (!file) return null
@@ -536,14 +589,32 @@ async function sendLogo(file: File | null): Promise<string | null> {
     const form = new FormData()
     form.set('file', file)
     form.set('title', 'Logo')
-    const { uploadAsset } = await import('@/app/actions/assets')
-    const result = await uploadAsset(form)
+    const { setBrandLogo } = await import('@/app/actions/brand-logo')
+    const result = await setBrandLogo(form)
     if (result.ok) return null
-    // The COLOURS are already saved and the theme is right either way, so the
-    // sentence says what was lost and what was not.
-    return `Sahoda could not keep your logo file. Your colours are saved. Add it again from Assets.`
+    return LOGO_NOT_KEPT
   } catch {
-    return `Sahoda could not keep your logo file. Your colours are saved. Add it again from Assets.`
+    return LOGO_NOT_KEPT
+  }
+}
+
+/**
+ * Same shape as `sendLogo`, for the optional dark-background variant.
+ *
+ * `null` when nothing was offered: this variant is optional and most workspaces
+ * will never set one, so "nothing to send" must not read as a failure.
+ */
+async function sendLogoDark(file: File | null): Promise<string | null> {
+  if (!file) return null
+  try {
+    const form = new FormData()
+    form.set('file', file)
+    const { setBrandLogoDark } = await import('@/app/actions/brand-logo')
+    const result = await setBrandLogoDark(form)
+    if (result.ok) return null
+    return LOGO_DARK_NOT_KEPT
+  } catch {
+    return LOGO_DARK_NOT_KEPT
   }
 }
 

@@ -186,6 +186,37 @@ describe('Topbar', () => {
     })
   })
 
+  // ── THE LEAD CLUSTER MUST NOT COLLAPSE ONTO THE SEARCH FIELD ───────────────
+  // The bug: the lead cluster (brand mark + workspace switcher) carried an
+  // UNCONDITIONAL `min-w-0`, so at constrained widths it shrank below its own
+  // `shrink-0` children while the centre search stayed pinned at `max-w-[460px]`.
+  // The whole row's deficit landed on this zone; its fixed children then spilled
+  // past its right edge and painted over the search text. MEASURED in Chromium
+  // against the shipped stylesheet with the workspace name visible: at 1120 the
+  // switcher (x 93–314) overlapped the search (x 278–738); at 1024 the search
+  // began at x=182, fully under the 93–314 switcher.
+  //
+  // jsdom HAS NO LAYOUT — it reports every box as 0×0 — so this suite cannot see
+  // the overlap itself. It pins the CSS invariant the measured Chromium fix rests
+  // on instead: `min-w-0` here is GATED behind `wide` (1180), which is the only
+  // band where the switcher shows a truncatable name. Below that the cluster is
+  // all fixed widths and must keep its intrinsic floor, so the SEARCH is the item
+  // that yields. Reverting the class to a bare `min-w-0` reopens the overlap and
+  // turns this red.
+  test('gates the lead cluster min-width behind `wide`, so it cannot collapse onto the search', async () => {
+    const { container } = render(await Topbar())
+
+    const lead = container.querySelector('[data-slot="topbar-lead"]')
+    expect(lead).not.toBeNull()
+
+    const classes = (lead as HTMLElement).className.split(/\s+/)
+    // An UNCONDITIONAL `min-w-0` is the defect: it lets this zone shrink below its
+    // shrink-0 children. The gated `wide:min-w-0` is fine — it only applies where
+    // the switcher name is shown and needs to truncate.
+    expect(classes).not.toContain('min-w-0')
+    expect(classes).toContain('wide:min-w-0')
+  })
+
   describe('the Brand Brain ring', () => {
     test('counts confirmed fields, not filled ones', async () => {
       // A resolved brain with nothing confirmed. Every field is FILLED; the ring

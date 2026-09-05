@@ -40,11 +40,16 @@ export function Unreadable({ what }: { what: string }) {
  * absence either way and the shape of the absence is not worth a second glyph.
  * The claim differs only where a claim is actually made, which is the name.
  */
-export function NotYet({ what }: { what: string }) {
+export function NotYet({ what, because }: { what: string; because?: string }) {
   return (
     <>
       <span aria-hidden className="is-unreadable" />
-      <span className="sr-only">{what} starts once you create a workspace</span>
+      {/* The workspace sentence is the ORIGINAL case and stays the default. A
+          caller with its own reason passes it, because "there is no subject
+          yet" is true of more than one situation and each has its own words:
+          the report's `Approved` figure is null because nothing was ever put
+          to the customer for approval, not because no workspace exists. */}
+      <span className="sr-only">{because ?? `${what} starts once you create a workspace`}</span>
     </>
   )
 }

@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import type { Workspace } from '@sahoda/shared'
 
 import { withSuffix } from './slug'
@@ -10,6 +11,15 @@ import { withSuffix } from './slug'
 const MAX_NAME_LENGTH = 120
 const DEFAULT_WORKSPACE_NAME = 'My workspace'
 const DEFAULT_MAX_ATTEMPTS = 5
+/**
+ * The cap `lib/slug.ts` enforces, restated here because the random fallback
+ * has to shorten the base the same way `withSuffix` does. `SlugSchema` in
+ * actions/workspace.ts and the cookie pointer both assume 48, even though the
+ * RPC's own regex would allow 63. The test file pins the two caps together.
+ */
+const MAX_SLUG_LENGTH = 48
+/** Six hex characters: 16.7 million shapes, so a second collision is a fault, not a queue. */
+const RANDOM_SUFFIX_BYTES = 3
 
 /** The bits of the signed-in Clerk user used to name a first workspace. */
 export interface CreatorIdentity {
@@ -65,13 +75,14 @@ export function deriveWorkspaceName(provided: string | null | undefined): string
  * must stay that way.
  *
  * `workspaces.slug` is globally unique (identity.sql:8) and bootstrapWithRetry
- * tries only DEFAULT_MAX_ATTEMPTS (5) suffixes, so the seed has to live in a
- * sparse namespace. Seeding from the display name would put every nameless
- * signup on "my-workspace" and hard-fail the 6th. Seeding from the bare
- * identity token ("trinity") rather than the possessive ("trinity-s-workspace")
- * would collapse first names into a dense namespace and hard-fail the 6th
- * "Divya". Keeping the possessive keeps slugify() byte-identical to today for
- * every input: no slug shape moves, no collision headroom is lost.
+ * tries DEFAULT_MAX_ATTEMPTS (5) deterministic suffixes before its one random
+ * one, so the seed should live in a sparse namespace: a dense one makes every
+ * sixth signup land on the random shape rather than a readable `-n`. Seeding
+ * from the display name would put every nameless signup on "my-workspace";
+ * seeding from the bare identity token ("trinity") rather than the possessive
+ * ("trinity-s-workspace") would collapse first names. Keeping the possessive
+ * keeps slugify() byte-identical to today for every input: no slug shape
+ * moves, no collision headroom is lost.
  *
  * The slug therefore still carries the creator's identity. That is unchanged
  * from today and deliberately out of scope: the slug is a POINTER (the
@@ -94,23 +105,46 @@ export function deriveSlugSeed(
   return DEFAULT_WORKSPACE_NAME
 }
 
+function isSlugTaken(envelope: RpcEnvelope<BootstrapResult>): boolean {
+  return (envelope.error?.message ?? '').includes('SLUG_TAKEN')
+}
+
+function defaultRandomSuffix(): string {
+  return randomBytes(RANDOM_SUFFIX_BYTES).toString('hex')
+}
+
+/** `<base shortened to fit>-<6 hex>`, within the same cap `withSuffix` keeps. */
+export function withRandomSuffix(slug: string, suffix: string): string {
+  const tail = `-${suffix}`
+  return slug.slice(0, MAX_SLUG_LENGTH - tail.length).replace(/-+$/, '') + tail
+}
+
 /**
  * Call the bootstrap RPC, retrying with a suffixed slug (`-2`, `-3`, …) when the
- * slug is taken — the FSD §M1 uniquification path. Any non-collision error (or a
- * success) returns immediately; SLUG_TAKEN persists after maxAttempts.
+ * slug is taken (the FSD §M1 uniquification path), then ONCE more with a random
+ * suffix. Any non-collision error (or a success) returns immediately.
+ *
+ * ── WHY THE RANDOM ATTEMPT EXISTS ────────────────────────────────────────────
+ * The seed is `<first name>'s workspace` and every Create workspace affordance
+ * in the product is a bare submit button, so the sixth signup sharing a first
+ * name used to get SLUG_TAKEN five times and then a refusal telling them to try
+ * a different name on a screen with no name field. The slug is a pointer, not
+ * identity (see deriveSlugSeed), so a readable shape is preferred and an
+ * unreadable one is still a workspace. SLUG_TAKEN after this is a fault that a
+ * second press resolves, which is what mapBootstrapError now says.
  */
 export async function bootstrapWithRetry(
   call: (slug: string) => Promise<RpcEnvelope<BootstrapResult>>,
   baseSlug: string,
   maxAttempts: number = DEFAULT_MAX_ATTEMPTS,
+  randomSuffix: () => string = defaultRandomSuffix,
 ): Promise<RpcEnvelope<BootstrapResult>> {
   let last: RpcEnvelope<BootstrapResult> = { data: null, error: { message: 'SLUG_TAKEN' } }
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     last = await call(withSuffix(baseSlug, attempt))
-    if (!last.error) return last
-    if (!(last.error.message ?? '').includes('SLUG_TAKEN')) return last
+    if (!isSlugTaken(last)) return last
   }
-  return last
+  return call(withRandomSuffix(baseSlug, randomSuffix()))
 }
 
 /**
@@ -124,7 +158,14 @@ export function mapBootstrapError(
 ): CreateWorkspaceState {
   const message = error?.message ?? ''
   if (message.includes('SLUG_TAKEN')) {
-    return { ok: false, code: 'SLUG_TAKEN', message: 'That name is taken. Try a different one.' }
+    // No screen offers a name field, so "try a different one" was a remedy the
+    // reader could not carry out. After the random attempt a collision is
+    // transient, and a second press draws a new suffix.
+    return {
+      ok: false,
+      code: 'SLUG_TAKEN',
+      message: 'Could not find a free address for the workspace. Try again.',
+    }
   }
   if (message.includes('INVALID_NAME')) {
     return { ok: false, code: 'INVALID_NAME', message: 'Enter a workspace name.' }

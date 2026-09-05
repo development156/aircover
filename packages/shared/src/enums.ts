@@ -75,8 +75,21 @@ export type VariantPublishStatus = z.infer<typeof VariantPublishStatusSchema>
  * through this column, because a post can carry this origin without any run
  * still pointing at it and destroying that post is the one thing the switch must
  * not do. `kill-switch.pglite.test.ts` plants exactly that row as a control.
+ *
+ * `radar` joined on 2026-09-03, and it is a REPAIR rather than a new feature.
+ * `20260822090000_posts_origin_radar.sql` widened the column's check constraint
+ * to four values and is applied to production; this enum was never widened with
+ * it, so `PostInsertSchema` refused every draft `draftFromRadarChange` built and
+ * the feature has never produced one. Found by a test written for the action's
+ * error handling, not by the action failing loudly: the ZodError surfaced as an
+ * unhandled throw in a server action, which reads to a person as the screen
+ * breaking rather than as the draft being refused.
+ *
+ * A member added here must also be classified in `AgencyBlade`'s
+ * `SAHODA_ORIGINS`, which decides whether the post is shown as Sahoda's work.
+ * A Radar draft is Sahoda's, so it is on that list.
  */
-export const PostOriginSchema = z.enum(['manual', 'plan_week', 'playbook'])
+export const PostOriginSchema = z.enum(['manual', 'plan_week', 'playbook', 'radar'])
 export type PostOrigin = z.infer<typeof PostOriginSchema>
 
 /** Durable-job lifecycle (FSD 0.5). */

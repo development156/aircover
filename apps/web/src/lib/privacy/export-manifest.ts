@@ -106,6 +106,37 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   },
   { table: 'asset_folders', readability: 'readable', describes: 'the folders you made' },
   {
+    /**
+     * ── A TABLE THAT IS READABLE, EXPORTED, AND EMPTY FOR EVERYONE ──────────
+     * It stays on this list because the list's promise is COMPLETENESS: every
+     * table carrying a `workspace_id` is named, or "everything you own" is a
+     * false claim. And `readable` is right — the policy check in
+     * `export-drift.test.ts` reads `pg_policies`, and a member genuinely can
+     * select from it.
+     *
+     * But nothing writes it, and that is a decision rather than an oversight:
+     * `lib/brand/logo-bytes.ts` says "measuring is cheap next to the generation
+     * it rides on, and a reader that writes is a reader that can fail", and
+     * recomputes the facts per request instead. So the export renders
+     * `asset_logo_facts: []` for every customer, for ever.
+     *
+     * The sentence had to change with that. "What Sahoda measured about each
+     * logo you uploaded", above an empty list, tells a reader we measured
+     * nothing about their logos — which is the opposite of true; we measure them
+     * every time we draw a picture and keep none of it. That is the same trap
+     * this file was written for, one step along: `ai_provider_logs` is an empty
+     * array because the reader cannot see it, and this one is an empty array
+     * because there is nothing to see.
+     *
+     * If a writer ever arrives — `set-logo-variant.ts` at upload time is where
+     * it would go — this sentence goes back to the plain one.
+     */
+    table: 'asset_logo_facts',
+    readability: 'readable',
+    describes:
+      'measurements of your logo files. Sahoda works these out each time it draws a picture and does not keep them, so this is empty',
+  },
+  {
     table: 'asset_smart_folders',
     readability: 'readable',
     describes: 'the saved searches you named',

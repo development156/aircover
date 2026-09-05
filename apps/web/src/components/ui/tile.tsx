@@ -43,20 +43,24 @@ export function Tile({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'flex min-h-16 w-full items-center gap-2.5 rounded-card border px-3 py-3 text-left transition-micro',
+        // `rounded` is `--r` (16px): docs/37 §5 puts TILES on that rung and
+        // cards one above it, so a tile inside a card gets the parent's radius
+        // minus one step rather than fighting it with an equal curve. The edge
+        // is an inset ring — this shipped `border` AND `ring-1` on the selected
+        // state, the exact pair §6 forbids, two files from card.tsx saying so.
+        'flex min-h-16 w-full items-center gap-2.5 rounded px-3 py-3 text-left transition-micro',
         'max-narrow:min-h-[44px]',
         selected
-          ? 'border-brand bg-brand-wash ring-1 ring-brand'
-          : 'border-line hover:border-line-firm hover:bg-s2',
-        disabled && 'cursor-not-allowed opacity-45 hover:border-line hover:bg-transparent',
+          ? 'bg-brand-wash shadow-[inset_0_0_0_1.5px_var(--brand)]'
+          : 'surface-ring-firm hover:bg-s2 hover:shadow-[inset_0_0_0_1px_var(--line-firm)]',
+        disabled &&
+          'cursor-not-allowed opacity-45 hover:bg-transparent hover:shadow-[inset_0_0_0_1px_var(--line)]',
         className,
       )}
     >
       {icon ? <span className="flex-none">{icon}</span> : null}
       <span className="min-w-0 flex-1">
-        <span
-          className={cn('block truncate text-[13px]', selected ? 'font-semibold' : 'font-medium')}
-        >
+        <span className={cn('block truncate type-sm', selected ? 'font-semibold' : 'font-medium')}>
           {title}
         </span>
         {meta ? <span className="type-sm block truncate text-muted">{meta}</span> : null}

@@ -62,10 +62,17 @@ describe('deriveSlugSeed', () => {
 })
 
 describe('mapBootstrapError', () => {
-  test('SLUG_TAKEN → typed slug-taken message', () => {
+  /**
+   * The sentence used to be "That name is taken. Try a different one." No
+   * screen has a name field, so "try a different one" was a remedy nobody
+   * could carry out. After the random-suffix attempt a collision is only ever
+   * transient, and the remedy that works is pressing the button again.
+   */
+  test('SLUG_TAKEN → typed slug-taken message that never names a field the screen lacks', () => {
     const result = mapBootstrapError({ message: 'SLUG_TAKEN', code: 'P0001' })
     expect(result).toMatchObject({ ok: false, code: 'SLUG_TAKEN' })
-    expect(result.message).toMatch(/taken/i)
+    expect(result.message).toBe('Could not find a free address for the workspace. Try again.')
+    expect(result.message).not.toMatch(/different (name|one)/i)
   })
 
   test('INVALID_NAME → name error', () => {
@@ -113,14 +120,17 @@ describe('bootstrapWithRetry', () => {
         settings: {},
         created_at: 't',
         updated_at: 't',
-        // The five columns added to `workspaces` after this fixture was
+        // The seven columns added to `workspaces` after this fixture was
         // written. NULL is the real value for all of them on a workspace the
-        // bootstrap has just created: nobody has been asked anything yet.
+        // bootstrap has just created: nobody has been asked anything yet, and
+        // no logo (of either variant) has been set.
         deleted_at: null,
         timezone: null,
         business_model: null,
         regime: null,
         locale: null,
+        logo_asset_id: null,
+        logo_asset_id_dark: null,
       },
       replayed: false,
     },
@@ -146,10 +156,51 @@ describe('bootstrapWithRetry', () => {
     expect(res.data?.workspace.slug).toBe('acme-2')
   })
 
-  test('gives up after maxAttempts, returning the last SLUG_TAKEN error', async () => {
+  /**
+   * THE SIXTH RAHUL. The deterministic suffixes run out at `-5`, and every
+   * screen that offers Create workspace is a bare submit button with no name
+   * field, so a sixth signup sharing a first name was stranded on the first
+   * screen of the product with a refusal it could not act on. One more attempt
+   * with a random suffix ends that: the slug is a pointer, not identity.
+   */
+  test('a sixth namesake still gets a workspace, on a random suffix within the cap', async () => {
+    const call = vi.fn(async (slug: string) =>
+      /^acme(-[2-5])?$/.test(slug)
+        ? { data: null, error: { message: 'SLUG_TAKEN' } }
+        : okResult(slug),
+    )
+    const res = await bootstrapWithRetry(call, 'acme')
+    expect(res.error).toBeNull()
+    expect(call).toHaveBeenCalledTimes(6)
+    expect(res.data?.workspace.slug).toMatch(/^acme-[0-9a-f]{6}$/)
+  })
+
+  test('the random fallback shortens a long base so the slug stays within 48 chars', async () => {
+    const base = 'a'.repeat(48)
+    // Only the random shape is free; the base and every `-n` suffix are taken.
+    const call = vi.fn(async (slug: string) =>
+      /^a{41}-[0-9a-f]{6}$/.test(slug)
+        ? okResult(slug)
+        : { data: null, error: { message: 'SLUG_TAKEN' } },
+    )
+    const res = await bootstrapWithRetry(call, base)
+    expect(res.error).toBeNull()
+    const slug = res.data?.workspace.slug ?? ''
+    expect(slug.length).toBeLessThanOrEqual(48)
+    expect(slug).toMatch(/^a{41}-[0-9a-f]{6}$/)
+  })
+
+  test('the cap the fallback shortens to is the cap slugify enforces', () => {
+    // Two constants in two files. If lib/slug.ts moves its cap, this is the
+    // line that says the fallback has to move with it.
+    expect(slugify('a'.repeat(100))).toHaveLength(48)
+  })
+
+  test('gives up only after the deterministic attempts AND the random one, still SLUG_TAKEN', async () => {
     const call = vi.fn(async () => ({ data: null, error: { message: 'SLUG_TAKEN' } }))
     const res = await bootstrapWithRetry(call, 'acme', 3)
-    expect(call).toHaveBeenCalledTimes(3)
+    // 3 deterministic + 1 random. The last error is still the collision.
+    expect(call).toHaveBeenCalledTimes(4)
     expect(res.data).toBeNull()
     expect(res.error?.message).toContain('SLUG_TAKEN')
   })

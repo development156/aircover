@@ -33,6 +33,7 @@ import { assetObjectPath, derivativePrefix } from '@/lib/posts/media-path'
 import { mapPostError } from '@/lib/posts/post-error'
 import { getPost, readMedia, readVariantFormatsStrict } from '@/lib/posts/read'
 import { sniffImage } from '@/lib/posts/sniff-image'
+import { readStorageUsage, storageRefusal } from '@/lib/storage/usage'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { workspaceForWrite } from '@/lib/workspaces'
 
@@ -152,9 +153,19 @@ export async function uploadAsset(formData: FormData): Promise<UploadAssetState>
     if (file.size > MEDIA_UPLOAD_CAP_BYTES) {
       return {
         ok: false,
-        message: `That file is larger than ${Math.floor(MEDIA_UPLOAD_CAP_BYTES / 1_000_000)} MB, which no channel accepts.`,
+        message: `That file is larger than ${Math.floor(MEDIA_UPLOAD_CAP_BYTES / 1_000_000)} MB, which is the most an upload can carry.`,
       }
     }
+
+    // THE WORKSPACE ALLOWANCE, CHECKED BEFORE THE BYTES ARE READ.
+    //
+    // Above this line is the per-FILE ceiling; this is the per-WORKSPACE one, and
+    // they refuse for different reasons. Asked here rather than after the upload
+    // so that a full workspace costs the customer no wait and us no transfer, and
+    // leaves no object for the sweep to find. `storageRefusal` fails open when the
+    // figure cannot be read — see its own comment for why that is the safe way round.
+    const refusal = storageRefusal(await readStorageUsage(workspace.id), file.size)
+    if (refusal) return { ok: false, message: refusal }
 
     const bytes = new Uint8Array(await file.arrayBuffer())
 
@@ -557,7 +568,10 @@ export async function emptyTrash(): Promise<EmptyTrashState> {
     }
 
     revalidatePath('/assets')
-    return { ok: true, deleted, kept }
+    // `capped` is the read saying it stopped at ASSET_LIST_LIMIT rather than at
+    // the end of the trash. Dropping it here is what made "Deleted 200 files for
+    // good" a claim that the trash was empty when 300 files were still in it.
+    return { ok: true, deleted, kept, more: trash.capped }
   } catch (error) {
     reportServerError(error, { action: 'emptyTrash', workspaceId })
     return { ok: false, message: 'Could not empty the trash. Try again.' }
@@ -791,8 +805,13 @@ export async function attachAssetToPost(
     //
     // The refusal already exists a few lines up, for a file whose dimensions are
     // missing; this is the same sentence for the same reason.
-    const existing = await readMedia(postId)
-    const formats = await readVariantFormatsStrict(postId)
+    // Both take only `postId` and neither reads the other, so they go together.
+    // Serially this cost the customer two database round trips before the first
+    // byte of their photo was judged.
+    const [existing, formats] = await Promise.all([
+      readMedia(postId),
+      readVariantFormatsStrict(postId),
+    ])
     if (existing === null || formats === null) {
       return {
         ok: false,

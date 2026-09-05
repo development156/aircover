@@ -199,7 +199,15 @@ export function SpendTrend({
             aria-hidden
             data-avg-rule
             className="pointer-events-none absolute right-0 left-0 border-t border-dotted border-line-firm"
-            style={{ top: `${((1 - heightFraction(average)) * 100).toFixed(2)}%` }}
+            /* ── THROUGH `py`, LIKE EVERYTHING ELSE THAT IS PLOTTED ──────────
+               This was `(1 - heightFraction(average)) * 100`, which ignores
+               PAD_TOP and PAD_BOTTOM while the line and the hover dot below both
+               go through `py`. MEASURED with the panel's own constants
+               (H 160, pad 8/2): the right answer is `98.75 - 93.75f` and that
+               expression is `100 - 100f`, so the rule sat 8px too high at the
+               peak and 2px too low at the baseline. With points [40, 41, 42] the
+               "Avg 41" rule drew ABOVE the plotted 42. */
+            style={{ top: `${((py(average) / H) * 100).toFixed(2)}%` }}
           >
             <span className="absolute -top-2.5 left-0 rounded-xs bg-ink px-1.5 py-0.5 type-chip text-white">
               Avg <span className="num">{Math.round(average).toLocaleString('en-IN')}</span>
@@ -234,7 +242,7 @@ export function SpendTrend({
               top: `${((py(active!.value as number) / H) * 100).toFixed(2)}%`,
             }}
           >
-            <span className="absolute -translate-x-1/2 -translate-y-1/2 block size-2 rounded-full bg-brand ring-2 ring-surface" />
+            <span className="absolute -translate-x-1/2 -translate-y-1/2 block size-2 rounded-pill bg-brand ring-2 ring-surface" />
             <span
               data-tip
               className="absolute bottom-3 -translate-x-1/2 rounded-sm bg-ink px-2 py-1 type-chip whitespace-nowrap text-white"

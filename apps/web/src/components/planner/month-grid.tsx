@@ -36,15 +36,22 @@ const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const
 export function MonthGrid({ buckets, monthAnchor }: { buckets: WeekBuckets; monthAnchor: Date }) {
   return (
     <section className="surface-ring overflow-hidden rounded-card bg-surface">
-      <header className="flex min-h-[46px] items-center gap-3 border-b border-line-soft px-4 py-3">
+      <header className="flex min-h-[46px] items-center gap-3 px-5 pt-5 pb-3 max-narrow:px-4">
         {/* `shrink-0 whitespace-nowrap`: this is a flex item, and a flex item
             shrinks below its content by default, so at 390px the IST note beside
             it squeezed the label into two lines reading "August" / "2026". A month
             and its year are one token. Same failure the topbar chips had. */}
-        <h2 className="shrink-0 text-[14px] font-semibold tracking-[-0.01em] whitespace-nowrap">
+        <h2 className="type-h3 shrink-0 whitespace-nowrap text-ink">
           {istMonthLabel(monthAnchor)}
         </h2>
-        <p className="ml-auto text-[12px] text-muted">
+        {/* THE SENTENCE IS NOT SHORTENED TO "Times in IST". The brief asks for
+            less text and this is the one line that keeps every word, because the
+            clause carries a claim the short form does not: these times are the
+            zone the schedule is STORED in, not a conversion into the reader's
+            own. A workspace in Dubai reads GST in the rail beside this grid and
+            IST inside it, and this clause is the only thing on screen that
+            explains why. Quieter, yes. Vaguer, no. */}
+        <p className="ml-auto type-meta text-muted">
           Times are shown in IST, the zone every schedule is stored in.
         </p>
       </header>
@@ -64,9 +71,9 @@ export function MonthGrid({ buckets, monthAnchor }: { buckets: WeekBuckets; mont
         {/* `aria-hidden` because each cell already names its own date — a screen
             reader reading seven weekday names before the grid would announce a
             header row it cannot navigate by. */}
-        <div aria-hidden className="grid min-w-[840px] grid-cols-7 border-b border-line-soft">
+        <div aria-hidden className="grid min-w-[840px] grid-cols-7 border-y border-line-soft">
           {WEEKDAYS.map((day) => (
-            <div key={day} className="type-eyebrow px-2 py-2 text-center text-muted">
+            <div key={day} className="type-eyebrow px-2 py-2 text-center text-ink-mute">
               {day}
             </div>
           ))}
@@ -79,16 +86,25 @@ export function MonthGrid({ buckets, monthAnchor }: { buckets: WeekBuckets; mont
               <div
                 key={bucket.key}
                 className={cn(
-                  'min-h-[104px] border-r border-b border-line-soft p-2 last:border-r-0',
+                  // 128px, up from 104. The brief asks for "large usable cells"
+                  // and the calendar to be the page's primary workspace; at 104
+                  // a cell holding two posts had no room left and the grid read
+                  // as a summary of a calendar rather than one.
+                  'group/day min-h-[128px] border-r border-b border-line-soft p-2 transition-micro last:border-r-0',
                   // Outside the displayed month: quieter ground, but the posts
                   // still render at full strength.
-                  inMonth ? 'bg-surface' : 'bg-s2',
+                  inMonth ? 'bg-surface hover:bg-s2' : 'bg-s2',
                 )}
               >
                 <p
                   className={cn(
-                    'text-[11px] font-semibold tabular-nums',
-                    inMonth ? 'text-ink' : 'text-muted',
+                    'num type-meta',
+                    // A date is a label, not a heading. It was `font-semibold`
+                    // at every cell, which put 42 bold numerals on the screen
+                    // competing with the post titles that are the actual
+                    // content. Only TODAY is emphasised now, and it is
+                    // emphasised by a mark rather than by weight.
+                    inMonth ? 'text-ink' : 'text-ink-mute',
                   )}
                 >
                   {istDayOfMonth(bucket.date)}
@@ -101,11 +117,35 @@ export function MonthGrid({ buckets, monthAnchor }: { buckets: WeekBuckets; mont
                         href={`/posts/${post.id}` as Route}
                         className="surface-ring block rounded-sm bg-surface px-[6px] py-[3px] transition-micro hover:shadow-[inset_0_0_0_1px_var(--line-firm)]"
                       >
-                        <span className="block truncate text-[11px] font-[550] text-ink">
-                          {post.title?.trim() || 'Untitled post'}
+                        <span className="flex items-center gap-1.5">
+                          {/* ── THE ORANGE INDICATOR THE BRIEF ASKS FOR ──────
+                              A 4px dot, filled for SCHEDULED and hollow for
+                              anything else — the same two marks, meaning the
+                              same two things, that the mini calendar in the rail
+                              already draws and already legends. A third mark was
+                              not added: the tab bar above answers "needs
+                              approval" with a number, and this cell is 118px
+                              wide.
+
+                              `--brand` at 16px² is far under the 1000px² floor
+                              `accent-budget.spec.ts` uses to tell a fill from a
+                              dot, so a full month of scheduled posts still spends
+                              no accent budget. It is an indicator, not a fill. */}
+                          <span
+                            aria-hidden
+                            className={cn(
+                              'size-1 shrink-0 rounded-pill',
+                              post.intent === 'scheduled'
+                                ? 'bg-brand'
+                                : 'shadow-[inset_0_0_0_1px_var(--line-firm)]',
+                            )}
+                          />
+                          <span className="min-w-0 flex-1 truncate type-meta font-[550] text-ink">
+                            {post.title?.trim() || 'Untitled post'}
+                          </span>
                         </span>
                         {post.channels.length > 0 ? (
-                          <span className="block truncate text-[10px] text-muted">
+                          <span className="block truncate pl-2.5 text-[10px] text-muted">
                             {post.channels.map((c) => CHANNEL_SHORT[c]).join(' · ')}
                           </span>
                         ) : null}
@@ -123,7 +163,7 @@ export function MonthGrid({ buckets, monthAnchor }: { buckets: WeekBuckets; mont
           stated here rather than silently dropped — the failure mode of every
           calendar view is work that exists and is nowhere on screen. */}
       {buckets.unscheduled.length > 0 ? (
-        <p className="border-t border-line-soft px-4 py-3 text-[12px] text-muted">
+        <p className="border-t border-line-soft px-5 py-3 type-meta text-muted max-narrow:px-4">
           <span className="font-[550] text-ink tabular-nums">{buckets.unscheduled.length}</span>{' '}
           {buckets.unscheduled.length === 1 ? 'post has' : 'posts have'} no date yet, so they cannot
           appear on a calendar.{' '}

@@ -4,8 +4,6 @@ import { useState } from 'react'
 import { FolderInput, FolderMinus, Trash2, X } from 'lucide-react'
 import type { AssetFolder } from '@sahoda/shared'
 
-import { cn } from '@/lib/utils'
-
 /**
  * THE BULK BAR — appears once something is selected, and only then.
  *
@@ -129,7 +127,7 @@ export function BulkBar({
         type="button"
         onClick={onClear}
         aria-label="Clear selection"
-        className="ml-auto grid size-7 place-items-center rounded-sm text-muted transition-micro hover:bg-s2 hover:text-ink"
+        className="ml-auto grid size-7 place-items-center max-narrow:size-11 rounded-sm text-muted transition-micro hover:bg-s2 hover:text-ink"
       >
         <X size={14} aria-hidden />
       </button>

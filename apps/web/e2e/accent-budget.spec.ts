@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { adminClient, expect, test } from './fixtures/seeded-user'
+import { dismissPlanOffer } from './fixtures/compose'
 import { useTheme, type Theme } from './helpers/ux-shot'
 import type { Page } from '@playwright/test'
 
@@ -276,6 +277,13 @@ async function sweep(page: Page, state: string, report: string[], over: string[]
       for (const width of WIDTHS) {
         await page.setViewportSize({ width, height: 900 })
         await page.goto(route, { waitUntil: 'domcontentloaded' })
+        // /home opens the plan offer for a workspace on Free, which every seeded
+        // account is, and its recommended plan carries a solid brand fill. That
+        // is a SECOND fill on this page and this guard would have counted it —
+        // intermittently, since the dialog waits on Clerk's client SDK, which is
+        // the worst way for a guard to fail. The dialog is the customer's to
+        // close and this measures the screen behind it.
+        await dismissPlanOffer(page)
         // Park the pointer off-screen. A hovered primary paints `--brand-deep`
         // (black) and would be MISSED, so a run that left the mouse on the
         // button would report one fewer fill than ships.

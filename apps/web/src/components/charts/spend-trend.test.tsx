@@ -69,6 +69,34 @@ describe('SpendTrend — what it may not claim', () => {
     expect(Math.max(...ys) - Math.min(...ys)).toBeLessThan(12)
   })
 
+  it('draws the average rule inside the plot, never above the highest point', () => {
+    // ── THE RULE USED ITS OWN GEOMETRY ──────────────────────────────────────
+    // `top` was `(1 - heightFraction(average)) * 100`, which ignores PAD_TOP and
+    // PAD_BOTTOM, while the line path and the hover dot both go through `py`.
+    // MEASURED with the panel's constants (H 160, pad 8/2): the correct
+    // expression is `98.75 - 93.75f` and that one is `100 - 100f`.
+    //
+    // 40/41/42 is the dataset that shows it: the rule landed at 2.38% while the
+    // plotted 42 sat at 5.00%, so "Avg 41" was drawn ABOVE the highest reading
+    // on the chart. Asserted against the PATH rather than against a number, so
+    // the guard survives a change to the padding.
+    const { container } = render(<SpendTrend points={days([40, 41, 42])} unit="credits" />)
+
+    const d = container.querySelector('path[stroke="var(--brand)"]')!.getAttribute('d')!
+    const ys = [...d.matchAll(/[ML]\d+(?:\.\d+)? (\d+(?:\.\d+)?)/g)].map((m) => Number(m[1]))
+    const highestPointY = Math.min(...ys)
+    const lowestPointY = Math.max(...ys)
+
+    const rule = container.querySelector('[data-avg-rule]') as HTMLElement
+    // `top` is a percentage of the panel; the path is in viewBox units of H.
+    const ruleY = (parseFloat(rule.style.top) / 100) * 160
+
+    // Larger y is further down. The average of 40/41/42 is between them, so the
+    // rule must sit between the highest and lowest plotted points.
+    expect(ruleY).toBeGreaterThan(highestPointY)
+    expect(ruleY).toBeLessThan(lowestPointY)
+  })
+
   it('averages the days it read, not the days it did not', () => {
     // Two measured days, 10 and 30, and two unread. The average is 20. Dividing
     // by four would print 10 and understate what was actually spent per day.

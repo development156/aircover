@@ -115,7 +115,7 @@ export function RailToggle() {
            well as from the page on its right, and a fill equal to the panel
            would leave it edgeless on that side. The white chevron carries the
            contrast either way — 12:1 on #292929. */
-        'rounded-full bg-surface-3 text-ink ring-1 ring-line-firm',
+        'rounded-pill bg-surface-3 text-ink ring-1 ring-line-firm',
         'transition-micro hover:bg-surface-2',
         'focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
         /* ── HIDDEN BELOW 1180, AND THAT IS THE POINT ──────────────────────

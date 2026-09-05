@@ -9,7 +9,7 @@ import {
   createCashfreeProvider,
   loadCashfreeEnv,
 } from '@sahoda/billing'
-import { PlanIdSchema, parseGstin, type PlanId } from '@sahoda/shared'
+import { PlanIdSchema, parseGstin } from '@sahoda/shared'
 
 import { env } from '@/lib/env'
 import { reportServerError } from '@/lib/observability/report'
@@ -23,6 +23,7 @@ import type {
   PlanPreviewState,
   UpgradeCheckoutState,
 } from '@/lib/billing/plan-state'
+import { checkoutFailureMessage } from '@/lib/billing/checkout-failure-copy'
 
 /**
  * Plan changes, from the screen.
@@ -280,7 +281,9 @@ export async function startPlanUpgrade(planId: unknown): Promise<UpgradeCheckout
     return { ok: true, simulated: false, mode: 'live', sessionId: session.id, url: session.url }
   } catch (error) {
     reportServerError(error, { action: 'startPlanUpgrade', workspaceId })
-    return { ok: false, message: 'Sahoda could not start that upgrade. Try again.' }
+    // Same reasoning as `startCheckout`: a permanent provider refusal must not
+    // be sold to a customer as something pressing the button again will fix.
+    return { ok: false, message: checkoutFailureMessage(error) }
   }
 }
 

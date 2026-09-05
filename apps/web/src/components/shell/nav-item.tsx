@@ -145,7 +145,7 @@ export function NavItem({
         // The 2px rail. Structure, not decoration: it is the one active signal
         // that survives greyscale, so the state does not rest on hue alone.
         active &&
-          'before:absolute before:top-2 before:bottom-2 before:-left-[9px] before:w-[2px] before:rounded-full before:bg-brand before:content-[""]',
+          'before:absolute before:top-2 before:bottom-2 before:-left-[9px] before:w-[2px] before:rounded-pill before:bg-brand before:content-[""]',
         active && 'rail-min:before:hidden',
       )}
     >
@@ -169,7 +169,7 @@ export function NavItem({
       {count !== undefined && count > 0 ? (
         <>
           {/* Expanded: the number, pushed to the trailing edge. */}
-          <span className="ml-auto grid h-[18px] min-w-[18px] flex-none place-items-center rounded-full bg-brand px-[5px] text-[11px] font-bold text-primary-foreground tabular-nums rail-min:hidden">
+          <span className="ml-auto grid h-[18px] min-w-[18px] flex-none place-items-center rounded-pill bg-brand px-[5px] text-[11px] font-bold text-primary-foreground tabular-nums rail-min:hidden">
             {count}
           </span>
           {/* Collapsed: a dot. The count has nowhere to go in a 64px rail, but
@@ -177,7 +177,7 @@ export function NavItem({
               for. The accessible name below carries the number either way. */}
           <span
             aria-hidden
-            className="absolute top-[7px] right-[13px] hidden size-[7px] rounded-full bg-brand ring-2 ring-surface rail-min:block"
+            className="absolute top-[7px] right-[13px] hidden size-[7px] rounded-pill bg-brand ring-2 ring-surface rail-min:block"
           />
           <span className="sr-only">{count} waiting</span>
         </>

@@ -31,12 +31,21 @@ const nextConfig: NextConfig = {
     // trusted from the browser — `validateMedia` checks all three, and against
     // client-supplied values it would be validating a claim, not a file.
     //
-    // The ceiling is the Constraint Engine's own: the largest `maxMediaMB` is
-    // Instagram's 8, so 12 MB leaves room for multipart overhead while still
-    // refusing anything no channel could accept. Raise this only if a channel's
-    // limit rises — it is a real memory cost per request, and a direct-to-
-    // storage signed upload URL is the right answer if media ever gets large.
-    serverActions: { bodySizeLimit: '12mb' },
+    // The ceiling is the PLATFORM's, not the Constraint Engine's. This was
+    // '12mb', derived from Instagram's 8 MB plus multipart overhead. Vercel
+    // answers 413 FUNCTION_PAYLOAD_TOO_LARGE at the edge for any function
+    // request body over 4.5 MB, before Next runs, so the 12 was unreachable in
+    // production and a 6 MB photo failed there while passing on every laptop.
+    //
+    // '4mb' is 4,194,304 binary bytes (Next parses this with the `bytes`
+    // package), which sits under the 4.5 MB edge limit and leaves room above
+    // MEDIA_UPLOAD_CAP_BYTES for the multipart envelope. Raising it past 4.5 MB
+    // does nothing: the request never reaches this config. Larger media needs
+    // the signed direct-to-storage upload plus a server-side re-read of the
+    // stored bytes, which is the real answer and is not this line.
+    // `lib/posts/media-constants.ts` holds the matching product cap and
+    // `media-constants.test.ts` reads this file to keep the two in step.
+    serverActions: { bodySizeLimit: '4mb' },
   },
   /**
    * THE HEADERS THAT WERE MEASURED ABSENT, 2026-08-23.

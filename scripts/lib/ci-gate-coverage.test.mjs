@@ -123,9 +123,20 @@ describe('the CI workflow covers the gate, or says which part it does not', () =
     // matches `head_ref`. Asserted as an exact expression rather than "contains
     // a branch-ish thing", because the whole defect was two expressions that
     // both name the branch and do not match each other.
-    const group = /concurrency:\s*\n\s*group: (.+)/.exec(WORKFLOW)?.[1]
+    // Comments may sit between `concurrency:` and `group:`; skip them.
+    const group = /concurrency:\s*\n(?:\s*#[^\n]*\n)*\s*group: (.+)/.exec(WORKFLOW)?.[1]
     expect(group, 'no concurrency group').toBeDefined()
-    expect(group).toBe('gate-${{ github.head_ref || github.ref_name }}')
+    // The push/pull_request half is exact, as before. Since 2026-09-05 a
+    // dispatched run appends its own run id: MEASURED, two smoke dispatches
+    // were cancelled by a teammate's push seconds later because all three
+    // events shared one group. The suffix must be EMPTY for push and
+    // pull_request (or the pair stops collapsing) and must key on run_id for a
+    // dispatch (or a second dispatch cancels the first).
+    expect(group.startsWith('gate-${{ github.head_ref || github.ref_name }}')).toBe(true)
+    const suffix = group.slice('gate-${{ github.head_ref || github.ref_name }}'.length)
+    expect(suffix).toMatch(/workflow_dispatch/)
+    expect(suffix).toMatch(/run_id/)
+    expect(suffix).toMatch(/\|\| ''/)
     // Named explicitly: `github.ref` carries a `refs/heads/` prefix that
     // `head_ref` does not, so pairing the two can never collapse.
     expect(group).not.toMatch(/github\.ref\s*\}\}/)
@@ -159,6 +170,78 @@ describe('the CI workflow covers the gate, or says which part it does not', () =
         WORKFLOW,
         `${name} is declared on test:smoke but the workflow never sets it`,
       ).toContain(`${name}:`)
+    }
+  })
+
+  it('the refusal guard checks every secret the run step forwards', () => {
+    /**
+     * ── THE DEFECT THIS EXISTS FOR ──────────────────────────────────────────
+     * The guard step refused on THREE names while the run step below it
+     * forwarded SIX. Two of the missing three are in `cloud-setup.sh`'s
+     * ENV_REQUIRED, so somebody who added exactly the three the guard asked for
+     * CLEARED IT and then died inside the suite with the opaque failure the
+     * guard exists to prevent. A guard that certifies a configuration it never
+     * checked is worse than no guard: it says the environment is ready.
+     *
+     * The test directly above -- "passes every environment variable the smoke
+     * task declares" -- could NOT see this, and that is the point of adding a
+     * second one. It asserts the workflow mentions each name somewhere, and the
+     * run step mentions all six, so it was green throughout. Presence in the
+     * FILE is not presence in the GUARD.
+     */
+    const turbo = JSON.parse(readFileSync(resolve(ROOT, 'turbo.json'), 'utf8'))
+    const declared = turbo.tasks['test:smoke'].env.filter(
+      (name) => !name.startsWith('E2E_') && name !== 'SAHODA_E2E_ACK_TARGET',
+    )
+    expect(declared.length).toBe(6)
+
+    // The guard's list, read out of its own NEEDED block rather than retyped --
+    // a retyped copy is a third list that can drift from the other two.
+    const block = /NEEDED="([^"]+)"/.exec(WORKFLOW)
+    expect(block, 'could not find the NEEDED list in the refusal guard').not.toBeNull()
+    // Each line is ENV=SECRET since 2026-09-05: the four Supabase values are read
+    // from E2E_-prefixed secrets that name STAGING, because the unprefixed names
+    // are production and three nightly workflows write real customers' metrics
+    // through them. MEASURED, run 33961015055: with the six unprefixed secrets
+    // set, the guard passed and the suite refused `refused-production` in 9s.
+    const pairs = block[1]
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line !== '')
+      .map((line) => {
+        const [env, secret] = line.split('=')
+        expect(secret, `${line} is not an ENV=SECRET pair`).toBeDefined()
+        return { env, secret }
+      })
+    const checked = pairs.map((p) => p.env)
+
+    expect([...checked].sort()).toEqual([...declared].sort())
+
+    // And each one must be wired to BOTH namespaces, or the "wrong tab" half of
+    // the message silently stops reporting for that name -- and wired to the
+    // SAME secret the run step forwards, or the guard certifies one value while
+    // the suite runs on another.
+    for (const { env, secret } of pairs) {
+      expect(WORKFLOW, `${env} has no SECRET_ binding in the guard`).toContain(
+        `SECRET_${env}: \${{ secrets.${secret} }}`,
+      )
+      expect(WORKFLOW, `${env} has no VAR_ binding in the guard`).toContain(
+        `VAR_${env}: \${{ vars.${secret} }}`,
+      )
+      // Anchored at a line start: a bare `toContain` here was green under
+      // mutation, because `SECRET_SUPABASE_DB_URL: ...` in the guard block
+      // CONTAINS `SUPABASE_DB_URL: ...`. MEASURED 2026-09-05, first draft.
+      const escaped = (v) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      expect(WORKFLOW, `the run step does not forward ${secret} as ${env}`).toMatch(
+        new RegExp(`\\n\\s+${escaped(env)}: ${escaped(`\${{ secrets.${secret} }}`)}`),
+      )
+    }
+
+    // The four Supabase values must NOT be the production names: the nightly
+    // workflows read those, and the suite refuses production by design.
+    for (const { env, secret } of pairs) {
+      if (env.includes('SUPABASE'))
+        expect(secret, `${env} reads a production secret`).toMatch(/^E2E_/)
     }
   })
 })

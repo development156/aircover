@@ -2,6 +2,7 @@ import Link from 'next/link'
 import {
   CalendarDays,
   ClipboardCheck,
+  Clock,
   Coins,
   Eye,
   Lightbulb,
@@ -10,10 +11,15 @@ import {
 } from 'lucide-react'
 
 import { ObservationNote } from '@/components/brain/observation-note'
+import { CHANNEL_LABELS } from '@/components/posts/channel-label'
+import { metricInWords } from '@/lib/report/metric-words'
 import { AtAGlanceCard, CreditsCard, InsightPromiseCard } from '@/components/report/insights'
 import { ReportModule } from '@/components/report/module'
 import { PageTitle } from '@/components/page-title'
 import { reflectionWindow } from '@/lib/loop/iso-week'
+import { bestSlotSentence } from '@/lib/analytics/timing'
+import { readWindow } from '@/lib/analytics/window-data'
+import { resolveView } from '@/lib/analytics/view-params'
 import { readBrainObservations, type BrainRead } from '@/lib/brain/read'
 import { brainWaiting } from '@/lib/brain/waiting'
 import { readLoop } from '@/lib/loop/read'
@@ -46,6 +52,25 @@ export const metadata = { title: 'CMO Report' }
  * there is no ranking to make — fewer than two posts measured — the block says
  * so, because one post is simultaneously the best and the worst and printing
  * that is worse than printing nothing.
+ *
+ * ── THERE WAS A SECOND, COMPLETE DESIGN OF THIS SCREEN. IT IS GONE ───────────
+ * `components/report/report-body.tsx` and the whole of `lib/report/` were a
+ * rival CMO Report: a verdict-first weekly note with a WhatsApp plain-text
+ * variant. Both designs were finished, both were argued for in their own
+ * headers, and one screen cannot have two.
+ *
+ * The choice was already made twice before anybody wrote it down. `87abe541`
+ * replaced the page with this one, and `af3c20cc` deleted the five readers the
+ * other design needed — `readReach`, `readReplies`, `readEnquiries`,
+ * `readPlanTimes`, `readPostTitles` — as dead code. So mounting it was never a
+ * missing import; it was rebuilding a data layer that had been removed on
+ * purpose, to reinstate a design that had been replaced on purpose.
+ *
+ * Deleted 2026-09-04: 11 modules and 4 test files, a closed cluster whose every
+ * product consumer was inside itself. Nothing outside it referred to any of it,
+ * which is why it could sit there complete and unreachable. If the verdict-first
+ * form is ever wanted back, it is in git and this comment names the commit that
+ * removed it — bring back the design AND its readers, and delete this one.
  */
 /**
  * The report's own table of contents, and it is the SAME list the filled report
@@ -174,17 +199,45 @@ export default async function ReportPage() {
   }
 
   const window = reflectionWindow(new Date(cycle.startedAt))
-  const [ranking, learnings] = await Promise.all([
+  const [ranking, learnings, timingRead] = await Promise.all([
     readRanking(workspace.id, window.fromIso, window.toIso),
     readCycleLearnings(workspace.id, cycle.id),
+    /**
+     * THE SAME READ /analytics MAKES, calling the same function.
+     *
+     * Not a second query shaped like it: `readWindow` is one function and
+     * `bestSlotSentence` is one code path, so the sentence below and the grid on
+     * Analytics come from identical data through identical arithmetic. Two
+     * implementations of "the best time to post" disagree eventually, and the
+     * customer meets the two screens an hour apart.
+     *
+     * The default view is passed because the timing grid deliberately ignores
+     * the date window: it is a claim about the business rather than about
+     * thirty days, and a best slot that moved whenever somebody changed a date
+     * filter would not be a pattern.
+     */
+    readWindow(resolveView({})),
   ])
+
+  const slotSentence = timingRead.kind === 'ready' ? bestSlotSentence(timingRead.timing) : null
 
   const written = snapshot.briefs.filter((b) => b.postId !== null)
   // The three-card column only promises insights while there genuinely are
   // none. Beside real ones it would read as a product that had not noticed its
   // own output.
-  const hasFindings =
+  // ── THREE ANSWERS, BECAUSE A FAILED READ IS NOT AN EMPTY ONE ──────────────
+  // This was a boolean, and `brain.status !== 'ok'` fell into the false arm — so
+  // a workspace whose Brand Brain could not be read got `InsightPromiseCard`
+  // ("Once your posts start rolling, you'll see clear insights here every
+  // Monday"), which blames the empty column on them not having posted, directly
+  // beside a block saying the read failed. The promise may only be made when we
+  // actually KNOW there is nothing.
+  const findings: 'some' | 'none' | 'unknown' =
     learnings.length > 0 || (brain.status === 'ok' && brain.observations.length > 0)
+      ? 'some'
+      : brain.status === 'ok'
+        ? 'none'
+        : 'unknown'
 
   return (
     <div className="space-y-6">
@@ -230,8 +283,8 @@ export default async function ReportPage() {
               >
                 <p className="type-body max-w-[68ch] text-ink">{ranking.top.title}</p>
                 <p className="type-sm mt-1 text-muted">
-                  <span className="num">{ranking.top.value}</span> {ranking.top.metric} on{' '}
-                  {ranking.top.channel}.
+                  <span className="num">{ranking.top.value}</span>{' '}
+                  {metricInWords(ranking.top.metric)} on {CHANNEL_LABELS[ranking.top.channel]}.
                 </p>
               </ReportModule>
               <ReportModule
@@ -242,8 +295,9 @@ export default async function ReportPage() {
               >
                 <p className="type-body max-w-[68ch] text-ink">{ranking.bottom.title}</p>
                 <p className="type-sm mt-1 text-muted">
-                  <span className="num">{ranking.bottom.value}</span> {ranking.bottom.metric} on{' '}
-                  {ranking.bottom.channel}.
+                  <span className="num">{ranking.bottom.value}</span>{' '}
+                  {metricInWords(ranking.bottom.metric)} on {CHANNEL_LABELS[ranking.bottom.channel]}
+                  .
                 </p>
                 {/* NO REASON IS GIVEN, and its absence is deliberate. Every
                     candidate reason would be Sahoda asserting a CAUSE, and
@@ -318,9 +372,38 @@ export default async function ReportPage() {
             )}
           </ReportModule>
 
+          {/* ── WHEN TO POST ─────────────────────────────────────────────
+              THE SENTENCE COMES FROM THE SAME SELECTOR ANALYTICS DRAWS ITS GRID
+              FROM. `bestSlotSentence(timing)` is the only code path that
+              produces it, and Analytics renders the identical string beneath
+              its heatmap. Two calculations of "the best time to post" WILL
+              disagree, and the customer meets the two screens an hour apart.
+
+              It renders nothing when the selector has no defensible winner.
+              Nothing, rather than a hedge: "no best time found" invites the
+              reader to believe there is one and Sahoda is being coy. */}
+          {slotSentence ? (
+            <ReportModule
+              n={ranking ? 7 : 5}
+              eyebrow="What the numbers say about timing"
+              title="When to post"
+              icon={Clock}
+            >
+              <p className="type-body max-w-[68ch] text-ink">{slotSentence}</p>
+              <p className="type-sm mt-1 text-muted">
+                Worked out from every post you have published, each read at the same age so an older
+                post does not win for being older.{' '}
+                <Link href="/analytics" className="underline-offset-2 hover:underline">
+                  See the grid behind this
+                </Link>
+                .
+              </p>
+            </ReportModule>
+          ) : null}
+
           {/* ── THE MONEY, and the one module that carries the accent ───── */}
           <ReportModule
-            n={ranking ? 7 : 5}
+            n={ranking ? 8 : 6}
             eyebrow="And what it cost"
             title="Credits used"
             icon={Coins}
@@ -365,7 +448,15 @@ export default async function ReportPage() {
               { label: 'Posts measured', value: ranking ? ranking.postsMeasured : null },
               { label: 'Written this week', value: written.length },
               { label: 'Spent', value: cycle.spentCredits, unit: 'cr' },
-              { label: 'Approved', value: cycle.approvedCredits, unit: 'cr' },
+              {
+                label: 'Approved',
+                value: cycle.approvedCredits,
+                unit: 'cr',
+                // Null here means no spending was ever put to this person for
+                // approval, which is not a reading we failed to take. It was
+                // announced as "Approved has not been measured yet".
+                absent: 'Nothing has been put to you for approval in this cycle',
+              },
             ]}
             note={
               ranking
@@ -374,7 +465,7 @@ export default async function ReportPage() {
             }
           />
           <CreditsCard balance={balance} spent={cycle.spentCredits} budget={cycle.budgetCredits} />
-          {hasFindings ? null : <InsightPromiseCard />}
+          {findings === 'none' ? <InsightPromiseCard /> : null}
         </aside>
       </div>
     </div>

@@ -35,8 +35,53 @@ import { resolve } from 'node:path'
  * hand-written list cannot see a scanner arrive in a later lane.
  */
 
-/** How a guard might reach the source tree. Any of these makes it a scanner. */
+/**
+ * How a guard might reach the source tree. The WIDE net, used for `git grep`
+ * only: it is a candidate list, not a verdict.
+ */
 const READS_SOURCE = /readFileSync|readdirSync|globSync|execFileSync|execSync/
+
+/**
+ * THE SAME NAMES, BUT SHAPED LIKE A CALL — AND THIS ONE DECIDES.
+ *
+ * `READS_SOURCE` is a bare identifier match over the whole file, comments
+ * included, so a file is flagged for MENTIONING a reader in prose. That is not
+ * theoretical: `apps/web/src/lib/brand/logo-facts.test.ts` was flagged on
+ * 2026-09-01 for a doc comment whose entire purpose was to explain that it calls
+ * none of them — "`scanner-registry.mjs` only flags a test file that calls
+ * `readFileSync`, `readdirSync`, `globSync`, `execFileSync` or `execSync` — this
+ * one calls none of them". Its author reasoned correctly and was flagged for
+ * writing the reasoning down, and the gate went red for a lane that had not
+ * touched the file. The comment was later reworded upstream, which cleared the
+ * symptom and left the cause.
+ *
+ * The failure this must not have is the OPPOSITE one — a real scanner slipping
+ * out of the register — so the narrowing is the smallest that separates prose
+ * from code: an identifier followed by `(`. Every call has one; a sentence
+ * listing names does not. MEASURED on 2026-09-01 across all 124 candidates: the
+ * two nets disagree about ZERO files, so this changes no verdict today and
+ * removes the false one waiting for the next person who explains the rule.
+ *
+ * WHAT IT CANNOT SEE, since this file is subject to its own rule: a reader bound
+ * to another name before it is called — `const read = readFileSync; read(p)` —
+ * has no call-shaped occurrence of the original identifier and is no longer
+ * seen. The wide net did see that; this one does not. Nothing in the repository
+ * does it today, and the exchange is deliberate: a scanner escaping the register
+ * is the worse failure, but so is a rule that fires on people describing it,
+ * because that is a rule someone deletes.
+ */
+const CALLS_A_SOURCE_READER = /\b(?:readFileSync|readdirSync|globSync|execFileSync|execSync)\s*\(/
+
+/**
+ * Whether a file's own text shows it actually REACHING the source tree.
+ *
+ * Exported so the distinction can be asserted on strings rather than only
+ * observed through `findScanners`, which needs a real repository and can only
+ * ever say how many files matched today.
+ */
+export function readsSource(source) {
+  return CALLS_A_SOURCE_READER.test(source)
+}
 
 /**
  * The marker a scanner uses to declare its limit. Prose, deliberately — the
@@ -80,15 +125,23 @@ export function findScanners(repoRoot) {
     .split('\n')
     .filter(Boolean)
 
-  return files.map((file) => {
-    const source = readFileSync(resolve(repoRoot, file), 'utf8')
-    return {
-      file,
-      declaresLimit: DECLARES_LIMIT.test(source),
-      patterns: accessPatternsSeen(source),
-      // A scanner that enumerates its own targets by glob/git survives a new
-      // entry arriving; one that iterates a literal array does not.
-      enumeratesDynamically: /readdirSync|globSync|execFileSync|execSync/.test(source),
-    }
-  })
+  return (
+    files
+      .map((file) => ({ file, source: readFileSync(resolve(repoRoot, file), 'utf8') }))
+      // `git grep` matched the wide net, which cannot tell a call from a sentence
+      // about one. The second pass has the file in hand and can.
+      .filter(({ source }) => readsSource(source))
+      .map(({ file, source }) => ({
+        file,
+        // Deliberately still the WHOLE source: a declared limit IS prose, written
+        // in a comment, and that is the one thing here that belongs in one.
+        declaresLimit: DECLARES_LIMIT.test(source),
+        patterns: accessPatternsSeen(source),
+        // A scanner that enumerates its own targets by glob/git survives a new
+        // entry arriving; one that iterates a literal array does not. Call-shaped
+        // for the same reason as above — naming `execSync` in a comment does not
+        // make a scanner dynamic.
+        enumeratesDynamically: /\b(?:readdirSync|globSync|execFileSync|execSync)\s*\(/.test(source),
+      }))
+  )
 }

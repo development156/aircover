@@ -183,9 +183,25 @@ root, from `$HOME`, from `/tmp`, from `/`, and with no `setup.sh` anywhere.
 3. **Never execute a publish.** It posts to a real customer's feed.
 4. **The browser suite writes to production.** It once created 12,196 accounts.
    It refuses without an explicit acknowledgement — leave that in place.
-5. **Two migrations are deliberately unapplied**: the plan reprice (starter
-   ₹499 → ₹1999, and there is a live subscriber on it) and `clerk_id_remap`.
-   Your decision, not an oversight.
+5. **Both migrations this rule used to hold back are now APPLIED.** Corrected
+   2026-09-03; the sentence below replaces "two migrations are deliberately
+   unapplied", which had stopped being true.
+   - The **plan reprice** was applied on 29 August as version `20260829105627`,
+     not by this session. Production charges starter ₹1999 today
+     (`plans.updated_at = 2026-08-29T10:56:27Z`) and the live subscriber the old
+     note warned about is on that row. Nobody has confirmed what they are billed.
+   - **`clerk_id_remap`** was applied 2026-09-03 as part of clearing the backlog,
+     BEFORE this note was read. It is inert rather than harmful, and that was
+     verified rather than assumed: `clerk_id_map` holds 0 rows and
+     `verify_clerk_remap()` returns 0, which is what its own header promises
+     ("applying this to production is harmless and does nothing on its own").
+     It creates one empty table and two functions. The rollback is in the file
+     if you want it gone.
+
+   The wider lesson for whoever reads this next: 27 repo migrations were absent
+   from production BY VERSION, but 18 of them were already applied through the
+   dashboard under DIFFERENT timestamps with the same `name`. An audit that
+   matches on version alone reports 27 false absences. Match on `name` too.
 
 ---
 

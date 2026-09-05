@@ -12,7 +12,23 @@ import type { DisplayPost } from '@/lib/posts/display-post'
  * rendered in, and the zone the planner header already names out loud.
  */
 
-const IST = 'Asia/Kolkata'
+/**
+ * THE ZONE THE WEEK GRID IS BUILT IN, exported because the label must match it.
+ *
+ * `istDayKey`, `istMinutes` and `hourRange` all place a card with this, so the
+ * column a card lands in and the row it sits on are IST facts. When the chip's
+ * LABEL was moved to the workspace zone and the placement was not, the two
+ * disagreed: a America/New_York workspace with a post at 2026-09-02T20:00-04:00
+ * got a card drawn in the Sept 3 column at the 5 am row, captioned "08:00 pm
+ * EDT". Every part of that is a real number and the card is nonsense.
+ *
+ * Exported so the caption asks the grid what zone it is in rather than assuming.
+ * Moving the planner to the workspace zone means changing THIS, and the caption
+ * follows for free.
+ */
+export const PLANNER_GRID_ZONE = 'Asia/Kolkata'
+
+const IST = PLANNER_GRID_ZONE
 const DAY_MS = 86_400_000
 
 /** `en-GB` is Monday-first, which is what the grid is. Same source as `month.ts`. */
@@ -151,4 +167,36 @@ export function placeDay(posts: readonly DisplayPost[], slotMinutes: number): Pl
   flush()
 
   return out
+}
+
+/**
+ * The ONE day the day view draws.
+ *
+ * ── A SELECTION, NOT A FILTER, AND THAT IS THE WHOLE FIX ─────────────────────
+ * The page used to write `window.days.filter(isToday)`. A filter can return
+ * nothing, and it did: `weekWindow(now, offset)` holds the days of the week
+ * `offset` weeks away, so on any week but this one the day view was handed an
+ * empty array and drew no column at all. "Next week" in day view is one click,
+ * and the navigation label above the blank grid still read the full seven-day
+ * range.
+ *
+ * The day view needs exactly one column, always. So this SELECTS one, and the
+ * three fallbacks are ordered by what the reader asked for:
+ *
+ *   1. the date they picked, when it is in the week being shown
+ *   2. today, when today is in the week being shown
+ *   3. that week's Monday, which is the only remaining honest answer
+ *
+ * `window.days` always holds seven entries, so the last fallback cannot be
+ * undefined and there is no fourth case.
+ *
+ * A picked date OUTSIDE the shown week falls to 2 or 3 rather than drawing
+ * nothing: the page's own off-grid note already tells the reader their posts sit
+ * elsewhere and offers the list, whereas a blank grid under a labelled week says
+ * nothing whatever.
+ */
+export function dayColumn(window: WeekWindow, dateKey: string | null, now: Date): Date {
+  const picked = dateKey === null ? undefined : window.days.find((d) => istDayKey(d) === dateKey)
+  const today = window.days.find((d) => istDayKey(d) === istDayKey(now))
+  return picked ?? today ?? window.days[0]!
 }

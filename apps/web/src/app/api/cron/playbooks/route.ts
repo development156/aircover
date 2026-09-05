@@ -84,10 +84,13 @@ export async function GET(request: Request): Promise<Response> {
     return Response.json({ ok: true, ...result })
   } catch (error) {
     reportServerError(error, { action: 'cron.playbooks' })
-    // 200 with an error body, not a 500. Vercel retries a failing cron, and a
-    // retry here would re-enter playbooks whose runs already opened — the
-    // one-live-run index makes that safe, but a retry storm is not something to
-    // invite.
-    return Response.json({ ok: false, error: 'PLAYBOOKS_CRON_FAILED' })
+    // 500, matching the metrics, radar and autopilot siblings: a 200 here hid a
+    // broken daily tick from Vercel's cron log and from every 5xx filter, while
+    // the heartbeat above (stamped before the work) still read as alive.
+    //
+    // This said "200, because Vercel retries a failing cron". Vercel documents
+    // no automatic retry for a cron invocation, and the one-live-run index makes
+    // a re-entry safe anyway, which the old comment said itself.
+    return Response.json({ ok: false, error: 'PLAYBOOKS_CRON_FAILED' }, { status: 500 })
   }
 }

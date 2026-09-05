@@ -49,11 +49,20 @@ const BrandPanel = dynamic(() => import('./brand-panel').then((m) => m.BrandPane
 
 export function BrandMark({
   logoUrl,
+  logoUrlDark,
   primary,
   hasTheme,
 }: {
   /** A signed link to the workspace's logo, or null when there is none. */
   logoUrl: string | null
+  /**
+   * The dark-background variant, passed straight through to the panel.
+   *
+   * The MARK itself never uses it: the topbar is a light surface in both
+   * themes, so the light variant is always the right one to show here. Only the
+   * panel needs it, and only to say which file is already there.
+   */
+  logoUrlDark?: string | null
   /** The brand colour, for the chip when there is no logo picture to show. */
   primary: string | null
   /** Whether a brand has been stored at all. With none, there is nothing to switch to. */
@@ -155,7 +164,7 @@ export function BrandMark({
             })}
         data-guide="topbar.brand"
         onClick={() => (hasTheme ? toggleSkin() : setOpen(true))}
-        className="surface-ring grid h-8 min-w-8 place-items-center overflow-hidden rounded-l-control bg-s2 px-1.5 transition-micro hover:bg-surface-3 active:scale-[.97]"
+        className="surface-ring grid h-control min-w-control place-items-center overflow-hidden rounded-l-control bg-s2 px-1.5 transition-micro hover:bg-surface-3 active:scale-[.97] max-narrow:h-11 max-narrow:min-w-11"
       >
         {logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -163,7 +172,7 @@ export function BrandMark({
         ) : (
           <span
             aria-hidden
-            className="size-4 rounded-full"
+            className="size-4 rounded-pill"
             style={{ background: primary ?? 'var(--p)' }}
           />
         )}
@@ -183,7 +192,7 @@ export function BrandMark({
         aria-expanded={open}
         aria-label="Open brand options"
         onClick={() => setOpen((was) => !was)}
-        className="surface-ring -ml-px grid h-8 w-6 place-items-center rounded-r-control bg-s2 text-muted transition-micro hover:bg-surface-3 hover:text-ink active:scale-[.97]"
+        className="surface-ring -ml-px grid h-control w-6 place-items-center rounded-r-control bg-s2 text-muted transition-micro hover:bg-surface-3 hover:text-ink active:scale-[.97] max-narrow:h-11 max-narrow:w-11"
       >
         <ChevronDown size={13} strokeWidth={1.8} aria-hidden />
       </button>
@@ -191,6 +200,7 @@ export function BrandMark({
       {open ? (
         <BrandPanel
           logoUrl={logoUrl}
+          logoUrlDark={logoUrlDark ?? null}
           current={primary}
           skinOn={on}
           hasTheme={hasTheme}

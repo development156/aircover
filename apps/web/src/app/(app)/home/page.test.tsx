@@ -10,6 +10,7 @@ import { readBalance, readLedger } from '@/lib/wallet/read'
 import { readBrain } from '@/lib/brand/read-brain'
 import { listConnections } from '@/lib/connections/read'
 
+import { readSubscription } from '@/lib/billing/read'
 import { hasDeferredOnboarding } from '@/lib/onboarding/defer'
 import { onboardingStateRead } from '@/lib/onboarding/read-onboarding-state'
 
@@ -85,6 +86,24 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('@/app/actions/posts', () => ({ createPost: vi.fn() }))
 
+/**
+ * ── THE PLAN OFFER'S THREE DEPENDENCIES, MOCKED FOR THE SAME REASON AS THE
+ *    NINE ABOVE ─────────────────────────────────────────────────────────────
+ * `readSubscription` decides whether the dialog is mounted at all, so it has to
+ * be steerable from here or the offer can never be asserted either way. Before
+ * it was mocked the real module ran, threw inside its own try/catch and returned
+ * `unreadable` — which is `silent`, so every test in this file passed while
+ * proving nothing about the offer. A read that fails quietly into the answer you
+ * were hoping for is the worst kind of green.
+ *
+ * `auth` and `startCheckout` are the other two: the first scopes a dismissal to
+ * a sign-in and pulls `server-only`, which throws in this environment; the
+ * second is a `'use server'` export that opens a real payment order.
+ */
+vi.mock('@/lib/billing/read', () => ({ readSubscription: vi.fn() }))
+vi.mock('@clerk/nextjs/server', () => ({ auth: async () => ({ sessionId: 'sess_test' }) }))
+vi.mock('@/app/actions/wallet', () => ({ startCheckout: vi.fn() }))
+
 const balanceRead = vi.mocked(readBalance)
 
 // The EMPTY sentinels each read returns for a workspace-less session, copied
@@ -119,8 +138,42 @@ const EMPTY_PUBLISH = {
   coveredFrom: null,
 }
 
+const FREE_SUBSCRIPTION = {
+  status: 'ok' as const,
+  data: {
+    workspaceId: '00000000-0000-4000-8000-000000000001',
+    planId: 'free' as const,
+    status: 'active' as const,
+    currentPeriodStart: null,
+    currentPeriodEnd: null,
+    cancelAtPeriodEnd: false,
+    pendingPlanId: null,
+    pendingPlanEffectiveAt: null,
+    graceEndsAt: null,
+    dunningAttempts: 0,
+    lastFailureAt: null,
+    lastFailureCode: null,
+  },
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.mocked(readSubscription).mockResolvedValue(FREE_SUBSCRIPTION)
+  /**
+   * jsdom implements no `<dialog>` at all, and the plan offer is a `<dialog>`
+   * that opens ITSELF on mount rather than on a click. Without these two, every
+   * test in this file throws `el.showModal is not a function` from the modal's
+   * effect — which is worth knowing about the real browser too: a client without
+   * `<dialog>` support would take the whole dashboard down, where the product's
+   * other fourteen modals would only fail to open when pressed. Every browser
+   * this product supports has shipped it since 2022.
+   */
+  HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
+    this.open = true
+  })
+  HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) {
+    this.open = false
+  })
   // The default is a finished account, which is what every assertion in this
   // file below the landing block is about. The landing block sets its own.
   vi.mocked(hasDeferredOnboarding).mockResolvedValue(false)
@@ -132,7 +185,7 @@ beforeEach(() => {
   // a half-populated one.
   vi.mocked(readBrain).mockResolvedValue({ status: 'no-brain' })
   vi.mocked(listConnections).mockResolvedValue([])
-  vi.mocked(readLedger).mockResolvedValue({ entries: [], skipped: 0 })
+  vi.mocked(readLedger).mockResolvedValue({ entries: [], skipped: 0, unreadable: false })
   vi.mocked(readSpend).mockResolvedValue(EMPTY_SPEND)
   vi.mocked(readPostCounts).mockResolvedValue(EMPTY_COUNTS)
   vi.mocked(readPublishSummary).mockResolvedValue(EMPTY_PUBLISH)
@@ -372,5 +425,98 @@ describe('the landing rule on the page that lands', () => {
     render(await HomePage())
 
     expect(screen.getByTestId('home-get-started')).toBeInTheDocument()
+  })
+})
+
+/**
+ * ── DOES THE DASHBOARD ACTUALLY MOUNT THE PLAN OFFER? ────────────────────────
+ *
+ * `lib/billing/plan-offer.test.ts` proves the DECISION and
+ * `components/billing/plan-offer-modal.test.tsx` proves the DIALOG. Both mount
+ * the component by hand, so between them they would still pass if this page had
+ * never been wired up at all. This block is the join: the real page, the real
+ * decision, and a subscription read steered to each of the two answers that
+ * matter.
+ */
+describe('the plan offer on the dashboard', () => {
+  const OFFER = 'Choose the right plan for you'
+  const offerHeading = () => screen.queryByRole('heading', { name: OFFER })
+  /**
+   * AWAITED, because the dialog is fetched on demand. `plan-offer-mount.tsx`
+   * loads it with `next/dynamic` so its weight stays out of /home's first load,
+   * and the budget that decision came from is recorded there. A synchronous
+   * lookup finds nothing and would read as "the page does not mount the offer",
+   * which is the opposite of what it means.
+   */
+  const findOffer = () => screen.findByRole('heading', { name: OFFER })
+
+  test('a workspace on Free that has done something is offered the plans', async () => {
+    vi.mocked(listPosts).mockResolvedValue([A_POST])
+    render(await HomePage())
+
+    expect(await findOffer()).toBeInTheDocument()
+  })
+
+  test('a workspace on a paid plan is NOT', async () => {
+    // The expensive failure this whole feature can produce: a pricing wall in
+    // front of somebody who has already paid.
+    vi.mocked(readSubscription).mockResolvedValue({
+      ...FREE_SUBSCRIPTION,
+      data: { ...FREE_SUBSCRIPTION.data, planId: 'growth', status: 'active' },
+    })
+
+    render(await HomePage())
+
+    // Absence needs no wait: when the decision is `silent` the page renders no
+    // mount at all, so there is no chunk on its way. The positive cases above
+    // prove the awaited form does resolve, which is what stops this from being
+    // a test that passes because the dialog is merely slow.
+    expect(offerHeading()).toBeNull()
+  })
+
+  test('a subscription read that failed offers nothing, rather than guessing Free', async () => {
+    vi.mocked(readSubscription).mockResolvedValue({ status: 'unreadable' })
+
+    render(await HomePage())
+
+    expect(offerHeading()).toBeNull()
+  })
+
+  test('an account with no workspace is offered nothing, because it cannot check out', async () => {
+    vi.mocked(readSubscription).mockResolvedValue({ status: 'no-workspace' })
+    balanceRead.mockResolvedValue({ status: 'no-workspace' })
+
+    render(await HomePage())
+
+    expect(offerHeading()).toBeNull()
+  })
+
+  test('the empty dashboard gets NO offer: a plan is not the first thing a new workspace sees', async () => {
+    // This test used to pin the opposite, and its reasoning is worth keeping:
+    // the account most likely to be weighing a plan is the one on this screen.
+    // MEASURED 2026-09-05 in a real browser, the effect was that a workspace
+    // which had just finished onboarding met a pricing dialog before it had
+    // seen its own dashboard. Founder's ruling the same day: the offer waits
+    // until the workspace has done something. `planOfferDecision` takes
+    // `hasStarted` so the rule lives in the decision, not in this JSX.
+    //
+    // The balance is set here rather than left to the shared `beforeEach`, which
+    // does not set it: `vi.clearAllMocks()` clears CALLS and leaves the
+    // IMPLEMENTATION, so whichever test ran last is still answering. Written
+    // without this line, this test inherited a `no-workspace` balance from four
+    // tests earlier and rendered the first-run screen.
+    balanceRead.mockResolvedValue({
+      status: 'ok',
+      balance: { total: 100, held: 0, available: 100, hasHold: false, heldNote: null },
+    })
+    vi.mocked(listPosts).mockResolvedValue([])
+    vi.mocked(listConnections).mockResolvedValue([])
+    vi.mocked(readBrain).mockResolvedValue({ status: 'no-brain' })
+
+    render(await HomePage())
+
+    expect(screen.getByTestId('home-get-started')).toBeInTheDocument()
+    // Absence needs no wait: a `silent` decision renders no mount at all.
+    expect(offerHeading()).toBeNull()
   })
 })

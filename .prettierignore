@@ -65,3 +65,8 @@ test-results/
 # It arrived from wt-core on 2026-08-29 and turned `prettier --check .` red
 # everywhere it landed, this lane included. Excluded rather than rewritten.
 ops/account-transfer/
+
+# Per-checkout ops queue overlay, written by scripts/lib/ops-state.mjs. Machine
+# state, not source. It is written in prettier's own shape anyway; this line is
+# so a future change to that shape cannot turn the format leg red.
+ops/state/.pending.local.json

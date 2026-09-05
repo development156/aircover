@@ -31,7 +31,7 @@ import type { VariantExtras } from '@/lib/posts/variant-extras'
  */
 
 const SELECT_CLASS =
-  'h-input w-full rounded-sm bg-s1 px-2.5 text-[13px] text-ink transition-micro shadow-[inset_0_0_0_1px_var(--line)] focus:bg-surface focus:outline-none max-narrow:min-h-[44px]'
+  'h-input w-full rounded-sm bg-s1 px-2.5 text-[13px] text-ink transition-micro surface-ring-firm focus:bg-surface focus:outline-none max-narrow:min-h-[44px]'
 
 /** The four codes LinkedIn takes, in the words a person uses for them. */
 const LINKEDIN_DURATIONS: readonly { code: string; label: string }[] = [

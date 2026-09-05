@@ -27,7 +27,7 @@ import { ViewToggle, type PlannerView } from '@/components/planner/view-toggle'
 import { WeekTimeline } from '@/components/planner/week-timeline'
 import { PlannerSummary } from '@/components/planner/planner-summary'
 import { WeekNav } from '@/components/planner/week-nav'
-import { istDayKey, weekWindow } from '@/lib/planner/week-window'
+import { dayColumn, istDayKey, weekWindow } from '@/lib/planner/week-window'
 import { MonthGrid } from '@/components/planner/month-grid'
 import { firstGridDay, MONTH_GRID_DAYS } from '@/lib/planner/month'
 import { bucketWeek } from '@/lib/planner/week'
@@ -113,8 +113,6 @@ export default async function PlannerPage({
   // TODAY, which cannot be navigated: "previous week" would move by a
   // different amount depending on the weekday you asked on.
   const window = weekWindow(now, weekOffset)
-  const todayKey = istDayKey(now)
-  const isToday = (day: Date): boolean => istDayKey(day) === todayKey
   const windowKeys = new Set(window.days.map(istDayKey))
 
   // The provider's seed, assembled from reads this page has ALREADY done —
@@ -177,6 +175,18 @@ export default async function PlannerPage({
   }
   const visible = applyFilter(shown, filter)
 
+  /**
+   * The days the grid draws, computed ONCE.
+   *
+   * This used to be `window.days.filter(isToday)`, written out twice: once for
+   * the grid and once for the off-grid count. A filter can return nothing, and
+   * for any week but this one it did — so the day view drew zero columns, and
+   * the duplicated expression kept the off-grid note arithmetically consistent
+   * with the blank grid instead of exposing it. `dayColumn` selects exactly one
+   * day, on every offset, and both call sites now read the same value.
+   */
+  const drawnDays = view === 'day' ? [dayColumn(window, filter.dateKey, now)] : window.days
+
   // ── EACH COUNT IS WHAT THAT TAB WOULD SHOW, GIVEN THE OTHER TWO FILTERS ────
   // Not the count of the whole page, and not the count of what is already
   // showing. The first was wrong and shipped for an hour: with `?q=chai` the All
@@ -210,7 +220,7 @@ export default async function PlannerPage({
           ),
         )
       : view === 'day'
-        ? new Set(window.days.filter(isToday).map(istDayKey))
+        ? new Set(drawnDays.map(istDayKey))
         : windowKeys
 
   const offGrid = visible.filter((p) => {
@@ -244,7 +254,21 @@ export default async function PlannerPage({
       <div className="space-y-grid">
         <div className="enter">
           <PlannerHero context={<ConnectFirstNote connections={connected} />}>
-            {posts.length > 0 ? <ViewToggle active={view} /> : null}
+            {posts.length > 0 ? (
+              /* The reader's filter rides along. Every other control on this
+                 page already carried it; this one emitted `{ view }` alone,
+                 so choosing Month threw away the tab, the search and the day
+                 the toolbar directly below it was still showing. */
+              <ViewToggle
+                active={view}
+                carry={{
+                  ...(filter.tab === 'all' ? {} : { tab: filter.tab }),
+                  ...(filter.query === '' ? {} : { q: filter.query }),
+                  ...(filter.dateKey === null ? {} : { date: filter.dateKey }),
+                  ...(weekParam === null ? {} : { week: weekParam }),
+                }}
+              />
+            ) : null}
           </PlannerHero>
         </div>
 
@@ -357,9 +381,12 @@ export default async function PlannerPage({
                         ...(filter.dateKey === null ? {} : { date: filter.dateKey }),
                       }}
                     />
+                    {/* No `zone`: the grid places every card by
+                        PLANNER_GRID_ZONE, and its caption reads the same zone.
+                        Passing the workspace's would only let the two drift
+                        apart again. */}
                     <WeekTimeline
-                      zone={zone}
-                      days={view === 'day' ? window.days.filter(isToday) : window.days}
+                      days={drawnDays}
                       posts={visible}
                       variantStates={variantStates}
                       today={now}
@@ -432,7 +459,7 @@ export default async function PlannerPage({
                 query={filter.query}
                 week={weekParam}
               />
-              {next.length > 0 ? <PlannerUpcoming posts={next} /> : null}
+              {next.length > 0 ? <PlannerUpcoming posts={next} zone={zone} /> : null}
             </aside>
           ) : null}
         </div>

@@ -1,10 +1,14 @@
 import 'server-only'
 
+import type { StampAnchor, StampAnchorMoveReason, StampOutcome } from '@sahoda/shared'
 import {
+  StampAnchorMoveReasonSchema,
+  StampAnchorSchema,
   StudioGenerationImageSchema,
-  StudioGenerationSchema,
+  StudioGenerationRowSchema,
   type StudioGeneration,
 } from '@sahoda/shared'
+import { z } from 'zod'
 
 import { signMediaPreviews } from '@/lib/posts/media-url'
 import { createServerSupabase } from '@/lib/supabase/server'
@@ -48,6 +52,67 @@ export type GenerationPicture = {
    * and a download then carries no extension rather than a wrong one.
    */
   mime: string | null
+  /**
+   * The logo-stamped copy's link, or null when there is no stamped copy — or
+   * when there is one and ITS link would not sign. Same three states `url`
+   * keeps apart one field up, for the same reason.
+   */
+  stampedUrl: string | null
+  /**
+   * WHY this picture does or does not carry the logo. Null means stamping was
+   * never attempted, which is a different answer from every value in the enum
+   * and must never be rendered as a failure.
+   */
+  stampOutcome: StampOutcome | null
+  /**
+   * The corner the mark actually landed in, or null when it was not recorded.
+   * Null covers a row drawn before this shipped, a deploy where the column is
+   * not applied, and a picture that carries no mark. `lib/studio/anchor-note.ts`
+   * turns this and `stampAnchorMovedReason` into the sentence the customer reads,
+   * and null is never rendered as "stamped where asked".
+   *
+   * Optional so a hand-built fixture, and a component built before the result
+   * screen was wired, need not carry it; the read path always sets it, to a
+   * value or to null. An absent field reads exactly like null: not recorded.
+   */
+  stampAnchor?: StampAnchor | null
+  /**
+   * Why the mark landed somewhere other than the corner asked for, or null when
+   * it did not move. Only ever set alongside a non-null `stampAnchor`. Optional
+   * for the same reason as `stampAnchor`.
+   */
+  stampAnchorMovedReason?: StampAnchorMoveReason | null
+}
+
+/**
+ * The two anchor columns, read straight from the raw row.
+ *
+ * ── WHY THIS BYPASSES `StudioGenerationImageSchema` ─────────────────────────
+ * `20260904160000` adds `stamped_anchor` and `stamp_anchor_moved_reason`. The
+ * shared row schema in `packages/db`'s sibling `@sahoda/shared` does not yet
+ * carry them, and another lane owns that file, so this reads the two columns off
+ * the raw PostgREST row with the SHARED enums rather than redefining the row
+ * shape. A `select *` omits a column that is not yet applied, so an absent column
+ * arrives as `undefined`, parses through `.nullish()`, and lands as null: the
+ * "not recorded" case, never a guessed placement. A value the check constraint
+ * would have refused (it cannot reach here) parses to null the same honest way.
+ */
+const StampAnchorColumnsSchema = z.object({
+  id: z.uuid(),
+  stamped_anchor: StampAnchorSchema.nullish(),
+  stamp_anchor_moved_reason: StampAnchorMoveReasonSchema.nullish(),
+})
+
+export function stampAnchorFromImageRow(row: unknown): {
+  stampAnchor: StampAnchor | null
+  stampAnchorMovedReason: StampAnchorMoveReason | null
+} {
+  const parsed = StampAnchorColumnsSchema.safeParse(row)
+  if (!parsed.success) return { stampAnchor: null, stampAnchorMovedReason: null }
+  return {
+    stampAnchor: parsed.data.stamped_anchor ?? null,
+    stampAnchorMovedReason: parsed.data.stamp_anchor_moved_reason ?? null,
+  }
 }
 
 export type GenerationCard = {
@@ -70,7 +135,14 @@ export type GenerationsRead =
  * reads make a failure a failure.
  */
 export async function readGenerations(limit = 24): Promise<GenerationsRead> {
+  // ── TWO ANSWERS, NOT ONE ────────────────────────────────────────────────
+  // `status !== 'ok'` collapsed `unreadable` into `no-workspace`, and this
+  // union carries both on purpose. `RecentGenerations` renders NOTHING for
+  // `no-workspace`, so a member whose workspace read failed lost the entire
+  // "What you have made" section with no picture, no error and no explanation.
+  // `read-brain.ts:117` fixed exactly this for the Brand Brain and states why.
   const workspace = await activeWorkspaceRead()
+  if (workspace.status === 'unreadable') return { status: 'unreadable' }
   if (workspace.status !== 'ok') return { status: 'no-workspace' }
   const workspaceId = workspace.workspace.id
 
@@ -89,7 +161,13 @@ export async function readGenerations(limit = 24): Promise<GenerationsRead> {
   const generations: StudioGeneration[] = []
   let unreadable = 0
   for (const row of data ?? []) {
-    const parsed = StudioGenerationSchema.safeParse(row)
+    // The REFINED schema, which is the whole reason it exists: it also asserts
+    // the migration's own CHECK that a settled row carries a finish time. It was
+    // exported with a comment saying the shape is "refused once, here" and then
+    // called by nothing, so a `ready` row with no finish time — from a restored
+    // backup or a hand-written fix — parsed cleanly and every screen downstream
+    // had to defend against it.
+    const parsed = StudioGenerationRowSchema.safeParse(row)
     if (parsed.success) generations.push(parsed.data)
     else unreadable += 1
   }
@@ -117,7 +195,7 @@ export async function readGenerations(limit = 24): Promise<GenerationsRead> {
  * asked and what it cost, and that is worth showing even when the file behind it
  * cannot be reached this second.
  */
-async function picturesFor(
+export async function picturesFor(
   workspaceId: string,
   generationIds: readonly string[],
 ): Promise<Map<string, GenerationPicture[]>> {
@@ -139,9 +217,21 @@ async function picturesFor(
     .filter((parsed) => parsed.success)
     .map((parsed) => parsed.data)
 
-  const assetIds = images
-    .map((image) => image.asset_id)
-    .filter((id): id is string => typeof id === 'string')
+  // The anchor columns, keyed by image id, read from the RAW rows because the
+  // shared schema above does not carry them yet. See `stampAnchorFromImageRow`.
+  const anchorByImageId = new Map<string, ReturnType<typeof stampAnchorFromImageRow>>()
+  for (const row of data) {
+    const id = (row as { id?: unknown }).id
+    if (typeof id === 'string') anchorByImageId.set(id, stampAnchorFromImageRow(row))
+  }
+
+  // BOTH the original and its stamped copy, because the screen offers a choice
+  // between them and a choice needs two links. One extra id per stamped image,
+  // through the same two round trips rather than a third.
+  const assetIds = [
+    ...images.map((image) => image.asset_id),
+    ...images.map((image) => image.stamped_asset_id),
+  ].filter((id): id is string => typeof id === 'string')
 
   // One round trip for the paths, one for the signatures.
   const paths = new Map<string, string>()
@@ -169,6 +259,10 @@ async function picturesFor(
 
   for (const image of images) {
     const list = grouped.get(image.generation_id) ?? []
+    const anchor = anchorByImageId.get(image.id) ?? {
+      stampAnchor: null,
+      stampAnchorMovedReason: null,
+    }
     list.push({
       imageId: image.id,
       idx: image.idx,
@@ -179,6 +273,17 @@ async function picturesFor(
       width: image.width,
       height: image.height,
       mime: image.asset_id === null ? null : (mimes.get(image.asset_id) ?? null),
+      stampedUrl:
+        image.stamped_asset_id === null ? null : (urls.get(image.stamped_asset_id) ?? null),
+      // `?? null`, not a bare read. This row comes back through `select('*')`,
+      // so on a deploy where `20260831150000_studio_stamped_asset.sql` has not
+      // been applied the column is ABSENT and this field is `undefined` — and
+      // `stampNote`'s `case null`, written for exactly that situation, does not
+      // match `undefined`. Without this the switch fell through every case and
+      // returned nothing at all. MEASURED 2026-09-04.
+      stampOutcome: image.stamp_outcome ?? null,
+      stampAnchor: anchor.stampAnchor,
+      stampAnchorMovedReason: anchor.stampAnchorMovedReason,
     })
     grouped.set(image.generation_id, list)
   }
@@ -194,19 +299,37 @@ export type LibraryPicture = {
 }
 
 /**
+ * The picker's read: the pictures, or which of two reasons there are none.
+ *
+ * The same three answers `GenerationsRead` keeps apart, for the same reason.
+ * `ok` with an empty list is "we asked and there are none", and only that one
+ * has "add a picture" as its natural remedy. `unreadable` is "we asked and
+ * could not get an answer", and a screen that calls it empty is telling
+ * somebody with thirty pictures that they have never added one.
+ */
+export type LibraryRead =
+  | { status: 'ok'; pictures: LibraryPicture[] }
+  | { status: 'no-workspace' }
+  | { status: 'unreadable' }
+
+/**
  * Recent pictures from this workspace, newest first, for the reference picker.
  *
  * Images only, and live only: a trashed file is not something to build a look
  * from, and offering one would let somebody condition a paid generation on a
  * picture they had already decided to throw away.
  *
- * Returns an EMPTY list on a failed read. The picker then says there is nothing
- * to match, which is wrong in a harmless direction: the person can still make a
- * picture. Failing the screen over a picker would be worse.
+ * NON-FATAL, AND HONEST ABOUT IT. A failed read comes back as `unreadable`
+ * rather than throwing: the person can still add a picture from their device
+ * or make one below, so failing the whole screen over a picker would be worse.
+ * It used to come back as `[]`, and the workbench read that as "You have no
+ * pictures yet", a claim that was false on every transient failure. The status
+ * is what lets the screen say what actually happened.
  */
-export async function readLibraryPictures(limit = 12): Promise<LibraryPicture[]> {
+export async function readLibraryPictures(limit = 12): Promise<LibraryRead> {
   const workspace = await activeWorkspaceRead()
-  if (workspace.status !== 'ok') return []
+  if (workspace.status === 'unreadable') return { status: 'unreadable' }
+  if (workspace.status !== 'ok') return { status: 'no-workspace' }
 
   const supabase = createServerSupabase()
   const { data, error } = await supabase
@@ -218,7 +341,7 @@ export async function readLibraryPictures(limit = 12): Promise<LibraryPicture[]>
     .order('created_at', { ascending: false })
     .limit(limit)
 
-  if (error || !data) return []
+  if (error || !data) return { status: 'unreadable' }
 
   const rows = data
     .filter((row) => typeof row.id === 'string' && typeof row.storage_path === 'string')
@@ -230,11 +353,14 @@ export async function readLibraryPictures(limit = 12): Promise<LibraryPicture[]>
   const signed = await signMediaPreviews(rows)
   const urls = new Map(signed.map((one) => [one.id, one.url]))
 
-  return rows.map((row) => ({
-    assetId: row.id,
-    // Null when the link would not sign. The picker shows the card anyway,
-    // because the picture exists and can still be picked.
-    url: urls.get(row.id) ?? null,
-    title: row.title !== null && row.title !== '' ? row.title : null,
-  }))
+  return {
+    status: 'ok',
+    pictures: rows.map((row) => ({
+      assetId: row.id,
+      // Null when the link would not sign. The picker shows the card anyway,
+      // because the picture exists and can still be picked.
+      url: urls.get(row.id) ?? null,
+      title: row.title !== null && row.title !== '' ? row.title : null,
+    })),
+  }
 }

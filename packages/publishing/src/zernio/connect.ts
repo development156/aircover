@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+
 import { ZernioError, ZERNIO_ID_RE, type ZernioAccount, type ZernioClient } from './client'
 
 /**
@@ -22,30 +24,76 @@ import { ZernioError, ZERNIO_ID_RE, type ZernioAccount, type ZernioClient } from
  */
 export const ZERNIO_DEFAULT_PROFILE_ID = '6a69d2ac81d9920d149afc18'
 
-/** One Zernio profile per workspace, named so a human can find it in their UI. */
+/** The first eight characters of the workspace id: the token that names its profile. */
+function workspaceToken(workspaceId: string): string {
+  return workspaceId.slice(0, 8)
+}
+
+/**
+ * One Zernio profile per workspace, named so a human can find it in their UI.
+ *
+ * The display name is the workspace name; the `(<id8>)` suffix is the part that
+ * MATCHES. See `profileBelongsToWorkspace`.
+ */
 export function profileNameForWorkspace(workspaceId: string, workspaceName: string): string {
-  return `sahoda:${workspaceName} (${workspaceId.slice(0, 8)})`
+  return `sahoda:${workspaceName} (${workspaceToken(workspaceId)})`
+}
+
+/**
+ * Is this Zernio profile the one for this workspace?
+ *
+ * ── MATCHED ON THE ID TOKEN, NEVER ON THE NAME ───────────────────────────────
+ * The lookup used to compare the whole string, and the string embeds the
+ * workspace NAME. A rename changed the name, the lookup missed, and the create
+ * that followed went out under the old Idempotency-Key with a new body. Zernio
+ * refuses that (MEASURED, Sentry JAVASCRIPT-NEXTJS-1M, 2026-08-25), so the start
+ * route failed for every channel and the customer could not connect anything.
+ *
+ * The `(<id8>)` suffix cannot be moved by a rename, so it is what identifies the
+ * profile. Anchored to the END of the name: a workspace literally called
+ * "(a1b2c3d4)" must not claim another workspace's profile.
+ */
+export function profileBelongsToWorkspace(profileName: string, workspaceId: string): boolean {
+  return profileName.endsWith(` (${workspaceToken(workspaceId)})`)
+}
+
+/**
+ * The Idempotency-Key for a create: a pure function of the BODY.
+ *
+ * Zernio remembers a key together with the body it was sent with and refuses
+ * the same key under a different body. So the key has to change when the body
+ * does, or a renamed workspace can never be created. The workspace id keeps a
+ * double-submit of ONE body to one profile; the name hash makes a different
+ * body a different request.
+ *
+ * Safe ONLY together with `profileBelongsToWorkspace` above and the stored
+ * mapping the routes read first: on its own this would mint a fresh profile per
+ * rename, and `ensure_zernio_profile` would then refuse it as
+ * PROFILE_ALREADY_BOUND for good.
+ */
+function idempotencyKeyFor(workspaceId: string, name: string): string {
+  const body = createHash('sha256').update(name, 'utf8').digest('hex').slice(0, 8)
+  return `sahoda-profile:${workspaceId}:${body}`
 }
 
 /**
  * Find-or-create the Zernio profile for a workspace, idempotently.
  *
- * Looks up by exact name first — the spec offers `?name=` precisely to "recover a
- * profile id after an ambiguous create (timeout followed by a 409 on retry)" — and
- * only creates when there is genuinely none. The workspace id seeds the
- * Idempotency-Key so a double-submit cannot mint two profiles for one workspace.
+ * Lists the team's profiles and matches on the workspace's id token, so the
+ * profile is found whatever the workspace is called today. Only creates when
+ * there is genuinely none. The list is unfiltered on purpose: `?name=` needs
+ * the exact string, and the exact string is the thing a rename changes.
  */
 export async function ensureZernioProfile(
   client: ZernioClient,
   args: { workspaceId: string; workspaceName: string },
 ): Promise<string> {
-  const name = profileNameForWorkspace(args.workspaceId, args.workspaceName)
-
-  const existing = await client.listProfiles(name)
-  const match = existing.find((p) => p.name === name)
+  const existing = await client.listProfiles()
+  const match = existing.find((p) => profileBelongsToWorkspace(p.name, args.workspaceId))
   if (match) return assertUsableProfile(match._id)
 
-  const created = await client.createProfile(name, `sahoda-profile:${args.workspaceId}`)
+  const name = profileNameForWorkspace(args.workspaceId, args.workspaceName)
+  const created = await client.createProfile(name, idempotencyKeyFor(args.workspaceId, name))
   return assertUsableProfile(created._id)
 }
 

@@ -3,6 +3,7 @@ import { ChannelSchema, SectionKindSchema } from '../enums'
 import { BrandMemoryPayloadSchema } from '../brand/resolve'
 import { ClassifierFindingSchema, RuleTierSchema } from '../gate/rules'
 import type { ActionType } from '../ledger/pricing'
+import type { ImageTier } from '../studio/generation'
 
 /** The Alpha mesh tasks. */
 export const MeshTaskNameSchema = z.enum([
@@ -330,12 +331,43 @@ export const MESH_TASK_ACTION: Record<Exclude<MeshTaskName, 'gate_classify'>, Ac
   site_generate: 'site_generate',
   // pricing.config.json carries BOTH `image_standard` (6) and `image_premium`
   // (12), and this map is one-to-one, so the task name has to pick. It picks the
-  // cheaper: a customer who asked for "an image" and is charged 12 credits for a
-  // tier they never chose has been overcharged, and the reverse never happens.
-  // A premium task is a SECOND MeshTaskName when a UI exists to choose it —
-  // not a runtime branch inside this one, which would make the price depend on
-  // something the caller cannot see before spending.
+  // cheaper: a caller that names no tier (`posts-image.ts` offers no model
+  // choice) asked for "an image", and charging it 12 credits for a tier nobody
+  // chose would be an overcharge. The premium price is reached through
+  // `IMAGE_TIER_ACTION` below, from a tier the person picked and saw the price
+  // of, and never from a branch inside this map.
   image_generate: 'image_standard',
+}
+
+/**
+ * THE SECOND IMAGE PRICE, NOW THAT A UI EXISTS TO CHOOSE IT.
+ *
+ * The Studio lets a person pick which model draws, and two of the three are
+ * billed by the provider per image drawn at many times the flat everyday rate
+ * (`apps/web/src/lib/studio/models.ts` carries the measured figures). Charging
+ * every model at `image_standard` sold those two below cost on every press.
+ *
+ * ── KEYED BY THE PRODUCT TIER, NOT BY THE MODEL ID ──────────────────────────
+ * `ImageTier` is the choice a shop owner makes: `draft` while they are still
+ * finding the idea, `finish` for the one that has to be right. Each model in the
+ * catalogue declares which it is, so a model can be swapped for a newer one
+ * without a price moving, and the row records the tier rather than deriving it
+ * from a routing table that changes monthly.
+ *
+ * ── AND IT IS NOT A SECOND MeshTaskName ─────────────────────────────────────
+ * The mesh task is still `image_generate`: routing, timeouts and token budgets
+ * are keyed on the task and do not change with the price. What changes is the
+ * pricing key handed to `withCredits` BEFORE the hold, so the ledger entry
+ * reads "Premium image" for a premium draw. The price is visible before the
+ * click because the picker and the total both read this same map.
+ *
+ * `draft` is `MESH_TASK_ACTION.image_generate` by reference rather than a
+ * second literal, so a draft-tier press and a plain `image_generate` can never
+ * drift to different prices.
+ */
+export const IMAGE_TIER_ACTION: Record<ImageTier, ActionType> = {
+  draft: MESH_TASK_ACTION.image_generate,
+  finish: 'image_premium',
 }
 
 // ── image_generate ────────────────────────────────────────────────────────────
@@ -397,7 +429,17 @@ export const ImageGenerateInputSchema = z.object({
    * here so a malformed request cannot send a hundred, and bounded lower by
    * `MAX_REFERENCES` where the product knows which model it routes to.
    */
-  references: z.array(z.string().min(1)).max(14).optional(),
+  references: z.array(z.string().min(1)).max(16).optional(),
+  /**
+   * WHICH MODEL DRAWS IT, when the caller has let somebody choose.
+   *
+   * Optional: a caller that does not care gets the tier's default. The string is
+   * NOT trusted here, and the mesh checks it against `ALLOWED_IMAGE_MODELS`
+   * before it reaches a provider. Validating the shape in this schema and the
+   * VALUE at the router is deliberate: a schema cannot know what this account is
+   * willing to be billed for.
+   */
+  modelId: z.string().min(1).optional(),
 })
 export type ImageGenerateInput = z.infer<typeof ImageGenerateInputSchema>
 

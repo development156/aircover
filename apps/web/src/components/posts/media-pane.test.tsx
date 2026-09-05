@@ -1,9 +1,11 @@
-import { render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { CONSTRAINTS } from '@sahoda/shared'
 import type { PostMedia } from '@sahoda/shared'
 import { toChannelSet } from '@sahoda/shared'
+
+import { MEDIA_UPLOAD_CAP_MB } from '@/lib/posts/media-constants'
 
 /**
  * The three ways this pane can lie to a writer, pinned:
@@ -125,28 +127,52 @@ describe('MediaPane — attach', () => {
     expect(refresh).not.toHaveBeenCalled()
   })
 
-  test('quotes THIS post’s size ceiling, not the global upload cap', () => {
+  /** The MB figure the pane actually prints, read back out of the sentence. */
+  function quotedCapMb(): number {
+    const text = screen.getByText(/images only/i).textContent ?? ''
+    const match = /up to\s*(\d+(?:\.\d+)?)\s*MB/i.exec(text)
+    expect(match, `no MB figure in: ${text}`).not.toBeNull()
+    return Number(match![1])
+  }
+
+  test('quotes a ceiling this post can actually reach, never a larger one', () => {
     render(<MediaPane media={[]} channels={toChannelSet(['gbp'])} postId={POST_ID} />)
 
-    const limits = screen.getByText(/images only/i)
-    // gbp stops at 5 MB. Quoting the 8 MB global cap (instagram's, and the only
-    // channel that reaches it) would send the writer to export a file this post
-    // can never carry.
-    expect(limits.textContent).toMatch(new RegExp(`up to ${CONSTRAINTS.gbp.maxMediaMB} MB`))
-    expect(limits.textContent).toMatch(/spends no credits/i)
+    // Two ways to overstate, and both send the writer off to export a file that
+    // comes back refused. The channel's own limit is one: gbp stops at 5 MB, so
+    // quoting instagram's 8 (the only channel that reaches it) would be wrong.
+    // The upload cap is the other, and since 2026-09-02 it is the LOWER of the
+    // two — Vercel refuses a function request body over 4.5 MB at the edge, so
+    // MEDIA_UPLOAD_CAP_MB binds before any channel does. This asserted the
+    // literal `up to 5 MB` and had to be retargeted at the claim: not larger
+    // than either limit, and never instagram's figure on a gbp-only post.
+    expect(quotedCapMb()).toBeLessThanOrEqual(CONSTRAINTS.gbp.maxMediaMB)
+    expect(quotedCapMb()).toBeLessThanOrEqual(MEDIA_UPLOAD_CAP_MB)
+    expect(quotedCapMb()).not.toBe(CONSTRAINTS.instagram.maxMediaMB)
+
+    expect(screen.getByText(/images only/i).textContent).toMatch(/spends no credits/i)
     // A credit cost would be a lie — attaching never touches the ledger.
     expect(screen.queryByText(/\d+ credits?\b(?!\.)/i)).toBeNull()
   })
 
-  test('quotes the MOST generous selected channel, matching what decideAttach allows', () => {
+  test('never understates a post to its least generous channel', () => {
     // An attach is accepted when ANY selected channel takes it, so a post
-    // carrying instagram really can hold 8 MB — quoting gbp's 5 here would
-    // understate the post and talk the writer out of a legal file.
+    // carrying instagram may hold more than gbp alone — quoting gbp's number
+    // there would talk the writer out of a legal file.
+    render(<MediaPane media={[]} channels={toChannelSet(['gbp'])} postId={POST_ID} />)
+    const gbpOnly = quotedCapMb()
+
+    cleanup()
     render(<MediaPane media={[]} channels={toChannelSet(['gbp', 'instagram'])} postId={POST_ID} />)
 
-    expect(screen.getByText(/images only/i).textContent).toMatch(
-      new RegExp(`up to ${CONSTRAINTS.instagram.maxMediaMB} MB`),
-    )
+    // Not `=== instagram.maxMediaMB` any more: the upload cap is below every
+    // channel's limit today, so both posts legitimately quote the same 4 MB and
+    // an equality on 8 would only be asserting that the clamp is missing. What
+    // survives the clamp is the ordering, and it sharpens on its own the moment
+    // the upload cap rises past gbp's 5.
+    expect(quotedCapMb()).toBeGreaterThanOrEqual(gbpOnly)
+    expect(quotedCapMb()).toBeLessThanOrEqual(CONSTRAINTS.instagram.maxMediaMB)
+    expect(quotedCapMb()).toBeLessThanOrEqual(MEDIA_UPLOAD_CAP_MB)
   })
 
   test('drops a verdict once the channels it was decided against change', async () => {

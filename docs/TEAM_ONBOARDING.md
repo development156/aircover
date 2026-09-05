@@ -5,8 +5,8 @@ This guide is for teammates who don't code. You'll use **Claude Code on the web*
 ## One-time setup (about 10 minutes)
 
 1. **Get a Claude account with a paid plan.** Go to [claude.ai](https://claude.ai), sign up with your work email, and subscribe to the Pro plan (or ask the team lead if there's a team plan to join).
-2. **Get access to our code on GitHub.** GitHub is the website where our code lives, in a project folder called a **repository** — ours is named `sahodalabs`. If you don't have a GitHub account, create one at [github.com](https://github.com). Then ask the dev team to invite your GitHub username to the `sahodalabs` repository.
-3. **Connect the two.** Go to [claude.ai/code](https://claude.ai/code), sign in with your Claude account, and follow the prompts to connect GitHub. When it asks which repository, choose `sahodalabs`.
+2. **Get access to our code on GitHub.** GitHub is the website where our code lives, in a project folder called a **repository** — ours is named `aircover`. If you don't have a GitHub account, create one at [github.com](https://github.com). Then ask the dev team to invite your GitHub username to the `aircover` repository.
+3. **Connect the two.** Go to [claude.ai/code](https://claude.ai/code), sign in with your Claude account, and follow the prompts to connect GitHub. When it asks which repository, choose `aircover`.
 
 That's it — you never need to download or install anything.
 
@@ -14,11 +14,11 @@ That's it — you never need to download or install anything.
 
 ### 1. Pick your bug
 
-Bugs are tracked as **issues** — numbered reports you can see at [github.com/development156/sahodalabs/issues](https://github.com/development156/sahodalabs/issues). Only work on an issue that has been assigned to you. Note its number (for example, issue **#12**).
+Bugs are tracked as **issues** — numbered reports you can see at [github.com/development156/aircover/issues](https://github.com/development156/aircover/issues). Only work on an issue that has been assigned to you. Note its number (for example, issue **#12**).
 
 ### 2. Tell Claude to fix it
 
-1. Open [claude.ai/code](https://claude.ai/code) and start a new session in the `sahodalabs` repository.
+1. Open [claude.ai/code](https://claude.ai/code) and start a new session in the `aircover` repository.
 2. Type `/fix 12` (using your issue's number) and press Enter.
 
 Claude will now, on its own: read the bug report, find the cause, write an automatic check that proves the bug exists, fix it, verify the fix, have its work reviewed, and then propose the change as a **pull request** — a bundle of changes waiting for a human to approve. It explains each step in plain language as it goes; you can just watch. If it asks permission for a step, read what it says and approve it if it matches what you asked for.

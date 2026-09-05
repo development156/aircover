@@ -1,3 +1,5 @@
+import { randomBytes, timingSafeEqual } from 'node:crypto'
+
 import type { ZernioSelectionPlatform, ZernioSelectionState } from '@sahoda/publishing'
 import type { ZernioPlatform } from '@sahoda/shared'
 
@@ -235,4 +237,97 @@ function safeBase64(raw: string): string | null {
   } catch {
     return null
   }
+}
+
+/**
+ * THE PER-ATTEMPT NONCE, AND WHY THE PICKER CANNOT RUN WITHOUT IT.
+ *
+ * ── THE HOLE ─────────────────────────────────────────────────────────────────
+ * Everything the picker needs (`profileId`, `tempToken`, `pendingDataToken`,
+ * `userProfile`) arrives on the query string, and the only thing that bound it
+ * to the signed-in customer was `profileId === the one in our table`. A profile
+ * id is not a secret: it is on every return URL the customer's browser has ever
+ * visited. So a top-level GET link carrying the VICTIM's profile id and the
+ * ATTACKER's `tempToken` rendered a normal-looking picker, and one click
+ * committed the attacker's Page under the victim's profile. Clerk's session
+ * cookie is `SameSite=Lax`, which rides exactly that kind of navigation.
+ *
+ * ── THE FIX ──────────────────────────────────────────────────────────────────
+ * The start route mints sixteen random bytes per press, puts them in an
+ * `httpOnly` cookie AND on the return URL Zernio preserves. The return route
+ * honours selection parameters, and a create scoped by the URL's `platform`,
+ * only when the two agree. A link somebody else built cannot carry a value
+ * that lives in the customer's own cookie jar, and a value read off an old URL
+ * no longer matches the cookie the next press overwrote.
+ *
+ * `SameSite=Lax` for the same reason `sahoda_connect` is: the trip home is a
+ * cross-site top-level GET, which `Lax` allows and `Strict` would drop.
+ *
+ * Read off the request's own `Cookie` header rather than `cookies()`, so the
+ * route stays testable with a plain `Request` and there is no request-scoped
+ * store to mutate.
+ */
+export const CONNECT_NONCE_COOKIE = 'sahoda_connect_nonce'
+
+/** The query parameter the start route puts the same value on. */
+export const RETURN_NONCE_PARAM = 'nonce'
+
+/** Fifteen minutes, matching `sahoda_connect`: the two are spent together. */
+const NONCE_MAX_AGE_SECONDS = 15 * 60
+
+/** Sixteen bytes as base64url is exactly 22 characters of this alphabet. */
+const NONCE_RE = /^[A-Za-z0-9_-]{22}$/
+
+export function mintConnectNonce(): string {
+  return randomBytes(16).toString('base64url')
+}
+
+/** The `Set-Cookie` VALUE, as a literal header. See `pending-connect.ts` for why. */
+export function setConnectNonceHeader(nonce: string): string {
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : ''
+  return (
+    `${CONNECT_NONCE_COOKIE}=${nonce}` +
+    `; Path=/; Max-Age=${NONCE_MAX_AGE_SECONDS}; HttpOnly; SameSite=Lax${secure}`
+  )
+}
+
+/** Spend it. Same `Path`, or the clear silently fails to match. */
+export const CLEAR_CONNECT_NONCE = `${CONNECT_NONCE_COOKIE}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`
+
+/** The nonce in a raw `Cookie` header, or null when there is no well-formed one. */
+export function readNonceCookie(cookieHeader: string | null | undefined): string | null {
+  if (!cookieHeader) return null
+  for (const part of cookieHeader.split(';')) {
+    const eq = part.indexOf('=')
+    if (eq === -1) continue
+    if (part.slice(0, eq).trim() !== CONNECT_NONCE_COOKIE) continue
+    const value = part.slice(eq + 1).trim()
+    return NONCE_RE.test(value) ? value : null
+  }
+  return null
+}
+
+/**
+ * Did this trip start from a press in THIS browser?
+ *
+ *   `matched`     cookie and URL carry the same well-formed nonce
+ *   `absent`      one or both are missing or malformed
+ *   `mismatched`  both present, and they differ
+ *
+ * The two refusals are kept apart because they are different facts with
+ * different sentences: a dropped cookie is a browser we could not follow, a
+ * mismatch is a link that belongs to another attempt.
+ */
+export type NonceVerdict = 'matched' | 'absent' | 'mismatched'
+
+export function verifyConnectNonce(
+  cookieHeader: string | null | undefined,
+  params: URLSearchParams,
+): NonceVerdict {
+  const fromCookie = readNonceCookie(cookieHeader)
+  const raw = params.get(RETURN_NONCE_PARAM)?.trim() ?? ''
+  const fromUrl = NONCE_RE.test(raw) ? raw : null
+  if (fromCookie === null || fromUrl === null) return 'absent'
+  // Same length by construction (the regex fixes it), so this cannot throw.
+  return timingSafeEqual(Buffer.from(fromCookie), Buffer.from(fromUrl)) ? 'matched' : 'mismatched'
 }

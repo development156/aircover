@@ -13,7 +13,7 @@ import { ReferenceIdsSchema } from './reference-ids'
 
 // Real v4 shapes: zod's uuid() checks the version and variant nibbles, so a
 // convenient-looking all-zeros id is not a UUID and would test nothing.
-const id = (n: number) => `aaaaaaaa-0000-4000-8000-00000000000${n}`
+const id = (n: number) => `aaaaaaaa-0000-4000-8000-${String(n).padStart(12, '0')}`
 
 describe('the pictures a request says to look at', () => {
   test('an absent list is an empty one, not a failure', () => {
@@ -44,12 +44,12 @@ describe('the pictures a request says to look at', () => {
   })
 
   test('more DISTINCT pictures than the model will look at is refused', () => {
-    const tooMany = Array.from({ length: MAX_REFERENCES + 1 }, (unused, i) => id(i))
+    const tooMany = Array.from({ length: MAX_REFERENCES + 1 }, (_unused, i) => id(i))
     expect(ReferenceIdsSchema.safeParse(tooMany).success).toBe(false)
   })
 
   test('exactly the maximum is allowed, because the bound is inclusive', () => {
-    const most = Array.from({ length: MAX_REFERENCES }, (unused, i) => id(i))
+    const most = Array.from({ length: MAX_REFERENCES }, (_unused, i) => id(i))
     expect(ReferenceIdsSchema.parse(most)).toHaveLength(MAX_REFERENCES)
   })
 

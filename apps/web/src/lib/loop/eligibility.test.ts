@@ -177,9 +177,19 @@ describe('the Loop says why it will not plan', () => {
   })
 
   // ── A CHANNEL THE LOOP CANNOT PLAN FOR IS NOT A CHANNEL ───────────────────
-  it('ignores a connected platform that is not one of the four', () => {
+  it('ignores a connected platform that is not a channel at all', () => {
     const v = assess(eligibleFacts({ connections: [{ platform: 'tiktok', status: 'active' }] }))
     expect(explain(v)).toBe('Connect a channel first. Sahoda has nowhere to plan for.')
+  })
+
+  it('plans for a Facebook-only workspace, as the manual run already did', () => {
+    // MEASURED 2026-09-02: this file carried ['x','gbp','linkedin','instagram']
+    // while the enum held six values, so the Sunday cron wrote `no_channel` for
+    // a Facebook shop every week and the /loop screen said "Connect a channel"
+    // over a connected one. The list is now derived from the enum.
+    const v = assess(eligibleFacts({ connections: [{ platform: 'facebook', status: 'active' }] }))
+    expect(v.eligible).toBe(true)
+    expect(v.eligible && [...v.channels]).toEqual(['facebook'])
   })
 
   it('never returns eligible without naming at least one channel', () => {

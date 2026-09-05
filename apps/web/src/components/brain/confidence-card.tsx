@@ -25,7 +25,10 @@ export function ConfidenceCard({ provenance }: { provenance: Provenance }) {
   const pct = ring.total === 0 ? 0 : Math.round((ring.confirmed / ring.total) * 100)
 
   return (
-    <section className="surface-ring rounded-card bg-surface" aria-labelledby="brain-confidence">
+    <section
+      className="surface-ring-lift rounded-card bg-surface"
+      aria-labelledby="brain-confidence"
+    >
       <header className="flex min-h-[46px] items-center gap-3 border-b border-line-soft px-4 py-3">
         <h2 id="brain-confidence" className="text-[14px] font-semibold tracking-[-0.01em]">
           Brand confidence
@@ -39,7 +42,7 @@ export function ConfidenceCard({ provenance }: { provenance: Provenance }) {
         {/* The split bar. Two segments, each with its own texture, so the ratio
             is readable before any label is. */}
         <div
-          className="surface-ring flex h-[10px] w-full overflow-hidden rounded-full bg-surface"
+          className="surface-ring flex h-[10px] w-full overflow-hidden rounded-pill bg-surface"
           role="img"
           aria-label={`${ring.confirmed} of ${ring.total} fields confirmed by a person; ${inferred} still inferred by Sahoda.`}
         >
@@ -60,8 +63,7 @@ export function ConfidenceCard({ provenance }: { provenance: Provenance }) {
         <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1">
           <li className="flex items-center gap-[6px] text-[12px] text-muted">
             <Check className="size-[13px] shrink-0 text-ink" aria-hidden />
-            <span className="font-[550] text-ink tabular-nums">{ring.confirmed}</span> confirmed by
-            you
+            <span className="font-[550] text-ink tabular-nums">{ring.confirmed}</span> confirmed
           </li>
           <li className="flex items-center gap-[6px] text-[12px] text-muted">
             <Sparkles className="size-[13px] shrink-0" aria-hidden />
@@ -69,10 +71,23 @@ export function ConfidenceCard({ provenance }: { provenance: Provenance }) {
           </li>
         </ul>
 
+        {/* ── ONE LINE, AND IT IS NOT OPTIONAL ─────────────────────────────
+            This was three sentences and the compaction pass deleted it. That
+            was wrong twice over and `brain-claim.test.ts` caught it: the screen
+            must NAME at least one thing the brain genuinely reaches, or the
+            most important page in the product describes only its own parts —
+            the "screaming tech" failure CLAUDE.md's Tone Setup ruling is about.
+
+            What survives is the capability. What went is the second half, which
+            explained that a wrong guess stays wrong until corrected and that
+            correcting is free — both true, and both already said on the panel
+            to the right of this one.
+
+            The three named things are the three that are TRUE. The same guard
+            refuses "reply" and "campaign" here, because no mesh task writes a
+            reply and a campaign has no generation step of its own. */}
         <p className="mt-3 text-[12px] text-muted">
-          Every caption Sahoda writes, every weekly plan and the website it builds come from these
-          fields. A guess Sahoda got wrong is wrong in everything it writes until someone corrects
-          it, and correcting one costs nothing.
+          Sahoda writes your captions, your weekly plan and your website from these fields.
         </p>
       </div>
     </section>

@@ -80,7 +80,27 @@ function whenLabel(iso: string, now: Date): string | null {
   return `${DAY.format(at)}, ${time}`
 }
 
-export function ActivityFeed({ entries }: { entries: LedgerEntry[] }) {
+export function ActivityFeed({
+  entries,
+  unreadable = false,
+}: {
+  entries: LedgerEntry[]
+  /**
+   * The read FAILED, rather than coming back empty. Both carry zero entries, so
+   * without this the card below states that nothing has ever happened to this
+   * person's credits on the strength of a question that got no answer.
+   */
+  unreadable?: boolean
+}) {
+  if (unreadable) {
+    return (
+      <p role="alert" className="px-4 py-6 text-center type-sm text-danger">
+        Sahoda could not read your recent activity just now. Reload to try again. Nothing has been
+        charged and your credits are unaffected.
+      </p>
+    )
+  }
+
   if (entries.length === 0) {
     return (
       <p className="px-4 py-6 text-center type-sm text-muted">
@@ -135,7 +155,7 @@ export function ActivityFeed({ entries }: { entries: LedgerEntry[] }) {
           <li key={entry.seq} className="flex items-center gap-3 py-3">
             <span
               aria-hidden
-              className={`grid size-9 shrink-0 place-items-center rounded-full ${tone.pill}`}
+              className={`grid size-9 shrink-0 place-items-center rounded-pill ${tone.pill}`}
             >
               <tone.Glyph size={15} strokeWidth={1.8} />
             </span>

@@ -105,8 +105,10 @@ export function Badge({ rung, children, hideGlyph, className, ...props }: BadgeP
     <span
       data-rung={rung}
       className={cn(
-        // 20px tall, 7px inset, 11px/600 — the kit's `.sl-badge`.
-        'inline-flex h-5 shrink-0 items-center gap-1 rounded-sm px-[7px] text-[11px] leading-none font-semibold whitespace-nowrap',
+        // 20px tall, 7px inset, and the chip step (12px/600). This is the
+        // component `type-chip` was ADDED for — globals.css names it — and it
+        // kept the hand-written 11px literal the step exists to replace.
+        'inline-flex h-5 shrink-0 items-center gap-1 rounded-sm px-[7px] type-chip whitespace-nowrap',
         RUNG_FILL[rung],
         className,
       )}

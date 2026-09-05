@@ -28,6 +28,17 @@ export { planWeekTask, PlanWeekInputSchema } from './tasks/plan-week'
 export type { PlanWeekInput } from './tasks/plan-week'
 export { siteGenerateTask, SiteGenerateInputSchema } from './tasks/site-generate'
 export type { SiteGenerateInput } from './tasks/site-generate'
+// Studio prompt refine. Not in MeshTaskName (packages/shared is frozen for this
+// task) — see the file header for why its I/O contract lives here instead.
+export {
+  promptRefineTask,
+  PromptRefineInputSchema,
+  PromptRefineOutputSchema,
+  stripSettingsLanguage,
+  NO_INVENTION_RULE,
+  NO_SETTINGS_RULE,
+} from './tasks/prompt-refine'
+export type { PromptRefineInput, PromptRefineOutput } from './tasks/prompt-refine'
 
 // Brand grounding (server-only) — the cache-controlled Brand Brain prefix.
 export { createPostgrestBrandContext, buildBrandMessage } from './brand-context'
@@ -50,7 +61,13 @@ export {
 export type { BrandContext, BrandContextProvider } from './brand-context'
 
 // Routing tables (typed Alpha stand-in for ai_model_routes).
-export { TASK_TIER, TIER_ROUTES, routeForTier } from './routing'
+export {
+  ALLOWED_IMAGE_MODELS,
+  TASK_TIER,
+  TIER_ROUTES,
+  isAllowedImageModel,
+  routeForTier,
+} from './routing'
 export type { TierRoute } from './routing'
 
 // Server-only guard for callers that want to assert context explicitly.

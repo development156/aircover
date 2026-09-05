@@ -38,7 +38,7 @@ export function SmartFolderMenu({ folder }: { folder: AssetSmartFolder }) {
     <MenuTrigger
       trigger={trigger}
       ariaLabel={label}
-      buttonClassName="grid size-7 place-items-center rounded-sm text-muted transition-micro hover:bg-s2 hover:text-ink"
+      buttonClassName="grid size-7 place-items-center max-narrow:size-11 rounded-sm text-muted transition-micro hover:bg-s2 hover:text-ink"
     >
       <MenuItemRow onClick={remove} disabled={pending} autoFocus>
         Forget this smart folder

@@ -22,8 +22,29 @@
  * `SAHODA_ALLOW_LIVE_TESTS` and SKIP when it is unset, so refusing costs nothing.
  *
  * The e2e suite has no such default. It drives a browser against a running app,
- * and the app has exactly one database. A flat refusal here does not protect
- * production; it deletes the gate. So this asks a different question.
+ * and until 2026-09-04 the app had exactly one database, so a flat refusal here
+ * did not protect production, it deleted the gate. That is why production was
+ * merely GUARDED — refused unless a person typed its ref.
+ *
+ * ## Why production is now refused outright, and the fact that changed
+ *
+ * `yoxmzwkxweasfaahhvpj` — "sahoda-staging", ap-south-1 — was restored from
+ * paused on 2026-09-04 and carries the migration set. MEASURED: `list_projects`
+ * returns two projects, and staging answers queries.
+ *
+ * The whole argument for the acknowledgement was that there was nowhere else to
+ * point. There is now, so the ack is no longer a decision a person is entitled
+ * to make: it is just the old hole with a password on it. An acknowledgement
+ * asks "are you sure?", and the honest answer is that nobody should be sure —
+ * every spec mints a Clerk user and lets the app create a workspace and a credit
+ * ledger, and doing that in the customer database is not a thing to be certain
+ * about. So production moved from GUARDED to UNACKNOWLEDGEABLE, and the refusal
+ * now names staging instead of asking for a password.
+ *
+ * This is not the flat refusal the paragraph above rejected. It is the same
+ * refusal made affordable by a second database existing — and it stops being
+ * correct the moment staging stops existing, which is why the message says so
+ * rather than leaving the reader to work it out.
  *
  * ## A positive check, not an inequality
  *
@@ -34,7 +55,9 @@
  *   · a value that mentions Supabase but yields no ref  → REFUSE (unidentifiable)
  *   · no Supabase target configured at all              → REFUSE (nothing to run against)
  *   · two variables naming DIFFERENT projects           → REFUSE (split target)
- *   · the identified ref is a guarded one               → REFUSE unless acknowledged
+ *   · the identified ref is PRODUCTION                  → REFUSE, full stop. No
+ *                                                         acknowledgement unlocks it
+ *   · the identified ref is otherwise guarded           → REFUSE unless acknowledged
  *                                                         by its EXACT ref
  *   · anything else                                     → allow
  *
@@ -76,6 +99,32 @@
  * they ever disagree, so the duplication is checked rather than merely regretted.
  */
 export const GUARDED_PROJECT_REFS: readonly string[] = Object.freeze(['rloztdhzfliyvpvxsgjl'])
+
+/**
+ * The refs no acknowledgement can unlock.
+ *
+ * A SUBSET of `GUARDED_PROJECT_REFS`, deliberately expressed as its own list
+ * rather than as a flag on the other: the four-copy consistency check in
+ * `e2e-target.test.ts` reads `GUARDED_PROJECT_REFS` out of four files that
+ * cannot import each other, and changing that list's shape would break a guard
+ * whose whole job is to notice a ref being edited alone.
+ *
+ * Production is here because a second database now exists (see the header). If
+ * `sahoda-staging` were ever deleted, the honest response is to reopen that
+ * decision in this file, not to quietly re-add the ack path.
+ */
+export const UNACKNOWLEDGEABLE_PROJECT_REFS: readonly string[] = Object.freeze([
+  'rloztdhzfliyvpvxsgjl',
+])
+
+/**
+ * Where an e2e run is supposed to point instead.
+ *
+ * Named in the refusal so the reader is given a destination rather than only a
+ * prohibition — `no-impossible-remedy.spec.ts`'s rule applied to an operator's
+ * error message: refusing without saying where to go is a dead end.
+ */
+export const STAGING_PROJECT_REF = 'yoxmzwkxweasfaahhvpj'
 
 /** The variable a deliberate operator sets, to the exact ref they are accepting. */
 export const ACK_VARIABLE = 'SAHODA_E2E_ACK_TARGET'
@@ -171,6 +220,8 @@ export type TargetOutcome =
   | 'refused-no-target'
   | 'refused-split-target'
   | 'refused-unacknowledged'
+  /** Production. Distinct from `refused-unacknowledged` because no ack fixes it. */
+  | 'refused-production'
 
 export interface TargetDecision {
   readonly outcome: TargetOutcome
@@ -204,7 +255,13 @@ export function decideTarget(
   const ref = reading.distinctRefs[0]!
   if (!GUARDED_PROJECT_REFS.includes(ref)) return at('allowed-unguarded', ref, true)
 
-  // Guarded. The acknowledgement must name THIS ref — see the header.
+  // Checked BEFORE the acknowledgement is read, so an ack naming production
+  // cannot be mistaken for consent to something no longer on offer. A stale
+  // `SAHODA_E2E_ACK_TARGET` left in a shell or a CI dispatch field is exactly
+  // the input this ordering exists to make harmless.
+  if (UNACKNOWLEDGEABLE_PROJECT_REFS.includes(ref)) return at('refused-production', ref, false)
+
+  // Guarded but not production. The acknowledgement must name THIS ref.
   return env[ACK_VARIABLE]?.trim() === ref
     ? at('allowed-acknowledged', ref, true)
     : at('refused-unacknowledged', ref, false)

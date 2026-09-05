@@ -157,7 +157,7 @@ export function LibrarySidebar({
           type="button"
           onClick={onToggleCollapsed}
           aria-label={collapsed ? 'Expand folders' : 'Collapse folders'}
-          className="grid size-7 place-items-center self-end rounded-sm text-muted transition-micro hover:bg-s2 hover:text-ink"
+          className="grid size-7 place-items-center max-narrow:size-11 self-end rounded-sm text-muted transition-micro hover:bg-s2 hover:text-ink"
         >
           {collapsed ? (
             <ChevronsRight size={14} aria-hidden />

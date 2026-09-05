@@ -8,6 +8,7 @@ import { cycleCost } from '@/lib/loop/cost'
 // comments too — and would have matched the example.)
 import { credits } from '@/lib/credit-words'
 
+import { isPlannableChannel } from './plannable'
 import { LOOP_SCHEDULE_PHRASE } from './schedule'
 
 /**
@@ -42,8 +43,9 @@ import { LOOP_SCHEDULE_PHRASE } from './schedule'
  * `readLoopFacts` does the I/O, separately, and is the only part that needs one.
  */
 
-/** The four channels the Loop can plan for. */
-const PLANNABLE: readonly Channel[] = ['x', 'gbp', 'linkedin', 'instagram']
+// The channels the Loop plans for come from `./plannable`, derived from the
+// shared enum. This file carried its own four-channel literal, which refused a
+// Facebook or Telegram workspace that `actions/loop-cycle.ts` planned for.
 
 /**
  * The connection status a channel must hold to be planned for.
@@ -190,7 +192,7 @@ export function assess(facts: LoopFacts): LoopVerdict {
   const channels = facts.connections
     .filter((c) => c.status === PLANNABLE_STATUS)
     .map((c) => c.platform)
-    .filter((p): p is Channel => (PLANNABLE as readonly string[]).includes(p))
+    .filter(isPlannableChannel)
   const unique = [...new Set(channels)]
 
   if (unique.length === 0) {
@@ -203,7 +205,7 @@ export function assess(facts: LoopFacts): LoopVerdict {
         facts.connections
           .filter((c) => LAPSED_STATUSES.has(c.status))
           .map((c) => c.platform)
-          .filter((p): p is Channel => (PLANNABLE as readonly string[]).includes(p)),
+          .filter(isPlannableChannel),
       ),
     ]
     return lapsed.length > 0
@@ -291,9 +293,42 @@ export interface ExplainOptions {
   autoSchedule: 'armed' | 'off'
 }
 
-/** What a reader is owed when nothing is going to run on Sunday. */
-const NO_AUTO_SCHEDULE =
+/**
+ * What a reader is owed when nothing is going to run on Sunday.
+ *
+ * TWO of them, and which one is used depends on whether the button on that
+ * screen can actually be pressed. `controls.tsx:154` disables planning while
+ * `paused || !hasChannels || cycleRunning`, so "plan yours here whenever you
+ * want one" was offering a greyed-out control to exactly the two verdicts whose
+ * text is rewritten above it. That is the `no-impossible-remedy` class, and the
+ * workspace's own sentence already carries the step that comes first.
+ */
+const NO_AUTO_SCHEDULE_PLAIN = 'Sahoda is not planning weeks automatically at the moment.'
+const NO_AUTO_SCHEDULE_WITH_REMEDY =
   'Sahoda is not planning weeks automatically at the moment, so plan yours here whenever you want one.'
+
+/**
+ * Whether the plan-a-week button on `/loop` can be pressed from this verdict.
+ *
+ * Mirrors `controls.tsx`'s own `disabled` expression. Enumerated rather than
+ * defaulted so that a NEW refusal reason fails the build here and forces
+ * somebody to decide, which is how the `insufficient_credits` leak below got in.
+ */
+function canPlanByHand(verdict: LoopVerdict): boolean {
+  if (verdict.eligible) return true
+  switch (verdict.reason) {
+    // `disabled={paused || ...}` and `... || !hasChannels`.
+    case 'paused':
+    case 'no_channel':
+      return false
+    case 'never_enabled':
+    case 'channel_lapsed':
+    case 'already_planned':
+    case 'insufficient_credits':
+    case 'brain_not_resolved':
+      return true
+  }
+}
 
 export function explain(verdict: LoopVerdict, options?: ExplainOptions): string {
   // ── THE PROMISE THAT NOTHING CHECKED ──────────────────────────────────────
@@ -307,7 +342,8 @@ export function explain(verdict: LoopVerdict, options?: ExplainOptions): string 
   // still paused, and swapping one wrong sentence for a different wrong sentence
   // would be no fix at all.
   if (options?.autoSchedule === 'off') {
-    return `${withoutSundayPromise(verdict)} ${NO_AUTO_SCHEDULE}`
+    const tail = canPlanByHand(verdict) ? NO_AUTO_SCHEDULE_WITH_REMEDY : NO_AUTO_SCHEDULE_PLAIN
+    return `${withoutSundayPromise(verdict)} ${tail}`
   }
   return explainArmed(verdict)
 }
@@ -326,14 +362,44 @@ function withoutSundayPromise(verdict: LoopVerdict): string {
       ? `${base} Nothing in your Brand Brain is confirmed yet, so it will write in a voice it guessed at.`
       : base
   }
+  // ── EVERY REASON, NAMED. NO `default:` ──────────────────────────────────────
+  // This switch used to end in `default: return explainArmed(verdict)` under a
+  // comment asserting "every other reason says nothing about Sunday". Two of
+  // them did. `insufficient_credits` returns "Top up and Sahoda will plan your
+  // next week", so with the cron off a workspace short on credits was told
+  // "...Sahoda will plan your next week. Sahoda is not planning weeks
+  // automatically at the moment" — the promise this whole option exists to
+  // remove, and a self-contradiction inside one string.
+  //
+  // The suite's own `promisesSunday` regex matched it. It was never pointed at
+  // this verdict: `auto-schedule.test.ts` exercised only never_enabled, paused
+  // and eligible.
+  //
+  // Exhaustive on purpose. A new reason must fail to compile here rather than
+  // fall through to a sentence written for an armed schedule.
   switch (verdict.reason) {
     case 'never_enabled':
       return 'Turn the Loop on to plan a week here.'
     case 'paused':
       return 'The Loop is paused. Resume it to plan a week here.'
-    default:
-      // Every other reason names something about this workspace and says nothing
-      // about Sunday, so it is already true whatever the switch says.
+    case 'insufficient_credits':
+      // WAS "Top up and Sahoda will plan your next week."
+      return `Planning a week costs ${credits(verdict.required)} and you have ${credits(verdict.available)}. Top up to plan one here.`
+    case 'channel_lapsed': {
+      // WAS "...and Sahoda has somewhere to plan for again", which reads as the
+      // Loop resuming on its own.
+      const has = verdict.lapsed.length === 1 ? 'connection has' : 'connections have'
+      const them = verdict.lapsed.length === 1 ? 'it' : 'them'
+      return `Your ${list(verdict.lapsed)} ${has} lapsed. Reconnect ${them} to plan a week here.`
+    }
+    case 'brain_not_resolved':
+      // "it can plan a week" is a capability rather than a schedule, and it stays
+      // true with the cron off, so this one is carried over unchanged.
+      return explainArmed(verdict)
+    case 'no_channel':
+    case 'already_planned':
+      // Neither says anything about Sunday. `no_channel` states a missing
+      // prerequisite; `already_planned` is in the past tense.
       return explainArmed(verdict)
   }
 }

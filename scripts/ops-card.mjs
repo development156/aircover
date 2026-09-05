@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process'
 import { warn } from './lib/ops-env.mjs'
-import { readState, writeState, clientId } from './lib/ops-state.mjs'
+import { readState, writeState, readPending, appendPending, clientId } from './lib/ops-state.mjs'
 import { hasDbCredentials, select } from './lib/ops-rest.mjs'
 import { taskCodesIn } from './lib/ops-classify.mjs'
 import { appendCapped, ceilingWarning } from './lib/ops-queue.mjs'
@@ -144,9 +144,9 @@ function cmdQa() {
     die('the summary has to say something a non-technical owner can read.')
   }
 
-  const qa = readState('qa')
+  const queuedQa = readPending('qa')
   const now = new Date().toISOString()
-  const { items, accepted, refused } = appendCapped(qa.runs, [
+  const { items, accepted, refused } = appendCapped(queuedQa, [
     {
       client_id: clientId('qa'),
       task_code: code,
@@ -160,8 +160,11 @@ function cmdQa() {
     },
   ])
 
-  qa.runs = items
-  writeState('qa', qa)
+  // Into the untracked overlay, not the tracked file: `.githooks/pre-commit`
+  // refuses any commit that stages ops/state/qa.pending.json, so writing a run
+  // there leaves a working tree that can never be made clean. The run is still
+  // queued, still sent, and still survives a failed sync.
+  appendPending('qa', items.slice(queuedQa.length))
 
   const warning = ceilingWarning({ queue: 'QA', refused, queued: items.length })
   if (warning) {
@@ -190,8 +193,8 @@ function cmdChange() {
     die('summary_plain reads technical. Write what a non-technical owner would notice.')
   }
 
-  const changelog = readState('changelog')
-  const { items, accepted, refused } = appendCapped(changelog.entries, [
+  const queued = readPending('changelog')
+  const { items, accepted, refused } = appendCapped(queued, [
     {
       client_id: clientId('cl'),
       title,
@@ -207,8 +210,12 @@ function cmdChange() {
     },
   ])
 
-  changelog.entries = items
-  writeState('changelog', changelog)
+  // A changelog entry is written by a PERSON and belongs in the pull request
+  // diff (doc 13 §9.1), so it appends to the tracked file. Only the acknowledged
+  // prefix is held off it, in the untracked overlay, so a later sync never
+  // rewrites this file. `items` is recomputed by appendPending on the tracked
+  // rows; what is used here is only the accepted/refused verdict.
+  appendPending('changelog', items.slice(queued.length))
 
   const warning = ceilingWarning({ queue: 'changelog', refused, queued: items.length })
   if (warning) {
@@ -247,8 +254,7 @@ async function cmdShipCheck() {
 
   const board = readState('board')
   const known = new Map((board.tasks ?? []).map((t) => [t?.code, t]))
-  const changelog = readState('changelog')
-  const queued = new Set((changelog.entries ?? []).flatMap((entry) => entry?.task_codes ?? []))
+  const queued = new Set(readPending('changelog').flatMap((entry) => entry?.task_codes ?? []))
 
   const problems = []
   for (const code of codes) {

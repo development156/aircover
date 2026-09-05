@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { FileText, Globe, Plus, Type } from 'lucide-react'
 
 import { addPdfDocument, addTypedDocument, addUrlDocument } from '@/app/actions/knowledge'
-import type { KnowledgeActionState } from '@/app/actions/knowledge'
+import type { KnowledgeActionState } from '@/lib/knowledge/ingest'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -141,7 +141,7 @@ export function AddDocument() {
                   'focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--brand)]',
                   door === entry.id
                     ? 'bg-brand-wash shadow-[inset_0_0_0_1.5px_var(--brand-lift)]'
-                    : 'surface-ring hover:bg-s1',
+                    : 'surface-ring hover:bg-s2',
                 )}
               >
                 <input

@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { QUEUE_CEILING } from './ops-queue.mjs'
+import { pendingView, PENDING_OVERLAY_FILE } from './ops-state.mjs'
 
 /**
  * The QA hook, run for real, against a throwaway repo root (SL-084).
@@ -28,13 +29,41 @@ let root
 
 const stateFile = (name) => resolve(root, 'ops/state', name)
 
-const seed = (runs) => {
+const seed = (runs, tasks = []) => {
   mkdirSync(resolve(root, 'ops/state'), { recursive: true })
   writeFileSync(stateFile('qa.pending.json'), JSON.stringify({ version: 1, runs }))
-  writeFileSync(stateFile('board.json'), JSON.stringify({ version: 1, tasks: [] }))
+  writeFileSync(stateFile('board.json'), JSON.stringify({ version: 1, tasks }))
 }
 
-const readQueue = () => JSON.parse(readFileSync(stateFile('qa.pending.json'), 'utf8')).runs
+/**
+ * A board with a card open, which is the ONLY state the old attribution needed
+ * to write a false record. SL-054 is the real card it kept choosing: the one
+ * recording that production was down for 22 hours 40 minutes.
+ */
+const BOARD_WITH_AN_OPEN_CARD = [
+  { code: 'SL-054', board_column: 'in_progress', archived: false },
+  { code: 'SL-099', board_column: 'todo', archived: false },
+]
+
+/**
+ * The unsent queue, which is what every assertion here has always meant.
+ *
+ * A recorded run no longer lands in the tracked file: that file is TRACKED and
+ * `.githooks/pre-commit` refuses any commit that stages it, so writing a
+ * session's scratch runs there left a working tree that could never be made
+ * clean. The runs go to an untracked overlay beside it and the queue is the two
+ * read together, through the same pure function the scripts use.
+ */
+const readQueue = () => {
+  const baseline = JSON.parse(readFileSync(stateFile('qa.pending.json'), 'utf8')).runs
+  let overlay = {}
+  try {
+    overlay = JSON.parse(readFileSync(resolve(root, PENDING_OVERLAY_FILE), 'utf8'))
+  } catch {
+    /* nothing recorded yet */
+  }
+  return pendingView(baseline, overlay?.queues?.qa)
+}
 
 /** A green unit run — classifyBashRuns turns this into exactly one QA row. */
 const GREEN_RUN = JSON.stringify({
@@ -77,6 +106,19 @@ describe('the QA hook writing to a full queue', () => {
       suite: 'unit',
       status: 'pass',
     })
+  })
+
+  it('records the run without touching the tracked file', () => {
+    // The whole point of the overlay. `.githooks/pre-commit` refuses a commit
+    // that stages ops/state/qa.pending.json, so a hook that writes it dirties a
+    // tree that cannot then be cleaned by committing.
+    seed([{ client_id: 'qa-committed-0', suite: 'unit', status: 'pass' }])
+    const before = readFileSync(stateFile('qa.pending.json'), 'utf8')
+
+    runHook(GREEN_RUN)
+
+    expect(readFileSync(stateFile('qa.pending.json'), 'utf8')).toBe(before)
+    expect(readQueue()).toHaveLength(2)
   })
 
   it('does not evict a single unsent run when the queue is full', () => {
@@ -130,5 +172,52 @@ describe('the QA hook writing to a full queue', () => {
     // "something was recorded" impression the guard exists to prevent.
     expect(output).not.toContain('ops: QA ')
     expect(output).toContain('REFUSED')
+  })
+})
+
+/**
+ * WHOSE CARD IS A GATE RUN? NOBODY'S — AND THAT HAS TO BE WHAT IS WRITTEN.
+ *
+ * The hook used to stamp each auto run with the first card in the in_progress
+ * column. That is a coincidence dressed as an inference, and it deposited `pass`
+ * and `fail` rows on SL-054 — an incident card recording a 22h40m production
+ * outage — for every gate run any session made (REQUESTS §18).
+ *
+ * These assert the CLAIM, not the mechanism: a run the hook cannot attribute
+ * carries no card, and specifically not the one that happens to be open. Rewrite
+ * how the value is derived freely; a run must never borrow a card it was not
+ * told about.
+ *
+ * WHAT THIS CANNOT SEE — it drives the hook through one green unit run, so it
+ * says nothing about the commit path next door, where `markCommitted` reads
+ * SL-### codes out of a commit message a person actually wrote. That link is a
+ * record, not a guess, and is deliberately left alone.
+ */
+describe('what an auto QA run is attributed to', () => {
+  it('records no card, even while one sits open in progress', () => {
+    seed([], BOARD_WITH_AN_OPEN_CARD)
+    runHook(GREEN_RUN)
+
+    const [run] = readQueue()
+    expect(run.task_code ?? null).toBeNull()
+  })
+
+  it('never borrows the open card, which is the defect this replaces', () => {
+    seed([], BOARD_WITH_AN_OPEN_CARD)
+    runHook(GREEN_RUN)
+
+    // Named explicitly: the assertion above would also pass if the hook stopped
+    // recording runs altogether, and this one says which value is forbidden.
+    expect(readQueue().map((r) => r.task_code)).not.toContain('SL-054')
+  })
+
+  it('still records the run itself, so the fix is not a deletion', () => {
+    seed([], BOARD_WITH_AN_OPEN_CARD)
+    runHook(GREEN_RUN)
+
+    const queue = readQueue()
+    expect(queue).toHaveLength(1)
+    expect(queue[0].suite).toBe('unit')
+    expect(queue[0].status).toBe('pass')
   })
 })

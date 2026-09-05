@@ -68,6 +68,7 @@ const ACTION_LABELS: Record<ActionType, string> = {
   brand_research: 'Brand research',
   site_generate: 'Site generation',
   voice_minute: 'Voice minute',
+  studio_prompt_refine: 'Prompt rewrite',
 }
 
 /** Widened view for lookup: `action_type` is free text, not an `ActionType`. */

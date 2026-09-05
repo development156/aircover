@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { toChannelSet, type Campaign, type Channel, type Post } from '@sahoda/shared'
+import { ChannelSchema, toChannelSet, type Campaign, type Channel, type Post } from '@sahoda/shared'
 
-import { campaignPeriod, channelUnion, orderChannels, rollupCampaigns } from './rollup'
+import {
+  CHANNEL_ORDER,
+  campaignPeriod,
+  channelUnion,
+  orderChannels,
+  rollupCampaigns,
+} from './rollup'
 
 const UUID = (n: number) => `0000000${n}-0000-0000-0000-000000000000`
 
@@ -98,6 +104,34 @@ describe('the channel union is a SET — six posts on Instagram are one Instagra
         { channels: toChannelSet(['instagram', 'x']) },
       ]),
     ).toEqual(['instagram', 'x'])
+  })
+})
+
+describe('the column list is the shared channel vocabulary, not a copy of it', () => {
+  // `CHANNEL_ORDER` was the literal ['instagram','linkedin','x','gbp'] and
+  // `orderChannels` FILTERS by it, so a campaign of Facebook and Telegram posts
+  // rendered a grid with a post column and no channel columns, and "0 of 0 live".
+  // The columns must come from `ChannelSchema`, which cannot drift from itself.
+  it('names every channel the shared schema admits, each exactly once', () => {
+    expect([...CHANNEL_ORDER].sort()).toEqual([...ChannelSchema.options].sort())
+    expect(new Set(CHANNEL_ORDER).size).toBe(CHANNEL_ORDER.length)
+  })
+
+  it('keeps the column for a campaign that only targets Facebook', () => {
+    expect(channelUnion([{ channels: toChannelSet(['facebook']) }])).toEqual(['facebook'])
+  })
+
+  it('rolls a Telegram post up onto its campaign chips', () => {
+    const rollups = rollupCampaigns(
+      [campaign(UUID(1))],
+      [{ campaign_id: UUID(1), post_id: 'p1' }],
+      new Map([['p1', post('p1', ['telegram', 'instagram'])]]),
+    )
+    expect(rollups[0]!.channels).toEqual(['instagram', 'telegram'])
+  })
+
+  it('still puts the four original channels first, in their fixed order', () => {
+    expect(CHANNEL_ORDER.slice(0, 4)).toEqual(['instagram', 'linkedin', 'x', 'gbp'])
   })
 })
 
