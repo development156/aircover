@@ -23,6 +23,29 @@ const vercelConfig = JSON.parse(readFileSync(resolve(WEB, 'vercel.json'), 'utf8'
 }
 const middleware = readFileSync(resolve(WEB, 'src/middleware.ts'), 'utf8')
 
+/**
+ * The shortest gap between two firings of a schedule, in seconds.
+ *
+ * Only the shapes vercel.json actually uses are understood, and an unknown shape
+ * THROWS rather than returning a generous default: a schedule this cannot read is
+ * a schedule the ceiling check below would otherwise wave through.
+ */
+function minIntervalSeconds(schedule: string): number {
+  const fields = schedule.trim().split(/\s+/)
+  if (fields.length !== 5) throw new Error(`not a five-field cron schedule: "${schedule}"`)
+  const [minute, hour, dom, month, dow] = fields as [string, string, string, string, string]
+  if (dom !== '*' || month !== '*') throw new Error(`unrecognised schedule shape: "${schedule}"`)
+
+  const everyN = minute.match(/^\*\/(\d+)$/)
+  if (everyN && hour === '*' && dow === '*') return Number(everyN[1]) * 60
+  if (!/^\d+$/.test(minute)) throw new Error(`unrecognised minute field: "${schedule}"`)
+  if (hour === '*' && dow === '*') return 60 * 60
+  if (!/^\d+$/.test(hour)) throw new Error(`unrecognised hour field: "${schedule}"`)
+  if (dow === '*') return 24 * 60 * 60
+  if (/^\d$/.test(dow)) return 7 * 24 * 60 * 60
+  throw new Error(`unrecognised day-of-week field: "${schedule}"`)
+}
+
 describe('cron wiring', () => {
   it('schedules exactly the seven jobs, on their own cadences', () => {
     // Pinned as a SET of exact entries rather than a count, so a job cannot
@@ -205,6 +228,43 @@ describe('cron wiring', () => {
         expect(pattern, `${cron.path} is not excluded from matcher ${i}`).toContain(anchored)
       }
     }
+  })
+
+  /**
+   * ── THE SCHEDULE AND THE ROUTE'S OWN CEILING ARE TWO FILES, AND THEY DISAGREED ─
+   * `/api/cron/sweeps` declared `maxDuration = 300` beside a comment saying the
+   * tick was "still inside the five-minute cron interval so a tick cannot
+   * straddle the next one". Five minutes IS 300 seconds. A tick that ran to its
+   * ceiling would still be publishing when the next one was dispatched — the
+   * exact overlap the post_variants claim exists to survive, promised away by a
+   * comment that nothing read. This reads both files.
+   *
+   * Strictly below, never equal: equality is the case that was wrong.
+   */
+  it('gives every cron route a maxDuration strictly below its own interval', () => {
+    for (const cron of vercelConfig.crons ?? []) {
+      const route = readFileSync(resolve(WEB, 'src/app', `.${cron.path}`, 'route.ts'), 'utf8')
+      const declared = route.match(/^export const maxDuration = (\d+)$/m)?.[1]
+      expect(declared, `${cron.path} declares no maxDuration`).toBeDefined()
+
+      const interval = minIntervalSeconds(cron.schedule)
+      expect(
+        Number(declared),
+        `${cron.path}: maxDuration ${declared}s is not below its ${interval}s interval`,
+      ).toBeLessThan(interval)
+    }
+  })
+
+  it('reads the schedule shapes vercel.json uses, and refuses one it does not', () => {
+    // Pinned so the check above cannot pass by misreading a schedule as longer
+    // than it is. The five-minute case is the one that was wrong.
+    expect(minIntervalSeconds('*/5 * * * *')).toBe(300)
+    expect(minIntervalSeconds('*/10 * * * *')).toBe(600)
+    expect(minIntervalSeconds('20 1 * * *')).toBe(86_400)
+    expect(minIntervalSeconds('0 21 * * 0')).toBe(604_800)
+    // A shape this cannot read must not be waved through as "long enough".
+    expect(() => minIntervalSeconds('0 0 1 * *')).toThrow(/unrecognised/)
+    expect(() => minIntervalSeconds('0 9 * * 1-5')).toThrow(/unrecognised/)
   })
 
   it('every cron route checks the shared secret before anything else', () => {
