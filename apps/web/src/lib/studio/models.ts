@@ -129,8 +129,7 @@ export const STUDIO_MODELS: readonly StudioModel[] = [
   {
     id: 'bytedance-seed/seedream-5-0-lite',
     label: 'Everyday, a matching set',
-    goodAt:
-      'Food, shopfronts and people, at one flat price however big the picture.',
+    goodAt: 'Food, shopfronts and people, at one flat price however big the picture.',
     unlocks: 'Up to 14 pictures to match against.',
     maxPerPress: 4,
     maxReferences: 14,
