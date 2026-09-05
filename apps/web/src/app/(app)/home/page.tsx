@@ -18,7 +18,6 @@ import { countIndexedDocuments } from '@/lib/knowledge/store'
 import { InstagramInsights } from '@/components/home/instagram-insights'
 import { PerformanceStrip } from '@/components/analytics/performance-strip'
 import { SahodaRail } from '@/components/home/sahoda-rail'
-import { SpendCard } from '@/components/home/spend-card'
 import { WeekStrip } from '@/components/home/week-strip'
 import { StaggerItem } from '@/components/motion/stagger'
 import { ActivityFeed } from '@/components/home/activity-feed'
@@ -416,17 +415,26 @@ export default async function HomePage() {
             <PerformanceStrip analytics={instagram} />
           </StaggerItem>
 
-          <StaggerItem i={3}>
-            <SpendCard spend={spend} />
-          </StaggerItem>
+          {/* ── THE CREDITS-SPENT CHART IS NOT HERE, AND `readSpend` STILL IS ──
+              Founder's ruling, 2026-09-04: spending belongs on /wallet and
+              nowhere else. The card moved there whole — same component, same
+              reads, same window — rather than being deleted, so nothing about
+              what it says changed.
+
+              The READ stays on this page and must not be removed with it. It
+              feeds `signals.spendRows` above, which is one of the five things
+              `workspaceHasStarted` weighs when deciding whether to show this
+              dashboard or the Get started screen. Dropping the read would send
+              that decision a `null` meaning "we could not tell", and a
+              workspace that HAS spent could land on the beginner screen. */}
 
           {/* Instagram's own series: the strip carries the headline numbers,
               this carries the one real chart a platform reported. */}
-          <StaggerItem i={4}>
+          <StaggerItem i={3}>
             <InstagramInsights analytics={instagram} />
           </StaggerItem>
 
-          <StaggerItem i={5}>
+          <StaggerItem i={4}>
             <WeekStrip buckets={buckets} variantStates={variantStates} />
           </StaggerItem>
         </div>
@@ -435,7 +443,7 @@ export default async function HomePage() {
           {/* 1 — WHAT HAPPENED. The reference puts the activity feed at the
                   top of the rail; this app had it as a full-width table at the
                   very bottom, which is the least-read position on the page. */}
-          <StaggerItem i={6}>
+          <StaggerItem i={5}>
             {/* `flush`: the feed's rows run to the card's own edge, so the body
                 may not carry the standard 20px inset. The header still does, so
                 this heading sits on the same line as every other card's. */}
@@ -459,14 +467,14 @@ export default async function HomePage() {
               copies, down from three, and the biggest one is at the top. */}
 
           {/* WHAT NEXT: what Sahoda knows, and what it can post to. */}
-          <StaggerItem i={7}>
+          <StaggerItem i={6}>
             <BrainCard brain={brain} knowledgeDocuments={knowledgeDocuments} />
           </StaggerItem>
-          <StaggerItem i={8}>
+          <StaggerItem i={7}>
             <ConnectionsCard connections={connections} />
           </StaggerItem>
 
-          <StaggerItem i={9}>
+          <StaggerItem i={8}>
             <SahodaRail drafted={draftedThisWeek} planCost={creditCost('loop_cycle')} />
           </StaggerItem>
         </div>

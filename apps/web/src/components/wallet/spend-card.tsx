@@ -1,5 +1,4 @@
-import { Info, TrendingUp } from 'lucide-react'
-import Link from 'next/link'
+import { Info } from 'lucide-react'
 
 import { SpendTrend, type SpendPoint } from '@/components/charts/spend-trend'
 import { ChartSparse, Panel, PanelHead } from '@/components/charts/panel'
@@ -7,8 +6,8 @@ import { CountUp } from '@/components/motion/count-up'
 import { Unreadable } from '@/components/design-system/absence-row'
 import type { SpendRead } from '@/lib/home/spend'
 
-import { CoverageNote } from './chart-empty'
-import { SpendBars } from './spend-bars'
+import { CoverageNote } from '@/components/home/chart-empty'
+import { SpendBars } from '@/components/home/spend-bars'
 
 /**
  * Credits spent, last 30 days.
@@ -118,19 +117,18 @@ export function SpendCard({ spend }: { spend: SpendRead }) {
 
   return (
     <Panel className="space-y-4" data-guide="home.spend">
-      <PanelHead
-        title="Credits spent"
-        sub="last 30 days"
-        trailing={
-          <Link
-            href="/wallet"
-            className="card-link inline-flex items-center gap-1.5 rounded-pill border border-brand-lift px-3 py-1.5 type-meta font-[550] text-accent transition-micro hover:bg-brand-wash max-narrow:min-h-[44px]"
-          >
-            <TrendingUp aria-hidden className="size-3.5" />
-            See activity
-          </Link>
-        }
-      />
+      {/* ── NO "See activity" LINK, AND THAT IS THE MOVE, NOT AN OMISSION ────
+          This panel carried one to `/wallet` for as long as it lived on the
+          dashboard, where it was the whole point: the chart summarised, the
+          link took you to the itemised list. The panel now RENDERS on /wallet,
+          with `Credit activity` immediately below it, so the same link would
+          point at the page the reader is already on — pressable, and unable to
+          change anything they can see. `no-impossible-remedy.spec.ts` exists
+          for exactly that shape of control.
+
+          If this panel is ever placed on another screen, the link comes back
+          with it, as a prop rather than as a constant. */}
+      <PanelHead title="Credits spent" sub="last 30 days" />
 
       {/* THE NUMBER, at the size the panel is about. */}
       <p className="flex min-h-[44px] flex-wrap items-baseline gap-x-2">

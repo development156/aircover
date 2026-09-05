@@ -6,6 +6,7 @@ import { CardLabel } from '@/components/ui/card'
 import { BalanceHero } from '@/components/wallet/balance-hero'
 import { CreditActivity } from '@/components/wallet/credit-activity'
 import { SkippedNote } from '@/components/wallet/ledger-table'
+import { SpendCard } from '@/components/wallet/spend-card'
 import { TopUpPanel } from '@/components/wallet/top-up-panel'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
 import { holdReaperFromEnv, staleHoldNote } from '@/lib/wallet/balance'
@@ -16,6 +17,7 @@ import {
   readLedger,
   readOpenHolds,
 } from '@/lib/wallet/read'
+import { readSpend } from '@/lib/home/spend'
 import { readBillingProfile } from '@/lib/billing/read'
 import { detectedCountry, pickDisplayCountry } from '@/lib/billing/display-country'
 import { getFxRates } from '@/lib/billing/fx-store'
@@ -44,18 +46,25 @@ export default async function WalletPage() {
    * buys back a serial round trip on the money screen. The waste is real and it
    * is the cheaper side of the trade.
    */
-  const [balance, ledger, ledgerTotal, openHolds, profile, detected, fx] = await Promise.all([
-    readBalance(),
-    readLedger(),
-    // The seventh read, in the same round trip for the reason the note above
-    // gives. It fetches no rows — `head: true` — and answers the one question
-    // the windowed list cannot: how many entries there actually are.
-    countLedger(),
-    readOpenHolds(),
-    readBillingProfile(),
-    detectedCountry(),
-    getFxRates(),
-  ])
+  const [balance, ledger, ledgerTotal, openHolds, profile, detected, fx, spend] = await Promise.all(
+    [
+      readBalance(),
+      readLedger(),
+      // The seventh read, in the same round trip for the reason the note above
+      // gives. It fetches no rows — `head: true` — and answers the one question
+      // the windowed list cannot: how many entries there actually are.
+      countLedger(),
+      readOpenHolds(),
+      readBillingProfile(),
+      detectedCountry(),
+      getFxRates(),
+      // The 30-day spending window, in the SAME round trip rather than after
+      // it. It is one more read on a page that already makes seven; sequencing
+      // it would put a serial database round trip on the money screen for a
+      // panel that sits above the fold.
+      readSpend(),
+    ],
+  )
 
   /**
    * The local-currency approximation on the top-up panel.
@@ -120,6 +129,18 @@ export default async function WalletPage() {
           and your credits are unaffected.
         </div>
       )}
+
+      {/* ── SPENDING LIVES HERE AND NOWHERE ELSE ─────────────────────────
+          Founder's ruling, 2026-09-04. This panel was on the dashboard; it is
+          the same component with the same reads, moved rather than rebuilt, so
+          it makes exactly the claims it always did — a settled 30-day window,
+          never the live balance.
+
+          Between the balance and the ledger on purpose: how much you have, how
+          you have been spending it, then every line. `spend.status` carries its
+          own unreadable case, so a failed read says so here rather than drawing
+          a flat line that would read as "you spent nothing". */}
+      <SpendCard spend={spend} />
 
       <section data-guide="wallet.ledger" className="space-y-3">
         {ledger.entries.length === 0 ? (

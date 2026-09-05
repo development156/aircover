@@ -33,7 +33,7 @@
   "/(app)/playbooks": 732350,
   "/(app)/posts": 691559,
   "/(app)/radar/[id]": 721632,
-  "/(app)/wallet": 781750,
+  "/(app)/wallet": 791759,
   "/(app)/sites": 761045,
   "/(auth)/layout": 617709,
   "/(auth)/error": 639243,
