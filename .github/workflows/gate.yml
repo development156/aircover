@@ -179,7 +179,12 @@ jobs:
     name: Playwright @smoke (writes to the named database)
     if: github.event_name == 'workflow_dispatch' && inputs.ack_target != ''
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # 60, not 45. MEASURED 2026-09-05, run 33965242498: the first run that ever
+    # reached the suite was killed by the 45-minute limit with no verdict and no
+    # output flushed, on a dev server compiling every route on first request.
+    # The build step below removes that cost; the extra fifteen minutes are so
+    # a slow runner reports a result rather than a cancellation.
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4
@@ -333,8 +338,27 @@ jobs:
       - name: Install Chromium
         run: pnpm --filter @sahoda/web exec playwright install --with-deps chromium
 
+      # ── A PRODUCTION BUILD, NEVER THE DEV SERVER ────────────────────────────
+      # docs/workflow/05_TRAPS.md: "Never run `pnpm dev` for a measurement or a
+      # suite." MEASURED 2026-09-05, run 33965242498: on the dev server every
+      # spec timed out at 60s, three attempts each, for 45 minutes, and the job
+      # was cancelled with nothing to show. `playwright.config.ts` starts
+      # whatever `E2E_SERVER_CMD` names; a built app answers /sign-in in under a
+      # second, so the webServer's own five-minute ceiling is never near.
+      - name: Build the app
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_DB_URL: ${{ secrets.E2E_SUPABASE_DB_URL }}
+        run: pnpm --filter @sahoda/web exec next build
+
       - name: Run the smoke suite
         env:
+          # The built app from the step above, on the port the config defaults to.
+          E2E_SERVER_CMD: pnpm exec next start -p 3100
           # The acknowledgement, typed by a person at dispatch time. Declared on
           # the `test:smoke` task in turbo.json — Turborepo 2.x defaults to
           # `envMode: "strict"` and strips anything undeclared, so an
@@ -350,9 +374,11 @@ jobs:
         run: pnpm turbo run test:smoke --concurrency=1
 
       # The traces are the only thing worth having from a failed browser run, and
-      # they are the first thing lost when a runner is torn down.
+      # they are the first thing lost when a runner is torn down. `always()`, not
+      # `failure()`: a CANCELLED job (the 45-minute kill above) is neither, and
+      # that run left nothing at all to read.
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
           name: playwright-report
           path: |
