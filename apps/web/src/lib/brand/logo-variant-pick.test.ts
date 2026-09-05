@@ -88,7 +88,14 @@ describe('pickLogoVariant', () => {
 
   it('says neither fits when both files are mixed ink (always plated)', () => {
     const result = pickLogoVariant({ light: MIXED_INK, dark: MIXED_INK }, 0.5)
-    expect(result.ok).toBe(false)
+    // RETARGETED: a bare `.ok` check cannot tell "neither clears contrast"
+    // from "no logo file has ink" — two different reasons this function can
+    // return, and a regression that returned the WRONG one would pass. Pin
+    // the specific sentence for the mixed-ink case.
+    expect(result).toEqual({
+      ok: false,
+      reason: 'Neither logo variant clears contrast on this backdrop without a plate.',
+    })
   })
 
   it('picks the light file when only it has ink, even if the dark file exists but is blank', () => {

@@ -50,7 +50,15 @@ describe('the upload door reads the file, not the label', () => {
       'Acme',
       nothingShouldRun,
     )
+    // RETARGETED: a bare `.ok` check passes identically whether the empty
+    // payload was correctly refused as unreadable-as-a-PDF, or `openUploadDoor`
+    // threw on the empty base64 body and never got near the type check at all.
+    // The prefix is present but there is no magic-bytes head to sniff, so this
+    // takes the SAME 'not_pdf' branch as the it.each block above — assert that,
+    // and that the door never reached the reader it must stop before.
     expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.reason).toBe('not_pdf')
+    expect(nothingShouldRun.extract).not.toHaveBeenCalled()
   })
 
   it('still accepts a real PDF past the type check', async () => {

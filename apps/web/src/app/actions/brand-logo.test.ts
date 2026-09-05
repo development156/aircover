@@ -297,7 +297,16 @@ describe('setBrandLogo', () => {
     const empty = new FormData()
     empty.set('file', new File([], 'logo.png', { type: 'image/png' }))
 
-    expect((await setBrandLogo(empty)).ok).toBe(false)
+    // RETARGETED: a bare `.ok` check passes identically whether the empty
+    // file was correctly refused before any upload, or `setBrandLogo` threw
+    // reading a 0-byte File and the outer catch produced its OWN generic
+    // "Could not set that as your logo" message instead. Assert the actual
+    // sentence set-logo-variant.ts returns for this branch, and that nothing
+    // was uploaded or written.
+    const result = await setBrandLogo(empty)
+    expect(result).toEqual({ ok: false, message: 'Pick a logo to use.' })
+    expect(state.uploadCalled).toBe(0)
+    expect(state.updates).toHaveLength(0)
   })
 
   /**
@@ -395,6 +404,10 @@ describe('setBrandLogoDark', () => {
     const empty = new FormData()
     empty.set('file', new File([], 'logo.png', { type: 'image/png' }))
 
-    expect((await setBrandLogoDark(empty)).ok).toBe(false)
+    // RETARGETED, same reasoning as the light-variant test above.
+    const result = await setBrandLogoDark(empty)
+    expect(result).toEqual({ ok: false, message: 'Pick a logo to use.' })
+    expect(state.uploadCalled).toBe(0)
+    expect(state.updates).toHaveLength(0)
   })
 })

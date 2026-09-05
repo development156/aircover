@@ -95,7 +95,14 @@ describe('publishOne — what counts as published', () => {
     // test, and the empty string is the one that slips between them.
     const result = await publishOne('p1', 'x', answering({ ok: true, permalink: '' }))
 
+    // RETARGETED: a bare `.ok` check passes identically whether the empty
+    // string took the same "no link yet" branch as a missing permalink, or
+    // `publishOne` threw on the empty string and some unrelated catch
+    // produced a DIFFERENT ok:false. Assert the specific sentence, which is
+    // exactly the sibling test's claim above — that the two are the same case.
     expect(result.ok).toBe(false)
+    expect(result.ok === false && result.message).toMatch(/hasn’t given us a link yet/i)
+    expect(result.ok === false && result.message).toMatch(/\bX\b/)
   })
 
   test('a 200 whose BODY says not-ok is a failure, and the body’s words are kept', async () => {
