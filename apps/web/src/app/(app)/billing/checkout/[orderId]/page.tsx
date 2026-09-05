@@ -90,6 +90,11 @@ export default async function CheckoutBridgePage({
   try {
     order = await provider.fetchOrder(orderId)
   } catch (error) {
+    // An order Cashfree does not know is an old or mistyped link, not an outage: the same
+    // 404 an unknown post gets, and nothing to page anybody about. `cashfreeHttpError`
+    // stamps the upstream status on the error it throws. MEASURED 2026-09-05: without
+    // this, /billing/checkout/nope claimed the provider was unreachable and told Sentry.
+    if ((error as { status?: unknown }).status === 404) notFound()
     // The provider could not be reached, or refused us. Either way it is Sahoda's problem
     // and the customer's money has not moved. Say that, not that their payment failed.
     reportServerError(error, { action: 'checkoutBridge', workspaceId: workspace.workspace.id })
