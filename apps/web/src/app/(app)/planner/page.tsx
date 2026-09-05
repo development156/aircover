@@ -254,7 +254,21 @@ export default async function PlannerPage({
       <div className="space-y-grid">
         <div className="enter">
           <PlannerHero context={<ConnectFirstNote connections={connected} />}>
-            {posts.length > 0 ? <ViewToggle active={view} /> : null}
+            {posts.length > 0 ? (
+              /* The reader's filter rides along. Every other control on this
+                 page already carried it; this one emitted `{ view }` alone,
+                 so choosing Month threw away the tab, the search and the day
+                 the toolbar directly below it was still showing. */
+              <ViewToggle
+                active={view}
+                carry={{
+                  ...(filter.tab === 'all' ? {} : { tab: filter.tab }),
+                  ...(filter.query === '' ? {} : { q: filter.query }),
+                  ...(filter.dateKey === null ? {} : { date: filter.dateKey }),
+                  ...(weekParam === null ? {} : { week: weekParam }),
+                }}
+              />
+            ) : null}
           </PlannerHero>
         </div>
 
