@@ -4,9 +4,10 @@ import { PageTitle } from '@/components/page-title'
 import { EmptyState } from '@/components/empty-state'
 import { CardLabel } from '@/components/ui/card'
 import { BalanceHero } from '@/components/wallet/balance-hero'
-import { CreditActivity } from '@/components/wallet/credit-activity'
 import { SkippedNote } from '@/components/wallet/ledger-table'
-import { TopUpPanel } from '@/components/wallet/top-up-panel'
+import { CreditHistory } from '@/components/wallet/credit-history'
+import { TopUpCredits } from '@/components/wallet/top-up-credits'
+import { SpendCard } from '@/components/home/spend-card'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
 import { holdReaperFromEnv, staleHoldNote } from '@/lib/wallet/balance'
 import {
@@ -16,17 +17,28 @@ import {
   readLedger,
   readOpenHolds,
 } from '@/lib/wallet/read'
-import { readBillingProfile } from '@/lib/billing/read'
-import { detectedCountry, pickDisplayCountry } from '@/lib/billing/display-country'
-import { getFxRates } from '@/lib/billing/fx-store'
-import { displayCurrencyForCountry } from '@sahoda/shared'
+import { readSpend } from '@/lib/home/spend'
 
 export const metadata = { title: 'Wallet' }
 
 /**
- * Wallet. Every number on this page comes from `credit_balances` / `credit_ledger`
- * under RLS — there is no spend cap, no usage forecast and no performance-credit
- * panel here, because nothing persists or produces those yet.
+ * Wallet: what you have, what you have used, and how to get more.
+ *
+ * Every number comes from `credit_balances` / `credit_ledger` under RLS. There is no
+ * spend cap, no usage forecast and no performance-credit panel, because nothing
+ * persists or produces those yet.
+ *
+ * ── THE PLANS ARE NOT HERE, AND THAT IS THE POINT ────────────────────────────
+ * Three monthly plan cards used to close this page — the same picker that lives on
+ * Settings → Plans. One product sold in two places is two places to keep in step,
+ * and the wallet is where somebody goes when they are SHORT of credits, not when
+ * they are choosing a subscription. Founder's ruling, 2026-09-03. What replaced it
+ * sells credits and only credits, at the one rate `pricing.config.json` carries.
+ *
+ * ── AND THE SPEND GRAPH MOVED IN BESIDE THE BALANCE ──────────────────────────
+ * "Credits spent, last 30 days" was on the dashboard, a screen away from the
+ * balance it should be read against. Available and used are one question asked
+ * twice; they now sit together, over the same window the activity list shows.
  */
 export default async function WalletPage() {
   /**
@@ -44,7 +56,7 @@ export default async function WalletPage() {
    * buys back a serial round trip on the money screen. The waste is real and it
    * is the cheaper side of the trade.
    */
-  const [balance, ledger, ledgerTotal, openHolds, profile, detected, fx] = await Promise.all([
+  const [balance, ledger, ledgerTotal, openHolds, spend] = await Promise.all([
     readBalance(),
     readLedger(),
     // The seventh read, in the same round trip for the reason the note above
@@ -52,22 +64,8 @@ export default async function WalletPage() {
     // the windowed list cannot: how many entries there actually are.
     countLedger(),
     readOpenHolds(),
-    readBillingProfile(),
-    detectedCountry(),
-    getFxRates(),
+    readSpend(),
   ])
-
-  /**
-   * The local-currency approximation on the top-up panel.
-   *
-   * Every input here is allowed to come back empty and none of them can fail the
-   * page: the rupee price is the charge, and an approximation that cannot be
-   * made is simply not shown. A profile that is unreadable contributes no
-   * declared country, which falls through to the edge's guess, which may itself
-   * be absent — and all three roads end at the rupee price alone.
-   */
-  const declaredCountry = profile.status === 'ok' ? (profile.data?.country_code ?? null) : null
-  const currency = displayCurrencyForCountry(pickDisplayCountry(declaredCountry, detected))
 
   // A user with no workspace has no wallet — not a broken one. This is the
   // whole page, not a banner above the usual furniture: an empty ledger and a
@@ -121,6 +119,12 @@ export default async function WalletPage() {
         </div>
       )}
 
+      {/* Used, beside what is left. The card carries its own unreadable state, so a
+          failed spend read costs this block and nothing else on the page. */}
+      <SpendCard spend={spend} showActivityLink={false} />
+
+      <TopUpCredits />
+
       <section data-guide="wallet.ledger" className="space-y-3">
         {ledger.entries.length === 0 ? (
           <>
@@ -135,16 +139,15 @@ export default async function WalletPage() {
             <SkippedNote skipped={ledger.skipped} />
           </>
         ) : (
-          <CreditActivity
+          <CreditHistory
             entries={ledger.entries}
             skipped={ledger.skipped}
             limit={HISTORY_LIMIT}
             total={ledgerTotal}
+            now={new Date().toISOString()}
           />
         )}
       </section>
-
-      <TopUpPanel currency={currency} fx={fx} />
     </div>
   )
 }

@@ -61,6 +61,24 @@ export interface CreateCheckoutInput {
    * Absent for a normal purchase, which keeps the existing catalogue-price path untouched.
    */
   planChange?: PlanChangeCheckout
+  /**
+   * A PACK OF CREDITS bought outright, rather than a month of a plan.
+   *
+   * Present only for a wallet top-up. It overrides the amount exactly as `planChange`
+   * does, and for the same reason: the figure charged is not the plan's catalogue
+   * price. `planId` stays on the input because the order still records which plan the
+   * workspace was on when the pack was bought — context for reconciliation, never the
+   * product. Nothing about a plan purchase changes when this is absent.
+   */
+  topUp?: TopUpCheckout
+}
+
+/** A bought pack of credits. Both figures are derived from the one configured rate. */
+export interface TopUpCheckout {
+  /** Credits the pack grants. Validated against pricing.config.json before the order opens. */
+  credits: number
+  /** What the customer pays, in paise, for exactly those credits. */
+  amountPaise: number
 }
 
 /** The prorated figures an upgrade order carries. Every one of them is ours, not the customer's. */
@@ -138,5 +156,13 @@ export interface ParsedWebhookEvent {
    * this is optional rather than a second event type.
    */
   planChange?: { changeId: string; credits: number }
+  /**
+   * Set when the order was a bought PACK OF CREDITS rather than a month of a plan.
+   *
+   * `orderId` is the provider's own order id and is what keys the ledger entry, via
+   * `topUpGrantKey`. It is carried explicitly rather than recovered from `eventId`
+   * because those are different identifiers: one order can produce several events.
+   */
+  topUp?: { orderId: string; credits: number }
   raw: unknown
 }

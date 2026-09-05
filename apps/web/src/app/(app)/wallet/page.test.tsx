@@ -35,8 +35,12 @@ vi.mock('@/lib/wallet/read', () => ({
 // The top-up panel reaches a `'use server'` module (Clerk + the billing rail) on
 // import. Its behaviour is not what this file is about; its PRESENCE is, so the
 // stub keeps an identifiable marker.
-vi.mock('@/components/wallet/top-up-panel', () => ({
-  TopUpPanel: () => <div data-testid="top-up-panel" />,
+// Retargeted, not deleted: the CLAIM both assertions make is that the way to get
+// more credits appears with the wallet and disappears with the workspace. The panel
+// that does that changed from a plan picker to a credit top-up on 2026-09-03; the
+// claim did not.
+vi.mock('@/components/wallet/top-up-credits', () => ({
+  TopUpCredits: () => <div data-testid="top-up-panel" />,
 }))
 
 vi.mock('@/app/actions/workspace', () => ({ createWorkspace: vi.fn() }))

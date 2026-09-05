@@ -1,5 +1,11 @@
 import { z } from 'zod'
-import { PLAN_CATALOG, PlanIdSchema, type PlanId } from '@sahoda/shared'
+import {
+  inrForCredits,
+  PLAN_CATALOG,
+  PlanIdSchema,
+  refuseTopUpCredits,
+  type PlanId,
+} from '@sahoda/shared'
 import { PeriodSchema } from '../../period'
 import type { ParsedWebhookEvent, PaymentEventType, PaymentMode } from '../types'
 
@@ -33,6 +39,14 @@ export const CashfreeOrderTagsSchema = z.object({
   change_id: z.string().min(1).optional(),
   change_credits: z.coerce.number().int().min(0).optional(),
   change_amount_inr: z.coerce.number().min(0).optional(),
+
+  /**
+   * A bought PACK OF CREDITS. Same provenance and the same caveat as the three above:
+   * ours, echoed back inside a verified body, and still bounded below because our own
+   * bug is the threat this guards, not the customer.
+   */
+  topup_credits: z.coerce.number().int().positive().optional(),
+  topup_amount_inr: z.coerce.number().positive().optional(),
 })
 export type CashfreeOrderTags = z.infer<typeof CashfreeOrderTagsSchema>
 
@@ -93,6 +107,7 @@ export function tagsToEventFields(tags: Record<string, string>): {
   planId: PlanId
   period: string
   planChange?: { changeId: string; credits: number; amountInr: number }
+  topUp?: { credits: number; amountInr: number }
 } {
   const parsed = CashfreeOrderTagsSchema.parse(tags)
   const base = {
@@ -107,6 +122,41 @@ export function tagsToEventFields(tags: Record<string, string>): {
   const present = [parsed.change_id, parsed.change_credits, parsed.change_amount_inr].filter(
     (v) => v !== undefined,
   ).length
+
+  // The two top-up tags are a unit for the same reason the three above are, and the two
+  // KINDS are mutually exclusive: an order is a month of a plan or a pack of credits, never
+  // both. Tagged as both, there is no honest amount to reconcile against and no single
+  // idempotency key to write under, so it is a parse failure rather than a guess.
+  const topUpPresent = [parsed.topup_credits, parsed.topup_amount_inr].filter(
+    (v) => v !== undefined,
+  ).length
+  if (topUpPresent === 1) {
+    throw new Error('cashfree order_tags carry a partial top-up (both tags or neither)')
+  }
+  if (topUpPresent === 2 && present > 0) {
+    throw new Error('cashfree order_tags carry both a plan change and a top-up')
+  }
+
+  if (topUpPresent === 2) {
+    const credits = parsed.topup_credits as number
+    const amountInr = parsed.topup_amount_inr as number
+
+    // The pack must be one this product actually sells, and its price must be the one
+    // price. Without this a tag written by a future version of our own code — or an
+    // order opened before a rate change — could grant credits nobody paid for.
+    const refusal = refuseTopUpCredits(credits)
+    if (refusal) {
+      throw new Error(`cashfree order_tags carry an unsellable top-up of ${credits} credits`)
+    }
+    const expected = inrForCredits(credits)
+    if (amountInr !== expected) {
+      throw new Error(
+        `cashfree top-up tag says ${amountInr} for ${credits} credits; the rate says ${expected}`,
+      )
+    }
+    return { ...base, topUp: { credits, amountInr } }
+  }
+
   if (present === 0) return base
   if (present !== 3) {
     throw new Error('cashfree order_tags carry a partial plan change (all three or none)')
@@ -147,7 +197,7 @@ export function parseCashfreeWebhook(
   // Reconcile only what we are about to act on. A failed/dropped payment grants nothing, so
   // holding it to the plan price would reject legitimate failure notifications.
   if (eventType === 'payment_succeeded') {
-    assertOrderMatchesPlan(order, fields.planId, fields.planChange)
+    assertOrderMatchesPlan(order, fields.planId, fields.planChange, fields.topUp)
   }
 
   return {
@@ -166,6 +216,7 @@ export function parseCashfreeWebhook(
           },
         }
       : {}),
+    ...(fields.topUp ? { topUp: { orderId: order.order_id, credits: fields.topUp.credits } } : {}),
     // The DELIVERED payload, not the zod-parsed one. WebhookSchema is non-strict, so parsing
     // strips everything billing does not read — bank_reference, payment_time, payment_method,
     // customer_details. Those are exactly the fields needed to reconcile a disputed charge from
@@ -185,6 +236,7 @@ function assertOrderMatchesPlan(
   order: z.infer<typeof OrderSchema>,
   planId: PlanId,
   planChange?: { changeId: string; credits: number; amountInr: number },
+  topUp?: { credits: number; amountInr: number },
 ): void {
   const currency = order.order_currency ?? EXPECTED_CURRENCY
   if (currency !== EXPECTED_CURRENCY) {
@@ -202,6 +254,25 @@ function assertOrderMatchesPlan(
   // thing to reconcile against. The tagged amount is used instead — and then bounded, because
   // the tags and the amount both come from us and a bug in our own proration must not be able
   // to mint a month's credits for a rupee.
+  /**
+   * A bought pack is reconciled against THE RATE, not against a plan.
+   *
+   * `tagsToEventFields` has already checked that the tagged rupees are what the rate says
+   * for the tagged credits. This is the second half of the same guarantee and the one that
+   * matters: that the money Cashfree actually took is that same figure. Without it a tag
+   * pair consistent with itself but inconsistent with the order would grant credits for an
+   * order of any size.
+   */
+  if (topUp) {
+    const expectedInr = inrForCredits(topUp.credits)
+    if (order.order_amount !== expectedInr) {
+      throw new Error(
+        `cashfree order amount ${order.order_amount} does not match ${expectedInr} for ${topUp.credits} credits`,
+      )
+    }
+    return
+  }
+
   if (planChange) {
     if (order.order_amount !== planChange.amountInr) {
       throw new Error(

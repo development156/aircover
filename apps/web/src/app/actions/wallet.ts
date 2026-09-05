@@ -2,7 +2,8 @@
 
 import { auth } from '@clerk/nextjs/server'
 import { createCashfreeProvider, loadCashfreeEnv, type PaymentProvider } from '@sahoda/billing'
-import { PlanIdSchema } from '@sahoda/shared'
+import { inrForCredits, PlanIdSchema, refuseTopUpCredits, TOP_UP } from '@sahoda/shared'
+import { creditWord } from '@/lib/credit-words'
 
 import { env } from '@/lib/env'
 import { reportServerError } from '@/lib/observability/report'
@@ -10,6 +11,8 @@ import { workspaceForWrite } from '@/lib/workspaces'
 import type { CheckoutState } from '@/lib/wallet/checkout-state'
 import { currentBillingPeriod } from '@/lib/wallet/checkout-state'
 import { checkoutFailureMessage } from '@/lib/billing/checkout-failure-copy'
+import type { TopUpState } from '@/lib/wallet/topup-state'
+import { readSubscription } from '@/lib/billing/read'
 
 /**
  * Top-up entry point. This consumes the `PaymentProvider` INTERFACE only — it never
@@ -106,5 +109,93 @@ export async function startCheckout(planId: unknown): Promise<CheckoutState> {
     // Cashfree answers 401 on production today, and that failure repeats
     // identically however many times the button is pressed.
     return { ok: false, message: checkoutFailureMessage(error) }
+  }
+}
+
+/** The sentence each refusal gets. One per reason, because "invalid amount" helps nobody. */
+const TOP_UP_REFUSALS = {
+  'not-a-number': 'Choose how many credits you want.',
+  'below-minimum': `The smallest top-up is ${TOP_UP.min_credits.toLocaleString('en-IN')} ${creditWord(TOP_UP.min_credits)}.`,
+  'above-maximum': `The largest top-up is ${TOP_UP.max_credits.toLocaleString('en-IN')} ${creditWord(TOP_UP.max_credits)}. Buy it twice for more.`,
+  'not-a-step': `Credits are sold in steps of ${TOP_UP.step_credits.toLocaleString('en-IN')}.`,
+} as const
+
+/**
+ * BUY A PACK OF CREDITS. Not a plan — nothing here renews, and no entitlement moves.
+ *
+ * ── THE QUANTITY IS CHECKED HERE, NOT ONLY ON THE SCREEN ─────────────────────
+ * `refuseTopUpCredits` is the same function the panel calls, so what the button
+ * refuses and what this refuses cannot drift. It is called again on this side
+ * because a server action is a public endpoint: the panel's check is a courtesy to
+ * the customer, this one is the rule.
+ *
+ * ── THE PRICE IS DERIVED, NEVER ACCEPTED ─────────────────────────────────────
+ * The caller sends credits and nothing else. The rupees come from `inrForCredits`
+ * on this side, travel to Cashfree as the order amount, and are checked AGAIN
+ * against the same rate when the webhook comes back. A price posted by a browser
+ * would be a price a customer could choose.
+ *
+ * ── THE PLAN TAG IS CONTEXT, NOT THE PRODUCT ─────────────────────────────────
+ * The order still records which plan the workspace was on, because a support
+ * question about a charge starts there. It grants nothing: the webhook reads the
+ * two top-up tags and never looks at the plan for a pack. An unreadable
+ * subscription therefore cannot block a purchase — it falls back to `free`, which
+ * is what a workspace with no subscription row genuinely is.
+ */
+export async function startTopUp(credits: unknown): Promise<TopUpState> {
+  let workspaceId: string | undefined
+  try {
+    const { userId } = await auth()
+    if (!userId) return { ok: false, message: 'Sign in to buy credits.' }
+
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    workspaceId = ws.workspace.id
+
+    const refusal = refuseTopUpCredits(credits)
+    if (refusal) return { ok: false, message: TOP_UP_REFUSALS[refusal] }
+    const wanted = credits as number
+
+    const rail = provider()
+    if (!rail) {
+      return { ok: false, message: 'Card payments are not connected yet. Nothing was charged.' }
+    }
+
+    const subscription = await readSubscription()
+    const planId = subscription.status === 'ok' ? subscription.data.planId : 'free'
+
+    const appBaseUrl = env.NEXT_PUBLIC_APP_URL as string
+    const returnUrl = new URL('/wallet', appBaseUrl).toString()
+
+    const session = await rail.createCheckout({
+      workspaceId: ws.workspace.id,
+      planId,
+      period: currentBillingPeriod(new Date()),
+      successUrl: returnUrl,
+      cancelUrl: returnUrl,
+      topUp: { credits: wanted, amountPaise: inrForCredits(wanted) * 100 },
+    })
+
+    if (session.mode !== 'live') {
+      return {
+        ok: true,
+        simulated: true,
+        mode: session.mode,
+        sessionId: session.id,
+        credits: wanted,
+      }
+    }
+
+    return {
+      ok: true,
+      simulated: false,
+      mode: 'live',
+      sessionId: session.id,
+      url: session.url,
+      credits: wanted,
+    }
+  } catch (error) {
+    reportServerError(error, { action: 'startTopUp', workspaceId })
+    return { ok: false, message: 'Could not start your top-up. Nothing was charged.' }
   }
 }

@@ -35,6 +35,19 @@ export const monthlyGrantKey = (plan: string, period: string, workspaceId: strin
   `grant:${plan}:${period}:${workspaceId}`
 
 /**
+ * A bought pack of credits, keyed on the PAYMENT and nothing else.
+ *
+ * Not (workspace, amount) and not (workspace, period): a customer may buy the same
+ * size twice in one minute, and both purchases must land. `monthlyGrantKey`'s own
+ * comment records why keying too broadly is a money bug — here it would be the
+ * opposite defect, taking a second payment and granting nothing for it.
+ *
+ * The provider's order id is unique per order and survives a redelivery of the same
+ * webhook, which is exactly the pair of properties this needs.
+ */
+export const topUpGrantKey = (orderId: string): string => `topup:${orderId}`
+
+/**
  * Where a GRANT came from, carried on `action_type`.
  *
  * This exists because the value was previously a bare literal in TWO places with

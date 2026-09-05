@@ -6,6 +6,14 @@
     "monthly_cap_pct": 10,
     "lifetime_milestone_cap": 20
   },
+  "top_up": {
+    "credits_per_pack": 2000,
+    "inr_per_pack": 500,
+    "packs": [2000, 5000, 10000],
+    "min_credits": 2000,
+    "step_credits": 500,
+    "max_credits": 200000
+  },
   "actions": {
     "caption_rewrite": 1,
     "inbox_reply": 1,

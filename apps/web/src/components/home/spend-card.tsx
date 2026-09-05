@@ -98,7 +98,19 @@ function dayLabel(iso: string): string {
   }).format(date)
 }
 
-export function SpendCard({ spend }: { spend: SpendRead }) {
+export function SpendCard({
+  spend,
+  showActivityLink = true,
+}: {
+  spend: SpendRead
+  /**
+   * False on the wallet, where the activity this links to is already further down
+   * the same page. A link to the screen you are on is navigation that cannot
+   * happen — the impossible remedy `no-impossible-remedy.spec.ts` forbids, wearing
+   * chrome.
+   */
+  showActivityLink?: boolean
+}) {
   const readable = spend.status !== 'unreadable'
   const activeDays = spend.days.filter((day) => day.credits > 0).length
   // Every day in the window was READ, so every day is a measured value. The
@@ -122,13 +134,15 @@ export function SpendCard({ spend }: { spend: SpendRead }) {
         title="Credits spent"
         sub="last 30 days"
         trailing={
-          <Link
-            href="/wallet"
-            className="card-link inline-flex items-center gap-1.5 rounded-pill border border-brand-lift px-3 py-1.5 type-meta font-[550] text-accent transition-micro hover:bg-brand-wash max-narrow:min-h-[44px]"
-          >
-            <TrendingUp aria-hidden className="size-3.5" />
-            See activity
-          </Link>
+          showActivityLink ? (
+            <Link
+              href="/wallet"
+              className="card-link inline-flex items-center gap-1.5 rounded-pill border border-brand-lift px-3 py-1.5 type-meta font-[550] text-accent transition-micro hover:bg-brand-wash max-narrow:min-h-[44px]"
+            >
+              <TrendingUp aria-hidden className="size-3.5" />
+              See activity
+            </Link>
+          ) : null
         }
       />
 

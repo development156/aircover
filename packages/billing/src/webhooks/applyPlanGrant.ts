@@ -6,6 +6,7 @@ import {
   ok,
   PLAN_CATALOG,
   planChangeGrantKey,
+  topUpGrantKey,
   type Result,
 } from '@sahoda/shared'
 import type { LedgerPort } from '../ledger/port'
@@ -134,10 +135,28 @@ export function createApplyPlanGrant(
      * route would report success for a payment that produced no credits. Buying twice in one
      * month is not exotic; it is what a customer does when the first month's credits run out.
      */
-    const amount = event.planChange ? event.planChange.credits : plan.monthlyCredits
-    const key = event.planChange
-      ? planChangeGrantKey(event.planChange.changeId)
-      : purchaseGrantKey(event)
+    /**
+     * A BOUGHT PACK is keyed on the payment, and nothing about the plan enters it.
+     *
+     * Buying the same size twice in one afternoon is ordinary behaviour, so a key those two
+     * purchases shared would take the second payment and grant nothing for it. See
+     * `topUpGrantKey`.
+     *
+     * The entry type is TOPUP rather than GRANT because they are different facts — one is
+     * money the customer paid, the other is an allowance they were given — and the wallet's
+     * own copy classifier reads that column to tell a reader which happened.
+     */
+    const topUp = event.topUp
+    const amount = topUp
+      ? topUp.credits
+      : event.planChange
+        ? event.planChange.credits
+        : plan.monthlyCredits
+    const key = topUp
+      ? topUpGrantKey(topUp.orderId)
+      : event.planChange
+        ? planChangeGrantKey(event.planChange.changeId)
+        : purchaseGrantKey(event)
 
     // A zero-credit change is a real event (an upgrade in the last minutes of a period, where
     // the prorated difference rounds to nothing) and `apply_ledger_entry` rejects a zero
@@ -152,7 +171,7 @@ export function createApplyPlanGrant(
     try {
       const res = await port.apply({
         workspaceId: event.workspaceId,
-        entryType: 'GRANT',
+        entryType: topUp ? 'TOPUP' : 'GRANT',
         amount,
         idempotencyKey: key,
         actor: `provider:${event.provider}`,
@@ -162,6 +181,7 @@ export function createApplyPlanGrant(
           period: event.period,
           mode: event.mode,
           ...(event.planChange ? { planChangeId: event.planChange.changeId } : {}),
+          ...(topUp ? { topUpOrderId: topUp.orderId } : {}),
         },
       })
       return ok({ granted: amount, balanceAfter: res.entry.balanceAfter, replayed: res.replayed })

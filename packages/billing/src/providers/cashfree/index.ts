@@ -112,9 +112,13 @@ export function createCashfreeProvider(opts: CashfreeProviderOptions): CashfreeP
     // `computeProration` before we get here; converted to rupees because that is the unit
     // Cashfree's `order_amount` is in, and rounded to two decimals so the figure sent, the
     // figure tagged and the figure the webhook reconciles are byte-identical.
-    const amountInr = input.planChange
-      ? Math.round(input.planChange.amountPaise) / 100
-      : plan.priceInr
+    // A bought pack is charged its own price, which is the configured rate times the
+    // quantity — the same override the upgrade below makes, for the same reason.
+    const amountInr = input.topUp
+      ? Math.round(input.topUp.amountPaise) / 100
+      : input.planChange
+        ? Math.round(input.planChange.amountPaise) / 100
+        : plan.priceInr
 
     const res = await transport({
       method: 'POST',
@@ -149,6 +153,14 @@ export function createCashfreeProvider(opts: CashfreeProviderOptions): CashfreeP
                 change_id: input.planChange.changeId,
                 change_credits: String(input.planChange.credits),
                 change_amount_inr: String(amountInr),
+              }
+            : {}),
+          // `plan_id` above stays the plan the workspace is on. For a pack it is context
+          // for reconciliation and grants nothing — these two tags are the product.
+          ...(input.topUp
+            ? {
+                topup_credits: String(input.topUp.credits),
+                topup_amount_inr: String(amountInr),
               }
             : {}),
         },
