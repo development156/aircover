@@ -166,6 +166,17 @@ export default async function BrainKnowledgePage({
           </p>
         </div>
 
+        {/* THE COUNT ABOVE IS OF THE ROWS SHOWN, and past LIST_LIMIT that is not
+            the whole library. `readLibrary` bounds the read, so without this
+            sentence "23 of 200" would read as a total to a person who has 260
+            documents. Ordered newest-first, so the ones missing are the oldest.
+            Only rendered when the read actually hit the cap. */}
+        {library.truncated ? (
+          <p className="type-sm text-muted">
+            You have more documents than this list can show, so the oldest are not here.
+          </p>
+        ) : null}
+
         <ul className="flex flex-col gap-2">
           {library.documents.map((document) => (
             <DocumentRow key={document.id} document={document} />
