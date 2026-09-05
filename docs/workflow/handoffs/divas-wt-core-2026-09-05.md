@@ -45,3 +45,33 @@ service-role key and pooler URL, Supabase dashboard → sahoda-staging → Setti
 Also noticed: staging carries `20260820144500 variant_formats_story_thread`
 under a different version than production's unnamed `20260820144500`; a
 name-only drift, not investigated.
+
+## Session 4, continued: three smoke runs, each one step further
+
+| Run | Got as far as | Why it stopped | Fix |
+| --- | --- | --- | --- |
+| 33965242498 | suite started on the dev server | 45-min job limit, no output flushed | `b395eace`: build step + `next start`, 60 min, artifacts on `always()` |
+| 33968304482 | suite on the built app | `Invalid supabaseUrl`: `E2E_SUPABASE_URL` had been re-saved with a non-https value | `571d3259`: guard checks shape; both public values re-set |
+| 33976271461 | **sign-in works, app renders, real assertions run** | every read to staging answers **401** | Staging does not trust Clerk's tokens (below) |
+
+**MEASURED from staging's API logs, 15:55–16:55 UTC:** 251 × 401 on
+`/rest/v1/workspaces` and `/rest/v1/ops_admins`, 29 × 200, 50 × 204.
+Production, same Clerk instance, during the morning's browser QA: 1,630 × 200,
+0 × 401. `createServerSupabase` hands Supabase the Clerk session token; a
+project only accepts it when Clerk is registered as a third-party auth
+provider on THAT project. Production has it; staging, restored today, does not.
+
+**One dashboard action, then re-dispatch:** Supabase → `sahoda-staging` →
+Authentication → Sign In / Providers → Third-Party Auth → Add provider → Clerk,
+domain `leading-hyena-7.clerk.accounts.dev`. Then:
+
+    gh workflow run gate.yml -R development156/aircover --ref wt-core -f ack_target=yoxmzwkxweasfaahhvpj
+
+**First real result from the suite, before the 401s stopped it:**
+`accent-area-budget` fails on `/settings`: 7,012 px² of brand fill against a
+2,000 px² ceiling ("configuration — §2.3 says approximately zero"). That is a
+genuine design regression on the trunk, not an environment artefact; the
+selected "Plan & credits" nav item is the likely fill. Not fixed here.
+
+Clerk test users minted by the three runs were purged (34 + 34 + this run's);
+18 older `sahoda.e2e.*` users from before today remain on the dev instance.
