@@ -230,8 +230,34 @@ describe('bulk filing', () => {
     // "b" was already filed before this action; Undo must only remove what THIS
     // action added ("a"), never the filing that already existed.
     await user.click(screen.getByRole('button', { name: 'Undo' }))
-    await waitFor(() => expect(unfileAssets).toHaveBeenCalledWith('f1', ['a']))
-  })
+    //
+    // THE SIBLING OF THE WAIT AT THE BOTTOM OF THIS FILE, AND IT WAS MISSED.
+    // `restoreAssets` was raised 1s -> 5s on 2026-08-27 and 5s -> 15s by
+    // 00ef8381. This assertion is the same shape — click Undo, wait for the
+    // inverse server action — and kept waitFor's 1s default through both passes,
+    // inside a test that also kept vitest's 5s default because the `ui` project
+    // sets no `testTimeout`. So it had a fifteenth of its sibling's headroom.
+    //
+    // MEASURED 2026-09-05 on the wt-karunesh2 merge: 1 failed of 8,427 under the
+    // full gate, `unfileAssets` expiring here; this file then passed ALONE on the
+    // same tree, 34 of 34 in 7.6s. That is the signature this file already
+    // records for its sibling — green alone, red under load.
+    //
+    // 20s for the test and 15s for the wait, matching the sibling exactly rather
+    // than inventing a second pair of numbers. The invariant recorded there
+    // holds here: the inner wait must stay strictly smaller than the test budget
+    // containing it, or the test dies at its own boundary and the wait never
+    // reports. The assertion is untouched — `unfileAssets` must still be called
+    // with exactly ['a'], so filing that already existed is still not undone.
+    //
+    // NOT MUTATION-PROVED, for the reason its sibling states: on an idle machine
+    // the call has already happened before waitFor's first check, so shrinking
+    // the timeout does not turn it red here. This is headroom, not a demonstrated
+    // fix. If it goes red at 15s, suspect a real race in the Undo handler.
+    await waitFor(() => expect(unfileAssets).toHaveBeenCalledWith('f1', ['a']), {
+      timeout: 15_000,
+    })
+  }, 20_000)
 
   it('offers no Undo when the action added nothing, because there is nothing to put back', async () => {
     // Every selected photo was already in the folder. An Undo here would REMOVE
