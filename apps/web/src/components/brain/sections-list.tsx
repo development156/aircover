@@ -1,11 +1,12 @@
 import type { Route } from 'next'
 import Link from 'next/link'
-import { Anchor, AudioLines, Ban, ChevronRight, User, Users } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 
 import { BRAIN_SECTIONS, type BrainSectionKey } from '@/lib/brand/fields'
 import { sectionTally } from '@/lib/brand/brain-ring'
+import { cn } from '@/lib/utils'
 import type { Provenance } from '@/lib/brand/provenance'
+import { SECTION_ICON, SECTION_ICON_TILE } from './section-icon'
 
 /** Which tab owns each section. One place, so a row cannot link to the wrong one. */
 const SECTION_TAB: Record<BrainSectionKey, Route> = {
@@ -15,24 +16,6 @@ const SECTION_TAB: Record<BrainSectionKey, Route> = {
   voice: '/brain/voice',
   taboo: '/brain/voice',
   alignment: '/brain',
-}
-
-/**
- * A glyph per section, so five rows are told apart before any of them is read.
- *
- * `aria-hidden` on every one: the title is beside it and says the same thing, so
- * announcing the icon would read each row twice. The icon earns its place by
- * making the list scannable, not by carrying meaning — which is also why an
- * accent glyph is safe here (docs/26 §3.1: nothing may be knowable from colour
- * alone, and nothing here is).
- */
-const SECTION_ICON: Record<BrainSectionKey, LucideIcon> = {
-  voice: AudioLines,
-  brand_persona: User,
-  customer_persona: Users,
-  hook: Anchor,
-  taboo: Ban,
-  alignment: Anchor,
 }
 
 /**
@@ -80,10 +63,7 @@ export function SectionsList({ provenance }: { provenance: Provenance }) {
                     fix, and the ring gives the swapped surface the edge the same
                     note says it needs — `--surface-2` separates at 1.04:1 on its
                     own, which is chrome rather than separation. */}
-                <span
-                  aria-hidden
-                  className="grid size-8 shrink-0 place-items-center rounded-input bg-brand-wash text-accent dark:surface-ring dark:bg-s2"
-                >
+                <span aria-hidden className={cn(SECTION_ICON_TILE, 'size-8')}>
                   <Icon className="size-[15px]" strokeWidth={2} />
                 </span>
 

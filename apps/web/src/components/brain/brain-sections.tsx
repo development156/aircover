@@ -68,12 +68,13 @@ export async function BrainSections({ only }: { only: readonly BrainSectionKey[]
 
   return (
     <div className="grid gap-grid wide:grid-cols-2">
-      {sections.map((section) => (
+      {sections.map((section, index) => (
         <SectionCard
           key={section.key}
           section={section}
           brain={brain.active}
           provenance={brain.provenance}
+          index={index}
         />
       ))}
     </div>
