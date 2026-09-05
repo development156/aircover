@@ -65,6 +65,8 @@ export interface UseBuildArgs {
 export interface BuildFailure {
   message: string
   retryable: boolean
+  /** `limit` when the day's free builds are spent: the footer must stop saying "free". */
+  kind?: 'limit'
 }
 
 /**
@@ -317,6 +319,7 @@ export function useBuild({
           // An insufficient balance is not fixed by pressing the same button,
           // and neither is a daily allowance that returns tomorrow.
           retryable: state.kind !== 'insufficient' && state.kind !== 'limit',
+          ...(state.kind === 'limit' ? { kind: 'limit' as const } : {}),
         })
         return
       }

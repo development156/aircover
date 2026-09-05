@@ -567,7 +567,13 @@ export function OnboardingStage({
                  showed none — while BOTH buttons on it, one of them labelled
                  "Skip for now", start a charged resolve. */
               <span className="enterkey">
-                {isFree ? 'Free the first time' : `Uses ${cost} ${creditWord(cost)}`}
+                {build.failure?.kind === 'limit'
+                  ? /* MEASURED 2026-09-05: "Free the first time" sat under a refusal
+                       that said the day's free builds were spent (docs/51 Q-02). */
+                    'Free builds used up for today'
+                  : isFree
+                    ? 'Free the first time'
+                    : `Uses ${cost} ${creditWord(cost)}`}
               </span>
             ) : (
               <span className="enterkey">

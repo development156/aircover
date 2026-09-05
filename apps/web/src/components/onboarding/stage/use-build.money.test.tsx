@@ -160,6 +160,8 @@ describe('one press, one charge', () => {
     })
     expect(result.current.failure?.message).toBe('Try again tomorrow.')
     expect(result.current.failure?.retryable).toBe(false)
+    // And it says which kind it is, so the footer can stop promising "free".
+    expect(result.current.failure?.kind).toBe('limit')
   })
 
   test('a THROWN resolve releases the guard rather than latching it dead', async () => {
