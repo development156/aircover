@@ -81,7 +81,7 @@ export function AssetDetail({ card, onTrash }: { card: AssetCard; onTrash: () =>
           <Trash2 size={14} strokeWidth={1.8} aria-hidden />
           Move to trash
         </Button>
-        <p className="text-[12px] text-muted">
+        <p className="type-meta text-muted">
           It stays on its posts and in its folders, and Restore in the trash puts it back. Deleting
           for good happens from the trash.
         </p>
@@ -171,7 +171,7 @@ function AssetNameAndAlt({ card }: { card: AssetCard }) {
           placeholder="Describe what is in the photo"
           aria-describedby={`asset-alt-help-${card.id}`}
         />
-        <p id={`asset-alt-help-${card.id}`} className="text-[12px] text-muted">
+        <p id={`asset-alt-help-${card.id}`} className="type-meta text-muted">
           Written once here, and carried onto every post that uses this photo.
         </p>
       </div>

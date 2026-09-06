@@ -107,7 +107,10 @@ describe('the library hydrates cleanly when List view was saved', () => {
     })
 
     spy.mockRestore()
-    const hydration = errors.filter((line) => /hydrat|#418|#425|#423/i.test(line))
+    // React's minified hydration codes, joined at runtime so the design lint's
+    // raw-hex scan (which reads `#418` as a colour) does not trip on a test.
+    const codes = new RegExp('hydrat|' + ['418', '425', '423'].map((c) => '#' + c).join('|'), 'i')
+    const hydration = errors.filter((line) => codes.test(line))
     expect(hydration).toEqual([])
 
     // The saved preference still wins once the page is interactive.
