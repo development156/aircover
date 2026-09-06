@@ -178,3 +178,11 @@ Also this session: **Q-06's wallet half** (`f7b9bd5b`, top-up orders idempotent,
 **122 of 122, 0 skipped, run 34021699957 on `973c6534`.** The founder reset the staging password at 11:58; the probe went green on the next dispatch. From there: 116 (rail contrast, palette ring, phone floor, a templates step), then 120 (switcher back on the phone inside 360px, "Usage" in ink), then 122. Two rulings were delegated and made from measurements: the /analytics ceilings re-measured with the guard's own helper (one fill, seven small regions the page gained on purpose), and the negative-ADJUST guard left alone because `applyReversal` retries on the raw constraint. Q-19 (production Clerk) was answered in the session: where the keys go, and why pasting them now would orphan 35 workspaces keyed to 34 development-instance ids across 35 columns; a migration lane if wanted.
 
 Also: `~/.claude/hooks/alert.sh` on the global `Notification` and `Stop` hooks (two one-second chimes plus a popup), per the founder.
+
+## Session 6, afternoon (14:40–16:30 IST): the launch-night checklist and the TinyFish lane
+
+**`docs/52_Beta_Launch_Night_Checklist_2026-09-06.md`** (`b1dbc7cf`) plus its artifact: every key, plan and switch for 50 Free users, MEASURED where a dashboard answered (wt-web 1,246 commits behind; 35 columns hold Clerk ids; 7 admin seats; 4,879 credits outstanding). Old `DO_THIS_YOURSELF_FINAL.md` marked superseded.
+
+**TinyFish** (`15bcb0c8`): tier 3 of the site ladder and Radar's rendered rung, replacing Firecrawl and Zyte; Apify kept. `TINYFISH_API_KEY` in env-schema, turbo allowlist and jobs env; migration `20260906120000` APPLIED to staging and production (CHECK admits 'tinyfish', keeps 'zyte'); PGlite proof 3/3; research 204/204; jobs Radar 94/94; link hand-off proven red by mutation. Onboarding arms tier 3 only when the key exists. **The key is not set anywhere yet**: until it is, behaviour is exactly as before (tier 1 only; Radar records bot-walled pages as gaps).
+
+**Working tree note:** another session has uncommitted home-screen work in this worktree (`lib/home/live.ts` etc., a type error in their file). Committed by explicit path; nothing of theirs was touched.
