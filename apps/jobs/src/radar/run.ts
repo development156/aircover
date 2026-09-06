@@ -376,7 +376,14 @@ async function checkWebsite(
       costBasis: 'free',
     },
     async () => {
-      const rendered = await tinyfishFetch(url, { apiKey: options.tinyfishApiKey! })
+      // Through the PROVIDER transport, never the page one: the page transport is
+      // the guarded fetch for the competitor's own origin, and TinyFish is a host
+      // this repository names. (Zyte's call here reached for the global; the
+      // test for this rung could not exist until it did not.)
+      const rendered = await tinyfishFetch(url, {
+        apiKey: options.tinyfishApiKey!,
+        fetch: options.fetch as never,
+      })
       return {
         outcome: 'changed' as const,
         costMicros: TINYFISH_RENDER_ESTIMATE_MICROS,

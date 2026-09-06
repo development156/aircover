@@ -81,6 +81,74 @@ const providerNeverCalled = (async () => {
   throw new Error('the provider transport must not be reached')
 }) as never
 
+describe('the rendered rung, TinyFish', () => {
+  it('renders a bot-walled page through the provider transport, records provider tinyfish as free, and charges', async () => {
+    const ledger = new FakeLedger({ [WS_A]: 20 })
+    const { db, state } = fakeDb({ [SOURCE]: [WS_A] })
+    const begun: Array<{ provider: string; costBasis: string; estimateMicros: number }> = []
+    const recordingDb: RadarDb = {
+      ...db,
+      beginFetch: async (r) => {
+        begun.push({
+          provider: r.provider,
+          costBasis: r.costBasis,
+          estimateMicros: r.estimateMicros,
+        })
+        return { allowed: true, reservationId: `res-${begun.length}`, subscriberCount: 1 }
+      },
+    }
+    // Our own request is refused with a 403: the one failure a residential render fixes.
+    const page = { calls: 0 }
+    const fetchPage = async (): Promise<Response> => {
+      page.calls += 1
+      return new Response('forbidden', { status: 403 })
+    }
+    // The PROVIDER transport answers as TinyFish Fetch does.
+    const provider = { calls: [] as string[] }
+    const providerFetch = async (url: string, init?: RequestInit): Promise<Response> => {
+      provider.calls.push(url)
+      const body = JSON.parse(String(init?.body)) as { urls: string[]; format: string; ttl: number }
+      expect(body).toEqual({ urls: ['https://competitor.example/'], format: 'html', ttl: 0 })
+      return new Response(JSON.stringify({ results: [{ url: body.urls[0], text: PAGE }] }), {
+        status: 200,
+      })
+    }
+
+    const report = await runRadarPass({
+      db: recordingDb,
+      fetch: providerFetch as never,
+      fetchPage: fetchPage as never,
+      withCredits: createWithCredits(ledger),
+      now: MONDAY,
+      tinyfishApiKey: 'tf_test',
+    })
+
+    expect(provider.calls).toEqual(['https://api.fetch.tinyfish.ai'])
+    expect(report).toMatchObject({ considered: 1, changed: 1, couldNotCheck: 0 })
+    expect(report.spendMicros).toEqual({ measured: 0, estimated: 0, free: 0 })
+    expect(begun.map((b) => b.provider)).toEqual(['direct', 'tinyfish'])
+    expect(begun[1]).toEqual({ provider: 'tinyfish', costBasis: 'free', estimateMicros: 0 })
+    expect(state.snapshots).toBe(1)
+    expect(ledger.entries('DEBIT').map((d) => d.amount)).toEqual([PRICE])
+  })
+
+  it('without the key, the same page is a recorded gap and the provider transport is never touched', async () => {
+    const ledger = new FakeLedger({ [WS_A]: 20 })
+    const { db, state } = fakeDb({ [SOURCE]: [WS_A] })
+    const fetchPage = async (): Promise<Response> => new Response('forbidden', { status: 403 })
+    const report = await runRadarPass({
+      db,
+      fetch: providerNeverCalled,
+      fetchPage: fetchPage as never,
+      withCredits: createWithCredits(ledger),
+      now: MONDAY,
+    })
+    expect(report).toMatchObject({ considered: 1, changed: 0, couldNotCheck: 1 })
+    expect(state.snapshots).toBe(0)
+    expect(ledger.entries('DEBIT')).toEqual([])
+  })
+})
+
 describe('runRadarPass charges radar_scan', () => {
   it('debits every subscriber once when the page loads', async () => {
     const ledger = new FakeLedger({ [WS_A]: 20, [WS_B]: 20 })
