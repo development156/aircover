@@ -136,7 +136,11 @@ export default async function BrainPage() {
         {/* The single most useful thing to do next. It was the second half of
             BrainHeader; here it becomes the aside's lead, which is where the
             reference puts its own "suggested improvement". */}
-        <BrainHeader provenance={brain.provenance} version={brain.version} />
+        <BrainHeader
+          provenance={brain.provenance}
+          version={brain.version}
+          recordsAuthorship={brain.meta !== undefined}
+        />
         <DerivedCard alignment={brain.active.alignment} provenance={brain.provenance} />
       </aside>
     </div>

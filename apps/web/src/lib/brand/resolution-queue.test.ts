@@ -200,6 +200,7 @@ describe('resolutionQueue — answers the person gave at setup', () => {
     const queue = resolutionQueue(DEMO_FALLBACK_PAYLOAD, withIntake)
     const tally = queueTally(queue)
     expect(tally.fromIntake).toBe(1)
+    expect(tally.guesses).toBe(tally.total - 1)
     expect(tally.unearned + tally.proposed + tally.fromIntake).toBe(tally.total)
     expect(queue[0]?.field.path).toBe('taboo.red_lines')
   })

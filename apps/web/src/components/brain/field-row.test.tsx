@@ -183,7 +183,9 @@ describe('confirming without editing', () => {
 
     // The path and the STORED value: sending anything else would confirm a
     // wording the reader did not agree to.
-    expect(confirmBrainField).toHaveBeenCalledWith('hook.primary_emotion', 'Relief')
+    expect(confirmBrainField).toHaveBeenCalledWith('hook.primary_emotion', 'Relief', {
+      asSeen: true,
+    })
     expect(confirmBrainField).toHaveBeenCalledTimes(1)
   })
 
@@ -198,8 +200,12 @@ describe('confirming without editing', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /Confirm/ }))
 
-    expect(confirmBrainField).toHaveBeenCalledWith('hook.primary_emotion', 'Reassurance')
-    expect(confirmBrainField).not.toHaveBeenCalledWith('hook.primary_emotion', 'Relief')
+    expect(confirmBrainField).toHaveBeenCalledWith('hook.primary_emotion', 'Reassurance', {
+      asSeen: true,
+    })
+    expect(confirmBrainField).not.toHaveBeenCalledWith('hook.primary_emotion', 'Relief', {
+      asSeen: true,
+    })
   })
 
   test('does not open the editor to do it', async () => {
@@ -327,5 +333,14 @@ describe('FieldRow — a field seeded from a setup answer', () => {
     expect(screen.getByText('From your answer')).toHaveAttribute('data-certainty', 'proposed')
     expect(screen.queryByText('Guess')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /confirm · free/i })).toBeInTheDocument()
+  })
+})
+
+describe('FieldRow — the inline confirm agrees to what was SEEN', () => {
+  test('passes asSeen so a wording that moved underneath is refused, not overwritten', async () => {
+    const user = userEvent.setup()
+    render(<FieldRow field={TEXT_FIELD} value="Relief" state="guessed" />)
+    await user.click(screen.getByRole('button', { name: /confirm · free/i }))
+    expect(confirmBrainField).toHaveBeenCalledWith(TEXT_FIELD.path, 'Relief', { asSeen: true })
   })
 })

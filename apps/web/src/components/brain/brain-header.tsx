@@ -21,7 +21,21 @@ import { cn } from '@/lib/utils'
  */
 const NOTE_ID = 'brain-reresolve-note'
 
-export function BrainHeader({ provenance, version }: { provenance: Provenance; version: number }) {
+export function BrainHeader({
+  provenance,
+  version,
+  recordsAuthorship = false,
+}: {
+  provenance: Provenance
+  version: number
+  /**
+   * True when this brain carries `field_meta` at all. The zero-explanation
+   * below is for brains written BEFORE authorship was recorded; MEASURED
+   * 2026-09-06, it also showed on a brand-new version 1 with nothing to
+   * explain, reading as an apology for corrections that never happened.
+   */
+  recordsAuthorship?: boolean
+}) {
   const ring = brainRing(provenance)
 
   /**
@@ -44,7 +58,7 @@ export function BrainHeader({ provenance, version }: { provenance: Provenance; v
    * therefore written to be true of both: it states the rule going forward and
    * never asserts that earlier edits happened.
    */
-  const explainsZero = ring.confirmed === 0
+  const explainsZero = ring.confirmed === 0 && !recordsAuthorship
 
   return (
     <section className="surface-ring-lift flex flex-col gap-4 rounded-card bg-surface p-5">

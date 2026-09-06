@@ -57,6 +57,7 @@ const { confirmBrainField } = await import('./brand-field')
 
 beforeEach(() => {
   vi.clearAllMocks()
+  state.saveResult = { ok: true, version: 4, replayed: false }
   state.brainRead = {
     status: 'ok',
     active: BRAIN,
@@ -301,5 +302,33 @@ describe('confirmBrainField sends the version it read', () => {
     }
     const result = await confirmBrainField('hook.primary_emotion', 'Confidence')
     expect(result).toMatchObject({ ok: false, message: expect.stringMatching(/reload/i) })
+  })
+})
+
+/**
+ * MEASURED 2026-09-06 in two tabs on the preview: tab B pressed Confirm on the
+ * wording it had on screen after tab A had already changed that field. The
+ * version check did not catch it — the action's own read is fresh — so B's
+ * agreement would have written A's text back over as confirmed.
+ */
+describe('confirmBrainField asSeen', () => {
+  test('refuses to confirm a wording the store no longer holds', async () => {
+    const result = await confirmBrainField('hook.primary_emotion', 'an older wording', {
+      asSeen: true,
+    })
+    expect(result).toMatchObject({ ok: false, message: expect.stringMatching(/reload/i) })
+    expect(saveBrandMemory).not.toHaveBeenCalled()
+  })
+
+  test('agrees when the wording on screen is the wording stored', async () => {
+    const result = await confirmBrainField('hook.primary_emotion', BRAIN.hook.primary_emotion, {
+      asSeen: true,
+    })
+    expect(result.ok).toBe(true)
+  })
+
+  test('an explicit edit is never refused for being different — that is the point of it', async () => {
+    const result = await confirmBrainField('hook.primary_emotion', 'a new wording')
+    expect(result.ok).toBe(true)
   })
 })

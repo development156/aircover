@@ -185,6 +185,26 @@ describe('/brain', () => {
       )
     })
 
+    test('says nothing on a NEW brain that records authorship and has zero confirmed', async () => {
+      // MEASURED 2026-09-06: a version 1 written with field_meta showed "only
+      // started recording who wrote each field" beside 0 of 15 — an apology
+      // for setup corrections that never happened.
+      const fresh: BrandFieldMetaMap = {
+        'hook.primary_emotion': {
+          kind: 'asked',
+          confirmed: false,
+          source: 'model:brand_guidelines',
+        },
+      }
+      mockedReadBrain.mockResolvedValue({ ...OK, provenance: provenanceOf(fresh), meta: fresh })
+
+      render(await BrainPage())
+
+      expect(
+        screen.queryByText(/only started recording who wrote each field/),
+      ).not.toBeInTheDocument()
+    })
+
     test('drops the explanation once anything is confirmed', async () => {
       const edited = writeLeaf(DEMO_FALLBACK_PAYLOAD, 'hook.primary_emotion', 'Confidence')
       mockedReadBrain.mockResolvedValue({

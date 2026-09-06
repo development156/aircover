@@ -60,6 +60,14 @@ function validate(path: string, value: BrainLeaf): string | null {
 export async function confirmBrainField(
   path: string,
   value: BrainLeaf,
+  /**
+   * `asSeen`: the press meant "this is right as shown", not "write this". If
+   * the stored text has moved since the screen rendered (a teammate corrected
+   * it in another tab), agreeing to the old wording would write it back over
+   * theirs as confirmed. MEASURED 2026-09-06 in two tabs: the version check
+   * alone lets this through, because the action's own read is fresh.
+   */
+  options: { asSeen?: boolean } = {},
 ): Promise<ConfirmFieldState> {
   try {
     const invalid = validate(path, value)
@@ -89,6 +97,13 @@ export async function confirmBrainField(
     // confirmation independently of the text, so agreeing now costs one tap
     // instead of retyping a sentence verbatim.
     const unchangedText = leavesEqual(readLeaf(brain.active, path), value)
+    if (options.asSeen && !unchangedText) {
+      return {
+        ok: false,
+        message:
+          'This field changed since you opened the page. Reload to see the new wording before confirming it.',
+      }
+    }
     if (unchangedText && brain.meta?.[path]?.confirmed === true) {
       return { ok: true, version: brain.version, unchanged: true }
     }

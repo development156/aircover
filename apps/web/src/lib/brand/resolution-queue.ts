@@ -114,8 +114,10 @@ export interface QueueTally {
   unearned: number
   /** Guesses on fields where a proposal is what the field is FOR. */
   proposed: number
-  /** Every field still a guess. */
+  /** Every registered field still unconfirmed, intake ones included. */
   total: number
+  /** Unconfirmed fields that are Sahoda's own: `total` minus `fromIntake`. */
+  guesses: number
   /** Every registered field. The denominator the ring uses. */
   registered: number
 }
@@ -124,6 +126,7 @@ export function queueTally(queue: readonly QueueEntry[]): QueueTally {
   const guesses = queue.filter((item) => item.state !== 'intake')
   return {
     fromIntake: queue.length - guesses.length,
+    guesses: guesses.length,
     unearned: guesses.filter((item) => item.field.metaKind === 'asked').length,
     proposed: guesses.filter((item) => item.field.metaKind === 'negotiated').length,
     total: queue.length,

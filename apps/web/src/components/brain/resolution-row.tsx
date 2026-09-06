@@ -79,11 +79,13 @@ export function ResolutionRow({
     setEditing(true)
   }
 
-  function save(next: BrainLeaf) {
+  function save(next: BrainLeaf, asSeen = false) {
     setError(null)
     startSaving(async () => {
       try {
-        const result = await confirmBrainField(field.path, next)
+        const result = asSeen
+          ? await confirmBrainField(field.path, next, { asSeen: true })
+          : await confirmBrainField(field.path, next)
         if (!result.ok) {
           setError(result.message)
           return
@@ -249,7 +251,7 @@ export function ResolutionRow({
                   variant="secondary"
                   size="sm"
                   loading={pending}
-                  onClick={() => save(value)}
+                  onClick={() => save(value, true)}
                 >
                   Confirm · free
                 </Button>

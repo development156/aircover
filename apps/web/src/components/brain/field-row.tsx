@@ -84,7 +84,7 @@ export function FieldRow({ field, value, state }: FieldRowProps) {
     setError(null)
     startSaving(async () => {
       try {
-        const result = await confirmBrainField(field.path, value)
+        const result = await confirmBrainField(field.path, value, { asSeen: true })
         if (!result.ok) setError(result.message)
       } catch {
         setError(UNREACHABLE)
