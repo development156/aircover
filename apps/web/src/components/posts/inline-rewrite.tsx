@@ -17,7 +17,7 @@ import { creditWord } from '@/lib/credit-words'
 const INSTRUCTIONS = [
   { value: 'rewrite', label: 'Rewrite' },
   { value: 'shorten', label: 'Shorten' },
-  { value: 'hookify', label: 'Hookify' },
+  { value: 'hookify', label: 'Add a hook' },
 ] as const
 
 const PENDING_LINES = [

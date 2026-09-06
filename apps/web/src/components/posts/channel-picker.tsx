@@ -173,7 +173,7 @@ export function ChannelPicker({
       </div>
       {selected.length === 0 ? (
         <p className="type-sm text-muted">
-          Pick at least one channel before generating variants or previewing a publish.
+          Pick at least one channel before writing the per-channel versions or previewing a publish.
         </p>
       ) : null}
     </div>

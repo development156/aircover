@@ -183,7 +183,7 @@ export default async function PostsPage({
 
       {read.status === 'unreadable' ? (
         <p className="rounded-input bg-warn-bg px-3 py-2.5 text-[13px] text-warn">
-          Couldn&rsquo;t load your posts just now &mdash; reload to see them. Nothing has been lost.
+          Couldn&rsquo;t load your posts just now. Reload to see them. Nothing has been lost.
         </p>
       ) : read.status === 'no-workspace' ? (
         <EmptyState
@@ -196,7 +196,7 @@ export default async function PostsPage({
         <EmptyState
           icon={SquarePen}
           title="Nothing drafted yet"
-          body="Start a post here, then let me write the per-channel versions for you."
+          body="Start a post here, then Sahoda writes a version for each channel for you."
           action={<CreatePostButton />}
           tip="Write the idea once. Sahoda reshapes it for each channel, so you never rewrite the same thought four times."
         />

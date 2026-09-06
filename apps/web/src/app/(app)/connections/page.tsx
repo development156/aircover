@@ -225,7 +225,7 @@ export default async function ConnectionsPage({
   function connectBlocker(id: string): string | undefined {
     if (planFull) return 'Every slot on your plan is in use.'
     if (slots.limit === null) return 'Sahoda couldn’t check how many slots your plan includes.'
-    if (!railReady) return 'Publishing key isn’t set in this environment.'
+    if (!railReady) return 'Sahoda’s publishing isn’t switched on here yet.'
     if (LIVE_VIA_ZERNIO.has(id)) return undefined
     // NOT "secure token flow still being wired", which was written for a
     // different cause and is now false. A platform outside ZERNIO_PLATFORMS is
@@ -316,8 +316,7 @@ export default async function ConnectionsPage({
            failed. This is the only branch on this page where reloading is the
            correct remedy, so it is the only one that offers it. */
         <p className="rounded-input bg-warn-bg px-3 py-2.5 type-body text-warn" role="status">
-          Couldn&rsquo;t check your connections just now &mdash; reload to see what&rsquo;s already
-          linked.
+          Couldn&rsquo;t check your connections just now. Reload to see what&rsquo;s already linked.
         </p>
       ) : connections.status === 'no-workspace' ? (
         /* NO WORKSPACE IS NOT A FAILED READ. Telling a brand-new account that

@@ -90,7 +90,7 @@ export function GeneratePanel({
         onGenerated(result.variants)
         toast.success(
           <span>
-            Generated <span className="tabular-nums">{result.variants.length}</span> variants ·{' '}
+            Wrote <span className="tabular-nums">{result.variants.length}</span> versions ·{' '}
             <span className="tabular-nums">{result.creditsCharged}</span>{' '}
             {creditWord(result.creditsCharged)} used ·{' '}
             <span className="tabular-nums">{result.balanceAfter}</span> left

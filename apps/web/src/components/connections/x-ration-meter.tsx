@@ -48,7 +48,7 @@ export function XRationMeter(props: XRationMeterProps) {
               not find out, and it is the permissive direction, which a spending
               cap must never be wrong in. */}
           <Unreadable what="Your X post count" />
-          <span>Couldn&rsquo;t read your X count just now &mdash; reload to see it.</span>
+          <span>Couldn&rsquo;t read your X count just now. Reload to see it.</span>
         </p>
       </div>
     )
