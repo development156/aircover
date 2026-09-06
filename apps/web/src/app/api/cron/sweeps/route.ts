@@ -19,6 +19,8 @@ import { isAuthorizedCronRequest } from '@/lib/cron/authorize'
 import { recordCronRun } from '@/lib/cron/heartbeat-store'
 import { publishFromCronEnabled } from '@/lib/cron/publish-enabled'
 import { runCronSweeps } from '@/lib/cron/run-sweeps'
+import { loopSweepDeps } from '@/lib/loop/store'
+import { runLoopSweep } from '@/lib/loop/sweep'
 import { reportServerError } from '@/lib/observability/report'
 
 /**
@@ -113,6 +115,14 @@ const PUBLISH_BATCH = 4
  * first, so a backlog drains across ticks rather than being attempted at once.
  */
 const RECONCILE_BATCH = 15
+
+/**
+ * How many live Loop cycles the stale-cycle reaper examines per tick. A cycle is
+ * three cheap statements (one guarded UPDATE plus a hold read, and a hold release
+ * only in the rare mid-flight case), and stranded cycles are a slow trickle, so
+ * this is generous. Oldest-first, so a backlog drains across ticks.
+ */
+const LOOP_SWEEP_BATCH = 50
 
 export async function GET(request: Request): Promise<Response> {
   // FIRST STATEMENT IN THE HANDLER, AND IT MUST STAY FIRST. This route is excluded from
@@ -213,6 +223,16 @@ export async function GET(request: Request): Promise<Response> {
             reportServerError(e.error, { action: `cron:reconcile:${e.scope}-${e.stage}` }),
         }),
       ),
+    // The stale-Loop-cycle reaper: age out cycles stuck in a live status so the
+    // week's one-live-per-week slot is freed and any hold they took is released.
+    // Independent of the other sweeps, and counts-only on the wire like the rest.
+    runLoop: () =>
+      runLoopSweep({
+        ...loopSweepDeps(LOOP_SWEEP_BATCH),
+        // Per-cycle faults do not abort the sweep; this is the only place the real
+        // cause survives. The response body still carries counts only.
+        onError: (_cycleId, error) => reportServerError(error, { action: 'cron:loop-sweep-row' }),
+      }),
     // The real error goes to Sentry; the response says only which sweep failed, because
     // a database error message can carry a connection string, a host or a query.
     onError: (scope, error) => reportServerError(error, { action: `cron:${scope}-sweep` }),

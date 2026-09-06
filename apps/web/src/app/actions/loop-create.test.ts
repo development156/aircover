@@ -39,6 +39,7 @@ type InsertFn = (row: Record<string, unknown>) => {
 const h = vi.hoisted(() => {
   const store = {
     readApprovedCycleForCreate: vi.fn(),
+    claimCreateStage: vi.fn(async () => true),
     readBriefs: vi.fn(),
     linkBriefToPost: vi.fn(async () => true),
     addSpend: vi.fn(),
@@ -131,6 +132,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   DIAL = [{ channel: 'instagram', level: 1 }]
   h.store.readApprovedCycleForCreate.mockResolvedValue(APPROVED_CYCLE)
+  h.store.claimCreateStage.mockResolvedValue(true)
   h.store.readBriefs.mockResolvedValue([brief('b1')])
   h.store.linkBriefToPost.mockResolvedValue(true)
   h.store.finishCycle.mockResolvedValue(true)
@@ -333,5 +335,40 @@ describe('runCreateStage', () => {
     expect(out.ok).toBe(true)
     expect(out.cancelledMidRun).toBe(true)
     expect(out.created).toBe(1)
+  })
+})
+
+describe('runCreateStage — credits run out mid-stage', () => {
+  it('HALTS instead of reporting the week: leaves the cycle in creating, never advances to staging', async () => {
+    h.store.readBriefs.mockResolvedValue([brief('b1'), brief('b2')])
+    // First brief succeeds, second is refused for want of credits.
+    let call = 0
+    h.withCredits.mockImplementation(async (_opts, fn) => {
+      call += 1
+      if (call === 1) {
+        return { ok: true, data: await fn({ actionType: 'post_variants', creditsCharged: DRAFT }) }
+      }
+      return { ok: false, error: { code: 'CREDIT_INSUFFICIENT' } }
+    })
+
+    const out = await runCreateStage('cycle-1')
+
+    expect(out.ok).toBe(false)
+    expect(out.insufficient).toBe(true)
+    expect(out.created).toBe(1)
+    // The week is NOT reported as done — the cycle stays in `creating`.
+    expect(h.store.setCycleStatus).not.toHaveBeenCalledWith('cycle-1', WS, 'staging')
+    expect(h.store.finishCycle).not.toHaveBeenCalled()
+  })
+})
+
+describe('runCreateStage — the concurrency claim', () => {
+  it('turns a second concurrent run away before it charges or inserts', async () => {
+    h.store.claimCreateStage.mockResolvedValue(false)
+    const out = await runCreateStage('cycle-1')
+    expect(out.ok).toBe(true)
+    expect(out.created).toBeUndefined()
+    expect(h.withCredits).not.toHaveBeenCalled()
+    expect(h.insert).not.toHaveBeenCalled()
   })
 })

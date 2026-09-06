@@ -120,3 +120,19 @@ describe('createPostgrestBrandContext — field_meta reaches the prefix', () => 
     expect(ctx?.message.content).toMatch(/hook\.core_promise/)
   })
 })
+
+describe('buildBrandMessage — the accepted learning reaches the prompt', () => {
+  it('renders alignment.note so a Loop learning is not written to a field no prompt reads', () => {
+    const withNote = {
+      ...payload,
+      alignment: { ...payload.alignment, note: 'LinkedIn is currently your strongest channel.' },
+    }
+    const content = buildBrandMessage(withNote).content
+    expect(content).toContain('What is working now: LinkedIn is currently your strongest channel.')
+  })
+
+  it('omits the line when there is no note, so an empty brain says nothing extra', () => {
+    const noNote = { ...payload, alignment: { ...payload.alignment, note: '' } }
+    expect(buildBrandMessage(noNote).content).not.toContain('What is working now')
+  })
+})

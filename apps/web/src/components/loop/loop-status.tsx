@@ -109,6 +109,7 @@ export function LoopStatus({ enabled, paused, running, autoSchedule = 'armed' }:
 function StatusPill({ view }: { view: LoopStatusView }) {
   return (
     <span
+      role="status"
       className={[
         'type-chip inline-flex items-center gap-2 rounded-pill px-3 py-1',
         view.ground,

@@ -223,6 +223,7 @@ export function LoopControls({
                 value={budget}
                 disabled={pending}
                 aria-label="Weekly budget in credits"
+                aria-describedby="loop-budget-help"
                 onChange={(e) => {
                   setBudgetNote(null)
                   setBudget(
@@ -230,7 +231,7 @@ export function LoopControls({
                   )
                 }}
                 onBlur={(e) => saveBudget(e.target.value)}
-                className="w-24 rounded-input bg-s2 px-3 py-2 type-body tabular-nums text-ink outline-none focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-accent"
+                className="w-24 rounded-input bg-s2 px-3 py-2 type-body num text-ink outline-none focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-accent"
               />
               <span className="type-sm text-muted">credits</span>
               {budgetNote ? (
@@ -238,6 +239,12 @@ export function LoopControls({
                   {budgetNote}
                 </span>
               ) : null}
+            </span>
+            {/* The budget is advisory, not a hard ceiling: the Loop can still
+                spend past it, so the field must say that plainly rather than
+                let the word "budget" imply a cutoff nothing enforces. */}
+            <span id="loop-budget-help" className="type-sm mt-1 block text-muted">
+              A guide, not a limit. Sahoda shows the cost before it spends.
             </span>
             {/* `> 0`, not `!== null`. Zero is a real stored budget — it means
                 the Loop may spend nothing — and it is not a bar. Rendered as

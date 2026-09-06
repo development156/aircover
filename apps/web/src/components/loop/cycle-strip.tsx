@@ -1,31 +1,25 @@
-import {
-  BarChart3,
-  CalendarRange,
-  Check,
-  FlaskConical,
-  Lightbulb,
-  PenLine,
-  Send,
-  Sparkles,
-} from 'lucide-react'
+import { BarChart3, CalendarRange, Check, Lightbulb, PenLine, Send, Sparkles } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 import type { LoopCycleStatus } from '@sahoda/shared'
 
 /**
- * THE SEVEN STAGES OF ONE WEEK — the Loop section's signature, and now the page's
+ * THE SIX STAGES OF ONE WEEK — the Loop section's signature, and now the page's
  * hero.
  *
  * ── WHY THIS IS NUMBERED, WHEN ALMOST NOTHING ELSE HERE IS ───────────────────
  * Numbered markers are decoration in most designs. Here the order is the whole
- * product: `collect → reflect → plan → create → test → stage → report` is a real
+ * product: `collect → reflect → plan → create → stage → report` is a real
  * state machine (FSD M2), each stage consumes the previous one's output, and a
  * reader who does not grasp the sequence has not understood what the Loop is.
  * The numbers encode something true, so they earn their place.
  *
+ * There is no separate "test" stage: no Audience Twin reads a draft before it
+ * ships, so the strip does not claim one. Create hands straight to Stage.
+ *
  * ── AND WHY IT IS A LINE, NOT A RING ─────────────────────────────────────────
  * A circle is the obvious drawing for a "loop" and it is the wrong one twice
- * over: it has no reading order on a phone, and it implies the seven stages are
+ * over: it has no reading order on a phone, and it implies the six stages are
  * evenly weighted and evenly spaced in time, which they are not — collect and
  * report are minutes at the two ends of a week, create is hours in the middle.
  * A line reads left to right, wraps honestly at narrow widths, and the return
@@ -33,12 +27,12 @@ import type { LoopCycleStatus } from '@sahoda/shared'
  * only gestures at: what the report teaches goes back into the Brand Brain.
  *
  * ── WHAT CHANGED IN THE REDRAW, AND WHAT DID NOT ─────────────────────────────
- * Seven bordered cards became seven nodes on ONE rail. The change is not
- * cosmetic: a card per stage drew seven boxes of equal weight and the sequence
+ * Six bordered cards became six nodes on ONE rail. The change is not
+ * cosmetic: a card per stage drew six boxes of equal weight and the sequence
  * had to be inferred from the numbers, which is the opposite of what this
  * section is for. The rail draws the sequence itself, and the connector between
  * two nodes carries the state of the step BEFORE it, so progress reads as a line
- * filling rather than as seven independent lights.
+ * filling rather than as six independent lights.
  *
  * NOT ONE STAGE CARRIES A FIGURE. No durations, no counts, no "5–7 posts". The
  * plan stage will produce briefs; how many is a decision about the reader's
@@ -62,9 +56,11 @@ const STATUS_STAGE: Record<LoopCycleStatus, number> = {
   planning: 2,
   awaiting_cost_approval: 2,
   creating: 3,
-  testing: 4,
-  staging: 5,
-  reported: 6,
+  // No stage of its own: nothing tests a draft before staging, so a lingering
+  // "testing" status (if one is ever read) is drawn as still inside create.
+  testing: 3,
+  staging: 4,
+  reported: 5,
   // A cycle that ended badly has no current stage. Marking one would say it is
   // still working on something it stopped doing.
   cancelled: -1,
@@ -75,7 +71,7 @@ const STAGES: ReadonlyArray<{ icon: LucideIcon; name: string; what: string }> = 
   {
     icon: BarChart3,
     name: 'Collect',
-    what: 'Last week’s numbers, from every channel that reported them.',
+    what: 'Last week’s numbers, unanswered messages, and anything Radar picked up.',
   },
   {
     icon: Lightbulb,
@@ -93,11 +89,6 @@ const STAGES: ReadonlyArray<{ icon: LucideIcon; name: string; what: string }> = 
     what: 'Each brief becomes a draft, with a separate body for every channel.',
   },
   {
-    icon: FlaskConical,
-    name: 'Test',
-    what: 'Each draft is checked against each channel’s rules. One that fails stays a draft until you fix it.',
-  },
-  {
     icon: Send,
     name: 'Stage',
     what: 'Where it lands depends on your dial: your Planner, your approvals, or the queue.',
@@ -105,7 +96,7 @@ const STAGES: ReadonlyArray<{ icon: LucideIcon; name: string; what: string }> = 
   {
     icon: Sparkles,
     name: 'Report',
-    what: 'As soon as the week is written: what was planned, what it cost, and what Sahoda learned, on your Report page.',
+    what: 'Monday morning: what worked, what did not, and what Sahoda learned.',
   },
 ]
 
@@ -123,7 +114,7 @@ export function CycleStrip({ status }: CycleStripProps = {}) {
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
         <h2 id="loop-cycle" className="type-h2">
-          One week, seven steps
+          One week, six steps
         </h2>
         <p className="type-sm text-muted">
           {current >= 0 ? (
@@ -143,24 +134,24 @@ export function CycleStrip({ status }: CycleStripProps = {}) {
       </div>
 
       {/*
-        SEVEN EQUAL COLUMNS, and the rail is drawn BETWEEN them rather than
+        SIX EQUAL COLUMNS, and the rail is drawn BETWEEN them rather than
         inside them. Each cell carries half a connector on its left and half on
         its right; adjacent halves meet exactly on the column boundary, so the
         line is continuous at any width without a single absolute position.
 
         The first cell's left half and the last cell's right half render
         transparent rather than being omitted — a missing element would make
-        those two columns a different width from the other five, and the
-        reference's whole character is seven columns of one size.
+        those two columns a different width from the other four, and the
+        reference's whole character is six columns of one size.
 
-        WIDTH BEHAVIOUR. Seven columns hold to 1180px. Below that they become
-        four, then two — never seven squeezed, because a 90px column
+        WIDTH BEHAVIOUR. Six columns hold to 1180px. Below that they become
+        three, then two — never six squeezed, because a 90px column
         cannot hold "Approve to publish" and the description under it. The
         horizontal rail is hidden the moment the row wraps: a connector that
         runs off the end of a row and reappears on the next one draws an order
         that is not the order.
       */}
-      <ol className="mt-6 grid gap-y-7 wide:grid-cols-7 max-wide:grid-cols-4 max-narrow:grid-cols-2">
+      <ol className="mt-6 grid gap-y-7 wide:grid-cols-6 max-wide:grid-cols-3 max-narrow:grid-cols-2">
         {STAGES.map((stage, index) => (
           <Stage key={stage.name} stage={stage} index={index} current={current} />
         ))}
@@ -169,7 +160,7 @@ export function CycleStrip({ status }: CycleStripProps = {}) {
       {/* The return edge, stated rather than drawn. This is the sentence a
           circular diagram would be trying to convey, and it says more. */}
       <p className="type-sm mt-6 max-w-[68ch] border-t border-line-soft pt-4 text-muted">
-        The Loop runs the same seven steps every week. Then it starts again, from a Brand Brain that
+        The Loop runs the same six steps every week. Then it starts again, from a Brand Brain that
         now knows what happened last week. That is the part that makes it a loop rather than a
         schedule. You decide how far it gets on its own before it needs you, and the dial below is
         where you set that.
@@ -256,7 +247,7 @@ function Stage({
         of pure decoration, and it earns its place by being the only mark that
         survives at a glance from across a desk — but it is decoration, so the
         state it shows is also spelled out in the sr-only line above and in the
-        "Step 4 of 7" beside the heading. Nothing here is the only carrier of a
+        "Step 4 of 6" beside the heading. Nothing here is the only carrier of a
         fact.
       */}
       <span

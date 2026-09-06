@@ -66,7 +66,7 @@ export function buildBrandMessage(
   payload: BrandMemoryPayload,
   meta?: BrandFieldMetaLike,
 ): ChatMessage {
-  const { voice, brand_persona, customer_persona, hook, taboo } = payload
+  const { voice, brand_persona, customer_persona, hook, taboo, alignment } = payload
   const lines = [
     'BRAND BRAIN — write every line grounded in this brand; do not restate it back.',
     `Voice: ${voice.descriptor} (${voice.formality_label}).`,
@@ -76,6 +76,9 @@ export function buildBrandMessage(
     `Customer: ${customer_persona.one_liner} Pain: ${customer_persona.primary_pain_point}. Fear: ${customer_persona.primary_fear}. Wants to feel: ${customer_persona.desired_identity}.`,
     `Hook: ${hook.core_promise} (emotion: ${hook.primary_emotion}).`,
     taboo.red_lines.length ? `Red lines (never cross): ${taboo.red_lines.join('; ')}.` : '',
+    // The Loop writes an accepted learning here (brand_memory alignment.note).
+    // Without this line it landed in a field no prompt read.
+    alignment?.note ? `What is working now: ${alignment.note}` : '',
     ...provenanceLines(meta),
   ].filter(Boolean)
   return { role: 'system', content: lines.join('\n'), cache: true }

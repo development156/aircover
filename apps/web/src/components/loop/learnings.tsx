@@ -5,6 +5,7 @@ import { Lightbulb } from 'lucide-react'
 
 import { resolveLearning } from '@/app/actions/loop-controls'
 import { Button } from '@/components/ui/button'
+import { metricInWords } from '@/lib/report/metric-words'
 import type { PendingLearning } from '@/lib/loop/read'
 
 /**
@@ -97,7 +98,7 @@ function LearningCard({ learning }: { learning: PendingLearning }) {
               {learning.evidence.postCount === 1 ? 'post' : 'posts'} over{' '}
               <span className="num">{learning.evidence.windowDays}</span>{' '}
               {learning.evidence.windowDays === 1 ? 'day' : 'days'}, measured by{' '}
-              {learning.evidence.metric}.
+              {metricInWords(learning.evidence.metric)}.
             </p>
           ) : (
             <p className="type-sm mt-1.5 text-muted">
