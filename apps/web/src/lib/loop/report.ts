@@ -48,6 +48,8 @@ export interface ReportData {
   budgetCredits: number | null
 }
 
+const RANKING_SNAPSHOT_LIMIT = 5_000
+
 /** The two posts at the ends of the window, or null when there is no ranking to make. */
 export async function readRanking(
   workspaceId: string,
@@ -63,6 +65,9 @@ export async function readRanking(
     .eq('metric', metric)
     .gte('measured_on', fromIso)
     .lte('measured_on', toIso)
+    // A wall on an otherwise unbounded read (audit 2026-09-06, IL-08). A busy
+    // workspace has a few hundred readings a week; the wall is far above that.
+    .limit(RANKING_SNAPSHOT_LIMIT)
   if (!data || data.length === 0) return null
 
   // One value per post: the highest reading it reached. A post measured on four
@@ -77,11 +82,29 @@ export async function readRanking(
   }
   if (best.size < 2) return null
 
-  const { data: posts } = await supabase
-    .from('posts')
-    .select('id, title')
-    .eq('workspace_id', workspaceId)
-    .in('id', [...best.keys()])
+  /**
+   * ONLY POSTS THAT ACTUALLY WENT OUT. `post_metric_snapshots` does not know
+   * whether a post was published live or by a fixture, and `posts.status` says
+   * `published` for both; the one table that knows is `post_publish_logs`, whose
+   * `mode` is `live` or `fixture`. A report that ranked a fixture post as "your
+   * best" would be a claim about a post nobody saw (IL-08). The two reads are
+   * independent, so they go together.
+   */
+  const ids = [...best.keys()]
+  const [{ data: posts }, { data: liveLogs }] = await Promise.all([
+    supabase.from('posts').select('id, title').eq('workspace_id', workspaceId).in('id', ids),
+    supabase
+      .from('post_publish_logs')
+      .select('post_id')
+      .eq('workspace_id', workspaceId)
+      .eq('mode', 'live')
+      .eq('status', 'succeeded')
+      .in('post_id', ids),
+  ])
+  const live = new Set((liveLogs ?? []).map((row) => row.post_id as string))
+  for (const id of ids) if (!live.has(id)) best.delete(id)
+  if (best.size < 2) return null
+
   const titles = new Map(
     (posts ?? []).map((p) => [p.id as string, (p.title as string) ?? 'Untitled']),
   )
@@ -135,4 +158,27 @@ export async function readCycleLearnings(
       appliedVersion: (row.applied_memory_version as number | null) ?? null,
     }
   })
+}
+
+/**
+ * Where each post the plan wrote stands NOW, by id.
+ *
+ * The plan module used to say "sent to Approvals when the plan was written",
+ * which was true on the day and false by the time anybody read it (IL-02: the
+ * posts had expired). This reads `posts.status`, the one column that moves.
+ * A post that cannot be read is simply absent from the map, and the module
+ * falls back to the stage outcome it already had.
+ */
+export async function readPlanPostStatuses(
+  workspaceId: string,
+  postIds: readonly string[],
+): Promise<ReadonlyMap<string, string>> {
+  if (postIds.length === 0) return new Map()
+  const supabase = createServerSupabase()
+  const { data } = await supabase
+    .from('posts')
+    .select('id, status')
+    .eq('workspace_id', workspaceId)
+    .in('id', [...postIds])
+  return new Map((data ?? []).map((row) => [row.id as string, row.status as string]))
 }

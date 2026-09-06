@@ -26,7 +26,8 @@ import { resolveView } from '@/lib/analytics/view-params'
 import { readBrainObservations, type BrainRead } from '@/lib/brain/read'
 import { brainWaiting } from '@/lib/brain/waiting'
 import { readLoop } from '@/lib/loop/read'
-import { readCycleLearnings, readRanking } from '@/lib/loop/report'
+import { readCycleLearnings, readPlanPostStatuses, readRanking } from '@/lib/loop/report'
+import { planPostSentence } from '@/lib/report/plan-status'
 import { creditWord } from '@/lib/credit-words'
 import { InertPanel } from '@/components/roadmap/parts'
 import { readBalance } from '@/lib/wallet/read'
@@ -213,9 +214,13 @@ export default async function ReportPage() {
   }
 
   const window = reflectionWindow(new Date(cycle.startedAt))
-  const [ranking, learnings, timingRead] = await Promise.all([
+  const writtenIds = snapshot.briefs.flatMap((b) => (b.postId === null ? [] : [b.postId]))
+  const [ranking, learnings, postStatuses, timingRead] = await Promise.all([
     readRanking(workspace.id, window.fromIso, window.toIso),
     readCycleLearnings(workspace.id, cycle.id),
+    // Where each written post stands NOW, so the plan module never repeats a
+    // fact that was true on the day and false by Monday (IL-02).
+    readPlanPostStatuses(workspace.id, writtenIds),
     /**
      * THE SAME READ /analytics MAKES, calling the same function.
      *
@@ -377,12 +382,25 @@ export default async function ReportPage() {
               <ul className="grid gap-2">
                 {written.map((brief) => (
                   <li key={brief.id} className="rounded-input bg-surface-2 p-3">
-                    <p className="type-body text-ink">{brief.title}</p>
+                    <p className="type-body text-ink">
+                      {brief.postId ? (
+                        <Link
+                          href={`/posts/${brief.postId}`}
+                          className="underline-offset-2 hover:underline"
+                        >
+                          {brief.title}
+                        </Link>
+                      ) : (
+                        brief.title
+                      )}
+                    </p>
                     <p className="type-sm mt-1 text-muted">
                       {brief.channels.map(channelName).join(' · ')}
-                      {brief.stageOutcome === 'awaiting_approval'
-                        ? '. Sent to Approvals when the plan was written'
-                        : '. A draft in your Planner'}
+                      {'. '}
+                      {planPostSentence(
+                        brief.postId ? (postStatuses.get(brief.postId) ?? null) : null,
+                        brief.stageOutcome,
+                      )}
                     </p>
                   </li>
                 ))}

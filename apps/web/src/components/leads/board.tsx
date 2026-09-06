@@ -34,6 +34,9 @@ export function Board({ leads }: BoardProps) {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
   const [pending, startTransition] = useTransition()
+  // WHICH lead is moving, not whether any is: one move used to grey every card
+  // on the board, and a second lead could not be moved until the first came back.
+  const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const shown = useMemo(() => {
@@ -51,8 +54,10 @@ export function Board({ leads }: BoardProps) {
 
   function move(lead: LeadView, status: Stage['status']) {
     setError(null)
+    setBusyId(lead.id)
     startTransition(async () => {
       const result = await setLeadStatus(lead.id, status)
+      setBusyId(null)
       if (!result.ok) setError(result.message ?? 'Could not move that lead.')
     })
   }
@@ -126,7 +131,7 @@ export function Board({ leads }: BoardProps) {
                       */}
                       <LeadCard
                         lead={lead}
-                        busy={pending}
+                        busy={pending && busyId === lead.id}
                         actions={
                           <>
                             {nextStatus(stage.status) ? (
@@ -134,14 +139,14 @@ export function Board({ leads }: BoardProps) {
                                 label={
                                   STAGES.find((s) => s.status === nextStatus(stage.status))!.name
                                 }
-                                disabled={pending}
+                                disabled={pending && busyId === lead.id}
                                 onClick={() => move(lead, nextStatus(stage.status)!)}
                               />
                             ) : null}
                             {stage.status !== 'lost' ? (
                               <MoveButton
                                 label="Lost"
-                                disabled={pending}
+                                disabled={pending && busyId === lead.id}
                                 onClick={() => move(lead, 'lost')}
                               />
                             ) : null}
