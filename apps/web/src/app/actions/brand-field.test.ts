@@ -241,3 +241,36 @@ describe('confirmBrainField', () => {
     expect(result).toEqual({ ok: false, message: 'Reload — someone else saved first.' })
   })
 })
+
+/**
+ * MEASURED 2026-09-06 on the wt-core preview against production: three spaces
+ * were saved as `hook.core_promise` (version 11, `confirmed: true`, source
+ * `owner`) and a single space as the third core value (version 8). `validate`
+ * checked type and length and nothing else, so the field the console calls
+ * "worth the least as a guess" became a confirmed blank. Mesh prepends the
+ * active brain to every model call, so that blank was the promise every caption
+ * would have been written from.
+ */
+describe('confirmBrainField refuses a blank', () => {
+  test('whitespace text is refused before any read or write', async () => {
+    const result = await confirmBrainField('hook.core_promise', '   ')
+
+    expect(result.ok).toBe(false)
+    expect(result).toMatchObject({ message: expect.stringMatching(/blank/i) })
+    expect(saveBrandMemory).not.toHaveBeenCalled()
+  })
+
+  test('a fixed list with a whitespace entry is refused', async () => {
+    const result = await confirmBrainField('brand_persona.core_values', ['Craft', 'Care', ' '])
+
+    expect(result.ok).toBe(false)
+    expect(saveBrandMemory).not.toHaveBeenCalled()
+  })
+
+  test('an EMPTY open list still saves — "there are none" is an answer', async () => {
+    const result = await confirmBrainField('taboo.red_lines', [])
+
+    expect(result.ok).toBe(true)
+    expect(saveBrandMemory).toHaveBeenCalledTimes(1)
+  })
+})

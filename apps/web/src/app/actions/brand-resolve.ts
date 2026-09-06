@@ -1,5 +1,7 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
+
 import { auth } from '@clerk/nextjs/server'
 import {
   BrandIntakeSchema,
@@ -165,6 +167,14 @@ export async function saveBrandMemory(
     }
 
     if (nextIntake.success) await mirrorIntakeToWorkspace(supabase, workspace.id, nextIntake.data)
+
+    // The topbar ring lives in the app layout and reads the active brain. MEASURED
+    // 2026-09-06: after onboarding's first save, "Review Brand Brain" opened
+    // /brain at version 1 while the ring beside it still said "No brain yet"
+    // until a hard reload. The per-field actions revalidate the layout for this
+    // reason; the save that creates the brain must too.
+    revalidatePath('/', 'layout')
+    revalidatePath('/brain')
 
     return { ok: true, version: result.data.version, replayed: result.data.replayed }
   } catch (error) {

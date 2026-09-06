@@ -4,6 +4,7 @@ import { useId, useState, useTransition } from 'react'
 import { Pencil } from 'lucide-react'
 
 import { confirmBrainField } from '@/app/actions/brand-field'
+import { blankReason } from '@/lib/brand/blank'
 import { Button } from '@/components/ui/button'
 import { entitlementOf, type QueueEntry } from '@/lib/brand/resolution-queue'
 import { leavesEqual, type BrainLeaf } from '@/lib/brand/leaf'
@@ -13,6 +14,8 @@ import { CertaintyMark } from './certainty-mark'
 import { FieldEditor } from './field-editor'
 import { FieldEvidence } from './field-evidence'
 import { FieldValue } from './field-value'
+
+const UNREACHABLE = 'Could not reach Sahoda. Check your connection and try again. Nothing changed.'
 
 export interface ResolutionRowProps {
   entry: QueueEntry
@@ -79,19 +82,29 @@ export function ResolutionRow({
   function save(next: BrainLeaf) {
     setError(null)
     startSaving(async () => {
-      const result = await confirmBrainField(field.path, next)
-      if (!result.ok) {
-        setError(result.message)
-        return
+      try {
+        const result = await confirmBrainField(field.path, next)
+        if (!result.ok) {
+          setError(result.message)
+          return
+        }
+        // Left open on failure so the typing survives; on success the row
+        // leaves the queue and the revalidated server render is the truth.
+        setEditing(false)
+        onResolved(field.path)
+      } catch {
+        // MEASURED 2026-09-06: offline, this rejection escaped the transition
+        // and replaced the whole console with the route error boundary.
+        setError(UNREACHABLE)
       }
-      // Left open on failure so the typing survives; on success the row leaves
-      // the queue and the revalidated server render is the truth.
-      setEditing(false)
-      onResolved(field.path)
     })
   }
 
   const unchanged = leavesEqual(draft, value)
+  // MEASURED 2026-09-06: three spaces were saved as the core promise from this
+  // editor, next to a sentence saying a blank cannot be recorded. Same rule as
+  // the server and the Identity tab — lib/brand/blank.ts.
+  const blankDraft = blankReason(field, draft)
 
   /**
    * Emptying is only offered where an empty value is a real answer: an OPEN
@@ -251,7 +264,13 @@ export function ResolutionRow({
 
         {editing ? (
           <div className="flex flex-col gap-2">
-            <FieldEditor field={field} draft={draft} onDraftChange={setDraft} disabled={pending} />
+            <FieldEditor
+              field={field}
+              draft={draft}
+              onDraftChange={setDraft}
+              disabled={pending}
+              autoFocus
+            />
             <p className="type-sm text-muted">{field.question}</p>
             {error ? (
               <p role="alert" className="type-sm text-danger">
@@ -264,10 +283,12 @@ export function ResolutionRow({
                 variant="secondary"
                 size="sm"
                 loading={pending}
+                disabled={blankDraft !== null}
                 onClick={() => save(draft)}
               >
                 {unchanged ? 'Confirm as written · free' : 'Save · free'}
               </Button>
+              {blankDraft ? <span className="type-sm text-muted">{blankDraft}</span> : null}
               <Button
                 type="button"
                 variant="ghost"
