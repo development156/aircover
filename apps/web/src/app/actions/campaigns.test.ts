@@ -147,6 +147,7 @@ import {
   setCampaignStatus,
   updateCampaign,
 } from '@/app/actions/campaigns'
+import { revalidatePath } from 'next/cache'
 
 function editForm(): FormData {
   const form = new FormData()
@@ -162,6 +163,7 @@ beforeEach(() => {
   state.chains = []
   state.workspace = WS
   state.userId = 'user_camp'
+  vi.mocked(revalidatePath).mockClear()
 })
 
 /**
@@ -231,11 +233,19 @@ describe('removePostFromCampaign counts rows rather than asserting one', () => {
 
     const result = await removePostFromCampaign(CAMPAIGN_ID, POST_ID)
 
-    // `changed: 1` was a literal in the source. NO INVENTED NUMBERS: the count
-    // has to come from the rows the database returned, exactly as
-    // `addPostsToCampaign` already does with `data?.length ?? 0`.
-    if (result.ok) expect(result.changed).toBe(0)
-    else expect(result.ok).toBe(false)
+    // RETARGETED: `if (result.ok) … else expect(result.ok).toBe(false)` is a
+    // tautology — the `else` branch runs only when `result.ok` is already
+    // `false`, so `expect(result.ok).toBe(false)` there can never fail. It
+    // also let the code claim EITHER shape (a truthful `changed: 0` or a
+    // refusal) when in fact `removePostFromCampaign` always refuses a
+    // zero-row match via `PGRST116` — it never returns `ok: true` here. Pin
+    // the one behavior the code actually has: a refusal, with its sentence,
+    // and no screen re-read for a write that did not land.
+    expect(result).toEqual({
+      ok: false,
+      message: "You don't have access to this campaign.",
+    })
+    expect(revalidatePath).not.toHaveBeenCalled()
   })
 
   test('a removal that matched its row reports exactly one', async () => {

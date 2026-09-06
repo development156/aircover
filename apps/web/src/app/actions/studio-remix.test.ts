@@ -58,7 +58,13 @@ describe('recordRemixLineage', () => {
 
   it('a malformed id links nothing', async () => {
     const state = await recordRemixLineage('not-a-uuid', PARENT)
-    expect(state.ok).toBe(false)
+    // RETARGETED: a bare `.ok` check passes identically whether the zod parse
+    // correctly refused before touching the database, or `recordRemixLineage`
+    // threw somewhere else entirely and the outer catch produced a DIFFERENT
+    // generic message. Assert the specific "could not tell which pictures"
+    // sentence, and that the update never ran.
+    expect(state).toEqual({ ok: false, message: 'Sahoda could not tell which pictures to link.' })
+    expect(eqSpy).not.toHaveBeenCalled()
   })
 
   it('signed out: refused before any write', async () => {

@@ -140,10 +140,17 @@ describe('runCronSweeps', () => {
       runReconcile: async () => reconcileReport(),
     })
 
+    // RETARGETED: a bare `status`/`ok` pair cannot tell which sweep failed, and
+    // this is the ONE test that throws from `runHolds` — nothing else pins
+    // that `attempt()` names the RIGHT scope for a holds failure rather than
+    // mislabelling it as the dispatch sweep, which `isError`/`ok` alone would
+    // not catch since both produce the same shape.
     expect(dispatchFailed.status).toBe(500)
     expect(holdsFailed.status).toBe(500)
     expect(dispatchFailed.body.ok).toBe(false)
     expect(holdsFailed.body.ok).toBe(false)
+    expect(dispatchFailed.body.dispatch).toEqual({ error: 'dispatch-sweep-failed' })
+    expect(holdsFailed.body.holds).toEqual({ error: 'hold-sweep-failed' })
   })
 
   it('names the failing sweep without echoing the error', async () => {

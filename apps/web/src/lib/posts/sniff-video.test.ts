@@ -49,7 +49,15 @@ describe('sniffVideo, against files ffmpeg actually made', () => {
 
   it('refuses a JPEG, which is not its job to accept', () => {
     const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 16, 0, 0, 0, 0, 0, 0, 0])
-    expect(sniffVideo(jpeg).ok).toBe(false)
+    const r = sniffVideo(jpeg)
+    // RETARGETED: a bare `.ok` check cannot tell "not a recognised container"
+    // from "truncated" — the two refusals this sniffer distinguishes so a
+    // person is told to replace a file rather than re-save one. Pin the
+    // specific reason and sentence a JPEG actually takes.
+    expect(r.ok).toBe(false)
+    if (r.ok) return
+    expect(r.reason).toBe('unknown_format')
+    expect(r.message).toMatch(/MP4/)
   })
 
   it('says "could not read" rather than "wrong type" for a truncated MP4', () => {
