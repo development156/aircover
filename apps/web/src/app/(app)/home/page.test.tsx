@@ -279,6 +279,18 @@ const A_POST = {
   created_by: 'u1',
 } as unknown as Awaited<ReturnType<typeof listPosts>>[number]
 
+/**
+ * ── THE DASHBOARD'S LANDMARK IS THE COMMAND ROW, NOT THE QUEUE ───────────────
+ * These tests prove the DASHBOARD rendered rather than the setup screen, and
+ * they used "Needs your attention" to do it. That card is now rendered only when
+ * something is actually waiting — the board above it already carries the count,
+ * and a queue card over an empty queue was a second statement of one absence.
+ *
+ * So the proof moved to "What do you want to work on?", which is on the
+ * dashboard in every state and on the setup screen in none. The CLAIM each test
+ * makes is unchanged; only the sentence it reads to check it has moved, which is
+ * the retarget CLAUDE.md's fifth copy rule asks for rather than a deletion.
+ */
 describe('Home for a workspace with nothing in it', () => {
   beforeEach(() => {
     balanceRead.mockResolvedValue({
@@ -314,7 +326,7 @@ describe('Home for a workspace with nothing in it', () => {
     render(await HomePage())
 
     expect(screen.queryByTestId('home-get-started')).not.toBeInTheDocument()
-    expect(screen.getByText(/needs your attention/i)).toBeInTheDocument()
+    expect(screen.getByText(/what do you want to work on/i)).toBeInTheDocument()
   })
 
   test('an unreadable brain read does the same', async () => {
@@ -332,7 +344,7 @@ describe('Home for a workspace with nothing in it', () => {
     render(await HomePage())
 
     expect(screen.queryByTestId('home-get-started')).not.toBeInTheDocument()
-    expect(screen.getByText(/needs your attention/i)).toBeInTheDocument()
+    expect(screen.getByText(/what do you want to work on/i)).toBeInTheDocument()
   })
 })
 
@@ -349,7 +361,7 @@ describe('Home for a workspace that exists', () => {
   test('renders the dashboard, not the first run', async () => {
     render(await HomePage())
 
-    expect(screen.getByText(/needs your attention/i)).toBeInTheDocument()
+    expect(screen.getByText(/what do you want to work on/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /create workspace/i })).not.toBeInTheDocument()
   })
 
@@ -362,7 +374,7 @@ describe('Home for a workspace that exists', () => {
     // one first-run screen instead — a funded user told to create a workspace
     // they already have is the same lie pointing the other way.
     expect(screen.queryByRole('button', { name: /create workspace/i })).not.toBeInTheDocument()
-    expect(screen.getByText(/needs your attention/i)).toBeInTheDocument()
+    expect(screen.getByText(/what do you want to work on/i)).toBeInTheDocument()
   })
 })
 

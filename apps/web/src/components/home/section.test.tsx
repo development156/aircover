@@ -110,12 +110,11 @@ describe('the four numbers, as one board', () => {
         posts={NO_POSTS}
         buckets={NO_WEEK}
         publish={{ status: 'ok', live: 0 } as never}
-        balance={
-          {
-            status: 'ok',
-            balance: { total: 100, held: 0, available: 100, hasHold: false, heldNote: null },
-          } as never
-        }
+        /* Was a wallet balance. The founder's ruling took credits off this
+           screen and Reach took the slot, so the board now reads a connected
+           account instead. `not-connected` is the honest default for a fixture:
+           it is the state every workspace starts in. */
+        analytics={{ kind: 'not-connected' } as never}
       />,
     )
     return container.firstElementChild as HTMLElement

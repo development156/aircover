@@ -6,6 +6,7 @@ import { CardLabel } from '@/components/ui/card'
 import { BalanceHero } from '@/components/wallet/balance-hero'
 import { CreditActivity } from '@/components/wallet/credit-activity'
 import { SkippedNote } from '@/components/wallet/ledger-table'
+import { SpendCard } from '@/components/home/spend-card'
 import { TopUpPanel } from '@/components/wallet/top-up-panel'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
 import { holdReaperFromEnv, staleHoldNote } from '@/lib/wallet/balance'
@@ -16,6 +17,7 @@ import {
   readLedger,
   readOpenHolds,
 } from '@/lib/wallet/read'
+import { readSpend } from '@/lib/home/spend'
 import { readBillingProfile } from '@/lib/billing/read'
 import { detectedCountry, pickDisplayCountry } from '@/lib/billing/display-country'
 import { getFxRates } from '@/lib/billing/fx-store'
@@ -44,18 +46,24 @@ export default async function WalletPage() {
    * buys back a serial round trip on the money screen. The waste is real and it
    * is the cheaper side of the trade.
    */
-  const [balance, ledger, ledgerTotal, openHolds, profile, detected, fx] = await Promise.all([
-    readBalance(),
-    readLedger(),
-    // The seventh read, in the same round trip for the reason the note above
-    // gives. It fetches no rows — `head: true` — and answers the one question
-    // the windowed list cannot: how many entries there actually are.
-    countLedger(),
-    readOpenHolds(),
-    readBillingProfile(),
-    detectedCountry(),
-    getFxRates(),
-  ])
+  const [balance, ledger, ledgerTotal, openHolds, profile, detected, fx, spend] = await Promise.all(
+    [
+      readBalance(),
+      readLedger(),
+      // The seventh read, in the same round trip for the reason the note above
+      // gives. It fetches no rows — `head: true` — and answers the one question
+      // the windowed list cannot: how many entries there actually are.
+      countLedger(),
+      readOpenHolds(),
+      readBillingProfile(),
+      detectedCountry(),
+      getFxRates(),
+      // In the SAME batch, never on its own line: `read-waterfall.test.ts`
+      // counts sequential reads per route and exists because a lone `await`
+      // costs a round trip nobody sees in review.
+      readSpend(),
+    ],
+  )
 
   /**
    * The local-currency approximation on the top-up panel.
@@ -143,6 +151,16 @@ export default async function WalletPage() {
           />
         )}
       </section>
+
+      {/* ── WHERE THE CREDITS WENT, BY ACTION ────────────────────────────────
+          Moved here from /home by the founder's ruling that credits belong in
+          the wallet. It rendered NOWHERE else in the product, so leaving it out
+          of this page would have deleted the only view of what the money bought
+          — and the ruling asked for it to move, not to go. It sits under the
+          ledger because the ledger is the record and this is the summary of it;
+          a summary above its own evidence reads as the headline figure, which
+          on a money screen is the balance and nothing else. */}
+      <SpendCard spend={spend} />
 
       <TopUpPanel currency={currency} fx={fx} />
     </div>

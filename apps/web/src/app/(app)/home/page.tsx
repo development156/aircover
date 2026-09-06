@@ -18,7 +18,7 @@ import { countIndexedDocuments } from '@/lib/knowledge/store'
 import { InstagramInsights } from '@/components/home/instagram-insights'
 import { PerformanceStrip } from '@/components/analytics/performance-strip'
 import { SahodaRail } from '@/components/home/sahoda-rail'
-import { SpendCard } from '@/components/home/spend-card'
+import { StartHere } from '@/components/home/start-here'
 import { WeekStrip } from '@/components/home/week-strip'
 import { StaggerItem } from '@/components/motion/stagger'
 import { ActivityFeed } from '@/components/home/activity-feed'
@@ -33,6 +33,7 @@ import { readPostCounts } from '@/lib/home/posts'
 import { readPublishSummary } from '@/lib/home/publishing'
 import { readSpend } from '@/lib/home/spend'
 import { startSteps, workspaceHasStarted, type StartedSignals } from '@/lib/home/started'
+import { needsAPerson } from '@/lib/approvals/queue'
 import { bucketWeek } from '@/lib/planner/week'
 import { forDisplay } from '@/lib/posts/display-post'
 import { listPosts, listVariantStates } from '@/lib/posts/read'
@@ -364,7 +365,22 @@ export default async function HomePage() {
 
           The order is the design. Leading with the week strip, as this page
           used to, answers "what is scheduled" — a question nobody opened the
-          app to ask — and pushes the queue below the fold. */}
+          app to ask — and pushes the queue below the fold.
+
+          ── AND CREDITS ARE NOT ONE OF THE FOUR ANY MORE ───────────────────
+          Founder's ruling: no credits card, metric, usage chart, balance or
+          progress bar on this screen. Three things went: the balance out of the
+          board above (Reach took the slot), the spend chart off the page
+          entirely, and the `View all` beside the activity feed no longer sends
+          the reader to the wallet to read one.
+
+          The credit spend chart was NOT deleted. It rendered nowhere else in
+          the product, so removing it here would have removed the feature; it
+          moved to /wallet, which is where the same ruling says credits live.
+          The `readSpend` call stays on this page and is load-bearing for a
+          different reason — see `signals` above, where an empty spend history
+          is one of the five facts that decide whether this workspace has
+          started. */}
 
       {/* The header. Carries the page's ONE primary action, which this screen
           previously did not have at all: it was a dashboard you could only
@@ -378,8 +394,18 @@ export default async function HomePage() {
           divided card rather than four ringed ones: see `StatStrip`'s `board`
           for the argument, which is that thirteen separate boxes down one page
           is most of what made this screen read as assembled parts. */}
+      {/* ── WHAT TO DO NEXT, BEFORE WHAT HAPPENED ─────────────────────────
+          The founder's hierarchy puts the command centre above the status
+          numbers, and it is the right way round: a number tells you where you
+          are, a door tells you where to go, and this screen's whole job is the
+          second one. See `start-here.tsx` for why it is one row and not the two
+          the brief drew. */}
       <StaggerItem i={0}>
-        <AtAGlance posts={displayPosts} buckets={buckets} publish={publish} balance={balance} />
+        <StartHere planCost={creditCost('loop_cycle')} />
+      </StaggerItem>
+
+      <StaggerItem i={1}>
+        <AtAGlance posts={displayPosts} buckets={buckets} publish={publish} analytics={instagram} />
       </StaggerItem>
 
       {/* ── WHAT NEEDS ME — FULL WIDTH, AND THAT IS THE RESTRUCTURE ───────
@@ -390,9 +416,18 @@ export default async function HomePage() {
           and its own grid opens to three columns when three or more things are
           waiting, which is the shape a queue should have and could not take at
           870px. */}
-      <StaggerItem i={1}>
-        <NeedsAttention posts={displayPosts} />
-      </StaggerItem>
+      {/* ── AND IT IS RENDERED ONLY WHEN SOMETHING IS WAITING ─────────────
+          The board above already answers "how many need me" and links to the
+          queue. With nothing waiting, this card was a second statement of the
+          same absence — the shape docs/37 §16 names as the v4 failure and the
+          brief calls "a section that has not earned its place". With something
+          waiting it is the most important thing on the screen, so it stays
+          exactly where it is. */}
+      {displayPosts.some((post) => needsAPerson(post.intent)) ? (
+        <StaggerItem i={2}>
+          <NeedsAttention posts={displayPosts} />
+        </StaggerItem>
+      ) : null}
 
       {/* `split--wide` — 1fr / 380px, not the 280px this page used. The rail
           holds four cards; at 280px the connection tiles wrapped to one per
@@ -412,16 +447,14 @@ export default async function HomePage() {
               is connected, which is the honest answer; showing nothing left the
               reader unable to tell "we measured nothing" from "this product
               does not measure". */}
-          <StaggerItem i={2}>
+          <StaggerItem i={3}>
             <PerformanceStrip analytics={instagram} />
           </StaggerItem>
 
-          <StaggerItem i={3}>
-            <SpendCard spend={spend} />
-          </StaggerItem>
-
           {/* Instagram's own series: the strip carries the headline numbers,
-              this carries the one real chart a platform reported. */}
+              this carries the one real chart a platform reported. It is the
+              page's only chart now that the credit bars have gone to /wallet,
+              which is the right count for a screen whose job is "what next". */}
           <StaggerItem i={4}>
             <InstagramInsights analytics={instagram} />
           </StaggerItem>
@@ -442,6 +475,16 @@ export default async function HomePage() {
             <HomeSection
               id="home-activity"
               title="Recent activity"
+              /* /wallet, and this was CHANGED AND CHANGED BACK. The founder's
+                 ruling forbids a balance on this screen and allows the credit
+                 history, so the link was first sent to /posts to keep the reader
+                 away from the balance the wallet leads with. Rendering it showed
+                 the mistake: these rows ARE ledger entries — the card's own empty
+                 state says "credits you spend or receive show up here" — so "View
+                 all" pointing at the post list promised a longer version of a
+                 list it does not hold. The ruling is about this PAGE not stating
+                 a balance, which it does not; it cannot also mean the wallet is
+                 unreachable from a feed of wallet rows. */
               action={{ href: '/wallet', label: 'View all' }}
               flush
             >

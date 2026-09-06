@@ -1,11 +1,11 @@
-import { CalendarClock, Coins, Inbox, Send } from 'lucide-react'
+import { CalendarClock, Inbox, Send, TrendingUp } from 'lucide-react'
 
 import { StatCard, StatStrip, type StatAbsence } from '@/components/charts/stat-card'
 import { needsAPerson } from '@/lib/approvals/queue'
 import type { DisplayPost } from '@/lib/posts/display-post'
 import type { WeekBuckets } from '@/lib/planner/week'
 import type { PublishSummary } from '@/lib/home/publishing'
-import type { BalanceRead } from '@/lib/wallet/read'
+import type { AccountAnalytics } from '@/lib/analytics/account-insights'
 
 /**
  * FOUR NUMBERS THIS PRODUCT CAN ALWAYS PROVE.
@@ -30,20 +30,26 @@ import type { BalanceRead } from '@/lib/wallet/read'
  *   Published        SUCCEEDED LIVE publishes. Not `attempts`, not
  *                    `succeeded` — `live`, because a fixture run succeeded at
  *                    simulating and published nothing.
- *   Credits left     the wallet balance, which is a real number the moment a
- *                    workspace exists.
+ *   Reach            the reach a connected account REPORTED. See below.
  *
- * So the strip is fillable on day one, with no channel connected and no post
- * published — which is the state the founder's screenshot is in. Nothing here
- * can render an absence mark for a reason a customer has to fix; the only
- * absence any of these can take is `unreadable`, and that means a query threw.
+ * ── THE FOURTH SLOT WAS THE CREDIT BALANCE, AND THE FOUNDER REMOVED IT ───────
+ * Founder's ruling: no credits card, metric, chart, balance or progress bar on
+ * this screen; credits live in the wallet. The slot now carries Reach, which
+ * the same ruling names as its replacement.
  *
- * ── AND THE CREDIT BALANCE IS NOW ON THIS SCREEN TWICE, DOWN FROM THREE ──────
- * docs/40 §2.3 counted it three times on one page — the topbar chip, the rail
- * foot, and an `Available credits` card in the right column. That card is gone
- * and this slot replaces it, so the count goes to two; and the rail foot's copy
- * is hidden whenever the rail is minimised, which is now the default. At the
- * width the founder is looking at, the number appears in the topbar and here.
+ * It is a DIFFERENT KIND of number from the other three and the card says so.
+ * The first three are counts of rows this product owns, so they are fillable on
+ * day one with nothing connected. Reach comes from a platform, so a workspace
+ * with no connected account has no reach — not a zero, an absence. A zero here
+ * would claim a measured nothing, which is the one thing this product may never
+ * print, so the slot renders the absence mark and its note says which fact it
+ * is: nothing connected, or connected and nothing reported yet.
+ *
+ * NO PERCENTAGE CHANGE. The reference asks for "+12%", and the account read
+ * returns a single current value with no prior period beside it — `performance
+ * -strip.tsx` states the same thing in its own header: "the insights arrive as
+ * single values, not series". A delta computed from one number is a number
+ * nothing measured.
  *
  * ── WHY EACH CARD IS A LINK ──────────────────────────────────────────────────
  * A number you cannot act on is a report. Every one of these has exactly one
@@ -54,12 +60,13 @@ export function AtAGlance({
   posts,
   buckets,
   publish,
-  balance,
+  analytics,
 }: {
   posts: readonly DisplayPost[]
   buckets: WeekBuckets
   publish: PublishSummary
-  balance: BalanceRead
+  /** The connected account's own figures, or the reason there are none. */
+  analytics: AccountAnalytics
 }) {
   const waiting = posts.filter((post) => needsAPerson(post.intent)).length
   const scheduled = buckets.days.reduce((n, day) => n + day.posts.length, 0)
@@ -69,6 +76,30 @@ export function AtAGlance({
   // is knowledge — the rule CreditChip and SpendCard already state.
   const publishAbsent: StatAbsence | undefined =
     publish.status === 'unreadable' ? 'unreadable' : undefined
+
+  /**
+   * The reach a platform actually reported, or `undefined`. `Reach` is one of
+   * the keys the account-insights endpoint returns (`account-insights.ts`'s own
+   * INSIGHT_KEYS), so this is a lookup rather than a computation — and when the
+   * key is missing from a READY response, that is Instagram not reporting it,
+   * which is still an absence and not a zero.
+   */
+  const reach =
+    analytics.kind === 'ready'
+      ? analytics.insights.find((i) => i.label === 'Reach')?.value
+      : undefined
+
+  /* One sentence per state, never a shared "no data". "You have not connected
+     anything" and "we could not reach Instagram" send the reader to two
+     different places, and only one of them is their to fix. */
+  const reachNote =
+    reach !== undefined
+      ? 'Reported by your connected account'
+      : analytics.kind === 'not-connected'
+        ? 'Connect a channel to measure this'
+        : analytics.kind === 'ready'
+          ? 'Your account has not reported it yet'
+          : 'We could not read it just now'
 
   return (
     <StatStrip board>
@@ -106,17 +137,15 @@ export function AtAGlance({
       />
       <StatCard
         variant="cell"
-        icon={<Coins size={15} strokeWidth={1.9} />}
-        label="Credits left"
-        value={balance.status === 'ok' ? balance.balance.available : null}
-        absent={balance.status === 'ok' ? undefined : 'unreadable'}
-        unit="credits"
-        note={
-          balance.status === 'ok' && balance.balance.held > 0
-            ? `${balance.balance.held} held by actions in progress`
-            : 'To spend on drafts and plans'
-        }
-        href="/wallet"
+        icon={<TrendingUp size={15} strokeWidth={1.9} />}
+        label="Reach"
+        value={reach ?? null}
+        /* `unmeasured`, never `unreadable`. Nothing threw: there is simply no
+           account reporting a figure, and the two are different claims. */
+        absent={reach === undefined ? 'unmeasured' : undefined}
+        unit={reach === undefined ? undefined : 'people'}
+        note={reachNote}
+        href="/analytics"
       />
     </StatStrip>
   )
