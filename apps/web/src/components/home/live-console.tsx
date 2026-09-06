@@ -5,7 +5,8 @@ import { Check, Coins, Radio, Sparkles, UserRound } from 'lucide-react'
 
 import { pollLiveFeed } from '@/app/actions/home-live'
 import { HomeSection } from '@/components/home/section'
-import { agoWords, type LiveKind, type LiveLine } from '@/lib/home/live'
+import { agoWords } from '@/lib/home/ago'
+import type { LiveKind, LiveLine } from '@/lib/home/live-types'
 import { cn } from '@/lib/utils'
 
 /**

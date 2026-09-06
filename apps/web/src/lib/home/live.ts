@@ -3,6 +3,12 @@ import type { LedgerEntry, PostStatus } from '@sahoda/shared'
 import { CRON_SCHEDULES } from '@/lib/cron/heartbeat'
 import { actionLabel } from '@/lib/wallet/entry-copy'
 
+import { agoWords } from './ago'
+import type { LiveKind, LiveLine } from './live-types'
+
+export { agoWords }
+export type { LiveKind, LiveLine }
+
 /**
  * WHAT SAHODA IS DOING RIGHT NOW, IN PLAIN WORDS.
  *
@@ -18,16 +24,6 @@ import { actionLabel } from '@/lib/wallet/entry-copy'
  * "approved"; credits are "used", not "debited". The founder's brief on
  * 2026-09-06 was one sentence: everyone should understand every line.
  */
-
-export type LiveKind = 'you' | 'sahoda' | 'credits' | 'check'
-
-export interface LiveLine {
-  /** ISO time the thing happened. */
-  at: string
-  /** One plain sentence. */
-  text: string
-  kind: LiveKind
-}
 
 export interface LivePost {
   id: string
@@ -47,19 +43,6 @@ export interface LiveInput {
 }
 
 const MINUTE = 60_000
-
-/** "just now", "4 minutes ago", "3 hours ago", "yesterday", "5 days ago". */
-export function agoWords(iso: string, now: Date): string {
-  const ms = now.getTime() - new Date(iso).getTime()
-  if (!Number.isFinite(ms) || ms < MINUTE) return 'just now'
-  const minutes = Math.floor(ms / MINUTE)
-  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`
-  const days = Math.floor(hours / 24)
-  if (days === 1) return 'yesterday'
-  return `${days} days ago`
-}
 
 const quote = (title: string | null): string => {
   const t = title?.trim()
