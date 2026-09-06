@@ -51,6 +51,18 @@ and `savePost` revalidate `/home` (new `posts.revalidate.test.ts`). Verified on
 Also: the greeting says "N drafts in progress", so "waiting" belongs to the board alone.
 RED first (12 failures across five suites), 294 green after across 27 files; typecheck, lint and prettier clean.
 
+## The design pass (12:11 IST, "implement the best UI and UX")
+
+`3b47cd61`, held to docs/37. One setup ladder under the greeting (`lib/home/setup.ts`,
+`components/home/setup-strip.tsx`) says a missing brain or channel once, with its door;
+the Performance card drops its copy of the remedy; the rail leads with Connections and
+Brand Brain until setup is done. The empty spend card draws its baseline at content
+height (`ChartSparse compact`). Today's day label is ink. The rail runs two columns
+between 700 and 1180. The loading skeleton mirrors the real layout. Every shell link
+carries `prefetch={false}` (guarded by `shell-prefetch.test.ts`). `onboardingStateRead`
+derives from the cached `readBrain`. The greeting reads the workspace timezone.
+697 tests green in the touched areas; typecheck, lint, prettier clean.
+
 ## Cleanup done
 
 The audit's post `87e589c2` (and its one variant) was deleted from the QA
