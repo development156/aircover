@@ -52,15 +52,15 @@ export function setupLadder(signals: SetupSignals): SetupLadder {
   const steps: SetupStep[] = [
     {
       id: 'brain',
-      label: 'Teach Sahoda your brand',
-      doneLabel: 'Brand Brain set up',
+      label: 'Teach Sahoda about your business',
+      doneLabel: 'Sahoda knows your business',
       href: '/onboarding',
       done: signals.hasBrain !== false,
     },
     {
       id: 'connect',
-      label: 'Connect a channel',
-      doneLabel: 'Channel connected',
+      label: 'Connect a social account',
+      doneLabel: 'Account connected',
       href: '/connections',
       done: signals.connections === null || signals.connections > 0,
     },

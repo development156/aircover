@@ -119,8 +119,8 @@ export function AtAGlance({
         emphasis={0}
         label={
           scheduled === 0
-            ? 'Nothing approved on any of the next seven days.'
-            : `Approved posts by day: ${buckets.days
+            ? 'Nothing ready to go in the next 7 days.'
+            : `Posts ready to go, by day: ${buckets.days
                 .map((day, i) => `${DAY.format(day.date)} ${perDay[i]}`)
                 .join(', ')}.`
         }
@@ -154,26 +154,26 @@ export function AtAGlance({
             : undefined
         }
         icon={<Inbox size={15} strokeWidth={1.9} />}
-        label="Waiting on you"
+        label="Needs your OK"
         value={waiting}
         unit={waiting === 1 ? 'post' : 'posts'}
-        note={waiting === 0 ? 'Nothing needs a decision' : 'Approve, edit or send back'}
+        note={waiting === 0 ? 'Nothing to check right now' : 'Check these before they go out'}
         href="/approvals"
       />
       <StatCard
         variant="cell"
         icon={<CalendarClock size={15} strokeWidth={1.9} />}
-        label="Scheduled"
+        label="Going out this week"
         value={scheduled}
         unit={scheduled === 1 ? 'post' : 'posts'}
-        note="Approved for the next seven days"
+        note="Ready and set to post in the next 7 days"
         chart={weekChart}
         href="/planner"
       />
       <StatCard
         variant="cell"
         icon={<Send size={15} strokeWidth={1.9} />}
-        label="Published"
+        label="Posted"
         value={publishAbsent ? null : publish.live}
         absent={publishAbsent}
         unit={publish.live === 1 ? 'post' : 'posts'}
@@ -181,7 +181,7 @@ export function AtAGlance({
            and published nothing, so a card reading `succeeded` would count
            simulations as reach. `readiness-is-evidence` in LEARNINGS is the
            same lesson from the other end. */
-        note="Actually sent to a channel"
+        note="Really went out to your accounts"
         href="/analytics"
       />
       <StatCard
@@ -193,8 +193,8 @@ export function AtAGlance({
         unit="credits"
         note={
           balance.status === 'ok' && balance.balance.held > 0
-            ? `${balance.balance.held} held by actions in progress`
-            : 'To spend on drafts and plans'
+            ? `${balance.balance.held} held while Sahoda works`
+            : 'Use these to write and plan'
         }
         chart={balanceChart}
         href="/wallet"

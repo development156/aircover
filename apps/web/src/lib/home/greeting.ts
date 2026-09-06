@@ -22,7 +22,7 @@ const plural = (n: number, one: string, many: string): string => `${n} ${n === 1
 
 export function greetingState(counts: PostCounts, publish: PublishSummary): string {
   if (counts.status === 'unreadable' || publish.status === 'unreadable') {
-    return "Some of your workspace couldn't be read just now."
+    return 'Sahoda could not read part of your workspace just now.'
   }
 
   const drafts = (counts.byStatus.draft ?? 0) + (counts.byStatus.idea ?? 0)
@@ -38,24 +38,24 @@ export function greetingState(counts: PostCounts, publish: PublishSummary): stri
 
   // "in progress", not "waiting": the board 40px below owns the word
   // "Waiting on you", and a draft with no date is not waiting on anyone.
-  if (drafts > 0) clauses.push(`${plural(drafts, 'draft', 'drafts')} in progress`)
-  if (review > 0) clauses.push(`${plural(review, 'post', 'posts')} waiting for review`)
-  if (approved > 0) clauses.push(`${plural(approved, 'post', 'posts')} approved`)
+  if (drafts > 0) clauses.push(`${plural(drafts, 'draft', 'drafts')} you are still writing`)
+  if (review > 0) clauses.push(`${plural(review, 'post', 'posts')} waiting for your OK`)
+  if (approved > 0) clauses.push(`${plural(approved, 'post', 'posts')} ready to go`)
   // The composer's Confirm schedule writes `scheduled` (MEASURED 2026-09-06),
   // and the board counts it as committed; this sentence must not say "nothing
   // in flight" over a "Scheduled · 1 post" cell.
   const scheduled = (counts.byStatus.scheduled ?? 0) + (counts.byStatus.publishing ?? 0)
-  if (scheduled > 0) clauses.push(`${plural(scheduled, 'post', 'posts')} scheduled`)
+  if (scheduled > 0) clauses.push(`${plural(scheduled, 'post', 'posts')} set to go out`)
   // Only a SUCCEEDED live publish counts as "out". A fixture run is simulated
   // and saying it went out would be the fabricated success state the whole
   // product rule forbids.
-  if (publish.live > 0) clauses.push(`${plural(publish.live, 'post', 'posts')} out`)
+  if (publish.live > 0) clauses.push(`${plural(publish.live, 'post', 'posts')} went out`)
   // A partly published post is a failure to the reader: something they
   // approved did not all go out, and the queue below files it as one.
-  if (failed > 0) clauses.push(`${plural(failed, 'post', 'posts')} failed`)
+  if (failed > 0) clauses.push(`${plural(failed, 'post', 'posts')} could not go out`)
 
   if (clauses.length === 0) {
-    return 'Nothing in flight yet. Plan a week and it starts filling in.'
+    return 'Nothing is happening yet. Plan a week and this fills in.'
   }
 
   return `${clauses.join(', ')}.`

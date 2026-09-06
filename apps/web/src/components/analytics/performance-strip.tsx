@@ -74,15 +74,15 @@ function reasonFor(analytics: AccountAnalytics): string | null {
     case 'ready':
       return analytics.insights.length > 0
         ? null
-        : 'Instagram has not reported these for this window yet.'
+        : 'Instagram has not sent these numbers for this period yet.'
     case 'not-connected':
-      return 'Connect a channel to start measuring.'
+      return 'Connect a social account to start counting.'
     case 'reconnect':
-      return 'Reconnect Instagram to start measuring again.'
+      return 'Reconnect Instagram to start counting again.'
     case 'not-configured':
-      return 'This environment has no metrics connection, so no request went out.'
+      return 'This version of Sahoda cannot reach Instagram numbers, so nothing was asked.'
     case 'unreadable':
-      return 'Could not read these just now. Refresh to try again.'
+      return 'Could not read these just now. Reload to try again.'
   }
 }
 
@@ -130,7 +130,7 @@ export function PerformanceStrip({
   return (
     <Card className="space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="type-h3">Performance</h2>
+        <h2 className="type-h3">How your posts are doing</h2>
         {detailsLink ? (
           /* MUTED, not accent. docs/37 §2.3 spends the orange on the one
              thing the screen is for, and on /home that is `Create post`. This
@@ -162,7 +162,7 @@ export function PerformanceStrip({
            things. The mark is right where four numbers would otherwise be; it
            is noise in front of a sentence that says more than it does. */
         <p className="type-body text-muted">
-          Reach, views, accounts engaged and interactions: not measured yet.
+          Reach, views, people engaged and interactions: no numbers yet.
         </p>
       ) : (
         <dl className="grid grid-cols-4 gap-x-4 gap-y-3 max-wide:grid-cols-2 max-narrow:grid-cols-2">

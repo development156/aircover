@@ -92,21 +92,23 @@ describe('the board draws only what it can prove', () => {
 
   test('the waiting cell wears the wash only while something waits', () => {
     board([post('r', 'review')])
-    expect(screen.getByRole('link', { name: /^Waiting on you/ }).className).toMatch(/--brand-wash/)
-    expect(screen.getByRole('link', { name: /^Published/ }).className).not.toMatch(/--brand-wash/)
+    expect(screen.getByRole('link', { name: /^Needs your OK/ }).className).toMatch(/--brand-wash/)
+    expect(screen.getByRole('link', { name: /^Posted/ }).className).not.toMatch(/--brand-wash/)
   })
 
   test('the week bars say what is on which day', () => {
     board([post('a', 'approved'), post('d', 'draft')])
-    expect(screen.getByRole('img', { name: /approved posts by day: mon 1/i })).toBeInTheDocument()
+    expect(
+      screen.getByRole('img', { name: /posts ready to go, by day: mon 1/i }),
+    ).toBeInTheDocument()
   })
 })
 
 describe('the board counts what the ladder counts', () => {
   test('"Scheduled" counts only committed posts in the week', () => {
     board([post('a', 'approved'), post('s', 'scheduled'), post('r', 'review'), post('d', 'draft')])
-    expect(cell(/^Scheduled/)).toMatch(/2\s*posts/)
-    expect(cell(/^Scheduled/)).toMatch(/approved/i)
+    expect(cell(/^Going out this week/)).toMatch(/2\s*posts/)
+    expect(cell(/^Going out this week/)).toMatch(/ready and set to post/i)
   })
 
   test('"Waiting on you" counts review, failures and dated drafts, and nothing approved', () => {
@@ -117,12 +119,12 @@ describe('the board counts what the ladder counts', () => {
       post('d', 'draft'),
       post('u', 'draft', { scheduled_at: null }),
     ])
-    expect(cell(/^Waiting on you/)).toMatch(/3\s*posts/)
+    expect(cell(/^Needs your OK/)).toMatch(/3\s*posts/)
   })
 
   test('a review post dated this week is waiting, not scheduled', () => {
     board([post('r', 'review')])
-    expect(cell(/^Waiting on you/)).toMatch(/1\s*post/)
-    expect(cell(/^Scheduled/)).toMatch(/0\s*posts/)
+    expect(cell(/^Needs your OK/)).toMatch(/1\s*post/)
+    expect(cell(/^Going out this week/)).toMatch(/0\s*posts/)
   })
 })

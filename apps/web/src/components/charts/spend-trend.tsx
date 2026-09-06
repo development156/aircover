@@ -4,6 +4,7 @@ import { TrendingUp } from 'lucide-react'
 import { useId, useState } from 'react'
 
 import { cn } from '@/lib/utils'
+import { curvePath } from './trend-area'
 
 /**
  * A THIN CONNECTED LINE OVER A VERY LIGHT FILL, with an average rule, an axis
@@ -154,12 +155,14 @@ export function SpendTrend({
         >
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--brand)" stopOpacity="0.10" />
+              <stop offset="0%" stopColor="var(--brand)" stopOpacity="0.22" />
               <stop offset="100%" stopColor="var(--brand)" stopOpacity="0" />
             </linearGradient>
           </defs>
           {runs.map((run, i) => {
-            const line = run.map((p, j) => `${j === 0 ? 'M' : 'L'}${p.x} ${p.y}`).join('')
+            // A monotone curve through the readings: smooth between days, and
+            // it never overshoots a reading, so the peak drawn is the peak read.
+            const line = curvePath(run)
             const start = run[0]!
             const end = run[run.length - 1]!
             return (
@@ -179,7 +182,9 @@ export function SpendTrend({
                   }
                   fill="none"
                   stroke="var(--brand)"
-                  strokeWidth={1.5}
+                  strokeWidth={2}
+                  pathLength={1}
+                  className="spark-draw"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   // One pixel at every width, rather than smearing with the
@@ -191,6 +196,26 @@ export function SpendTrend({
           })}
         </svg>
 
+        {/* THE PEAK, marked. The one reading the caption names, so the eye
+            finds it on the line without reading the axis. */}
+        {peakIndex >= 0 ? (
+          <svg
+            viewBox={`0 0 ${W} ${H}`}
+            preserveAspectRatio="none"
+            aria-hidden
+            className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+          >
+            <circle
+              cx={px(peakIndex)}
+              cy={py(peak)}
+              r={3.5}
+              fill="var(--brand)"
+              stroke="var(--surface)"
+              strokeWidth={2}
+              vectorEffect="non-scaling-stroke"
+            />
+          </svg>
+        ) : null}
         {/* THE AVERAGE, as a dotted rule. Drawn only when there is something to
             average — a rule at zero over an empty window states nothing and
             adds a line the reader has to account for. */}
@@ -210,7 +235,7 @@ export function SpendTrend({
             style={{ top: `${((py(average) / H) * 100).toFixed(2)}%` }}
           >
             <span className="absolute -top-2.5 left-0 rounded-xs bg-ink px-1.5 py-0.5 type-chip text-white">
-              Avg <span className="num">{Math.round(average).toLocaleString('en-IN')}</span>
+              Average <span className="num">{Math.round(average).toLocaleString('en-IN')}</span>
             </span>
           </div>
         ) : null}
@@ -293,7 +318,7 @@ export function SpendTrend({
         <p className="mt-3 flex items-center gap-2 rounded-sm bg-surface-2 px-3 py-2 type-meta text-muted">
           <TrendingUp aria-hidden className="size-3.5 shrink-0 text-accent" />
           <span>
-            Highest:{' '}
+            Most used:{' '}
             <span className="num font-semibold text-ink">{peak.toLocaleString('en-IN')}</span>{' '}
             {unit} on {points[peakIndex]!.label}
           </span>

@@ -18,6 +18,8 @@
  * headless renderer sees the finished line.
  */
 
+import { curvePath } from './trend-area'
+
 const W = 120
 const H = 28
 const PAD = 2
@@ -68,8 +70,8 @@ export function Sparkline({
     current.push({ x: s.x(i), y: s.y(v) })
   })
   if (current.length) runs.push(current)
-  const line = (run: { x: number; y: number }[]) =>
-    run.map((p, j) => `${j === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+  // The same monotone curve the spend chart draws: smooth, never overshooting.
+  const line = (run: { x: number; y: number }[]) => curvePath(run)
 
   const lastIndex = values.length - 1
   const last = values[lastIndex]
@@ -152,6 +154,8 @@ export function MiniBars({
                 rx={1}
                 fill={i === emphasis ? 'var(--brand)' : 'var(--ink)'}
                 fillOpacity={i === emphasis ? 1 : 0.55}
+                className="bar-grow"
+                style={{ animationDelay: `${i * 40}ms` }}
               />
             ) : null}
           </g>

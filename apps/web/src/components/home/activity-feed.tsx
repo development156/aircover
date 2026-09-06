@@ -95,8 +95,7 @@ export function ActivityFeed({
   if (unreadable) {
     return (
       <p role="alert" className="px-4 py-6 text-center type-sm text-danger">
-        Sahoda could not read your recent activity just now. Reload to try again. Nothing has been
-        charged and your credits are unaffected.
+        Sahoda could not load this just now. Reload to try again. Nothing was charged.
       </p>
     )
   }
@@ -104,7 +103,7 @@ export function ActivityFeed({
   if (entries.length === 0) {
     return (
       <p className="px-4 py-6 text-center type-sm text-muted">
-        Nothing has happened yet. Credits you spend or receive show up here.
+        Nothing yet. Credits you use or get show up here.
       </p>
     )
   }

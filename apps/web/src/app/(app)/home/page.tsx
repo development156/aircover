@@ -17,6 +17,7 @@ import { BrainCard, ConnectionsCard } from '@/components/home/rail-cards'
 import { countIndexedDocuments } from '@/lib/knowledge/store'
 import { InstagramInsights } from '@/components/home/instagram-insights'
 import { PerformanceStrip } from '@/components/analytics/performance-strip'
+import { LiveConsole } from '@/components/home/live-console'
 import { SahodaRail } from '@/components/home/sahoda-rail'
 import { SetupStrip } from '@/components/home/setup-strip'
 import { SpendCard } from '@/components/home/spend-card'
@@ -33,7 +34,9 @@ import { onboardingStateRead } from '@/lib/onboarding/read-onboarding-state'
 import { readPostCounts } from '@/lib/home/posts'
 import { readPublishSummary } from '@/lib/home/publishing'
 import { readSpend } from '@/lib/home/spend'
+import { readCronRun } from '@/lib/cron/heartbeat-store'
 import { balanceSeries } from '@/lib/home/balance-history'
+import { liveLines } from '@/lib/home/live'
 import { setupLadder } from '@/lib/home/setup'
 import { startSteps, workspaceHasStarted, type StartedSignals } from '@/lib/home/started'
 import { resolveDisplayZone } from '@/lib/time/zone'
@@ -170,6 +173,7 @@ export default async function HomePage() {
     subscription,
     session,
     workspace,
+    sweepRanAt,
   ] = await Promise.all([
     /**
      * IN THE BATCH, NOT IN FRONT OF IT.
@@ -230,6 +234,12 @@ export default async function HomePage() {
      * above, so this is the shared promise and not a fourteenth query.
      */
     activeWorkspaceRead(),
+    /**
+     * When the publishing sweep last ran, for the live console's last line.
+     * One Upstash GET; null without credentials, which the console renders as
+     * the schedule rather than as a failure.
+     */
+    readCronRun('sweeps').catch(() => null),
   ])
 
   // The greeting's clock is the workspace's, not Kolkata's. `resolveDisplayZone`
@@ -508,6 +518,27 @@ export default async function HomePage() {
               cards that are doors — Connections, then Brand Brain — and the
               feed follows. One order per state, decided by the same ladder
               that renders the strip above. */}
+          {/* ── RIGHT NOW: what Sahoda is doing, in plain words, refreshed while
+              the page is open. First render is the server's, from the rows
+              this page already read; the client polls the same reads. */}
+          <StaggerItem i={5}>
+            <LiveConsole
+              initial={liveLines({
+                posts: displayPosts.map((post) => ({
+                  id: post.id,
+                  title: post.title,
+                  intent: post.intent,
+                  updated_at: post.updated_at,
+                  scheduled_at: post.scheduled_at,
+                  origin: post.origin,
+                })),
+                ledger: ledger.unreadable ? [] : ledger.entries,
+                sweepRanAt,
+                now,
+              })}
+              readAt={now.toISOString()}
+            />
+          </StaggerItem>
           {ladder.remaining > 0 ? (
             <>
               <StaggerItem i={6}>
@@ -519,7 +550,7 @@ export default async function HomePage() {
               <StaggerItem i={8}>
                 <HomeSection
                   id="home-activity"
-                  title="Recent activity"
+                  title="What happened"
                   action={{ href: '/wallet', label: 'View all' }}
                   flush
                 >
@@ -542,7 +573,7 @@ export default async function HomePage() {
                     card's. */}
                 <HomeSection
                   id="home-activity"
-                  title="Recent activity"
+                  title="What happened"
                   action={{ href: '/wallet', label: 'View all' }}
                   flush
                 >

@@ -51,18 +51,18 @@ describe('the greeting sentence agrees with the queue beneath it', () => {
   test('a post in review is in flight, and the sentence says so', () => {
     const sentence = greetingState(counts({ review: 1 }), publish())
     expect(sentence).not.toMatch(/nothing in flight/i)
-    expect(sentence).toMatch(/1 post waiting for review/i)
+    expect(sentence).toMatch(/1 post waiting for your OK/i)
   })
 
   test('a failed post is named, not folded into "nothing"', () => {
     const sentence = greetingState(counts({ failed: 2 }), publish())
     expect(sentence).not.toMatch(/nothing in flight/i)
-    expect(sentence).toMatch(/2 posts failed/i)
+    expect(sentence).toMatch(/2 posts could not go out/i)
   })
 
   test('a partly published post counts as failed for the reader', () => {
     const sentence = greetingState(counts({ partial: 1 }), publish())
-    expect(sentence).toMatch(/1 post failed/i)
+    expect(sentence).toMatch(/1 post could not go out/i)
   })
 
   test('every clause reads in the order the board shows them', () => {
@@ -71,7 +71,7 @@ describe('the greeting sentence agrees with the queue beneath it', () => {
       publish(4),
     )
     expect(sentence).toBe(
-      '2 drafts in progress, 1 post waiting for review, 3 posts approved, 4 posts out, 1 post failed.',
+      '2 drafts you are still writing, 1 post waiting for your OK, 3 posts ready to go, 4 posts went out, 1 post could not go out.',
     )
   })
 
@@ -79,25 +79,25 @@ describe('the greeting sentence agrees with the queue beneath it', () => {
     // MEASURED 2026-09-06 on the preview: the composer's Confirm schedule
     // writes `scheduled`, the board said "Scheduled · 1 post", and this line
     // said "Nothing in flight yet" directly above it.
-    expect(greetingState(counts({ scheduled: 1 }), publish())).toBe('1 post scheduled.')
+    expect(greetingState(counts({ scheduled: 1 }), publish())).toBe('1 post set to go out.')
     expect(greetingState(counts({ scheduled: 2, approved: 1 }), publish())).toBe(
-      '1 post approved, 2 posts scheduled.',
+      '1 post ready to go, 2 posts set to go out.',
     )
   })
 
   test('a draft is "in progress", so the word "waiting" belongs to the board alone', () => {
     // "1 draft waiting" sat 40px above "Waiting on you · 0" on the same
     // screen (MEASURED 2026-09-06). Two different things, one word.
-    expect(greetingState(counts({ draft: 1 }), publish())).toBe('1 draft in progress.')
+    expect(greetingState(counts({ draft: 1 }), publish())).toBe('1 draft you are still writing.')
   })
 
   test('an empty workspace still gets the invitation, not a row of zeroes', () => {
-    expect(greetingState(counts({}), publish())).toMatch(/nothing in flight yet/i)
+    expect(greetingState(counts({}), publish())).toMatch(/nothing is happening yet/i)
   })
 
   test('a failed read is never dressed as zero', () => {
     expect(greetingState({ ...counts({}), status: 'unreadable' }, publish())).toMatch(
-      /couldn.t be read/i,
+      /could not read part of your workspace/i,
     )
   })
 })

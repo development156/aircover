@@ -24,7 +24,7 @@ describe('Sparkline', () => {
     const { container } = render(<Sparkline values={[100, 100, 100]} label="Flat" />)
     const d = container.querySelector('path.spark-draw')?.getAttribute('d') ?? ''
     // Every y is the mid-height (14), never the baseline (28) or the top (0).
-    const ys = [...d.matchAll(/,([\d.]+)/g)].map((m) => Number(m[1]))
+    const ys = [...d.matchAll(/[\d.]+ ([\d.]+)/g)].map((m) => Number(m[1]))
     expect(ys.every((y) => y === 14)).toBe(true)
   })
 })

@@ -16,10 +16,10 @@ describe('SetupStrip', () => {
   test('states the count once and links the next door', () => {
     render(<SetupStrip ladder={setupLadder({ hasBrain: false, connections: 0, posts: 1 })} />)
     expect(screen.getByRole('heading', { name: /1 of 3 set up/i })).toBeInTheDocument()
-    const next = screen.getByRole('link', { name: /teach sahoda your brand/i })
+    const next = screen.getByRole('link', { name: /teach sahoda about your business/i })
     expect(next).toHaveAttribute('href', '/onboarding')
     // The other undone step is a door too, not a greyed-out promise.
-    expect(screen.getByRole('link', { name: /connect a channel/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /connect a social account/i })).toHaveAttribute(
       'href',
       '/connections',
     )
@@ -27,8 +27,8 @@ describe('SetupStrip', () => {
 
   test('a done step is a statement, not a link', () => {
     render(<SetupStrip ladder={setupLadder({ hasBrain: true, connections: 0, posts: 1 })} />)
-    expect(screen.getByText(/brand brain set up/i)).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /brand brain set up/i })).toBeNull()
+    expect(screen.getByText(/sahoda knows your business/i)).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /sahoda knows your business/i })).toBeNull()
     expect(screen.getByText(/first post written/i)).toBeInTheDocument()
   })
 

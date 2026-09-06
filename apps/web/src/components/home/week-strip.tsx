@@ -173,7 +173,7 @@ export function WeekStrip({ buckets, variantStates }: WeekStripProps) {
                 // Deliberately blank rather than "nothing planned" seven times
                 // over: an empty day in a calendar is self-evident, and the
                 // repetition would drown the days that DO have something.
-                <span className="sr-only">Nothing planned</span>
+                <span className="sr-only">Nothing set</span>
               ) : (
                 day.posts.map((post) => (
                   <Entry key={post.id} post={post} variants={variantStates.get(post.id) ?? []} />
@@ -185,7 +185,7 @@ export function WeekStrip({ buckets, variantStates }: WeekStripProps) {
       </ol>
       {total === 0 ? (
         <p className="mt-3 type-sm text-muted">
-          Nothing scheduled this week yet. Anything you approve or schedule shows up here.
+          Nothing set to go out this week yet. Posts you approve or schedule show up here.
         </p>
       ) : null}
     </HomeSection>

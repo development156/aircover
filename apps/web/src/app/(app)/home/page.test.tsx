@@ -237,7 +237,7 @@ describe('Home for a user with no workspace yet', () => {
 
     // The credits card, the week strip and the spend chart all describe a
     // workspace. None of them has one to describe.
-    expect(screen.queryByText(/needs your attention/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /needs your ok/i })).not.toBeInTheDocument()
     expect(screen.queryByText(/credits to spend/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/nothing in flight yet/i)).not.toBeInTheDocument()
   })
@@ -301,8 +301,8 @@ describe('Home for a workspace with nothing in it', () => {
 
     expect(screen.getByTestId('home-get-started')).toBeInTheDocument()
     // The dashboard's containers, each of which owned its own empty state.
-    expect(screen.queryByText(/needs your attention/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/needs your attention/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /needs your ok/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /needs your ok/i })).not.toBeInTheDocument()
     expect(screen.queryByText(/credits spent/i)).not.toBeInTheDocument()
   })
 
@@ -323,7 +323,7 @@ describe('Home for a workspace with nothing in it', () => {
     render(await HomePage())
 
     expect(screen.queryByTestId('home-get-started')).not.toBeInTheDocument()
-    expect(screen.getByText(/needs your attention/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /needs your ok/i })).toBeInTheDocument()
   })
 
   test('an unreadable brain read does the same', async () => {
@@ -341,7 +341,7 @@ describe('Home for a workspace with nothing in it', () => {
     render(await HomePage())
 
     expect(screen.queryByTestId('home-get-started')).not.toBeInTheDocument()
-    expect(screen.getByText(/needs your attention/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /needs your ok/i })).toBeInTheDocument()
   })
 })
 
@@ -358,7 +358,7 @@ describe('Home for a workspace that exists', () => {
   test('renders the dashboard, not the first run', async () => {
     render(await HomePage())
 
-    expect(screen.getByText(/needs your attention/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /needs your ok/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /create workspace/i })).not.toBeInTheDocument()
   })
 
@@ -371,7 +371,7 @@ describe('Home for a workspace that exists', () => {
     // one first-run screen instead — a funded user told to create a workspace
     // they already have is the same lie pointing the other way.
     expect(screen.queryByRole('button', { name: /create workspace/i })).not.toBeInTheDocument()
-    expect(screen.getByText(/needs your attention/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /needs your ok/i })).toBeInTheDocument()
   })
 })
 
@@ -397,12 +397,12 @@ describe('the setup ladder on the full dashboard', () => {
     render(await HomePage())
 
     expect(screen.getByRole('region', { name: /1 of 3 set up/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /teach sahoda your brand/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /teach sahoda about your business/i })).toHaveAttribute(
       'href',
       '/onboarding',
     )
     // The Performance card keeps its slots and drops its copy of the remedy.
-    expect(screen.queryByText(/connect a channel to start measuring/i)).toBeNull()
+    expect(screen.queryByText(/connect a social account to start counting/i)).toBeNull()
   })
 
   test('a workspace that is set up shows no ladder', async () => {
@@ -447,7 +447,7 @@ describe('the landing rule on the page that lands', () => {
     // `redirect` throws, so the JSX below it is never reached. If it were a
     // silent spy this would be a dashboard drawn under a passing assertion.
     expect(screen.queryByTestId('home-get-started')).not.toBeInTheDocument()
-    expect(screen.queryByText(/needs your attention/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /needs your ok/i })).not.toBeInTheDocument()
   })
 
   test('a finished account gets the dashboard', async () => {
@@ -526,7 +526,7 @@ describe('the plan offer on the dashboard', () => {
     })
     render(await HomePage())
 
-    expect(screen.getByText(/needs your attention/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /needs your ok/i })).toBeInTheDocument()
     expect(offerHeading()).toBeNull()
   })
 

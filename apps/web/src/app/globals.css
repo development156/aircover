@@ -1101,3 +1101,21 @@
 .value-lit {
   animation: value-lit var(--dur-slow) var(--ease) both;
 }
+
+/* ── THE BARS GROW IN ─────────────────────────────────────────────────────────
+   Same clock as the count-up and the line's draw-in, from the baseline up.
+   The bar exists at full height in the markup; this only animates its
+   transform, and the global reduced-motion block collapses it. */
+@keyframes bar-grow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+.bar-grow {
+  transform-origin: bottom;
+  transform-box: fill-box;
+  animation: bar-grow var(--dur-count, 560ms) cubic-bezier(0.22, 1, 0.36, 1) both;
+}

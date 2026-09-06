@@ -138,16 +138,14 @@ describe('a feed that could not be read is not an empty one', () => {
   it('never claims nothing has happened when the read failed', () => {
     render(<ActivityFeed entries={[]} unreadable />)
 
-    expect(screen.queryByText(/nothing has happened yet/i)).not.toBeInTheDocument()
-    expect(screen.getByRole('alert').textContent ?? '').toMatch(
-      /could not read your recent activity/i,
-    )
+    expect(screen.queryByText(/nothing yet/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('alert').textContent ?? '').toMatch(/could not load this/i)
   })
 
   it('repeats the guarantee, because this card is about money', () => {
     render(<ActivityFeed entries={[]} unreadable />)
 
-    expect(screen.getByRole('alert').textContent ?? '').toMatch(/nothing has been charged/i)
+    expect(screen.getByRole('alert').textContent ?? '').toMatch(/nothing was charged/i)
   })
 
   it('a feed that really is empty still says so', () => {
@@ -155,7 +153,7 @@ describe('a feed that could not be read is not an empty one', () => {
     // workspace its wallet is broken on the first screen it ever sees.
     render(<ActivityFeed entries={[]} />)
 
-    expect(screen.getByText(/nothing has happened yet/i)).toBeInTheDocument()
+    expect(screen.getByText(/nothing yet/i)).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })
