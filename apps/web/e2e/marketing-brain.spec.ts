@@ -82,7 +82,11 @@ test.describe('@smoke the Marketing Brain', () => {
     // third person (CLAUDE.md, Copy style), and the report page has said so since
     // the voice sweep. MEASURED stale on the first CI smoke run to reach this spec
     // (2026-09-05, run 33985674352).
-    const block = page.getByRole('heading', { name: 'What Sahoda noticed' })
+    // `.first()`: the report renders this heading twice — once as the lead
+    // module's title and once in the "what Monday's report says" preview list —
+    // and a strict locator threw on the pair (run 34009643341). The lead module
+    // is the one whose body the assertions below read.
+    const block = page.getByRole('heading', { name: 'What Sahoda noticed' }).first()
     await expect(block).toBeVisible()
     // It names the FLOOR, so the reader knows what would change it.
     // The floor sentence, so the reader knows what would change it. The string
