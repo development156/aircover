@@ -45,6 +45,15 @@ editor; a blank draft disables Save and shows the reason; the core promise was
 restored as v12; "Confirm all 2" made one POST and one version (v13); an
 offline confirm shows "Could not reach Sahoda…" inline and the tab stays.
 
+## The Brain that lights up (`1a3c6eb8`, `cca5e7a0`)
+
+The founder asked for the Brand Brain to be visually striking with feedback on each answer. Shipped and verified on the preview:
+
+- `lib/brand/brain-map.ts` + `components/brain/brain-map.tsx`: a neural map of the fifteen fields in five section clusters around a core carrying the ring's count. Confirmed = solid brand node (is-real), guess = dashed empty ring (is-proposed), setup answer = dashed ring over the brand wash. Edges into the core light with their nodes. Compact map on the title row of every brain screen (`brain-map-frame.tsx`, "Brain level n of 15"), full map above the confidence bar.
+- Feedback per answer: the node that just became confirmed pulses with a halo and the core pops; the chip pops as the dash turns solid; the value box carries one soft ring; the tally lifts (`pop-number.tsx`, `use-just-changed.ts`). All transform/opacity, none past `--dur-slow`, collapsed by the global reduced-motion block. Nothing pulses on arrival; no number is rolled.
+- MEASURED live: after Confirm on Archetype, node lit + halo + core pop + chip pop + value ring all present within 1.8 s (the round trip), settled by 2.7 s, level 0 → 1. Light, dark and 390 px checked; no horizontal overflow.
+- The first build failed the js-budget (+8.2 kB on the layout): the client map imported the field registry and, through provenance, `@sahoda/shared`. `cca5e7a0` moves geometry, counts and the spoken label to the server; the client draws plain data.
+
 ## Not done
 
 - The paid re-resolve was not spent. Two-session concurrency (BR-04) is INFERRED from code, not driven.
