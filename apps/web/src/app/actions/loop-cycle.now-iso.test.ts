@@ -112,6 +112,13 @@ vi.mock('@/lib/loop/store', () => ({
 
 // Recorded rather than swallowed: the action's catch turns any throw into
 // "Could not run the cycle", which would let a broken mock pass for a defect.
+vi.mock('@/lib/workspace-role', () => ({
+  getWorkspaceRole: async () => 'owner',
+  canManageLoop: (r: string | null) => r !== null && ['owner', 'editor', 'approver'].includes(r),
+  LOOP_ROLE_REFUSAL: 'refused',
+  LOOP_ROLE_UNKNOWN: 'unknown',
+}))
+
 vi.mock('@/lib/observability/report', () => ({
   reportServerError: (error: unknown) => {
     state.reported.push(error)

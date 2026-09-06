@@ -30,6 +30,12 @@ import {
 } from '@/lib/loop/refusal-copy'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { workspaceForWrite } from '@/lib/workspaces'
+import {
+  getWorkspaceRole,
+  canManageLoop,
+  LOOP_ROLE_REFUSAL,
+  LOOP_ROLE_UNKNOWN,
+} from '@/lib/workspace-role'
 
 /**
  * ONE CYCLE, UP TO THE HALT — collect, reflect, plan, then STOP.
@@ -154,6 +160,14 @@ export async function runCycleToPreview(
     const ws = await workspaceForWrite()
     if (!ws.ok) return { ok: false, insufficient: false, message: ws.message }
     workspaceId = ws.workspace.id
+
+    // ── ROLE GATE ─────────────────────────────────────────────────────────
+    // A viewer may read the Loop but not change it. The durable wall is RLS on
+    // these tables; this is the application half, checked before the write.
+    const _role = await getWorkspaceRole(workspaceId)
+    if (!canManageLoop(_role)) {
+      return { ok: false, message: _role === null ? LOOP_ROLE_UNKNOWN : LOOP_ROLE_REFUSAL }
+    }
 
     const now = nowIso ? new Date(nowIso) : new Date()
     if (Number.isNaN(now.getTime())) return { ok: false, message: 'Could not read the time.' }

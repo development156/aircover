@@ -88,3 +88,32 @@ export const APPROVE_ROLE_REFUSAL = 'Only an owner, editor or approver can appro
  */
 export const APPROVE_ROLE_UNKNOWN =
   'Sahoda could not confirm your role in this workspace, so nothing was approved. Try again in a moment.'
+
+/**
+ * Who may change the Loop — start a paid cycle, pause or un-pause it, set the
+ * weekly budget, or arm a channel to L3 autopilot.
+ *
+ * A VIEWER COULD DO ALL OF THAT. Measured in the 2026-09-06 audit: `loop_settings`
+ * and `loop_channel_autonomy` get `app.apply_tenant_policies` (full member CRUD, no
+ * role predicate), and `runCycleToPreview` / `setLoopSettings` / `setChannelAutonomy`
+ * read no role — so the one member who may only read could fund a week and arm
+ * autopilot, while Stop, Approve and Learning were already gated. The trio matches
+ * the durable RLS the db lane adds; this application check is the wall until it lands,
+ * so it is made before the write is issued.
+ */
+const MAY_MANAGE_LOOP: ReadonlySet<WorkspaceRole> = new Set<WorkspaceRole>([
+  'owner',
+  'editor',
+  'approver',
+])
+
+export function canManageLoop(role: WorkspaceRole | null): boolean {
+  return role !== null && MAY_MANAGE_LOOP.has(role)
+}
+
+/** Refused because the role is known and not allowed. */
+export const LOOP_ROLE_REFUSAL = 'Only an owner, editor or approver can change the Loop.'
+
+/** Refused because the role could not be established, which is a different claim. */
+export const LOOP_ROLE_UNKNOWN =
+  'Sahoda could not confirm your role in this workspace, so nothing changed. Try again in a moment.'
