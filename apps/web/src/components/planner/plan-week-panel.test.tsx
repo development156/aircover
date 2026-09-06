@@ -11,6 +11,7 @@ const state = vi.hoisted(() => ({
     ok: true,
     created: 5,
     clamped: 0,
+    postIds: ['p1', 'p2', 'p3', 'p4', 'p5'],
     balanceAfter: 80,
     creditsCharged: 20,
   } as unknown as PlanWeekState,
@@ -24,6 +25,9 @@ vi.mock('@/app/actions/plan-week', () => ({
   },
 }))
 
+// Never resolves: the panel test only needs to see the first card start drawing.
+vi.mock('@/app/actions/illustrate-post', () => ({ illustratePost: () => new Promise(() => {}) }))
+
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }))
@@ -33,6 +37,7 @@ beforeEach(() => {
     ok: true,
     created: 5,
     clamped: 0,
+    postIds: ['p1', 'p2', 'p3', 'p4', 'p5'],
     balanceAfter: 80,
     creditsCharged: 20,
   }
@@ -57,7 +62,14 @@ describe('PlanWeekPanel', () => {
   })
 
   test('moved times are reported, never hidden', async () => {
-    state.result = { ok: true, created: 5, clamped: 2, balanceAfter: 80, creditsCharged: 20 }
+    state.result = {
+      ok: true,
+      created: 5,
+      clamped: 2,
+      postIds: [],
+      balanceAfter: 80,
+      creditsCharged: 20,
+    }
 
     render(<PlanWeekPanel />)
     await userEvent.click(screen.getByRole('button', { name: /plan my week/i }))
@@ -147,5 +159,36 @@ describe('PlanWeekPanel', () => {
     // enforces, and 'Monsoon' alone cannot tell the two apart.
     await userEvent.type(screen.getByRole('textbox'), '  Monsoon  ')
     expect(screen.getByText(/characters$/i).textContent).toBe('11 / 500 characters')
+  })
+})
+
+describe('PlanWeekPanel · with pictures', () => {
+  test('ticking the box adds the pictures to the price on the button, before the click', async () => {
+    render(<PlanWeekPanel />)
+
+    expect(screen.getByRole('button', { name: /plan my week · 20 credits/i })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('checkbox', { name: /also make a picture/i }))
+
+    // 20 for the plan plus five everyday pictures at the Studio's own price.
+    expect(
+      screen.getByRole('button', { name: /plan my week with pictures · 50 credits/i }),
+    ).toBeInTheDocument()
+    expect(state.calls).toHaveLength(0)
+  })
+
+  test('unticked, no picture is asked for and the illustrator never mounts', async () => {
+    render(<PlanWeekPanel />)
+    await userEvent.click(screen.getByRole('button', { name: /plan my week/i }))
+    expect(screen.queryByRole('region', { name: /pictures for the week/i })).toBeNull()
+  })
+
+  test('ticked, the plan lands first and then the pictures start, one card per draft', async () => {
+    render(<PlanWeekPanel />)
+    await userEvent.click(screen.getByRole('checkbox', { name: /also make a picture/i }))
+    await userEvent.click(screen.getByRole('button', { name: /plan my week with pictures/i }))
+
+    const region = await screen.findByRole('region', { name: /pictures for the week/i })
+    expect(region.querySelectorAll('[data-illustration]')).toHaveLength(5)
+    expect(region.querySelector('[data-illustration="drawing"]')).not.toBeNull()
   })
 })

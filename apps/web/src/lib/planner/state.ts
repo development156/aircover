@@ -15,6 +15,8 @@ export type PlanWeekState =
       created: number
       /** How many model slots were unusable and replaced by deterministic fallbacks. */
       clamped: number
+      /** The drafts, in the order they were planned, so a follow-up can picture each one. */
+      postIds: string[]
       balanceAfter: number
       creditsCharged: number
     }

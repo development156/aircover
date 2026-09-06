@@ -167,9 +167,13 @@ describe('planMyWeek', () => {
       ok: true,
       created: 5,
       clamped: 0,
+      // The ids come back in the order the rows were inserted, so a follow-up
+      // (a picture per draft) works through the week in the plan's order.
+      postIds: expect.arrayContaining([expect.any(String)]),
       balanceAfter: 80,
       creditsCharged: 20,
     })
+    if (result.ok) expect(result.postIds).toHaveLength(5)
   })
 
   test('charges loop_cycle with a fresh server-minted objectRef each run', async () => {

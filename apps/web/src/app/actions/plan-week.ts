@@ -135,6 +135,7 @@ export async function planMyWeek(goals: unknown, channels: unknown): Promise<Pla
     let delivered = false
     let created = 0
     let clamped = 0
+    let postIds: string[] = []
 
     const credits = await getWithCredits()(
       { workspaceId: workspace.id, action, objectRef },
@@ -198,6 +199,7 @@ export async function planMyWeek(goals: unknown, channels: unknown): Promise<Pla
         }
 
         created = data.length
+        postIds = data.map((row) => String(row.id))
         // Last statement before the return: from here on the wrapper owns the
         // outcome, and any failure it reports may still have debited.
         delivered = true
@@ -234,6 +236,7 @@ export async function planMyWeek(goals: unknown, channels: unknown): Promise<Pla
       ok: true,
       created,
       clamped,
+      postIds,
       balanceAfter: credits.data.balanceAfter,
       creditsCharged: creditCost(action),
     }

@@ -3,11 +3,12 @@
 import Link from 'next/link'
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { ArrowRight, Share2, Sparkles, Target } from 'lucide-react'
+import { ArrowRight, ImageIcon, Share2, Sparkles, Target } from 'lucide-react'
 import { creditCost, toChannelSet, type ChannelSet } from '@sahoda/shared'
 
 import { planMyWeek } from '@/app/actions/plan-week'
 import { WarmBand } from '@/components/planner/warm-band'
+import { WeekIllustrator } from '@/components/planner/week-illustrator'
 import { ChannelPicker } from '@/components/posts/channel-picker'
 import { InlineError } from '@/components/posts/inline-error'
 import { PendingLines } from '@/components/posts/pending-lines'
@@ -15,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { CostLabel } from '@/components/ui/cost-label'
 import { creditWord } from '@/lib/credit-words'
+import { defaultModelId, imageActionFor } from '@/lib/studio/models'
 
 const PENDING = [
   'Reading your Brand Brain…',
@@ -33,8 +35,15 @@ const DEFAULT_CHANNELS: ChannelSet = toChannelSet(['x', 'gbp'])
  */
 const GOALS_MAX = 500
 
+/**
+ * How many drafts one plan makes, and so how many pictures the box below asks
+ * for. The action inserts what the model returns, which has been five on every
+ * run; the button says "up to" because the exact count is the model's.
+ */
+const DRAFTS_PER_PLAN = 5
+
 type Outcome =
-  | { kind: 'planned'; clamped: number }
+  | { kind: 'planned'; clamped: number; postIds: string[]; withImages: boolean }
   | { kind: 'insufficient'; required: number; available: number }
   | { kind: 'failed'; message: string }
 
@@ -49,7 +58,14 @@ export function PlanWeekPanel() {
   const [outcome, setOutcome] = useState<Outcome | null>(null)
   const [pending, startTransition] = useTransition()
 
+  const [withImages, setWithImages] = useState(false)
+
   const cost = creditCost('loop_cycle')
+  // The everyday model's own price, read through the same map the Studio
+  // charges by, never a literal. Null cannot happen for the routed default.
+  const imageAction = imageActionFor(defaultModelId())
+  const imageCost = imageAction === null ? 0 : creditCost(imageAction)
+  const totalCost = withImages ? cost + imageCost * DRAFTS_PER_PLAN : cost
 
   function run() {
     if (channels.length === 0) return
@@ -67,7 +83,12 @@ export function PlanWeekPanel() {
             <span className="tabular-nums">{result.balanceAfter}</span> left
           </span>,
         )
-        setOutcome({ kind: 'planned', clamped: result.clamped })
+        setOutcome({
+          kind: 'planned',
+          clamped: result.clamped,
+          postIds: result.postIds ?? [],
+          withImages,
+        })
         return
       }
 
@@ -172,7 +193,10 @@ export function PlanWeekPanel() {
                   direction instead. docs/37 §18 bans emoji in Sahoda's own
                   interface — the brief's "✨" and "→" are both lucide glyphs
                   here, which inherit the button's colour in both themes. */}
-              <CostLabel action="Plan my week" cost={cost} />
+              <CostLabel
+                action={withImages ? 'Plan my week with pictures' : 'Plan my week'}
+                cost={totalCost}
+              />
               <ArrowRight size={15} aria-hidden />
             </Button>
           }
@@ -261,6 +285,36 @@ export function PlanWeekPanel() {
           </div>
         </div>
 
+        {/* ── 3 · THE PICTURES ──────────────────────────────────────────────── */}
+        <div className="mt-5 border-t border-line pt-5">
+          <p className="type-eyebrow text-ink-mute">Step 3</p>
+          <label className="mt-1 flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={withImages}
+              onChange={(event) => setWithImages(event.target.checked)}
+              disabled={pending}
+              className="mt-1 size-4 shrink-0 accent-[var(--brand)]"
+            />
+            <span className="min-w-0">
+              <span className="flex items-center gap-2 type-h3 text-ink">
+                <ImageIcon size={15} strokeWidth={2} className="text-accent" aria-hidden />
+                Also make a picture for each post
+              </span>
+              {/* The price is a product of two figures the reader can check: the
+                  everyday model's price from the Studio, and the number of
+                  drafts a plan makes. "Up to" because the count is the model's. */}
+              <span className="mt-0.5 block type-sm text-muted">
+                Sahoda picks the shape for each post&apos;s channels, draws it on brand and attaches
+                it to the draft. Up to <span className="tabular-nums">{DRAFTS_PER_PLAN}</span>{' '}
+                pictures at <span className="tabular-nums">{imageCost}</span>{' '}
+                {creditWord(imageCost)} each, charged one by one as they arrive. A picture that
+                fails is not charged.
+              </span>
+            </span>
+          </label>
+        </div>
+
         <div className="mt-5 border-t border-line pt-5">
           {pending ? (
             /* The button in the band shows the spinner; these four lines say what
@@ -280,6 +334,31 @@ export function PlanWeekPanel() {
             </p>
           )}
         </div>
+
+        {outcome?.kind === 'planned' && outcome.withImages && outcome.postIds.length > 0 ? (
+          <WeekIllustrator
+            key={outcome.postIds.join(',')}
+            postIds={outcome.postIds}
+            costPerPicture={imageCost}
+            onDone={(summary) => {
+              if (summary.made === 0) return
+              toast.success(
+                <span>
+                  <span className="tabular-nums">{summary.made}</span>{' '}
+                  {summary.made === 1 ? 'picture' : 'pictures'} attached ·{' '}
+                  <span className="tabular-nums">{summary.charged}</span>{' '}
+                  {creditWord(summary.charged)} used
+                  {summary.balanceAfter !== null ? (
+                    <>
+                      {' '}
+                      · <span className="tabular-nums">{summary.balanceAfter}</span> left
+                    </>
+                  ) : null}
+                </span>,
+              )
+            }}
+          />
+        ) : null}
 
         {outcome?.kind === 'planned' && outcome.clamped > 0 ? (
           <p className="mt-4 rounded-input bg-s2 px-3 py-2.5 type-sm text-muted">
