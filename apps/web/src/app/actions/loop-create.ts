@@ -133,6 +133,14 @@ export async function runCreateStage(cycleId: string): Promise<CreateStageState>
       }
     }
 
+    // ── CONCURRENCY CLAIM ───────────────────────────────────────────────────
+    // One create run per cycle. A second concurrent request is turned away here,
+    // before it charges or inserts, so it cannot write a duplicate orphan post.
+    const claimed = await store.claimCreateStage(cycleId, workspaceId)
+    if (!claimed) {
+      return { ok: true, message: 'This week is already being created.' }
+    }
+
     // Included, and not yet turned into a post. The second half is what makes
     // a second entry harmless: a brief with a post is done, whatever else
     // happens to the request that wrote it.

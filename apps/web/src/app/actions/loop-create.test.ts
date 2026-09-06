@@ -39,6 +39,7 @@ type InsertFn = (row: Record<string, unknown>) => {
 const h = vi.hoisted(() => {
   const store = {
     readApprovedCycleForCreate: vi.fn(),
+    claimCreateStage: vi.fn(async () => true),
     readBriefs: vi.fn(),
     linkBriefToPost: vi.fn(async () => true),
     addSpend: vi.fn(),
@@ -131,6 +132,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   DIAL = [{ channel: 'instagram', level: 1 }]
   h.store.readApprovedCycleForCreate.mockResolvedValue(APPROVED_CYCLE)
+  h.store.claimCreateStage.mockResolvedValue(true)
   h.store.readBriefs.mockResolvedValue([brief('b1')])
   h.store.linkBriefToPost.mockResolvedValue(true)
   h.store.finishCycle.mockResolvedValue(true)
@@ -357,5 +359,16 @@ describe('runCreateStage — credits run out mid-stage', () => {
     // The week is NOT reported as done — the cycle stays in `creating`.
     expect(h.store.setCycleStatus).not.toHaveBeenCalledWith('cycle-1', WS, 'staging')
     expect(h.store.finishCycle).not.toHaveBeenCalled()
+  })
+})
+
+describe('runCreateStage — the concurrency claim', () => {
+  it('turns a second concurrent run away before it charges or inserts', async () => {
+    h.store.claimCreateStage.mockResolvedValue(false)
+    const out = await runCreateStage('cycle-1')
+    expect(out.ok).toBe(true)
+    expect(out.created).toBeUndefined()
+    expect(h.withCredits).not.toHaveBeenCalled()
+    expect(h.insert).not.toHaveBeenCalled()
   })
 })

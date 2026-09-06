@@ -367,6 +367,40 @@ export async function readApprovedCycleForCreate(
 }
 
 /**
+ * THE CONCURRENCY CLAIM — exactly one create run may proceed per cycle.
+ *
+ * Two requests can both pass `readApprovedCycleForCreate` (two tabs at the halt,
+ * a replayed action) and both insert a post per brief: `withCredits` dedupes the
+ * CHARGE on the object ref but still RUNS the wrapped insert, so the loser's post
+ * is an orphan the kill switch cannot reach. This atomic UPDATE lets one win.
+ *
+ * A 15-minute lease, not a permanent flag: a run that crashed mid-create leaves
+ * create_started_at set, and without the lease the week could never be resumed.
+ * The stale sweep is the longer backstop; this lets a person's Resume re-claim
+ * once the dead run is clearly gone.
+ *
+ * Graceful until the migration lands: 20260906201200 adds the column, and
+ * migrations here are applied by hand. A statement naming a missing column
+ * raises 42703 — the same fallback `setCycleStatus` uses — and returns true so
+ * the stage proceeds exactly as before the column existed.
+ */
+export async function claimCreateStage(cycleId: string, workspaceId: string): Promise<boolean> {
+  try {
+    const r = await getPool().query(
+      `update loop_cycles set create_started_at = now()
+       where id = $1 and workspace_id = $2
+         and (create_started_at is null or create_started_at < now() - interval '15 minutes')
+       returning id`,
+      [cycleId, workspaceId],
+    )
+    return (r.rowCount ?? 0) > 0
+  } catch (error) {
+    if (!isMissingColumn(error)) throw error
+    return true
+  }
+}
+
+/**
  * Record what the create stage did with one brief.
  *
  * ── `post_id is null` IS THE IDEMPOTENCY BOUNDARY ────────────────────────────
