@@ -172,3 +172,9 @@ Smoke run 34008428577 on `08a15f97` was dispatched to measure the trunk against 
 Also this session: **Q-06's wallet half** (`f7b9bd5b`, top-up orders idempotent, 4/5 mutants red), the audit doc's table now carries the closing SHA for 22 of 24 findings (`de4923e5`), and run 34015935570 was dispatched on `8c3c76c3` to watch the probe fire on CI.
 
 **Not done:** negative-ADJUST guard (applyReversal relies on the raw constraint); Q-09 unmeasured; Q-19 founder. **Decisions owed:** reset the staging DB password and update the secret; the ADJUST guard; production Clerk keys; the /analytics accent ceiling.
+
+## Session 6, close (14:15 IST): the smoke leg passes
+
+**122 of 122, 0 skipped, run 34021699957 on `973c6534`.** The founder reset the staging password at 11:58; the probe went green on the next dispatch. From there: 116 (rail contrast, palette ring, phone floor, a templates step), then 120 (switcher back on the phone inside 360px, "Usage" in ink), then 122. Two rulings were delegated and made from measurements: the /analytics ceilings re-measured with the guard's own helper (one fill, seven small regions the page gained on purpose), and the negative-ADJUST guard left alone because `applyReversal` retries on the raw constraint. Q-19 (production Clerk) was answered in the session: where the keys go, and why pasting them now would orphan 35 workspaces keyed to 34 development-instance ids across 35 columns; a migration lane if wanted.
+
+Also: `~/.claude/hooks/alert.sh` on the global `Notification` and `Stop` hooks (two one-second chimes plus a popup), per the founder.
