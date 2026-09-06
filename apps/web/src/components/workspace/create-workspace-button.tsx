@@ -2,7 +2,6 @@
 
 import { useActionState, useEffect } from 'react'
 import { Plus } from 'lucide-react'
-import { toast } from 'sonner'
 
 import { createWorkspace } from '@/app/actions/workspace'
 import { cn } from '@/lib/utils'
@@ -73,8 +72,14 @@ export function CreateWorkspaceButton({
 
   useEffect(() => {
     if (!state) return
-    // Success redirects into onboarding, so only failures ever land here.
-    toast(state.message)
+    // Success redirects into onboarding, so only failures ever land here. The
+    // toast library is fetched on that failure and not before: a static import
+    // put its 34 kB on the chunk list of every page that offers this button
+    // (/home first-run, /brain, /planner, /posts/[id] …), and the js-budget
+    // guard refused a /home build over it. The layout's Toaster has already
+    // loaded the module by then, so the import resolves without a request.
+    const message = state.message
+    void import('sonner').then(({ toast }) => toast(message))
   }, [state])
 
   return (
