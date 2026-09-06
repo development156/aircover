@@ -14,6 +14,7 @@ import type { ThemeTokens } from '@sahoda/shared'
 import { readBrain, type BrainRead } from '@/lib/brand/read-brain'
 import { readBalance, type BalanceRead } from '@/lib/wallet/read'
 import {
+  currentUserId,
   getActiveWorkspaceSlug,
   readWorkspaces,
   resolveActiveWorkspace,
@@ -58,7 +59,7 @@ export async function Topbar() {
   // Promise.all: `Promise.all` rejects the moment ANY input rejects, so a single
   // failing read would throw away the two that succeeded and blank the whole
   // topbar over one bad row.
-  const [workspacesRead, activeSlug, balance, brain] = await Promise.all([
+  const [workspacesRead, activeSlug, balance, brain, userId] = await Promise.all([
     // The three-way read, not the lossy `listWorkspaces`. An empty array here
     // used to mean two different things — "this account has none" and "we could
     // not look" — and the switcher rendered "Create workspace" for both, telling
@@ -76,9 +77,12 @@ export async function Topbar() {
     // as unconfirmed. `readBrain` already catches internally — this wrapper is
     // the SHELL's guarantee, not a restatement of that module's internals.
     softRead<BrainRead>('brand_brain', readBrain, { status: 'unreadable' }),
+    // So the switcher names the same workspace the page renders: the no-cookie
+    // fallback prefers the one this user created (lib/workspaces.ts).
+    softRead<string | null>('current_user', currentUserId, null),
   ])
   const workspaces = workspacesRead.status === 'ok' ? workspacesRead.workspaces : []
-  const active = resolveActiveWorkspace(workspaces, activeSlug)
+  const active = resolveActiveWorkspace(workspaces, activeSlug, userId)
 
   /**
    * THE BRAND MARK'S TWO INPUTS, together, and only once the workspace is known.

@@ -7,7 +7,12 @@ import * as Sentry from '@sentry/nextjs'
 import { NotYet, Unreadable } from '@/components/design-system/absence-row'
 import { getWorkspaceRole } from '@/lib/workspace-role'
 import { readBalance, type BalanceRead } from '@/lib/wallet/read'
-import { getActiveWorkspaceSlug, listWorkspaces, resolveActiveWorkspace } from '@/lib/workspaces'
+import {
+  currentUserId,
+  getActiveWorkspaceSlug,
+  listWorkspaces,
+  resolveActiveWorkspace,
+} from '@/lib/workspaces'
 
 /**
  * The rail's docked bottom block (reference `.side__foot`).
@@ -125,7 +130,7 @@ function CreditsFootRow() {
 }
 
 export async function RailFoot() {
-  const [user, workspacesRead, activeSlug, balance] = await Promise.all([
+  const [user, workspacesRead, activeSlug, balance, userId] = await Promise.all([
     soft('clerk_user', currentUser, null),
     /**
      * Read with its failure VISIBLE, not swallowed.
@@ -147,11 +152,12 @@ export async function RailFoot() {
     })(),
     soft('active_workspace_slug', getActiveWorkspaceSlug, null as string | null),
     soft<BalanceRead>('available_credits', readBalance, { status: 'unreadable' }),
+    soft('current_user', currentUserId, null as string | null),
   ])
   const workspaces = workspacesRead.value
 
   const credits = creditsText(balance)
-  const active = resolveActiveWorkspace(workspaces, activeSlug)
+  const active = resolveActiveWorkspace(workspaces, activeSlug, userId)
   /**
    * True only when we positively know there is no workspace: the read SUCCEEDED
    * and returned nothing. A failed read stays `Unreadable`, which is the honest
