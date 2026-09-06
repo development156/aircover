@@ -156,42 +156,67 @@ export function ConversationList({
             {shown.map((conversation) => {
               const who = nameOf(conversation)
               const count = conversation.unreadCount ?? 0
+              /* ── A THREAD NOBODY CAN OPEN IS NOT A LINK ─────────────────
+                 A stored thread carries no account; `lib/inbox/conversations.ts`
+                 resolves one through this workspace's connections and leaves it
+                 EMPTY when no connected account on that channel can say.
+                 MEASURED 2026-09-06 (wt-core preview): this row rendered
+                 `/inbox/threads//qa-thread-1` and the click landed on "This
+                 page isn't here". The message is real; the door is not. */
+              const canOpen = conversation.accountId !== ''
+              const rowClass =
+                'flex items-start gap-[10px] border-b border-line-soft px-3 py-3 last:border-b-0'
+              const body = (
+                <>
+                  <span
+                    aria-hidden
+                    className="grid size-8 shrink-0 place-items-center rounded-pill bg-ink text-[11px] font-bold text-white dark:bg-white dark:text-[var(--canvas)]"
+                  >
+                    {initialsOf(who)}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-baseline gap-2">
+                      <span className="min-w-0 flex-1 truncate text-[13px] font-[650] text-ink">
+                        {who}
+                      </span>
+                    </span>
+                    <span className="mt-[2px] flex items-center gap-2">
+                      <span className="shrink-0 text-[11px] text-muted">
+                        {platformLabel(conversation.platform)}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-[12px] text-muted">
+                        {conversation.lastMessage ?? 'No message text'}
+                      </span>
+                      {count > 0 ? (
+                        <span className="grid h-[18px] min-w-[18px] shrink-0 place-items-center rounded-pill bg-brand px-[5px] text-[11px] font-bold text-primary-foreground tabular-nums">
+                          {count}
+                        </span>
+                      ) : null}
+                    </span>
+                    {canOpen ? null : (
+                      <span className="mt-1 block type-meta text-muted">
+                        No connected {platformLabel(conversation.platform)} account can open this.
+                        Reconnect it to read and reply.
+                      </span>
+                    )}
+                  </span>
+                </>
+              )
               return (
                 <li key={`${conversation.accountId}:${conversation.id}`}>
-                  <Link
-                    href={threadHref({
-                      accountId: conversation.accountId,
-                      conversationId: conversation.id,
-                    })}
-                    className="flex items-start gap-[10px] border-b border-line-soft px-3 py-3 transition-micro last:border-b-0 hover:bg-s2"
-                  >
-                    <span
-                      aria-hidden
-                      className="grid size-8 shrink-0 place-items-center rounded-pill bg-ink text-[11px] font-bold text-white dark:bg-white dark:text-[var(--canvas)]"
+                  {canOpen ? (
+                    <Link
+                      href={threadHref({
+                        accountId: conversation.accountId,
+                        conversationId: conversation.id,
+                      })}
+                      className={cn(rowClass, 'transition-micro hover:bg-s2')}
                     >
-                      {initialsOf(who)}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-baseline gap-2">
-                        <span className="min-w-0 flex-1 truncate text-[13px] font-[650] text-ink">
-                          {who}
-                        </span>
-                      </span>
-                      <span className="mt-[2px] flex items-center gap-2">
-                        <span className="shrink-0 text-[11px] text-muted">
-                          {platformLabel(conversation.platform)}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate text-[12px] text-muted">
-                          {conversation.lastMessage ?? 'No message text'}
-                        </span>
-                        {count > 0 ? (
-                          <span className="grid h-[18px] min-w-[18px] shrink-0 place-items-center rounded-pill bg-brand px-[5px] text-[11px] font-bold text-primary-foreground tabular-nums">
-                            {count}
-                          </span>
-                        ) : null}
-                      </span>
-                    </span>
-                  </Link>
+                      {body}
+                    </Link>
+                  ) : (
+                    <div className={rowClass}>{body}</div>
+                  )}
                 </li>
               )
             })}
