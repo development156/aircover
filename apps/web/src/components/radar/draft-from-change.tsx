@@ -91,7 +91,7 @@ export function DraftFromChange({ changeId, competitorName, channels }: DraftFro
   }
 
   return (
-    <div className="flex flex-col gap-2 border-t border-[var(--hairline)] pt-3">
+    <div className="flex flex-col gap-2 border-t border-line pt-3">
       <p className="type-sm text-muted">
         Writes a draft grounded in your Brand Brain and adapts it for{' '}
         {channels.map((c) => CHANNEL_LABELS[c]).join(' · ')}. It stays a draft until you approve it

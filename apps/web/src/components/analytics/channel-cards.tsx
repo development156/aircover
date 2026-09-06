@@ -73,7 +73,7 @@ export function ChannelCards({
                 Furthest:{' '}
                 <Link
                   href={`/posts/${rollup.best.postId}`}
-                  className="text-body transition-micro hover:text-accent"
+                  className="text-ink-body transition-micro hover:text-accent"
                 >
                   {rollup.best.title}
                 </Link>
@@ -111,7 +111,7 @@ function comparison(
   const runnerName = CHANNEL_LABELS[runnerUp.channel] ?? runnerUp.channel
 
   return (
-    <p className="max-w-[62ch] type-sm text-body">
+    <p className="max-w-[62ch] type-sm text-ink-body">
       {leaderName} reached {multiple.toFixed(1).replace(/\.0$/, '')} times as many people as{' '}
       {runnerName} in this period
       {ageDays === null ? '' : `, comparing every post ${ageDays} days after it went out`}.

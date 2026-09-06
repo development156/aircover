@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
-import { AtAGlanceCard, CreditsCard } from './insights'
+import { AtAGlanceCard, CreditsCard, InsightPromiseCard } from './insights'
 import { ReportModule } from './module'
 import { Coins } from 'lucide-react'
 import type { BalanceRead } from '@/lib/wallet/read'
@@ -175,5 +175,54 @@ describe('the report module', () => {
      */
     const tinted = container.querySelector('.bg-tint-100')!
     expect(tinted.className).toMatch(/dark:bg-s2/)
+  })
+})
+
+describe('the three animations the founder allowed, and no fourth', () => {
+  it('rolls a numeric figure and leaves a text one alone', () => {
+    /**
+     * THE MUTATION THIS EXISTS FOR: `CountUp` wrapped around every figure. A
+     * figure on this card may be a STRING — a label, not a quantity — and
+     * rolling a label is nonsense. `CountUp` also takes `value: number` and
+     * would coerce.
+     */
+    const { container, unmount } = render(
+      <AtAGlanceCard figures={[{ label: 'Posts measured', value: 7 }]} note="n" />,
+    )
+    expect(container.querySelector('[data-countup]')).not.toBeNull()
+    unmount()
+
+    /**
+     * WRITTEN THE WEAK WAY FIRST AND THE MUTATION SURVIVED. The first version
+     * asserted only that "Tuesday" appears — and it does either way, because
+     * `CountUp` initialises to the answer, so a wrapped label renders exactly
+     * like an unwrapped one until it tries to animate. This asserts the WRAPPER
+     * instead, which is the thing that actually differs.
+     */
+    const text = render(
+      <AtAGlanceCard figures={[{ label: 'Best day', value: 'Tuesday' }]} note="n" />,
+    )
+    expect(screen.getByText('Tuesday')).toBeTruthy()
+    expect(text.container.querySelector('[data-countup]')).toBeNull()
+  })
+
+  it('lands on the real figure, so no-JavaScript and reduced-motion both read it', () => {
+    // `CountUp` initialises to the ANSWER. A reader who never runs the
+    // animation must never see a zero that was never true — which is the same
+    // rule as every other figure on this page.
+    render(<CreditsCard balance={OK} spent={0} budget={null} />)
+    expect(screen.getByText('448')).toBeTruthy()
+  })
+
+  it('keeps the drifting mark away from assistive tech', () => {
+    /**
+     * THE MUTATION THIS EXISTS FOR: the drift moved onto something that carries
+     * meaning. docs/37 §12 allows `transform` and `opacity` only, and an
+     * animation on a value is a value that is moving while you read it.
+     */
+    const { container } = render(<InsightPromiseCard />)
+    const drifting = container.querySelectorAll('.sl-drift')
+    expect(drifting).toHaveLength(1)
+    expect(drifting[0]!.getAttribute('aria-hidden')).toBe('true')
   })
 })

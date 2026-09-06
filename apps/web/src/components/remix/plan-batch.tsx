@@ -115,7 +115,7 @@ export function PlanBatch({ posts }: PlanBatchProps) {
                     checked={kinds.has(spec.kind)}
                     onChange={() => toggleKind(spec.kind)}
                     disabled={pending}
-                    className="mt-icon-nudge size-4 shrink-0 accent-[var(--accent)]"
+                    className="mt-icon-nudge size-4 shrink-0 accent-[var(--acc)]"
                   />
                   <span className="min-w-0 flex-1">
                     <span className="type-h3 block text-ink">{spec.label}</span>
@@ -144,7 +144,7 @@ export function PlanBatch({ posts }: PlanBatchProps) {
                 checked={channels.has(channel)}
                 onChange={() => toggleChannel(channel)}
                 disabled={pending}
-                className="size-4 accent-[var(--accent)]"
+                className="size-4 accent-[var(--acc)]"
               />
               <span className="type-body text-ink">{channel}</span>
             </label>

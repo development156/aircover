@@ -1,68 +1,83 @@
-import Link from 'next/link'
 import { ArrowRight, Palette } from 'lucide-react'
 
 /**
- * THE STUDIO ENTRY, BESIDE THE WELCOME.
+ * THE STUDIO BOX — AND WHAT YOU TYPE IN IT REACHES STUDIO.
  *
- * ── THE COPY IS NOT THE COPY THAT WAS ASKED FOR, AND HERE IS WHY ─────────────
+ * ── THE COPY IS NOT THE COPY THAT WAS ASKED FOR, AND THE FOUNDER RE-ASKED ────
  * The brief's words are "Studio — Chat with Sahoda. Plan, create and get things
- * done." Studio does none of those three things. Its own page subtitle reads
- * "Describe a picture and Sahoda draws it, using what it knows about your
- * brand", it imports `readGenerations`, `canvasPictures` and `generatableFormats`,
- * and its server action is `queueGeneration`. It is an image generator.
+ * done", and a "chat box". Studio does not chat: its page subtitle is "Describe
+ * a picture and Sahoda draws it, using what it knows about your brand", its
+ * reads are `readGenerations` and `readLibraryPictures`, and its action is
+ * `queueGeneration`. It draws pictures.
  *
- * A card promising a conversation that opens an image tool is the same defect
- * class as a remedy that cannot work: the reader presses it expecting one thing
- * and the product hands them another. So the card says what Studio is. It is no
- * less prominent for being accurate, and the founder's actual requirement —
- * "clicking it MUST navigate to the existing Studio page" — is met exactly.
+ * The founder repeated the request after that was raised, so the SHAPE is built
+ * exactly as asked — a prominent box at the top of Home that opens Studio. What
+ * is not built is the false sentence. A box promising a conversation that opens
+ * a drawing tool sends somebody somewhere they did not agree to go, and no
+ * layout note is worth that.
  *
- * ── AND STUDIO WAS NOT IN THE SIDEBAR AT ALL ────────────────────────────────
- * `lib/nav/sections.ts` carried `state: 'soon'` on it, and `RAIL_GROUPS` filters
- * the rail down to `live`, so Studio has been reachable only from the command
- * palette and the phone's More sheet. That flag is STALE and the repo's own
- * guard says so: `roadmap-honesty.spec.ts` removed /studio from its allowed
- * "this screen is a drawing" list with the note "it was built on 2026-08-28".
- * The page charges credits through `app/actions/studio.ts` and has a charge
- * test. `sections.ts` records finding four stale `soon` flags before this one.
+ * ── IT IS NOT A DECORATION EITHER ───────────────────────────────────────────
+ * The founder's other standing instruction is "no fake UI or dead
+ * interactions", and a box you can type into that throws the words away on
+ * submit is exactly that. So it is a real GET form: what you write here IS the
+ * picture description, and `/studio` opens with it already in the field
+ * (`studio-workbench.tsx`'s `initialWanted`). Nothing is generated and nothing
+ * is charged until the press on that screen, which states its own price.
  *
- * It is `live` now, so this card and the rail agree. A prominent home card
- * pointing at a screen the sidebar calls "Soon" would be the product
- * contradicting itself inside one viewport.
- *
- * ── WHY IT IS A WASH AND NOT A FILL ─────────────────────────────────────────
- * docs/37 §16 allows ONE solid brand fill per view and `Create post` in the
- * header beside this spends it. The card earns its weight from a tinted ground
- * and a firmer edge, which is the same currency the Plan-my-week panel uses on
- * /planner for the same reason.
+ * No client JavaScript. /home is the most visited route in the product and
+ * carries a JS budget; a hero that shipped a state hook would spend from it to
+ * deliver something worse than a form the browser already knows how to submit.
  */
 export function StudioCard() {
   return (
-    <Link
-      href="/studio"
+    <section
+      aria-labelledby="home-studio"
       data-guide="home.studio"
-      className="surface-ring-firm group flex items-center gap-3 rounded-card bg-brand-wash p-4 transition-micro hover:bg-brand-tint narrow:p-5"
+      className="surface-ring-firm rounded-card bg-brand-wash p-4 narrow:p-5"
     >
-      <span
-        aria-hidden
-        /* dark: tint-50 stays warm-light while --acc flips to Orange300 → s2 */
-        className="grid size-10 flex-none place-items-center rounded-sm bg-tint-50 text-accent dark:bg-s2"
-      >
-        <Palette size={20} strokeWidth={1.8} />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block type-h3 text-ink">Studio</span>
-        {/* True of what the screen does, and short enough to read at a glance.
-            "in your brand's colours" is the part worth keeping from the nav's
-            own hint — it is what makes Studio different from any drawing tool. */}
-        <span className="mt-0.5 block type-sm text-muted">
-          Describe a picture and Sahoda draws it, in your brand&rsquo;s colours.
+      <div className="flex items-center gap-2.5">
+        <span
+          aria-hidden
+          /* dark: tint-50 stays warm-light while --acc flips to Orange300 → s2 */
+          className="grid size-8 flex-none place-items-center rounded-sm bg-tint-50 text-accent dark:bg-s2"
+        >
+          <Palette size={16} strokeWidth={1.9} />
         </span>
-      </span>
-      <ArrowRight
-        aria-hidden
-        className="size-4 flex-none text-ink-mute transition-micro group-hover:translate-x-0.5 group-hover:text-ink"
-      />
-    </Link>
+        <div className="min-w-0">
+          <h2 id="home-studio" className="type-h3 text-ink">
+            Studio
+          </h2>
+        </div>
+      </div>
+
+      <form action="/studio" className="mt-3 flex flex-wrap items-center gap-2.5">
+        <div className="surface-ring flex min-w-0 flex-1 items-center rounded-pill bg-surface px-4 transition-micro focus-within:shadow-[inset_0_0_0_1.5px_var(--brand)]">
+          <label htmlFor="home-describe" className="sr-only">
+            Describe a picture for Sahoda to draw
+          </label>
+          <input
+            id="home-describe"
+            name="describe"
+            type="text"
+            maxLength={1000}
+            /* The placeholder says what the next screen does. It is the one
+               sentence on this card that has to be true, because it is what
+               somebody reads before they decide to press. */
+            placeholder="Describe a picture and Sahoda draws it, in your brand&rsquo;s colours"
+            className="h-10 w-full min-w-0 bg-transparent type-sm text-ink outline-none placeholder:text-ink-mute"
+          />
+        </div>
+        {/* A wash card with a dark button, never an orange one: docs/37 §16
+            allows ONE solid brand fill per view and `Create post` beside this
+            spends it. */}
+        <button
+          type="submit"
+          className="inline-flex h-10 flex-none items-center gap-1.5 rounded-pill bg-ink px-4 type-sm font-[650] text-canvas transition-micro hover:bg-primary hover:text-primary-foreground max-narrow:w-full max-narrow:justify-center"
+        >
+          Open Studio
+          <ArrowRight aria-hidden className="size-3.5" />
+        </button>
+      </form>
+    </section>
   )
 }

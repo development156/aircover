@@ -140,7 +140,7 @@ export function WorkedBlock({
  */
 export function ChangedBlock({ changed }: { changed: readonly string[] }) {
   return (
-    <section className="rounded-card bg-accent-subtle p-4 ring-1 ring-[var(--accent)]">
+    <section className="rounded-card bg-brand-wash p-4 ring-1 ring-[var(--brand-lift)]">
       <h3 className="type-h3 text-ink">{REPORT.changed.title}</h3>
       {changed.length === 0 ? (
         <p className="type-body mt-1 max-w-[62ch] text-muted">{REPORT.changed.nothing}</p>
@@ -177,7 +177,7 @@ export function PlanBlock({ plan }: { plan: readonly PlanRow[] }) {
       ) : (
         <ul className="mt-2 grid gap-2">
           {plan.map((row) => (
-            <li key={row.id} className="rounded-input bg-subtle p-3">
+            <li key={row.id} className="rounded-input bg-surface-2 p-3">
               <p className="type-body text-ink">{row.title}</p>
               <p className="type-sm mt-1 text-muted">
                 {[row.when, row.channels.join(', '), REPORT.plan.status[row.status]]

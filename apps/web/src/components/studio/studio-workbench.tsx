@@ -111,8 +111,15 @@ export function StudioWorkbench({
   pictures,
   signals,
   balance,
+  initialWanted = '',
 }: {
   formats: StudioFormat[]
+  /**
+   * What the reader typed on /home, handed over in the URL so the box they
+   * pressed on is the box their words end up in. Read once as the field's
+   * opening value; typing here always wins over the seed.
+   */
+  initialWanted?: string
   /**
    * Pictures already in this workspace, offered as things to match, or which
    * of two reasons there are none. A failed read is not an empty library.
@@ -140,7 +147,7 @@ export function StudioWorkbench({
   balance: number | null
 }) {
   const router = useRouter()
-  const [wanted, setWanted] = useState('')
+  const [wanted, setWanted] = useState(initialWanted)
   const [mode, setMode] = useState<GenerationMode>('on_brand')
   const [formatId, setFormatId] = useState(formats[0]?.id ?? '')
   const [picked, setPicked] = useState<string[]>([])

@@ -50,7 +50,7 @@ export function WeekCard({ week }: { week: WeekReport }) {
       <div
         className={`surface-ring rounded-card p-5 ${verdict.found ? 'bg-tint-50 dark:bg-s2' : 'bg-surface'}`}
       >
-        <p className={`max-w-[46ch] type-h2 ${verdict.found ? 'text-ink' : 'text-body'}`}>
+        <p className={`max-w-[46ch] type-h2 ${verdict.found ? 'text-ink' : 'text-ink-body'}`}>
           {verdict.headline}
         </p>
         <p className="mt-2 max-w-[62ch] type-sm text-muted">{verdict.detail}</p>

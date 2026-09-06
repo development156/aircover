@@ -149,7 +149,7 @@ export function CostPreview({ cycleId, briefs, budgetCredits }: CostPreviewProps
                   checked={on}
                   onChange={() => toggle(brief.id)}
                   disabled={pending}
-                  className="mt-icon-nudge size-4 shrink-0 accent-[var(--accent)]"
+                  className="mt-icon-nudge size-4 shrink-0 accent-[var(--acc)]"
                 />
                 <span className="min-w-0 flex-1">
                   <span className="type-h3 block text-ink">{brief.title}</span>
@@ -167,7 +167,7 @@ export function CostPreview({ cycleId, briefs, budgetCredits }: CostPreviewProps
         })}
       </ul>
 
-      <dl className="mt-4 grid gap-1 border-t border-[var(--hairline)] pt-3">
+      <dl className="mt-4 grid gap-1 border-t border-line pt-3">
         <div className="flex justify-between gap-4">
           <dt className="type-body text-muted">
             {included.length} {included.length === 1 ? 'post' : 'posts'} to write
@@ -178,7 +178,7 @@ export function CostPreview({ cycleId, briefs, budgetCredits }: CostPreviewProps
           <dt className="type-body text-muted">Planning this week, already charged</dt>
           <dd className="type-body num text-muted">{preview.orchestrationCredits} cr</dd>
         </div>
-        <div className="flex justify-between gap-4 border-t border-[var(--hairline)] pt-2">
+        <div className="flex justify-between gap-4 border-t border-line pt-2">
           <dt className="type-h3 text-ink">The week, in total</dt>
           <dd className="type-h3 num text-ink">{preview.totalCredits} cr</dd>
         </div>

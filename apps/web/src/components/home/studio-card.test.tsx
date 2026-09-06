@@ -19,8 +19,28 @@ import { RAIL_GROUPS, ALL_SECTIONS } from '@/lib/nav/sections'
  */
 describe('the Studio entry', () => {
   it('opens the Studio page', () => {
+    const { container } = render(<StudioCard />)
+    const form = container.querySelector('form')
+    expect(form?.getAttribute('action')).toBe('/studio')
+    // A GET form, so the result is a shareable URL and the route reads the
+    // description off the query string. `method` unset IS get.
+    expect(form?.getAttribute('method')).toBeNull()
+  })
+
+  it('carries what was typed, so the box is not a decoration', () => {
+    /**
+     * THE MUTATION THIS EXISTS FOR: the field losing its `name`, or the form
+     * losing its action — either turns a box you can type into on the busiest
+     * screen in the product into one that throws the words away on submit. The
+     * founder's standing instruction is "no fake UI or dead interactions", and
+     * that is what this pins.
+     *
+     * `describe` is the parameter `app/(app)/studio/page.tsx` reads into the
+     * workbench's opening value.
+     */
     render(<StudioCard />)
-    expect(screen.getByRole('link').getAttribute('href')).toBe('/studio')
+    const field = screen.getByLabelText(/describe a picture/i)
+    expect(field.getAttribute('name')).toBe('describe')
   })
 
   it('describes what Studio does, not a chat it does not have', () => {
@@ -33,9 +53,9 @@ describe('the Studio entry', () => {
      * the same defect as a remedy that cannot work.
      */
     const { container } = render(<StudioCard />)
-    const text = container.textContent ?? ''
-    expect(text).toMatch(/draws it/i)
-    expect(text).not.toMatch(/chat/i)
+    const field = screen.getByLabelText(/describe a picture/i) as HTMLInputElement
+    expect(field.placeholder).toMatch(/draws it/i)
+    expect((container.textContent ?? '') + field.placeholder).not.toMatch(/chat/i)
   })
 
   it('spends no brand fill, so the header keeps the screen`s one primary', () => {

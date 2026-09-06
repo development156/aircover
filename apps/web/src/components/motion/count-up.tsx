@@ -106,7 +106,11 @@ export function CountUp({
   return (
     // `.num` is not decoration here: without tabular figures the digits change
     // width on every frame and the number visibly jitters as it counts.
-    <span ref={ref} className={cn('num', className)}>
+    /* `data-countup` exists so a guard can tell a rolled figure from a printed
+       one. A test that matched on the rendered text could not: the component
+       lands on the answer, so a rolled 448 and a printed 448 read identically
+       once it has finished. */
+    <span ref={ref} data-countup className={cn('num', className)}>
       {write(shown)}
     </span>
   )

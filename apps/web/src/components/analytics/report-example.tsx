@@ -94,7 +94,7 @@ export function ReportExample({
           data-testid="report-example"
         >
           <div className="surface-ring rounded-card bg-surface p-5">
-            <p className="max-w-[46ch] type-h2 text-body">
+            <p className="max-w-[46ch] type-h2 text-ink-body">
               Your Tuesday posts reach more people than your Friday ones.
             </p>
             <p className="mt-2 max-w-[62ch] type-sm text-muted">
@@ -122,7 +122,7 @@ export function ReportExample({
           </div>
 
           <div className="surface-ring rounded-card bg-surface p-5">
-            <h4 className="type-h3 text-body">What Sahoda changed because of this</h4>
+            <h4 className="type-h3 text-ink-body">What Sahoda changed because of this</h4>
             <ul className="mt-3 space-y-2 type-sm text-muted">
               <li>Moved next week&rsquo;s posts to Tuesday and Thursday mornings.</li>
               <li>Wrote two more posts in the format that reached the most people.</li>
@@ -143,7 +143,7 @@ function ExampleTile({ label, value, note }: { label: string; value: string; not
   return (
     <div className="surface-ring rounded-card bg-surface p-5">
       <p className="type-meta text-muted">{label}</p>
-      <p className="mt-1 type-h3 tabular-nums text-body">{value}</p>
+      <p className="mt-1 type-h3 tabular-nums text-ink-body">{value}</p>
       <p className="mt-1 type-meta text-muted">{note}</p>
     </div>
   )

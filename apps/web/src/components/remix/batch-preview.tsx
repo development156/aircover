@@ -157,7 +157,7 @@ export function BatchPreview({ batch }: BatchPreviewProps) {
                       checked={!excluded.has(derivative.id)}
                       onChange={() => toggle(derivative.id)}
                       disabled={pending}
-                      className="size-4 accent-[var(--accent)]"
+                      className="size-4 accent-[var(--acc)]"
                     />
                     <span className="type-sm text-ink">{derivative.channel}</span>
                     <span className="type-sm text-muted">{derivative.format}</span>
@@ -175,7 +175,7 @@ export function BatchPreview({ batch }: BatchPreviewProps) {
         })}
       </ul>
 
-      <dl className="mt-4 grid gap-1 border-t border-[var(--hairline)] pt-3">
+      <dl className="mt-4 grid gap-1 border-t border-line pt-3">
         <div className="flex justify-between gap-4">
           <dt className="type-body text-muted">
             {cost.includedCount} {cost.includedCount === 1 ? 'draft' : 'drafts'} to write
@@ -186,7 +186,7 @@ export function BatchPreview({ batch }: BatchPreviewProps) {
           <dt className="type-body text-muted">The remix pack, charged when it runs</dt>
           <dd className="type-body num text-muted">{cost.batchCredits} cr</dd>
         </div>
-        <div className="flex justify-between gap-4 border-t border-[var(--hairline)] pt-2">
+        <div className="flex justify-between gap-4 border-t border-line pt-2">
           <dt className="type-h3 text-ink">In total</dt>
           <dd className="type-h3 num text-ink">{cost.totalCredits} cr</dd>
         </div>

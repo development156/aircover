@@ -904,6 +904,35 @@
   animation: radar-breathe 4s ease-in-out infinite;
 }
 
+/**
+ * A SLOW DRIFT FOR ONE DECORATIVE MARK.
+ *
+ * Founder's ruling 2026-09-06: the CMO Report may carry three animations, which
+ * is an exception to docs/37 §12's "one entrance keyframe for the whole
+ * product". Two of the three are the existing `CountUp`; this is the third.
+ *
+ * `transform` only. §12 forbids animating width, height, top or left, and this
+ * touches none of them — so it never reflows and never costs a layout pass. It
+ * is `aria-hidden` at the call site and nothing on the page is knowable from it.
+ *
+ * `tokens.css`'s `prefers-reduced-motion: reduce` block clamps every animation
+ * in the product to 0.01ms with one iteration, so this stops for anybody who
+ * asked for that without needing a rule of its own.
+ */
+@keyframes sl-drift {
+  from,
+  to {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+.sl-drift {
+  animation: sl-drift 3.2s var(--ease) infinite;
+}
+
 @keyframes radar-turn {
   from {
     transform: rotate(0deg);
