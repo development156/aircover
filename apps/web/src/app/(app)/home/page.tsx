@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { auth } from '@clerk/nextjs/server'
+import { auth, currentUser } from '@clerk/nextjs/server'
 import { creditCost } from '@sahoda/shared'
 
 import { PlanOfferMount } from '@/components/billing/plan-offer-mount'
@@ -18,7 +18,8 @@ import { countIndexedDocuments } from '@/lib/knowledge/store'
 import { InstagramInsights } from '@/components/home/instagram-insights'
 import { PerformanceStrip } from '@/components/analytics/performance-strip'
 import { SahodaRail } from '@/components/home/sahoda-rail'
-import { StartHere } from '@/components/home/start-here'
+import { CommandBar } from '@/components/home/command-bar'
+import { ContinueWorking } from '@/components/home/continue-working'
 import { WeekStrip } from '@/components/home/week-strip'
 import { StaggerItem } from '@/components/motion/stagger'
 import { ActivityFeed } from '@/components/home/activity-feed'
@@ -165,6 +166,7 @@ export default async function HomePage() {
     knowledgeDocuments,
     subscription,
     session,
+    signedInUser,
   ] = await Promise.all([
     /**
      * IN THE BATCH, NOT IN FRONT OF IT.
@@ -220,6 +222,13 @@ export default async function HomePage() {
      * accounts on their way into onboarding one throwaway call.
      */
     auth(),
+    /**
+     * Who is signed in, for the heading. In the SAME batch as the other reads —
+     * `read-waterfall.test.ts` counts sequential awaits per route, and a lone
+     * `await currentUser()` for one string would cost a round trip on the most
+     * visited screen in the product.
+     */
+    currentUser(),
   ])
 
   // THE RULING, ACTED ON. Everything above was read in parallel with the
@@ -297,6 +306,19 @@ export default async function HomePage() {
    * the strength of a query that failed is a far worse error than one extra
    * scroll past some empty cards.
    */
+  /**
+   * The heading's name, and it falls back to nothing rather than to a guess.
+   * Clerk can return a user with no full name and no username — an account
+   * created by email link is the common case — and "there" or "friend" in that
+   * slot is a name we invented for somebody. `GreetingBanner` renders the
+   * greeting alone when this is null, which is a heading that is true.
+   */
+  const signedInName =
+    signedInUser?.fullName?.trim() ||
+    signedInUser?.username?.trim() ||
+    signedInUser?.firstName?.trim() ||
+    null
+
   const signals: StartedSignals = {
     posts: posts.length,
     // `listConnections` returns null when the read failed, never on an empty table.
@@ -385,7 +407,11 @@ export default async function HomePage() {
       {/* The header. Carries the page's ONE primary action, which this screen
           previously did not have at all: it was a dashboard you could only
           read. No band behind it any more — see the component. */}
-      <GreetingBanner greeting={greetingFor(now)} state={greetingState(counts, publish)} />
+      <GreetingBanner
+        greeting={greetingFor(now)}
+        name={signedInName}
+        state={greetingState(counts, publish)}
+      />
 
       {/* ── FOUR NUMBERS AS ONE BOARD, NOT FOUR BOXES ─────────────────────
           All four are counts of rows this product owns or a ledger balance, so
@@ -401,7 +427,7 @@ export default async function HomePage() {
           second one. See `start-here.tsx` for why it is one row and not the two
           the brief drew. */}
       <StaggerItem i={0}>
-        <StartHere planCost={creditCost('loop_cycle')} />
+        <CommandBar />
       </StaggerItem>
 
       <StaggerItem i={1}>
@@ -423,8 +449,12 @@ export default async function HomePage() {
           brief calls "a section that has not earned its place". With something
           waiting it is the most important thing on the screen, so it stays
           exactly where it is. */}
+      <StaggerItem i={2}>
+        <ContinueWorking planCost={creditCost('loop_cycle')} />
+      </StaggerItem>
+
       {displayPosts.some((post) => needsAPerson(post.intent)) ? (
-        <StaggerItem i={2}>
+        <StaggerItem i={3}>
           <NeedsAttention posts={displayPosts} />
         </StaggerItem>
       ) : null}
@@ -457,10 +487,6 @@ export default async function HomePage() {
               which is the right count for a screen whose job is "what next". */}
           <StaggerItem i={4}>
             <InstagramInsights analytics={instagram} />
-          </StaggerItem>
-
-          <StaggerItem i={5}>
-            <WeekStrip buckets={buckets} variantStates={variantStates} />
           </StaggerItem>
         </div>
 
@@ -514,6 +540,21 @@ export default async function HomePage() {
           </StaggerItem>
         </div>
       </div>
+
+      {/* ── THE WEEK, FULL WIDTH AND LAST ─────────────────────────────────
+          It sat in the left column of the split, where seven days had ~840px
+          and each day card was ~115px wide. The founder's reference runs it
+          across the whole page, and at 1440 that is ~1350px — seven cards of
+          ~190px, which is the difference between a day you can read and a day
+          you can only count.
+
+          LAST, and that is deliberate rather than the reference's order: the
+          questions above it are "what needs me" and "how is it going", and the
+          week is the answer to "what is coming", which nobody opens this screen
+          to ask first. It is the same argument that moved the queue to the top. */}
+      <StaggerItem i={10}>
+        <WeekStrip buckets={buckets} variantStates={variantStates} />
+      </StaggerItem>
 
       {/* Last child, and a closed `<dialog>` is `display: none`, so the
           `space-y-5` above it costs nothing while it is shut. Open, it is in the

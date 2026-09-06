@@ -101,7 +101,14 @@ vi.mock('@/app/actions/posts', () => ({ createPost: vi.fn() }))
  * second is a `'use server'` export that opens a real payment order.
  */
 vi.mock('@/lib/billing/read', () => ({ readSubscription: vi.fn() }))
-vi.mock('@clerk/nextjs/server', () => ({ auth: async () => ({ sessionId: 'sess_test' }) }))
+vi.mock('@clerk/nextjs/server', () => ({
+  auth: async () => ({ sessionId: 'sess_test' }),
+  // The heading reads a name off the signed-in user. `null` is the honest
+  // default for a fixture and it exercises the fallback: Clerk can return a user
+  // with no full name and no username, and the banner must print the greeting
+  // rather than a name it invented.
+  currentUser: async () => null,
+}))
 vi.mock('@/app/actions/wallet', () => ({ startCheckout: vi.fn() }))
 
 const balanceRead = vi.mocked(readBalance)

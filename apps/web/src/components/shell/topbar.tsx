@@ -4,7 +4,6 @@ import * as Sentry from '@sentry/nextjs'
 import { MobileHeaderMark } from '@/components/shell/bottom-nav'
 import { BrainRing } from '@/components/shell/brain-ring'
 import { CommandPalette } from '@/components/shell/command-palette'
-import { CreditChip } from '@/components/shell/credit-chip'
 import { ThemeToggle } from '@/components/shell/theme-toggle'
 import { WorkspaceSwitcher } from '@/components/shell/workspace-switcher'
 import { BrandMark } from '@/components/shell/brand-mark'
@@ -12,7 +11,6 @@ import { readBrandLogo, readBrandLogoDark, type BrandLogo } from '@/lib/brand/lo
 import { activeThemeTokens } from '@/lib/brand/read-theme'
 import type { ThemeTokens } from '@sahoda/shared'
 import { readBrain, type BrainRead } from '@/lib/brand/read-brain'
-import { readBalance, type BalanceRead } from '@/lib/wallet/read'
 import {
   getActiveWorkspaceSlug,
   readWorkspaces,
@@ -58,7 +56,7 @@ export async function Topbar() {
   // Promise.all: `Promise.all` rejects the moment ANY input rejects, so a single
   // failing read would throw away the two that succeeded and blank the whole
   // topbar over one bad row.
-  const [workspacesRead, activeSlug, balance, brain] = await Promise.all([
+  const [workspacesRead, activeSlug, brain] = await Promise.all([
     // The three-way read, not the lossy `listWorkspaces`. An empty array here
     // used to mean two different things — "this account has none" and "we could
     // not look" — and the switcher rendered "Create workspace" for both, telling
@@ -67,10 +65,9 @@ export async function Topbar() {
     // exactly what a read that blew up amounts to, and never an empty account.
     softRead<WorkspacesRead>('workspaces', readWorkspaces, { status: 'unreadable' }),
     softRead<string | null>('active_workspace_slug', getActiveWorkspaceSlug, null),
-    // The same three-way answer /wallet renders, so the chip and the page
-    // cannot disagree. A throw here is `unreadable` — the honest fallback,
-    // since a read that blew up is exactly that, and never a placeholder 0.
-    softRead<BalanceRead>('available_credits', readBalance, { status: 'unreadable' }),
+    // The balance read went with the chip. /wallet reads it for itself, so
+    // nothing here needs it — and this is the hottest query in the product,
+    // running on every route of every page load.
     // Same discipline for the ring: the union /brain renders, and a throw is
     // `unreadable` rather than a 0/15 that would report every confirmed field
     // as unconfirmed. `readBrain` already catches internally — this wrapper is
@@ -174,11 +171,19 @@ export async function Topbar() {
         <CommandPalette />
 
         <div className="flex flex-1 basis-0 items-center justify-end gap-2">
-          {/* Beside the credit chip, and before it: the brain is what Sahoda
-              spends those credits ON, so it reads left-to-right as cause then
-              cost. */}
+          {/* ── THE CREDIT CHIP IS GONE FROM HERE ────────────────────────────
+              Founder's ruling: credits live in the wallet, and the top bar shows
+              none. It sat beside this ring on all 59 routes, which made the
+              balance the most-repeated figure in the product — docs/40 §2.3
+              counted it three times on /home alone.
+
+              WHAT REPLACES IT IS NOTHING, and that is the point. The balance was
+              never how a spend is disclosed: every paid button in this product
+              carries its own price in its label, which is the rule that actually
+              protects the reader. A chip that follows you onto /settings and
+              /inbox is a number with no decision attached to it. /wallet is one
+              click from every screen in the rail. */}
           <BrainRing brain={brain} />
-          <CreditChip balance={balance} />
           {/* The reference's right cluster ends icon, then avatar. The dark
               theme was fully built and completely unreachable until this button
               existed — see ThemeToggle. */}

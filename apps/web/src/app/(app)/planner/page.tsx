@@ -52,6 +52,8 @@ export default async function PlannerPage({
     tab?: string
     date?: string
     q?: string
+    /** A week's goals, handed over by the command bar on /home. */
+    goal?: string
   }>
 }) {
   const {
@@ -60,6 +62,7 @@ export default async function PlannerPage({
     tab: rawTab,
     date: rawDate,
     q: rawQuery,
+    goal: rawGoal,
   } = await searchParams
   // LIST is the default on purpose: approve and reschedule live on list rows,
   // and the seeded approve.first_tour targets `planner.approve` on THIS route —
@@ -462,7 +465,14 @@ export default async function PlannerPage({
 
             The spend panel goes only where there is something to spend from. A
             read hiccup keeps it — the plan may well be there. */}
-        {read.status === 'no-workspace' ? null : <PlanWeekPanel />}
+        {read.status === 'no-workspace' ? null : (
+          /* The goals the reader typed on /home arrive here as the panel's
+             opening value, so the box on the home page is not a promise this
+             screen breaks. Trimmed and capped at the same 500 the field itself
+             enforces: a query string is user input and the ceiling has to hold
+             on the way in, not only on the way through the keyboard. */
+          <PlanWeekPanel initialGoals={(rawGoal ?? '').trim().slice(0, 500)} />
+        )}
 
         <LivePhaseNote />
 

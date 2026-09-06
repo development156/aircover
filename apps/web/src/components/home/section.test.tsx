@@ -103,7 +103,23 @@ describe('the one card language', () => {
 const NO_POSTS: DisplayPost[] = []
 const NO_WEEK = { days: [] } as unknown as WeekBuckets
 
-describe('the four numbers, as one board', () => {
+/**
+ * ── THIS WAS "THE FOUR NUMBERS, AS ONE BOARD", AND THE SHAPE WAS REVERSED ────
+ * The four figures were one card split by hairline seams, and the argument for
+ * it was sound: a divided board says "these belong together", which is right
+ * when a row of figures is one reading.
+ *
+ * The founder's reference draws four separate cards, and on inspection that is
+ * the better fit — each of these four goes to a DIFFERENT screen, so their only
+ * relationship is that all four are true. The seams were claiming a kinship that
+ * was not there, and a pane inside a shared ring cannot carry a hover of its own
+ * without drawing a box inside a box.
+ *
+ * So these tests were rewritten rather than deleted: the old ones pinned a shape
+ * that is deliberately gone, and the claims worth keeping — four destinations,
+ * one ring each, no doubled edges — are pinned below against the new one.
+ */
+describe('the four numbers, as four cards', () => {
   function board() {
     const { container } = render(
       <AtAGlance
@@ -120,34 +136,21 @@ describe('the four numbers, as one board', () => {
     return container.firstElementChild as HTMLElement
   }
 
-  it('draws one edge, not four', () => {
-    const root = board()
-    // One ring, on the container.
-    expect(root.className).toMatch(/surface-ring/)
-    const panes = [...root.children] as HTMLElement[]
-    expect(panes).toHaveLength(4)
+  it('gives each card its own edge, and none of them two', () => {
     /**
-     * THE MUTATION THIS EXISTS FOR: a pane given `surface-ring rounded-card`
-     * back — which is exactly what `variant="cell"` was added to remove, and
-     * exactly what a later reader would restore by dropping the prop, since
-     * `StatCard`'s default is still the free-standing card.
-     *
-     * A ringed pane inside a ringed board draws a box inside a box: two edges
-     * 1px apart, four times over, which is worse than either shape alone.
+     * THE MUTATION THIS EXISTS FOR: `board` put back on the strip, or a ring put
+     * on the container as well as on the cards. Either draws an edge around a
+     * group of edged things — a box inside a box, four times over.
      */
-    for (const pane of panes) {
-      expect(pane.className).not.toMatch(/surface-ring/)
-      expect(pane.className).not.toMatch(/rounded-card/)
-    }
-  })
-
-  it('draws the seams as a gap over a line-coloured ground', () => {
     const root = board()
-    // Not `divide-x`: in a grid that rewraps to two columns, divide puts a rule
-    // on the wrong edge of the wrapped row. A gap cannot get that wrong.
-    expect(root.className).toMatch(/\bgap-px\b/)
-    expect(root.className).toMatch(/\bbg-line-soft\b/)
-    expect(root.className).not.toMatch(/\bdivide-/)
+    expect(root.className).not.toMatch(/surface-ring/)
+    expect(root.className).not.toMatch(/\bbg-line-soft\b/)
+    const cards = [...root.children] as HTMLElement[]
+    expect(cards).toHaveLength(4)
+    for (const card of cards) {
+      expect(card.className).toMatch(/surface-ring/)
+      expect(card.className).toMatch(/rounded-card/)
+    }
   })
 
   it('still lets every number be acted on', () => {

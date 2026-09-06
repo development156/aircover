@@ -80,7 +80,7 @@
   },
   "breakpoint_total": 0,
   "breakpoint": {},
-  "typesize_total": 646,
+  "typesize_total": 643,
   "typesize": {
     "app/(app)/approvals/page.tsx": 2,
     "app/(app)/billing/checkout/[orderId]/page.tsx": 1,
@@ -236,7 +236,7 @@
     "components/shell/credit-chip.tsx": 1,
     "components/shell/more-sheet.tsx": 2,
     "components/shell/nav-item.tsx": 2,
-    "components/shell/rail-foot.tsx": 6,
+    "components/shell/rail-foot.tsx": 3,
     "components/shell/workspace-switcher.tsx": 2,
     "components/sites/generate-site-panel.tsx": 5,
     "components/sites/site-preview.tsx": 3,

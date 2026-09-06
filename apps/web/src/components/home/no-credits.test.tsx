@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { AtAGlance } from './at-a-glance'
-import { StartHere } from './start-here'
+import { ContinueWorking } from './continue-working'
 import type { DisplayPost } from '@/lib/posts/display-post'
 import type { WeekBuckets } from '@/lib/planner/week'
 
@@ -130,7 +130,7 @@ describe('the paid door says what it costs', () => {
      * this product's own rule requires a cost before a spend, so this label is
      * what makes the removal safe rather than careless.
      */
-    const { container, unmount } = render(<StartHere planCost={37} />)
+    const { container, unmount } = render(<ContinueWorking planCost={37} />)
     // The figure and its word are two elements, so the text is read off the
     // node that holds both rather than matched as one string.
     expect(container.textContent?.replace(/\s+/g, ' ')).toContain('37 credits')
@@ -142,15 +142,19 @@ describe('the paid door says what it costs', () => {
      * plural, and it caught this exact line on its first run. Pinned here so the
      * fix cannot be undone without a red test in the same file as the code.
      */
-    render(<StartHere planCost={1} />)
+    render(<ContinueWorking planCost={1} />)
     expect(screen.getByText('1').parentElement?.textContent).toMatch(/1 credit$/)
   })
 
-  it('offers exactly one lead door, so the screen keeps one primary', () => {
-    const { container } = render(<StartHere planCost={20} />)
-    expect(container.querySelectorAll('.bg-brand-wash')).toHaveLength(1)
-    // A wash, never a fill: the Create button above already spends the screen's
-    // one solid brand fill.
+  it('spends no brand fill at all, so the screen keeps one primary', () => {
+    /**
+     * THE MUTATION THIS EXISTS FOR: an orange door. docs/37 §16 allows ONE solid
+     * brand fill per view and the Create button in the header already spends it;
+     * a second here would leave the screen with two primaries and therefore
+     * none. This row earns its weight from edges, not from colour.
+     */
+    const { container } = render(<ContinueWorking planCost={20} />)
     expect(container.querySelector('.bg-brand')).toBeNull()
+    expect(container.querySelector('.bg-brand-wash')).toBeNull()
   })
 })

@@ -51,6 +51,15 @@ import type { AccountAnalytics } from '@/lib/analytics/account-insights'
  * single values, not series". A delta computed from one number is a number
  * nothing measured.
  *
+ * ── FOUR CARDS, NOT ONE DIVIDED BOARD ───────────────────────────────────────
+ * They were one card split by hairline seams, which is the right shape when a
+ * row of figures is ONE reading. The founder's reference draws four separate
+ * cards and it is the better fit here, because these four are not one reading:
+ * each goes to a different screen, and the board's seams said "these belong
+ * together" about four numbers whose only relationship is that they are all
+ * true. Separate cards also give each one a hover of its own, which a pane
+ * inside a shared ring cannot have without drawing a box inside a box.
+ *
  * ── WHY EACH CARD IS A LINK ──────────────────────────────────────────────────
  * A number you cannot act on is a report. Every one of these has exactly one
  * place to go and it is the place that number came from, so the whole card is
@@ -102,9 +111,8 @@ export function AtAGlance({
           : 'We could not read it just now'
 
   return (
-    <StatStrip board>
+    <StatStrip>
       <StatCard
-        variant="cell"
         icon={<Inbox size={15} strokeWidth={1.9} />}
         label="Waiting on you"
         value={waiting}
@@ -113,7 +121,6 @@ export function AtAGlance({
         href="/approvals"
       />
       <StatCard
-        variant="cell"
         icon={<CalendarClock size={15} strokeWidth={1.9} />}
         label="Scheduled"
         value={scheduled}
@@ -122,7 +129,6 @@ export function AtAGlance({
         href="/planner"
       />
       <StatCard
-        variant="cell"
         icon={<Send size={15} strokeWidth={1.9} />}
         label="Published"
         value={publishAbsent ? null : publish.live}
@@ -136,7 +142,6 @@ export function AtAGlance({
         href="/analytics"
       />
       <StatCard
-        variant="cell"
         icon={<TrendingUp size={15} strokeWidth={1.9} />}
         label="Reach"
         value={reach ?? null}

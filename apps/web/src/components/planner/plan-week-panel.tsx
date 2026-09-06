@@ -43,8 +43,13 @@ type Outcome =
  * credit cost is rendered from `creditCost('loop_cycle')` BEFORE the click,
  * never after, and unusable model times are reported as moved, not hidden.
  */
-export function PlanWeekPanel() {
-  const [goals, setGoals] = useState('')
+export function PlanWeekPanel({ initialGoals = '' }: { initialGoals?: string }) {
+  /* Seeded from the URL, which is how the command bar on /home hands over what
+     the reader typed there. `useState`'s initial value is read once, so a later
+     navigation with a different goal remounts rather than fighting the field —
+     and typing here always wins over the seed, which is the behaviour anybody
+     would expect of a box they are looking at. */
+  const [goals, setGoals] = useState(initialGoals)
   const [channels, setChannels] = useState<ChannelSet>(DEFAULT_CHANNELS)
   const [outcome, setOutcome] = useState<Outcome | null>(null)
   const [pending, startTransition] = useTransition()

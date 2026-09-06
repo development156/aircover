@@ -3,10 +3,10 @@ import { currentUser } from '@clerk/nextjs/server'
 import { SkeletonBar } from '@/components/skeleton'
 import Link from 'next/link'
 import * as Sentry from '@sentry/nextjs'
+import { ArrowRight, Sparkles } from 'lucide-react'
 
 import { NotYet, Unreadable } from '@/components/design-system/absence-row'
 import { getWorkspaceRole } from '@/lib/workspace-role'
-import { readBalance, type BalanceRead } from '@/lib/wallet/read'
 import { getActiveWorkspaceSlug, listWorkspaces, resolveActiveWorkspace } from '@/lib/workspaces'
 
 /**
@@ -79,50 +79,44 @@ const ROLE_LABEL: Record<string, string> = {
 }
 
 /**
- * Deliberately NOT 0 when the read fails. "We could not read it" and "you have
- * none" are different claims and only one of them is true — the same rule
- * CreditChip follows. Returns null so the caller renders the `Unreadable` MARK
- * rather than a dash, because the mark carries an accessible name and a dash
- * does not.
- */
-function creditsText(balance: BalanceRead): string | null {
-  if (balance.status === 'ok') return balance.balance.available.toLocaleString('en-IN')
-  return null
-}
-
-/**
- * The label row under the credits figure — ONE definition, rendered by both the
- * real foot and its skeleton.
+ * WHAT REPLACED THE CREDIT METER.
  *
- * It started as a copy inside `RailFootSkeleton`, which the design lint caught:
- * `scripts/design/design-lint.mjs` ratchets hand-written font sizes per file, and
- * duplicating two `text-[12px]` labels took rail-foot.tsx from its baseline of 6 to
- * 8. The lint was right about more than the count — a skeleton that copies the
- * markup it stands in for is a second place for the geometry to drift, and the
- * whole point of this placeholder is that it is exactly the size of the thing that
- * replaces it.
+ * Founder's ruling: credits live in the wallet. The meter that stood here put a
+ * balance on all 59 routes, and a number you cannot act on from where you are
+ * standing is a number that trains you to stop reading it.
  *
- * Neither label waits on anything, so both are rendered for real in both states:
- * replacing a word the reader could already have read with a grey rectangle makes
- * the page slower to understand while making it look busier. `Usage` therefore
- * also works as a link before the balance has arrived.
+ * The slot is not left empty. It carries the one thing that makes every other
+ * screen in the product better and that most workspaces never finish — teaching
+ * Sahoda the brand. `brain` is the only nudge in the shell, it names its own
+ * benefit, and it goes away with the rail when the rail collapses. It states no
+ * count: "4 of 15 signals" would be a figure this component does not read, and
+ * the Brand Brain card on /home already carries the real one.
  */
-function CreditsFootRow() {
+function RailNudge() {
   return (
-    <div className="mt-1.5 flex items-center justify-between">
-      <span className="text-[12px] text-muted">Credits left</span>
-      <Link
-        href="/wallet"
-        className="rounded-sm text-[12px] font-semibold text-accent transition-micro hover:underline"
-      >
-        Usage
-      </Link>
+    <div className="px-3 pt-3 pb-1 rail-min:hidden">
+      <div className="surface-ring rounded-md bg-brand-wash p-3">
+        <p className="flex items-center gap-1.5 type-sm font-[650] text-ink">
+          <Sparkles size={14} strokeWidth={2} aria-hidden className="flex-none text-accent" />
+          Let Sahoda do more
+        </p>
+        <p className="mt-1 type-meta text-muted">
+          Teach it your brand and it writes more like you.
+        </p>
+        <Link
+          href="/brain"
+          className="mt-2.5 inline-flex items-center gap-1 rounded-pill px-2.5 py-1 type-meta font-[650] text-accent transition-micro surface-ring-firm hover:gap-1.5"
+        >
+          Open Brand Brain
+          <ArrowRight aria-hidden className="size-3" />
+        </Link>
+      </div>
     </div>
   )
 }
 
 export async function RailFoot() {
-  const [user, workspacesRead, activeSlug, balance] = await Promise.all([
+  const [user, workspacesRead, activeSlug] = await Promise.all([
     soft('clerk_user', currentUser, null),
     /**
      * Read with its failure VISIBLE, not swallowed.
@@ -143,11 +137,11 @@ export async function RailFoot() {
       }
     })(),
     soft('active_workspace_slug', getActiveWorkspaceSlug, null as string | null),
-    soft<BalanceRead>('available_credits', readBalance, { status: 'unreadable' }),
+    // The balance read went with the meter. It ran on every page load of every
+    // route in the product for a figure nobody could act on from here.
   ])
   const workspaces = workspacesRead.value
 
-  const credits = creditsText(balance)
   const active = resolveActiveWorkspace(workspaces, activeSlug)
   /**
    * True only when we positively know there is no workspace: the read SUCCEEDED
@@ -168,25 +162,7 @@ export async function RailFoot() {
 
   return (
     <div className="flex-none border-t border-line-soft">
-      {/* Credits. Dropped when the rail collapses, matching the reference.
-          There is no "of —" here any more: the quantity has no denominator, so
-          per docs/26 §4 the slot does not exist rather than being filled. */}
-      <div className="px-3 pt-3 pb-2 rail-min:hidden">
-        <div className="flex min-h-[19px] items-baseline gap-1.5">
-          {credits === null ? (
-            noWorkspaceYet ? (
-              <NotYet what="Your credit balance" />
-            ) : (
-              <Unreadable what="Your credit balance" />
-            )
-          ) : (
-            <span className="num text-[19px] leading-none font-[650] tracking-[-0.02em]">
-              {credits}
-            </span>
-          )}
-        </div>
-        <CreditsFootRow />
-      </div>
+      <RailNudge />
 
       {/* Who you are signed in as. The one part that survives the collapse. */}
       <Link
@@ -239,12 +215,10 @@ export async function RailFoot() {
 export function RailFootSkeleton() {
   return (
     <div className="flex-none border-t border-line-soft">
-      <div className="px-3 pt-3 pb-2 rail-min:hidden">
-        <div className="flex min-h-[19px] items-baseline gap-1.5">
-          <SkeletonBar className="h-[19px] w-16" />
-        </div>
-        <CreditsFootRow />
-      </div>
+      {/* The nudge waits on NOTHING — no read feeds it — so the skeleton
+          renders the real thing rather than a grey rectangle standing in for a
+          sentence that is already known. */}
+      <RailNudge />
       <div className="flex items-center gap-2 px-3 py-2.5 rail-min:justify-center rail-min:px-0">
         <span aria-hidden className="size-[26px] flex-none rounded-pill bg-s2" />
         <span className="min-w-0 flex-1 rail-min:hidden">

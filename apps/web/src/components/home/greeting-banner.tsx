@@ -1,3 +1,5 @@
+import { Sun } from 'lucide-react'
+
 import { CreatePostButton } from '@/components/posts/create-post-button'
 
 /**
@@ -47,10 +49,13 @@ import { CreatePostButton } from '@/components/posts/create-post-button'
  */
 export function GreetingBanner({
   greeting,
+  name,
   state,
   tools,
 }: {
   greeting: string
+  /** Who is signed in. `null` when Clerk gave us nothing to print. */
+  name: string | null
   /** One line of real state. Never a boast, never a number we cannot back. */
   state: string
   /** Secondary actions, rendered left of the primary. */
@@ -58,14 +63,41 @@ export function GreetingBanner({
 }) {
   return (
     <section data-guide="home.greeting" className="flex flex-wrap items-center gap-x-4 gap-y-3">
+      {/* The mark. Decoration, and the ONLY decoration on this header — the
+          reference sets a sun in a warm disc beside the greeting and it does the
+          one job an icon can do here: it makes the top of the page a place
+          rather than a line of text. `aria-hidden`, because "sun" is not part of
+          what the heading says. */}
+      <span
+        aria-hidden
+        /* dark: tint-50 stays warm-light while --acc flips to Orange300 → s2 */
+        className="grid size-10 flex-none place-items-center rounded-pill bg-tint-50 text-accent dark:bg-s2 max-narrow:hidden"
+      >
+        <Sun size={20} strokeWidth={1.8} />
+      </span>
+
       <div className="min-w-0">
-        {/* An <h1>, not a <p>. The banner took the page's only heading with it
-            during an earlier port and left the app's most-visited screen with
-            none — invisible to anyone navigating by headings. */}
-        <h1 className="type-h1">{greeting}</h1>
-        {/* NOT `text-accent`. A whole sentence in orange is decoration wearing a
-            state indicator's clothes, and docs/37 §2.3 spends the accent on the
-            one thing the screen is for — which on this page is the queue. */}
+        {/* ── THE GREETING IS THE SMALL LINE AND THE NAME IS THE HEADING ──────
+            The reference stacks a muted "Good afternoon," over the person's name
+            set large, and it is the better order: the greeting is the same four
+            words for everyone and the name is the only part of the pair that
+            says whose workspace this is.
+
+            The <h1> follows the name for that reason. It stays an <h1> — this
+            screen lost its only heading during an earlier port and was invisible
+            to anyone navigating by headings — and it falls back to the greeting
+            when Clerk gives us no name, so the heading is never empty. */}
+        <p className="type-sm text-muted">{greeting},</p>
+        <h1 className="type-display mt-0.5">{name ?? greeting}</h1>
+        {/* NOT the reference's "Here's what's happening with your workspace
+            today", which is the same sentence on every workspace on every day
+            and therefore says nothing. This line is a real reading of the
+            week — see `lib/home/greeting.ts` — and a rewrite that made it
+            generic would be a sentence that is true in fewer cases, which this
+            product treats as a defect rather than a style choice.
+
+            NOT `text-accent` either. A whole sentence in orange is decoration
+            wearing a state indicator's clothes. */}
         <p className="type-sm mt-1 text-muted">{state}</p>
       </div>
       <div className="ml-auto flex flex-none items-center gap-2">
