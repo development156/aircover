@@ -155,7 +155,16 @@ describe('sending, and what the customer is told afterwards', () => {
     await user.click(screen.getByRole('button', { name: /send reply/i }))
 
     await waitFor(() => expect(state.calls).toHaveLength(1))
-    expect(state.calls[0]).toEqual(['6a75caf7d0fe733d1afcc1f4', 'conv-1', 'On our way', undefined])
+    // Retargeted when the composer gained an Attach control: the fifth argument is
+    // the attachment, and a reply nobody attached a file to must carry none. The
+    // claim is unchanged — the account, the thread, the TRIMMED body, and no tag.
+    expect(state.calls[0]).toEqual([
+      '6a75caf7d0fe733d1afcc1f4',
+      'conv-1',
+      'On our way',
+      undefined,
+      undefined,
+    ])
   })
 
   /**
