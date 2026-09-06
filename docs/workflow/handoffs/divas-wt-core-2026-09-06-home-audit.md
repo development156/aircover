@@ -108,8 +108,43 @@ because the client card imported `live.ts`, which drags the cron schedule and
 wallet copy tables into the browser; `lib/home/ago.ts` + `live-types.ts` are
 import-free and the local build reports 83 routes within budget. Verified on a
 local production build in both themes. The founder's "takes live feedback and
-does that" was NOT built: there is no backend action to carry a typed
-instruction, and a box that pretends to would be a remedy that cannot work.
+does that" was built next, see below.
+
+## The console listens (16:20 IST, "complete everything")
+
+`12c7efbf`, `54462039`, `e0d2bf35`. The "Right now" card has a box under its
+lines: **Ask Sahoda to do something**. A typed sentence goes to `askSahoda`
+(`app/actions/home-live.ts`), which parses it deterministically
+(`lib/home/instruct.ts`, no model call, no credits) and does only what a click
+already can: "write a post about X" starts a draft called X through the
+composer's own `createPost` and opens it; "open my week", "connect an
+account", "what needs my OK", "buy credits", "teach you about my business",
+"how are my posts doing" open the screen that owns the thing. Anything else is
+refused in one sentence with the three things it can do. It never spends:
+"plan my week" opens /planner, where the cost preview lives, rather than
+pressing the paid button. Six tests pin the vocabulary and that every reply is
+plain ("make me famous by friday" is refused, not drafted as "me famous").
+
+**The budget, twice.** Vercel refused `12c7efbf` (+8.3 kB on /home, slack is
+8 kB) and then `54462039` by 0.3 kB while the same commit passed locally by
+0.2 kB: the route was on the line. The line was there because
+`CreateWorkspaceButton` imported the toast library statically, which put a
+34 kB chunk on every page that offers the button. `e0d2bf35` fetches the toast
+on failure instead. MEASURED locally: /home 684.0 → 651.0 kB against 676.2;
+/brain 627.8 against 657.2; 83 routes within budget.
+
+**The console is not on the empty screen.** A workspace with nothing in it
+renders "Three things to start with" alone, so the box appears once anything
+exists (`lib/home/started.ts`). The QA workspace was empty after the audit's
+cleanup, so the proof first made one post through the "Write your first post"
+door, then typed "write a post about the weekend menu" into the box.
+
+**MEASURED on the preview at `e0d2bf35` (17:18 IST), headless Chromium, 1440
+and 390, both themes:** the sentence created post `4dacff20` titled "the
+weekend menu", landed on `/posts/4dacff20…`, and the console's first line on
+return read "You saved a draft: “the weekend menu” · just now". Both posts
+(`44847cc5`, `4dacff20`) were deleted from production workspace `83bcafc4`
+afterwards; a re-query finds neither. Screenshots are in the report artifact.
 
 ## Cleanup done
 
@@ -118,7 +153,7 @@ workspace in production. The QA workspace itself was left as found.
 
 ## Not done, and why
 
-- Smoke suite not run locally: needs the e2e keys, which this session may not read into a shell.
+- Smoke suite not run locally: needs the e2e keys, which this session may not read into a shell. The console's typed path is proven by the headless run above, not by a spec: a @smoke spec for it cannot run from this machine (production target refused, staging keys absent from `.env.local`).
 - H-16 (Preview → staging): the founder ruled, 14:05 IST, that the Preview stays on production. Not changed; QA on the preview keeps writing to prod, so delete what you create.
 - Not folded: the two logo pointer reads (`readBrandLogo`, `readBrandLogoDark`) each select `workspaces` once; one query, eleven mocked tests to retarget, left for a later pass.
 - No @smoke spec was added for the board's numbers: it cannot be run from this machine (the e2e target guard refuses production, and staging keys are not in `.env.local`), and an unrun guard is not a guard.
