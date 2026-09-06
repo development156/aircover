@@ -135,7 +135,7 @@ export function describeBulkTrash(
  * detect until they look; reporting a failure is wrong because nothing failed.
  * Two numbers, both stated.
  */
-export function describeEmptyTrash(deleted: number, kept: number): string {
+export function describeEmptyTrash(deleted: number, kept: number, more: boolean): string {
   const gone =
     deleted === 0
       ? 'Nothing was deleted'
@@ -143,11 +143,19 @@ export function describeEmptyTrash(deleted: number, kept: number): string {
         ? 'Deleted 1 file for good'
         : `Deleted ${deleted} files for good`
 
-  if (kept === 0) return `${gone}.`
-
   const held =
-    kept === 1
-      ? '1 file stayed, because a post that cannot lose it still uses it'
-      : `${kept} files stayed, because posts that cannot lose them still use them`
-  return `${gone}. ${held}.`
+    kept === 0
+      ? null
+      : kept === 1
+        ? '1 file stayed, because a post that cannot lose it still uses it'
+        : `${kept} files stayed, because posts that cannot lose them still use them`
+
+  // No count. One pass reads at most `ASSET_LIST_LIMIT` rows, so what it knows is
+  // that it hit the ceiling, NOT how many are behind it. A figure here would be
+  // invented, which is the same defect as the missing sentence in the other
+  // direction. The remedy is the button that is already on the screen, named so
+  // it can be followed: pressing again reads the next batch and deletes it.
+  const rest = more ? 'More files are still in the trash. Press it again to carry on' : null
+
+  return [gone, held, rest].filter((part) => part !== null).join('. ') + '.'
 }

@@ -98,7 +98,7 @@ describe('the slot row is where a slot is defined', () => {
 })
 
 describe('the readiness row explains the rung rather than repeating it', () => {
-  it('is narrow about what "not proven live" means', () => {
+  it('is narrow about what "not yet confirmed live" means', () => {
     const { rows, note } = channelDetailContent(ENTRY.x, 0)
 
     // The exact claim: the code is there and has run, it has never reached the

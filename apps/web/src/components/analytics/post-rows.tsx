@@ -35,12 +35,38 @@ import type { PublishedRow } from '@/lib/analytics/window-data'
  * without a zero ever being drawn.
  */
 
+/**
+ * ── THE THREE FIGURES, AND WHY THE LABELS ARE NOT THE COLUMN NAMES ───────────
+ * "People reached" was already spelled out rather than left as "Reach", and the
+ * two new ones follow it. Impressions is the count of TIMES a post was shown and
+ * reach is how many PEOPLE saw it — a reader who takes impressions for people
+ * has been told their post did roughly twice as well as it did. "Times shown"
+ * says which of the two it is without a glossary.
+ *
+ * Engagement is the sum of the interactions the platform reported, so "Likes,
+ * comments, shares" names its parts instead of asking the reader to trust a word
+ * that means something different on every platform.
+ */
 const COLUMNS: ReadonlyArray<{ key: SortKey; label: string; numeric?: boolean }> = [
   { key: 'title', label: 'Post' },
   { key: 'channel', label: 'Channel' },
   { key: 'published', label: 'Published' },
   { key: 'reach', label: 'People reached', numeric: true },
+  { key: 'impressions', label: 'Times shown', numeric: true },
+  { key: 'engagement', label: 'Likes, comments, shares', numeric: true },
 ]
+
+/** A count, or the dash that refuses to call an absent reading a zero. */
+function Count({ value }: { value: number | null }) {
+  if (value === null) {
+    return (
+      <span className="text-muted" title="Not reported yet.">
+        —
+      </span>
+    )
+  }
+  return <>{value.toLocaleString('en-IN')}</>
+}
 
 export function PostRows({
   rows,
@@ -102,8 +128,9 @@ export function PostRows({
       <div className="mt-4 max-wide:hidden">
         <table className="w-full border-collapse">
           <caption className="sr-only">
-            Every post published in this period, with how many people it reached
-            {ageDays === null ? '' : ` ${ageDays} days after it went out`}.
+            Every post published in this period, with how many people it reached, how many times it
+            was shown, and how many likes, comments and shares it drew
+            {ageDays === null ? '' : `, ${ageDays} days after it went out`}.
           </caption>
           <thead>
             <tr className="border-b border-line">
@@ -164,16 +191,17 @@ export function PostRows({
                   {CHANNEL_LABELS[row.channel] ?? row.channel}
                 </td>
                 <td className="py-2 type-meta text-muted">{dayIn(row.publishedAt, timezone)}</td>
+                {/* A dash, never a zero, in all three. The platform not having
+                    reported is not a reading of nobody — and neither is the
+                    collecting job missing a night. */}
                 <td className="py-2 text-right type-sm tabular-nums">
-                  {/* A dash, never a zero. The platform not having reported is
-                      not a reading of nobody. */}
-                  {row.reachAtAge === null ? (
-                    <span className="text-muted" title="Not reported yet.">
-                      —
-                    </span>
-                  ) : (
-                    row.reachAtAge.toLocaleString('en-IN')
-                  )}
+                  <Count value={row.reachAtAge} />
+                </td>
+                <td className="py-2 text-right type-sm tabular-nums">
+                  <Count value={row.impressionsAtAge} />
+                </td>
+                <td className="py-2 text-right type-sm tabular-nums">
+                  <Count value={row.engagementAtAge} />
                 </td>
                 <td className="py-2 text-right type-meta text-muted">
                   {versusSentence(versusNormal(row, normal))}
@@ -204,6 +232,19 @@ export function PostRows({
                 reached · {versusSentence(versusNormal(row, normal))}
               </span>
             </p>
+            {/* Recomposed, not squeezed: the two new figures get their own line
+                with the words spelled out, because a phone has no column header
+                above them to say which is which. */}
+            <p className="mt-0.5 type-meta text-muted">
+              <span className="tabular-nums text-ink">
+                {row.impressionsAtAge === null ? '—' : row.impressionsAtAge.toLocaleString('en-IN')}
+              </span>{' '}
+              shown ·{' '}
+              <span className="tabular-nums text-ink">
+                {row.engagementAtAge === null ? '—' : row.engagementAtAge.toLocaleString('en-IN')}
+              </span>{' '}
+              likes, comments, shares
+            </p>
           </li>
         ))}
       </ul>
@@ -211,7 +252,7 @@ export function PostRows({
       <p className="mt-3 type-meta text-muted">
         {ageDays === null
           ? 'No post has been measured yet, so this list has no reach to show.'
-          : `Reach is each post's figure ${ageDays} days after it went out, so posts are compared at the same age.`}
+          : `Every figure here is each post's reading ${ageDays} days after it went out, so posts are compared at the same age. A dash means we hold no reading for that one, which is not a zero.`}
       </p>
 
       {view.pages > 1 ? (

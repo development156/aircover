@@ -9,6 +9,15 @@
  * for editing it is: fetch the page, and change a figure only alongside the
  * source that justifies it.
  *
+ * ── ONE CLAIM WAS REMOVED FROM THIS FILE, AND WHY ───────────────────────────
+ * Two cards used to read "Up to N pictures in one go, all matching". That was
+ * true of the PROVIDER and false of this product: `ImageGenerateInputSchema`
+ * carries no count and `ImageGenerateOutput` returns one picture, so a set is
+ * delivered as N separate calls with the same prompt. `maxPerPress` stays here
+ * as the measured provider fact that `modes.ts` will read again when the mesh
+ * can carry a count; it is no longer sold on the card. (4ec68060, kept through
+ * the 2026-09-05 merge with the routed-flag rewrite in 1302752f.)
+ *
  * ── WHAT A MODEL "UNLOCKS" IS A REAL CAPABILITY, NOT A SELLING POINT ────────
  * `maxPerPress` and `maxReferences` are consumed by `modes.ts`, which decides
  * whether Series may run at all and how many pictures may be matched against.
@@ -120,9 +129,8 @@ export const STUDIO_MODELS: readonly StudioModel[] = [
   {
     id: 'bytedance-seed/seedream-5-0-lite',
     label: 'Everyday, a matching set',
-    goodAt:
-      'Food, shopfronts and people, at one flat price however big the picture, and it can draw a matching set.',
-    unlocks: 'Up to 4 pictures in one go, all matching, and up to 14 to match against.',
+    goodAt: 'Food, shopfronts and people, at one flat price however big the picture.',
+    unlocks: 'Up to 14 pictures to match against.',
     maxPerPress: 4,
     maxReferences: 14,
     costNote: 'A flat price per picture',
@@ -135,7 +143,7 @@ export const STUDIO_MODELS: readonly StudioModel[] = [
     label: 'Words and detail',
     goodAt:
       'Pictures with writing in them, and anything where small details have to survive. Worth it when the picture is going somewhere public.',
-    unlocks: 'Up to 10 pictures in one go, all matching, and up to 16 to match against.',
+    unlocks: 'Up to 16 pictures to match against.',
     maxPerPress: 10,
     maxReferences: 16,
     costNote: 'Billed by what it draws, so a large picture costs more',

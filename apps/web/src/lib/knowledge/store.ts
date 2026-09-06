@@ -56,10 +56,30 @@ export interface KnowledgeDocument extends KnowledgeDocumentRow {
 }
 
 export type LibraryRead =
-  | { status: 'ok'; documents: KnowledgeDocument[]; workspaceId: string }
+  | {
+      status: 'ok'
+      documents: KnowledgeDocument[]
+      workspaceId: string
+      /**
+       * The read hit `LIST_LIMIT` — there are documents this list is not
+       * showing. `true` is a bounded fact, never a fabricated count of the
+       * hidden rows: the count line and the empty message are only honest if
+       * they can SAY the list is capped. `lib/campaigns/read.ts` carries the
+       * same flag for the same reason.
+       */
+      truncated: boolean
+    }
   | { status: 'empty'; workspaceId: string }
   | { status: 'no-workspace' }
   | { status: 'unreadable' }
+
+/**
+ * The most documents one library read returns. Following `campaigns/read.ts`:
+ * a plain `.limit(LIST_LIMIT)` with `truncated = rows >= LIST_LIMIT`, rather
+ * than a fabricated total. `readLibrary` was previously unbounded, so a large
+ * library ran a full scan and rendered every row on one page.
+ */
+export const LIST_LIMIT = 200
 
 const DOCUMENT_COLUMNS =
   'id, title, source_kind, source_ref, storage_path, bytes, status, failure_code, failure_detail, chunk_count, char_count, addressed_instructions, instruction_samples, created_at, updated_at, indexed_at'
@@ -91,6 +111,7 @@ export const readLibrary = cache(async (): Promise<LibraryRead> => {
       .select(DOCUMENT_COLUMNS)
       .eq('workspace_id', workspaceId)
       .order('created_at', { ascending: false })
+      .limit(LIST_LIMIT)
 
     if (error) {
       console.error('[knowledge] library read failed', error.code, error.message)
@@ -102,6 +123,12 @@ export const readLibrary = cache(async (): Promise<LibraryRead> => {
     return {
       status: 'ok',
       workspaceId,
+      // Measured on the ROWS RETURNED. At exactly LIST_LIMIT the read cannot
+      // tell a full page from a truncated one, so it reports truncated — the
+      // same conservative call campaigns makes, and the honest direction: a
+      // list that says it MIGHT be capped when it is exactly full beats one
+      // that says it is whole when it is not.
+      truncated: data.length >= LIST_LIMIT,
       documents: (data as KnowledgeDocumentRow[]).map((row) => withShownStatus(row, now)),
     }
   } catch (error) {

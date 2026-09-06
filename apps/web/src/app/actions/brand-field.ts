@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 
 import { saveBrandMemory, type SaveBrandState } from '@/app/actions/brand-resolve'
+import { blankReason } from '@/lib/brand/blank'
 import { BRAIN_FIELDS } from '@/lib/brand/fields'
 import { MAX_OPEN_LIST_ENTRIES } from '@/lib/brand/limits'
 import { leavesEqual, readLeaf, writeLeaf, type BrainLeaf } from '@/lib/brand/leaf'
@@ -31,11 +32,13 @@ function validate(path: string, value: BrainLeaf): string | null {
       return `Keep this list to ${MAX_OPEN_LIST_ENTRIES} entries or fewer.`
     }
     if (value.some((entry) => typeof entry !== 'string')) return 'That list expects text entries.'
-    return null
+    return blankReason(field, value)
   }
 
   if (typeof value !== 'string') return 'That field expects text.'
-  return null
+  // MEASURED 2026-09-06: three spaces were saved as the core promise and marked
+  // confirmed. Shape checks alone let a blank through; see lib/brand/blank.ts.
+  return blankReason(field, value)
 }
 
 /**

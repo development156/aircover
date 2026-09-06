@@ -230,8 +230,34 @@ describe('bulk filing', () => {
     // "b" was already filed before this action; Undo must only remove what THIS
     // action added ("a"), never the filing that already existed.
     await user.click(screen.getByRole('button', { name: 'Undo' }))
-    await waitFor(() => expect(unfileAssets).toHaveBeenCalledWith('f1', ['a']))
-  })
+    //
+    // THE SIBLING OF THE WAIT AT THE BOTTOM OF THIS FILE, AND IT WAS MISSED.
+    // `restoreAssets` was raised 1s -> 5s on 2026-08-27 and 5s -> 15s by
+    // 00ef8381. This assertion is the same shape — click Undo, wait for the
+    // inverse server action — and kept waitFor's 1s default through both passes,
+    // inside a test that also kept vitest's 5s default because the `ui` project
+    // sets no `testTimeout`. So it had a fifteenth of its sibling's headroom.
+    //
+    // MEASURED 2026-09-05 on the wt-karunesh2 merge: 1 failed of 8,427 under the
+    // full gate, `unfileAssets` expiring here; this file then passed ALONE on the
+    // same tree, 34 of 34 in 7.6s. That is the signature this file already
+    // records for its sibling — green alone, red under load.
+    //
+    // 20s for the test and 15s for the wait, matching the sibling exactly rather
+    // than inventing a second pair of numbers. The invariant recorded there
+    // holds here: the inner wait must stay strictly smaller than the test budget
+    // containing it, or the test dies at its own boundary and the wait never
+    // reports. The assertion is untouched — `unfileAssets` must still be called
+    // with exactly ['a'], so filing that already existed is still not undone.
+    //
+    // NOT MUTATION-PROVED, for the reason its sibling states: on an idle machine
+    // the call has already happened before waitFor's first check, so shrinking
+    // the timeout does not turn it red here. This is headroom, not a demonstrated
+    // fix. If it goes red at 15s, suspect a real race in the Undo handler.
+    await waitFor(() => expect(unfileAssets).toHaveBeenCalledWith('f1', ['a']), {
+      timeout: 15_000,
+    })
+  }, 20_000)
 
   it('offers no Undo when the action added nothing, because there is nothing to put back', async () => {
     // Every selected photo was already in the folder. An Undo here would REMOVE
@@ -810,7 +836,29 @@ describe('the bulk bar can move a selection to the trash', () => {
     // the signature of waitFor's 1s default expiring on a busy machine rather
     // than of a broken handler. A gate that is randomly red is a gate people
     // learn to skip.
-    await waitFor(() => expect(restoreAssets).toHaveBeenCalled(), { timeout: 5000 })
+    //
+    // 5000 was not enough. MEASURED 2026-09-05, CI run 33973215127: the SAME
+    // assertion, the same signature — 1 failed of 8,427, and this file green
+    // alone on the same commit moments later. The suite has grown from 5,734 to
+    // 8,427 tests since the 5s was chosen, so the machine it shares is busier
+    // than the one that figure was measured on.
+    //
+    // 15s, not 25s, because of the invariant recorded below: the inner budget
+    // must stay strictly smaller than the 20s test budget containing it, or the
+    // test dies at its own boundary and the wait never reports. This keeps 5s
+    // of headroom. The assertion is untouched — only how long it is willing to
+    // wait for a call that must still happen.
+    //
+    // AND THIS CHANGE IS NOT MUTATION-PROVED, which is worth saying plainly in a
+    // repository whose one rule is that a guard never shown to fail is not a
+    // guard. MEASURED: with the timeout set to 1ms this test still PASSES
+    // locally, because on an idle machine `restoreAssets` has already been
+    // called before waitFor's first check. The wait is load-bearing only under
+    // the load that cannot be reproduced here. So the remedy is the one this
+    // file already reasoned its way to, applied again with a larger number —
+    // not a demonstrated fix. If it goes red at 15s, the next reader should
+    // suspect a real race in the Undo handler rather than raise it to 25s.
+    await waitFor(() => expect(restoreAssets).toHaveBeenCalled(), { timeout: 15_000 })
     expect(await screen.findByText(/Put 2 files back/)).toBeInTheDocument()
     // 20s for the TEST, because the waitFor inside it may take up to 5s.
     //

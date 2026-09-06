@@ -5,8 +5,8 @@ import { useTheme } from './helpers/ux-shot'
 /**
  * WHAT NUMBER, IF ANY, REACHED EACH ROADMAP SCREEN.
  *
- * `roadmap-honesty.spec.ts` owns the PROPERTY for the two routes still on its
- * list (/radar) and holds each to an allowlist of real prices. This
+ * `roadmap-honesty.spec.ts` owns the PROPERTY: it holds the five `/ads/*` routes
+ * to an EMPTY allowlist, so any digit on one of them fails there. This
  * file is the wider EVIDENCE sweep the `wt-page-rest` brief asks for: it visits
  * every screen with an unbuilt section and prints every standalone run of digits
  * rendered inside `#main`, so "no invented figures" is a reading rather than an
@@ -15,7 +15,17 @@ import { useTheme } from './helpers/ux-shot'
  * The five `/ads/*` routes are the reason it exists. They are drawings — no ad
  * account, no bid, no impression, no rupee of spend — and every competing tool
  * puts an estimated reach under its audience builder and a CPM in its budget
- * step. `roadmap-honesty` does not list them.
+ * step. `roadmap-honesty` DOES list all five, each allowing nothing; this file
+ * prints what actually rendered, so a pass there is a reading rather than a
+ * silence.
+ *
+ * ── TWO SENTENCES HERE WERE THE INVERSE OF THE TRUTH ────────────────────────
+ * This header used to say `roadmap-honesty` covered "/radar" and did NOT list
+ * the `/ads` routes. Both halves were backwards: `/radar` was REMOVED from that
+ * list when it stopped being a drawing (roadmap-honesty.spec.ts:191), and the
+ * five `/ads` routes are exactly what the list holds (:217-221). A comment that
+ * misdescribes which guard owns which property is how a route ends up covered
+ * by neither.
  *
  * ── WHAT IT CANNOT SEE ───────────────────────────────────────────────────────
  * 1. A fabricated figure spelled in WORDS ("a few thousand people").

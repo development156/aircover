@@ -63,14 +63,22 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 /**
- * The platform ceiling (300s on both Hobby and Pro with Fluid compute), and still inside
- * the five-minute cron interval so a tick cannot straddle the next one.
+ * Strictly inside the five-minute cron interval, so a tick cannot straddle the next one.
+ *
+ * ── THIS WAS 300, AND THE SENTENCE ABOVE WAS FALSE AT 300 ────────────────────
+ * 300s is the platform ceiling (Hobby and Pro with Fluid compute), and it is also
+ * EXACTLY the five-minute interval in vercel.json. A tick that ran to its ceiling would
+ * still be publishing when the next one was dispatched, which is precisely the
+ * overlap the claim on post_variants exists to survive and the comment here
+ * promised could not happen. Sixty seconds of headroom makes the promise true:
+ * the next tick fires only after this one has been torn down. `wiring.test.ts`
+ * reads both files and refuses a maxDuration that is not below the interval.
  *
  * Raised from 60 because this route publishes now. One Instagram publish is ~50s of
  * container polling and media upload; 60s could not fit a single one alongside the
  * sweeps. See PUBLISH_BATCH for how the number of publishes is bounded to match.
  */
-export const maxDuration = 300
+export const maxDuration = 240
 
 /**
  * How much work one tick takes on. Both candidate queries are oldest-first, so a backlog
@@ -86,8 +94,11 @@ const HOLD_BATCH = 50
  *
  * The binding constraint is wall-clock, not database work: an Instagram publish spends
  * ~36s polling for its live URL plus the media upload, so each one is ~50s. Four of them
- * is ~200s, which leaves room inside `maxDuration` for the classification pass and the
- * hold sweep with margin for a slow cold start.
+ * is ~200s, which leaves ~40s inside `maxDuration` for the classification pass, the
+ * hold sweep and the reconcile pass. That margin was ~100s when `maxDuration` was 300;
+ * it narrowed when the ceiling was brought under the cron interval, and the batch was
+ * left at four rather than cut to three because nothing has yet MEASURED a tick that
+ * publishes four and overruns. The day one does, this number is the knob.
  *
  * A backlog is not lost, it is DEFERRED: the claim is released or the variant is left
  * pending, `posts.scheduled_at` has not moved, and the next tick five minutes later

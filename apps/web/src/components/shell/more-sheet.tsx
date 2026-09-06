@@ -110,6 +110,7 @@ function SheetLink({ item }: { item: (typeof NAV_GROUPS)[number]['items'][number
   return (
     <li>
       <Link
+        prefetch={false}
         href={item.href}
         aria-current={active ? 'page' : undefined}
         className={cn(

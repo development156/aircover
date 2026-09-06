@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures/seeded-user'
-import { bootstrapWorkspace, leaveOnboarding, dismissPlanOffer } from './fixtures/compose'
+import { bootstrapWorkspace, dismissPlanOffer } from './fixtures/compose'
 import { decodePng, luminanceAt } from './helpers/png'
 
 /**
@@ -85,8 +85,10 @@ for (const theme of ['light', 'dark'] as const) {
     }, theme)
     await page.emulateMedia({ colorScheme: theme })
 
+    // `bootstrapWorkspace` already presses "I'll do this later" on the way out
+    // of onboarding. A second `leaveOnboarding` here waited 60s for a button
+    // that is not on /home (run 34009643341, both themes).
     await bootstrapWorkspace(page)
-    await leaveOnboarding(page)
     await page.goto('/home')
     await dismissPlanOffer(page)
 

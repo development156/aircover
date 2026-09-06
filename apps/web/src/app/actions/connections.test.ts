@@ -31,7 +31,7 @@ vi.mock('@/lib/workspaces', () => ({
 }))
 
 vi.mock('@/lib/observability/report', () => ({ reportServerError: () => Promise.resolve() }))
-vi.mock('next/cache', () => ({ revalidatePath: () => {} }))
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
 vi.mock('@/lib/zernio/server', () => ({
   zernioClient: () =>
@@ -70,6 +70,7 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 const { disconnectConnection } = await import('./connections')
+const { revalidatePath } = await import('next/cache')
 
 beforeEach(() => {
   state.userId = 'user_1'
@@ -81,6 +82,7 @@ beforeEach(() => {
   state.clientPresent = true
   state.zernioCalls = []
   state.zernioThrows = null
+  vi.mocked(revalidatePath).mockClear()
 })
 
 /**
@@ -190,6 +192,15 @@ describe('the ordinary refusals still refuse', () => {
 
     const result = await disconnectConnection('conn-1')
 
+    // RETARGETED: a bare `.ok` check passes identically whether the code read
+    // the zero-row delete as a refusal, or `disconnectConnection` threw and
+    // the outer catch produced its OWN generic "Could not disconnect" message
+    // instead. Assert the specific NO_ACCESS sentence this branch returns, and
+    // that the refusal never reaches the caller as an applied change.
     expect(result.ok).toBe(false)
+    expect(result.ok === false && result.message).toMatch(
+      /couldn.t disconnect this account\. reload and try again\./i,
+    )
+    expect(revalidatePath).not.toHaveBeenCalled()
   })
 })

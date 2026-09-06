@@ -62,6 +62,12 @@ test.describe('templates @smoke', () => {
 
     // ── 3. IT SURVIVES A RELOAD, AND THE COUNT NOW EXISTS ───────────────────
     await page.reload()
+    // The count sits beside the list it describes, inside the browser, "rather
+    // than on a card nobody opened" (template-card.tsx). Open it first: before
+    // this the spec waited 30s for a figure the closed card never shows (run
+    // 34012814133). "Browse templates" being pressable at all is the first
+    // proof the read came back with a row.
+    await page.getByRole('button', { name: /^browse templates$/i }).click({ timeout: 30_000 })
     await expect(page.getByText('1 saved')).toBeVisible({ timeout: 30_000 })
     await expect(page.getByText(NAME)).toBeVisible()
 
@@ -83,6 +89,9 @@ test.describe('templates @smoke', () => {
     // exactly what is in the box before the click, so "the template put these
     // words here" is still the only reading of the line after it.
     await expect(page.locator('[data-variant-editor="linkedin"]')).toHaveValue(SEED_BODY)
+    // The list lives inside the browser here too (run 34017127220: 180s
+    // waiting for a name the closed card never shows).
+    await page.getByRole('button', { name: /^browse templates$/i }).click()
     await page.getByText(NAME).click()
     await expect(page.getByLabel('Your post', { exact: true })).toHaveValue(BODY)
     await expect(page.locator('[data-variant-editor="linkedin"]')).toHaveValue(BODY)

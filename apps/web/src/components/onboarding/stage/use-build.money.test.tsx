@@ -144,6 +144,26 @@ describe('one press, one charge', () => {
     expect(resolveOnboarding).toHaveBeenCalledTimes(2)
   })
 
+  test('a daily-limit refusal is NOT retryable, because its own sentence says tomorrow', async () => {
+    // MEASURED 2026-09-05 (docs/51 Q-02): "Sahoda has built a free Brand Brain
+    // for this workspace 3 times today… Try again tomorrow." rendered beside a
+    // "Try again" button. A remedy that cannot work is the product's own rule 2.
+    resolveOnboarding.mockResolvedValue({
+      ok: false,
+      kind: 'limit',
+      message: 'Try again tomorrow.',
+    })
+    const { result } = build()
+
+    await act(async () => {
+      await result.current.start()
+    })
+    expect(result.current.failure?.message).toBe('Try again tomorrow.')
+    expect(result.current.failure?.retryable).toBe(false)
+    // And it says which kind it is, so the footer can stop promising "free".
+    expect(result.current.failure?.kind).toBe('limit')
+  })
+
   test('a THROWN resolve releases the guard rather than latching it dead', async () => {
     // A rejection is the arm a guard placed anywhere but a `finally` misses.
     // It would leave `inFlight` true forever and every later press would be

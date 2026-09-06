@@ -1,5 +1,5 @@
 import { LIVE_SUBSCRIPTION_STATUSES } from '@sahoda/billing'
-import type { PlanId, SubscriptionView } from '@sahoda/shared'
+import { PLAN_CATALOG, type PlanId, type SubscriptionView } from '@sahoda/shared'
 
 import type { SettledRead } from './read'
 
@@ -57,7 +57,40 @@ const LIVE_STATUSES: ReadonlySet<SubscriptionView['status']> = new Set(LIVE_SUBS
 export type PlanOfferDecision =
   | { kind: 'offer' }
   /** Named, never a bare `false`. A reason nobody can read is a reason nobody can check. */
-  | { kind: 'silent'; because: 'has-plan' | 'no-workspace' | 'unknown' }
+  | {
+      kind: 'silent'
+      because: 'has-plan' | 'no-workspace' | 'unknown' | 'not-started' | 'credits-remain'
+    }
+
+export interface PlanOfferContext {
+  /**
+   * Whether the workspace has done anything yet — the same `workspaceHasStarted`
+   * verdict that decides between the empty dashboard and the full one.
+   *
+   * MEASURED 2026-09-05 in a real browser: a workspace that had just finished
+   * onboarding met this dialog before it had seen its own dashboard. Founder's
+   * ruling the same day: the offer waits for the first action. The rule lives
+   * here rather than in the page's JSX so that every mount site inherits it.
+   */
+  hasStarted: boolean
+  /**
+   * Credits the workspace can still spend, or `null` when the balance could
+   * not be read. `null` is silence, not an offer: not knowing the balance is
+   * not the same as knowing it is low.
+   */
+  creditsAvailable: number | null
+}
+
+/**
+ * ── THE SIGNAL: HALF THE FREE GRANT IS GONE ──────────────────────────────────
+ * MEASURED 2026-09-06 on the wt-core preview: "has done something" was true
+ * after ONE saved draft, and the dialog covered the first real dashboard a
+ * workspace ever saw with 100 of 100 credits unspent. A price list is an answer
+ * to a question nobody has asked until the free credits are running out. The
+ * founder delegated the choice of signal; this is it, read from the same
+ * catalog the plans themselves come from so the threshold moves with the grant.
+ */
+export const OFFER_AT_OR_BELOW = Math.floor(PLAN_CATALOG.free.monthlyCredits / 2)
 
 /**
  * The plan a workspace is really being served on, or `null` when the row is
@@ -68,9 +101,17 @@ export function livePlanId(view: SubscriptionView): PlanId | null {
   return LIVE_STATUSES.has(view.status) ? view.planId : null
 }
 
-export function planOfferDecision(read: SettledRead<SubscriptionView>): PlanOfferDecision {
+export function planOfferDecision(
+  read: SettledRead<SubscriptionView>,
+  context: PlanOfferContext = { hasStarted: true, creditsAvailable: null },
+): PlanOfferDecision {
   if (read.status === 'no-workspace') return { kind: 'silent', because: 'no-workspace' }
   if (read.status === 'unreadable') return { kind: 'silent', because: 'unknown' }
+  if (!context.hasStarted) return { kind: 'silent', because: 'not-started' }
+  if (context.creditsAvailable === null) return { kind: 'silent', because: 'unknown' }
+  if (context.creditsAvailable > OFFER_AT_OR_BELOW) {
+    return { kind: 'silent', because: 'credits-remain' }
+  }
 
   const live = livePlanId(read.data)
   // `free` is a live plan in the schema — a workspace with no row reads as

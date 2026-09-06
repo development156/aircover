@@ -100,7 +100,13 @@ const BRAIN_TABS: ReadonlyArray<readonly [string, RegExp]> = [
   // The subtitle is chosen because `Shell` renders it in EVERY state the page
   // has — no workspace, empty, populated, and unreadable — so it identifies the
   // tab without pinning any one state's copy.
-  ['/brain/knowledge', /documents Sahoda has read/i],
+  // WAS `/documents Sahoda has read/i`, the subtitle before the 2026-08-29 Tone
+  // Setup rewrote it as a capability. Stale for the same reason as the two above,
+  // and MEASURED failing on the first CI smoke run to reach it (2026-09-05, run
+  // 33985674352). The new subtitle's promise, "the documents that hold your real
+  // prices", is rendered by `Shell` in every state, so it identifies the tab
+  // without pinning one state's copy.
+  ['/brain/knowledge', /documents that hold your real prices/i],
 ]
 
 test.describe('every section loads @smoke', () => {

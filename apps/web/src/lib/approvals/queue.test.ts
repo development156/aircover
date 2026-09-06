@@ -5,8 +5,8 @@ import { awaitsDecision, awaitsRepair, needsAPerson, splitQueue } from './queue'
 import { bulkApproveMessage } from './state'
 import type { DisplayPost } from '@/lib/posts/display-post'
 
-const post = (id: string, intent: PostStatus): DisplayPost =>
-  ({ id, intent, title: id, channels: [] }) as unknown as DisplayPost
+const post = (id: string, intent: PostStatus, over: Record<string, unknown> = {}): DisplayPost =>
+  ({ id, intent, title: id, channels: [], scheduled_at: null, ...over }) as unknown as DisplayPost
 
 /**
  * ── THE SWEEP THAT WOULD HAVE PROVED NOTHING ─────────────────────────────────
@@ -46,21 +46,60 @@ describe('what lands on the approvals queue', () => {
 
   test.each(PostStatusSchema.options)('%s', (status) => {
     const expected = EXPECTED[status]
-    expect(needsAPerson(status), `${status} on the queue?`).toBe(expected.queue)
-    expect(awaitsDecision(status), `${status} awaits a decision?`).toBe(expected.decision)
-    expect(awaitsRepair(status), `${status} awaits a repair?`).toBe(
+    const undated = post('p', status)
+    expect(needsAPerson(undated), `${status} on the queue?`).toBe(expected.queue)
+    expect(awaitsDecision(undated), `${status} awaits a decision?`).toBe(expected.decision)
+    expect(awaitsRepair(undated), `${status} awaits a repair?`).toBe(
       expected.queue && !expected.decision,
     )
   })
 
-  test('a draft is not on the queue — unfinished is not the same as waiting on you', () => {
-    expect(needsAPerson('draft')).toBe(false)
+  test('an undated draft is not on the queue — unfinished is not the same as waiting on you', () => {
+    expect(needsAPerson(post('d', 'draft'))).toBe(false)
+    expect(needsAPerson(post('d', 'draft', { channels: ['instagram'] }))).toBe(false)
+  })
+
+  /**
+   * ── A DATED, CHANNELLED DRAFT IS WAITING ON YOU ──────────────────────────
+   * Founder's delegation, 2026-09-06, after the /home audit measured that only
+   * the Loop writes `review`, so the page's lead region stayed empty for 33 of
+   * 35 production workspaces. A draft with a day and a channel cannot go out
+   * until somebody approves it, which is exactly "needs a person" — and it is
+   * a DECISION, not a repair, because `canApprove` admits drafts.
+   */
+  test('a draft with a date and a channel is on the queue, as a decision', () => {
+    const dated = post('d', 'draft', {
+      scheduled_at: '2026-09-07T04:30:00.000Z',
+      channels: ['instagram'],
+    })
+    expect(needsAPerson(dated)).toBe(true)
+    expect(awaitsDecision(dated)).toBe(true)
+    expect(awaitsRepair(dated)).toBe(false)
+    const idea = post('i', 'idea', { scheduled_at: '2026-09-07T04:30:00.000Z', channels: ['x'] })
+    expect(awaitsDecision(idea)).toBe(true)
+  })
+
+  test('a date with no channel is a note to self, not a queue item', () => {
+    expect(needsAPerson(post('d', 'draft', { scheduled_at: '2026-09-07T04:30:00.000Z' }))).toBe(
+      false,
+    )
+  })
+
+  test('a date does not move an approved or published post onto the queue', () => {
+    for (const intent of ['approved', 'scheduled', 'publishing', 'published', 'expired'] as const) {
+      expect(
+        needsAPerson(
+          post('p', intent, { scheduled_at: '2026-09-07T04:30:00.000Z', channels: ['x'] }),
+        ),
+      ).toBe(false)
+    }
   })
 
   test('every queued post is in exactly one half', () => {
     for (const status of PostStatusSchema.options) {
-      if (!needsAPerson(status)) continue
-      expect(awaitsDecision(status) !== awaitsRepair(status)).toBe(true)
+      const undated = post('p', status)
+      if (!needsAPerson(undated)) continue
+      expect(awaitsDecision(undated) !== awaitsRepair(undated)).toBe(true)
     }
   })
 })

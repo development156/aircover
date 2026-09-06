@@ -559,7 +559,7 @@ export async function resolveFromLibrary(): Promise<LibraryResolveState> {
     )
 
     if (delivered) {
-      revalidatePath('/brain/resolve')
+      revalidatePath('/loop')
       revalidatePath('/brain')
     }
     // The credit chip lives in the layout, which a page-scoped revalidate never

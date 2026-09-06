@@ -105,6 +105,9 @@ export function NavItem({
   return (
     <Link
       href={href}
+      // Hover and focus still prefetch; only the on-sight fan-out is off.
+      // See shell-prefetch.test.ts for the twenty renders this stops.
+      prefetch={false}
       data-guide={guide}
       aria-current={active ? 'page' : undefined}
       /**
@@ -140,8 +143,11 @@ export function NavItem({
         // The active surface is an ALPHA wash (--t50 = orange at 6%), so it
         // composites correctly on white AND on the dark shell — which is why
         // this no longer needs the `dark:bg-s2` override the solid v3 tint did.
-        // Orange on the dark-composited wash measures ~6.7:1.
-        active && 'bg-brand-wash font-semibold text-accent',
+        // INK on it, not accent: tokens.css's own table puts #ff6600 on the
+        // light wash at 2.75:1, and `rail-collapse.spec.ts` measured exactly
+        // that on the active row (run 34017127220). The wash, the weight and
+        // the 2px bar below carry the state; the words stay readable.
+        active && 'bg-brand-wash font-semibold text-ink',
         // The 2px rail. Structure, not decoration: it is the one active signal
         // that survives greyscale, so the state does not rest on hue alone.
         active &&

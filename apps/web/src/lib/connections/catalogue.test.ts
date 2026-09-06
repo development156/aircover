@@ -116,10 +116,17 @@ describe('the channel catalogue', () => {
   })
 
   it('never labels an unproven channel as verified', () => {
-    // "Not proven live" is a claim about evidence. Any wording that implies a
-    // check was performed and passed would be a different, false claim.
-    expect(READINESS_LABEL['built-not-proven']).not.toMatch(/verified|checked|tested/i)
+    // "Not yet confirmed live" is a claim about evidence. Any wording that
+    // implies a check was performed and passed would be a different, false
+    // claim — so the label must NEGATE, and must not use a passed-check word.
+    // Retargeted 2026-09-06 when "Not proven live" was rewritten in the
+    // customer's voice; the claim is pinned, the wording is free.
+    expect(READINESS_LABEL['built-not-proven']).toMatch(/\bnot\b|\bun[a-z]/i)
+    expect(READINESS_LABEL['built-not-proven']).not.toMatch(/verified|checked|tested|proven/i)
     expect(READINESS_LABEL['publishes-today']).toMatch(/publish/i)
+    // And the rung that HAS the evidence must not hedge: a channel a post has
+    // reached is not "not yet" anything.
+    expect(READINESS_LABEL['publishes-today']).not.toMatch(/\bnot\b|\byet\b/i)
   })
 })
 

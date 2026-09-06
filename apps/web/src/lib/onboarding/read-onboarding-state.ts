@@ -2,48 +2,27 @@ import 'server-only'
 
 import { cache } from 'react'
 
-import { createServerSupabase } from '@/lib/supabase/server'
-import { activeWorkspaceRead } from '@/lib/workspaces'
+import { readBrain } from '@/lib/brand/read-brain'
 
 /**
  * WHERE DOES THIS ACCOUNT BELONG — onboarding, or the dashboard?
  *
- * ── WHY THIS IS NOT `activeBrandMemory(id) === null` ─────────────────────────
- * `activeBrandMemory` answers `null` for THREE different facts: this workspace
- * has no brain, its payload no longer parses, and *the read did not happen* —
- * `if (error || !data) return null`, plus a `catch` that swallows a thrown
- * fetch. That is fine where it is used, because both callers only ever ask "may
- * I charge for this resolve" and every arm of a failed read answers "treat it as
- * free", which errs toward the customer.
+ * ── DERIVED FROM `readBrain`, NOT A SECOND QUERY ─────────────────────────────
+ * This used to select `id` from `brand_memory` on its own, and `readBrain`
+ * selected the same active row for the topbar ring and the dashboard's Brand
+ * Brain card in the same render. MEASURED 2026-09-06 in production edge logs:
+ * two `brand_memory` queries on every /home render, 63ms apart, asking the
+ * same table the same question. `readBrain` is `cache()`d, so reading it here
+ * costs nothing when anything else on the screen already has.
  *
- * It is NOT fine as a ROUTING signal. A redirect built on that null sends a
- * customer who finished onboarding weeks ago back to the first screen of it
- * because one Supabase call hiccuped — the exact "one null, two meanings" defect
- * this codebase has now shipped four times and pinned by name in
- * `lib/one-null-two-meanings.test.ts`. So this read keeps the two apart and the
- * gate acts on `not-started` ONLY.
- *
- * ── FOUR ANSWERS, AND EACH ONE ROUTES DIFFERENTLY ────────────────────────────
- *  · `completed`    — a Brand Brain exists. The dashboard, and nothing sends
- *                     them back into the flow.
- *  · `not-started`  — a workspace with no brain. Onboarding. Whether they are
- *                     brand new or half way through is a fact only the browser
- *                     holds (the flow's resume point is localStorage, keyed per
- *                     workspace), and the stage restores it on mount — so both
- *                     cases route to the same URL and land on different screens.
- *  · `no-workspace` — nothing to onboard INTO yet. Onboarding too, which is
- *                     where the create-workspace remedy lives.
- *  · `unreadable`   — we did not find out. NOBODY MAY BE MOVED ON THIS. A
- *                     redirect here is a claim about the account that nothing
- *                     measured.
- *
- * ── AND THE UNPARSEABLE PAYLOAD IS DELIBERATELY `completed` ──────────────────
- * A row that exists but no longer matches the contract means this workspace HAS
- * been through the flow. `activeBrandMemory` degrades it to "no saved brain" so
- * the editor is not handed half a brain, which is right for the editor. Routing
- * has the opposite duty: walking a paying customer through nine screens again
- * because a schema moved under them is the worse of the two failures. The row's
- * existence is the fact this file needs, so it selects `id` and nothing else.
+ * ── THE THREE-WAY ANSWER SURVIVES, AND THAT IS THE POINT ─────────────────────
+ * A redirect built on a null that means three things sends a customer who
+ * finished onboarding weeks ago back to its first screen the moment one query
+ * times out. `readBrain` keeps the three apart: `no-brain` is a fact about the
+ * workspace, `unreadable` is a question that got no answer, and only the first
+ * may route anybody. A stored payload that no longer parses reads as
+ * `unreadable` too — which is right: an account with a brain row is not an
+ * account that never onboarded, whatever state the row is in.
  */
 export type OnboardingStatus = 'completed' | 'not-started' | 'no-workspace' | 'unreadable'
 
@@ -52,42 +31,17 @@ export interface OnboardingStateRead {
 }
 
 async function readOnboardingState(): Promise<OnboardingStateRead> {
-  const workspace = await activeWorkspaceRead()
-  // Both bad arms return WITHOUT touching the database. A query issued with a
-  // workspace we could not identify is a question about the wrong tenant.
-  if (workspace.status === 'none') return { status: 'no-workspace' }
-  if (workspace.status === 'unreadable') return { status: 'unreadable' }
-
-  try {
-    const supabase = createServerSupabase()
-    const { data, error } = await supabase
-      .from('brand_memory')
-      .select('id')
-      .eq('workspace_id', workspace.workspace.id)
-      .eq('status', 'active')
-      .limit(1)
-
-    // The whole point of the file. `error` is "we could not look" and an empty
-    // array is "there is nothing there", and they route to opposite places.
-    if (error) {
-      console.error('[onboarding-state] read failed', error.code, error.message)
+  const brain = await readBrain()
+  switch (brain.status) {
+    case 'ok':
+      return { status: 'completed' }
+    case 'no-brain':
+      return { status: 'not-started' }
+    case 'no-workspace':
+      return { status: 'no-workspace' }
+    case 'unreadable':
       return { status: 'unreadable' }
-    }
-    if (!data) return { status: 'unreadable' }
-
-    return { status: data.length > 0 ? 'completed' : 'not-started' }
-  } catch (error) {
-    console.error(
-      '[onboarding-state] read threw',
-      error instanceof Error ? error.message : 'unknown',
-    )
-    return { status: 'unreadable' }
   }
 }
 
-/**
- * Request-scoped, so the layout gate and anything else asking the same question
- * in the same render share ONE query and — more to the point — one ANSWER.
- * Two panels that each ask separately are two chances to disagree.
- */
 export const onboardingStateRead = cache(readOnboardingState)

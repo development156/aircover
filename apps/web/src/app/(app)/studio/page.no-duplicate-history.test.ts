@@ -13,7 +13,7 @@ import { describe, expect, test } from 'vitest'
  * `StudioWorkbench` owns the strip that survives: it is the one the artboard
  * draws, it already carries the shape-and-age caption the artboard asks for,
  * and it is covered by `studio-workbench.test.tsx`'s own `data-guide=
- * "studio-strip"` tests. `RecentGenerations` is left as a component — nothing
+ * "studio-strip"` tests. `RecentGenerations` was left as a component until 2026-09-05, when it was deleted — nothing
  * else in the app imports it, and deleting a working component is a bigger
  * change than the one this screen asked for — but this screen must not render
  * it.

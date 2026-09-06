@@ -18,6 +18,7 @@ import { countIndexedDocuments } from '@/lib/knowledge/store'
 import { InstagramInsights } from '@/components/home/instagram-insights'
 import { PerformanceStrip } from '@/components/analytics/performance-strip'
 import { SahodaRail } from '@/components/home/sahoda-rail'
+import { SetupStrip } from '@/components/home/setup-strip'
 import { SpendCard } from '@/components/home/spend-card'
 import { WeekStrip } from '@/components/home/week-strip'
 import { StaggerItem } from '@/components/motion/stagger'
@@ -32,7 +33,10 @@ import { onboardingStateRead } from '@/lib/onboarding/read-onboarding-state'
 import { readPostCounts } from '@/lib/home/posts'
 import { readPublishSummary } from '@/lib/home/publishing'
 import { readSpend } from '@/lib/home/spend'
+import { setupLadder } from '@/lib/home/setup'
 import { startSteps, workspaceHasStarted, type StartedSignals } from '@/lib/home/started'
+import { resolveDisplayZone } from '@/lib/time/zone'
+import { activeWorkspaceRead } from '@/lib/workspaces'
 import { bucketWeek } from '@/lib/planner/week'
 import { forDisplay } from '@/lib/posts/display-post'
 import { listPosts, listVariantStates } from '@/lib/posts/read'
@@ -164,6 +168,7 @@ export default async function HomePage() {
     knowledgeDocuments,
     subscription,
     session,
+    workspace,
   ] = await Promise.all([
     /**
      * IN THE BATCH, NOT IN FRONT OF IT.
@@ -219,7 +224,18 @@ export default async function HomePage() {
      * accounts on their way into onboarding one throwaway call.
      */
     auth(),
+    /**
+     * The workspace row, for its timezone. Already `cache()`d by every reader
+     * above, so this is the shared promise and not a fourteenth query.
+     */
+    activeWorkspaceRead(),
   ])
+
+  // The greeting's clock is the workspace's, not Kolkata's. `resolveDisplayZone`
+  // falls back to IST for a workspace that never set one.
+  const zone = resolveDisplayZone(
+    workspace.status === 'ok' ? workspace.workspace.timezone : null,
+  ).zone
 
   // THE RULING, ACTED ON. Everything above was read in parallel with the
   // decision; nothing below this line renders for an account that belongs in
@@ -275,10 +291,10 @@ export default async function HomePage() {
    * converts. The component keeps the props for a caller that wants to pay for
    * them.
    */
-  const offer =
-    session.sessionId !== null && planOfferDecision(subscription).kind === 'offer' ? (
-      <PlanOfferMount sessionKey={session.sessionId} plans={planOfferRows()} />
-    ) : null
+  // Decided below, once `workspaceHasStarted` has spoken: the offer waits for
+  // the workspace's first action, and that verdict is the same one that picks
+  // the empty dashboard over the full one.
+  let offer: React.ReactNode = null
 
   /**
    * ── AND A WORKSPACE THAT EXISTS AND HOLDS NOTHING GETS ITS OWN SCREEN TOO ──
@@ -306,16 +322,43 @@ export default async function HomePage() {
     // shop with an Instagram following has something to report on day one.
     accountReported: instagram.kind === 'ready' && instagram.insights.length > 0,
   }
-  if (!workspaceHasStarted(signals)) {
+  const started = workspaceHasStarted(signals)
+  /**
+   * ── THE THREE DOORS, WITH A TICK EACH ──────────────────────────────────────
+   * The same list `GetStarted` shows a workspace with nothing in it, for the
+   * workspace that has begun but not finished — which is most of them, most
+   * of the time. docs/37 §15: one absence, one statement, at the top, with the
+   * action. The cards below keep their structure and stop repeating it.
+   */
+  const ladder = setupLadder({
+    hasBrain: signals.hasBrain,
+    connections: signals.connections,
+    posts: posts.length,
+  })
+  const channelStated = !ladder.steps.some((step) => step.id === 'connect' && step.done)
+  offer =
+    session.sessionId !== null &&
+    planOfferDecision(subscription, {
+      hasStarted: started,
+      // The balance was read for the board; the offer reads the same number,
+      // so the dialog and the "Credits left" cell can never disagree about
+      // whether the free grant is running out.
+      creditsAvailable: balance.status === 'ok' ? balance.balance.available : null,
+    }).kind === 'offer' ? (
+      <PlanOfferMount sessionKey={session.sessionId} plans={planOfferRows()} />
+    ) : null
+
+  if (!started) {
     /* The offer rides BOTH dashboard states. A workspace with nothing in it yet
        is still a workspace on Free, and it is the account most likely to be
-       weighing a plan — leaving it out here would mean the offer only ever
-       reached people who had already committed to the product. The one state it
-       does not ride is the branch above: an account with NO workspace cannot
-       check out at all, because `startCheckout` resolves a workspace to charge
-       for, and an offer that cannot be taken up is the "impossible remedy" this
-       codebase has a whole guard about. `planOfferDecision` returns `silent` for
-       it, so that exclusion is in the decision rather than in this JSX. */
+       weighing a plan. It used to ride this branch for that reason. MEASURED
+       2026-09-05 in a real browser, the effect was a pricing dialog over the
+       first dashboard a workspace ever saw, before it had done anything, and
+       the founder ruled the same day that the offer waits for the first action.
+       `planOfferDecision` takes `hasStarted` and returns `silent` here, exactly
+       as it does for an account with NO workspace (which cannot check out at
+       all): both exclusions live in the decision rather than in this JSX, so
+       `{offer}` stays on every branch and is null on the ones it must not reach. */
     return (
       <>
         <GetStarted now={now} steps={startSteps()} />
@@ -369,7 +412,11 @@ export default async function HomePage() {
       {/* The header. Carries the page's ONE primary action, which this screen
           previously did not have at all: it was a dashboard you could only
           read. No band behind it any more — see the component. */}
-      <GreetingBanner greeting={greetingFor(now)} state={greetingState(counts, publish)} />
+      <GreetingBanner greeting={greetingFor(now, zone)} state={greetingState(counts, publish)} />
+
+      {/* Renders nothing once the three doors are done. Not staggered: it is
+          the greeting's second line, not a region arriving. */}
+      <SetupStrip ladder={ladder} />
 
       {/* ── FOUR NUMBERS AS ONE BOARD, NOT FOUR BOXES ─────────────────────
           All four are counts of rows this product owns or a ledger balance, so
@@ -413,7 +460,10 @@ export default async function HomePage() {
               reader unable to tell "we measured nothing" from "this product
               does not measure". */}
           <StaggerItem i={2}>
-            <PerformanceStrip analytics={instagram} />
+            {/* `reasonStated` while the ladder above already says "Connect a
+                channel": the card keeps its four named slots and drops the
+                second copy of the remedy. */}
+            <PerformanceStrip analytics={instagram} reasonStated={channelStated} />
           </StaggerItem>
 
           <StaggerItem i={3}>
@@ -431,40 +481,74 @@ export default async function HomePage() {
           </StaggerItem>
         </div>
 
-        <div className="flex flex-col gap-6 max-narrow:gap-5">
-          {/* 1 — WHAT HAPPENED. The reference puts the activity feed at the
-                  top of the rail; this app had it as a full-width table at the
-                  very bottom, which is the least-read position on the page. */}
-          <StaggerItem i={6}>
-            {/* `flush`: the feed's rows run to the card's own edge, so the body
-                may not carry the standard 20px inset. The header still does, so
-                this heading sits on the same line as every other card's. */}
-            <HomeSection
-              id="home-activity"
-              title="Recent activity"
-              action={{ href: '/wallet', label: 'View all' }}
-              flush
-            >
-              <ActivityFeed entries={ledger.entries.slice(0, 4)} />
-            </HomeSection>
-          </StaggerItem>
-
-          {/* ── WHERE `Available credits` USED TO BE ────────────────────────
-              docs/40 §2.3 counted the balance THREE times on this one screen —
-              the topbar chip, the rail foot and a card here — and demoted this
-              copy from `type-display` to `type-h2` rather than removing it. It
-              is removed now: the figure leads the page in `AtAGlance`, where it
-              is one of four things you can act on, and the rail foot's copy is
-              hidden whenever the rail is minimised, which is the default. Two
-              copies, down from three, and the biggest one is at the top. */}
-
-          {/* WHAT NEXT: what Sahoda knows, and what it can post to. */}
-          <StaggerItem i={7}>
-            <BrainCard brain={brain} knowledgeDocuments={knowledgeDocuments} />
-          </StaggerItem>
-          <StaggerItem i={8}>
-            <ConnectionsCard connections={connections} />
-          </StaggerItem>
+        {/* ── THE RAIL: TWO COLUMNS IN THE MIDDLE BAND ─────────────────────
+            Below `wide` the split collapses and the rail stacks under the
+            report. MEASURED 2026-09-06 at 1024 and 768: four 380px-designed
+            cards stretched to ~900px, one holding a single sentence, and the
+            page ran 2,014px. Two columns from `narrow` up, back to one at
+            `wide` where the rail is a rail again. */}
+        <div className="grid grid-cols-1 items-start gap-6 narrow:grid-cols-2 wide:grid-cols-1 max-narrow:gap-5">
+          {/* ── WHAT NEXT BEFORE WHAT HAPPENED, UNTIL SETUP IS DONE ───────────
+              The reference puts the activity feed at the top of the rail, and
+              for a workspace that is set up it belongs there: the ledger is
+              the money. A workspace still missing a channel or a brain opens
+              the app to finish setting up, so its rail leads with the two
+              cards that are doors — Connections, then Brand Brain — and the
+              feed follows. One order per state, decided by the same ladder
+              that renders the strip above. */}
+          {ladder.remaining > 0 ? (
+            <>
+              <StaggerItem i={6}>
+                <ConnectionsCard connections={connections} />
+              </StaggerItem>
+              <StaggerItem i={7}>
+                <BrainCard brain={brain} knowledgeDocuments={knowledgeDocuments} />
+              </StaggerItem>
+              <StaggerItem i={8}>
+                <HomeSection
+                  id="home-activity"
+                  title="Recent activity"
+                  action={{ href: '/wallet', label: 'View all' }}
+                  flush
+                >
+                  <ActivityFeed
+                    entries={ledger.entries.slice(0, 4)}
+                    unreadable={ledger.unreadable}
+                  />
+                </HomeSection>
+              </StaggerItem>
+            </>
+          ) : (
+            <>
+              {/* 1 — WHAT HAPPENED. The reference puts the activity feed at
+                  the top of the rail; this app had it as a full-width table at
+                  the very bottom, which is the least-read position on the page. */}
+              <StaggerItem i={6}>
+                {/* `flush`: the feed's rows run to the card's own edge, so the
+                    body may not carry the standard 20px inset. The header still
+                    does, so this heading sits on the same line as every other
+                    card's. */}
+                <HomeSection
+                  id="home-activity"
+                  title="Recent activity"
+                  action={{ href: '/wallet', label: 'View all' }}
+                  flush
+                >
+                  <ActivityFeed
+                    entries={ledger.entries.slice(0, 4)}
+                    unreadable={ledger.unreadable}
+                  />
+                </HomeSection>
+              </StaggerItem>
+              {/* WHAT NEXT: what Sahoda knows, and what it can post to. */}
+              <StaggerItem i={7}>
+                <BrainCard brain={brain} knowledgeDocuments={knowledgeDocuments} />
+              </StaggerItem>
+              <StaggerItem i={8}>
+                <ConnectionsCard connections={connections} />
+              </StaggerItem>
+            </>
+          )}
 
           <StaggerItem i={9}>
             <SahodaRail drafted={draftedThisWeek} planCost={creditCost('loop_cycle')} />

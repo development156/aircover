@@ -1,6 +1,7 @@
 import { BrainCircuit } from 'lucide-react'
 
 import { EmptyState } from '@/components/empty-state'
+import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
 import { SectionCard } from '@/components/brain/section-card'
 import { SectionCardEmpty } from '@/components/brain/section-card-empty'
 import { BRAIN_SECTIONS, type BrainSectionKey } from '@/lib/brand/fields'
@@ -24,14 +25,18 @@ export async function BrainSections({ only }: { only: readonly BrainSectionKey[]
   const sections = BRAIN_SECTIONS.filter((section) => only.includes(section.key))
 
   // No workspace means there is nowhere for a brain to live and nothing on this
-  // screen can change that, so the structure would be decoration. Onboarding is
-  // the only thing that helps, and FirstRun already says so elsewhere.
+  // screen can change that, so the structure would be decoration. The ONE remedy
+  // is creating a workspace, so that is the control offered. This branch used
+  // to say "until the Brand Brain has been resolved once" with nothing under it:
+  // a resolve needs a workspace, so the sentence named a remedy that could not
+  // work — the same status /brain and the console both answer with this button.
   if (brain.status === 'no-workspace') {
     return (
       <EmptyState
         icon={BrainCircuit}
-        title="Sahoda doesn’t know your brand yet"
-        body="These fields are what Sahoda writes your captions, your weekly plan and your website from. There is nothing to show until the Brand Brain has been resolved once."
+        title="Create a workspace to build a Brand Brain"
+        body="These fields are what Sahoda writes your captions, your weekly plan and your website from. A Brand Brain belongs to a workspace and you don’t have one yet. Nothing failed."
+        action={<CreateWorkspaceButton variant="primary" />}
       />
     )
   }

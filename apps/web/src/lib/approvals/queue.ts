@@ -39,18 +39,48 @@ import { rungFor } from '@/lib/posts/rung'
  */
 
 /** Everything on this queue, in one place, so a caller cannot invent a fourth. */
-export function needsAPerson(intent: PostStatus): boolean {
-  return rungFor(intent) === 'urgent'
+/**
+ * What the queue needs to know about a post. `DisplayPost` satisfies it; so
+ * does any row that carries the three columns.
+ */
+export interface QueueSubject {
+  readonly intent: PostStatus
+  readonly scheduled_at: string | null
+  readonly channels: readonly string[]
+}
+
+/**
+ * ── A DATED, CHANNELLED DRAFT IS WAITING ON YOU ─────────────────────────────
+ * Founder's delegation, 2026-09-06. The /home audit measured that only the
+ * Loop ever writes `review`, so this predicate — which leads the dashboard —
+ * was false for 33 of 35 production workspaces every day, and /approvals
+ * claimed "every post reaches this queue" while a hand-written post never did.
+ *
+ * A draft with a day and at least one channel cannot go out until somebody
+ * approves it. That is exactly "needs a person", and it is a DECISION rather
+ * than a repair because `canApprove` already admits drafts. An undated draft
+ * is still just unfinished; a dated draft with no channel is a note to self.
+ */
+function isDatedDraft(post: QueueSubject): boolean {
+  return (
+    (post.intent === 'draft' || post.intent === 'idea') &&
+    post.scheduled_at !== null &&
+    post.channels.length > 0
+  )
+}
+
+export function needsAPerson(post: QueueSubject): boolean {
+  return rungFor(post.intent) === 'urgent' || isDatedDraft(post)
 }
 
 /** A decision is owed: someone sent it for review and it can still be approved. */
-export function awaitsDecision(intent: PostStatus): boolean {
-  return needsAPerson(intent) && canApprove(intent)
+export function awaitsDecision(post: QueueSubject): boolean {
+  return needsAPerson(post) && canApprove(post.intent)
 }
 
 /** A repair is owed: it went out badly, or only partly. */
-export function awaitsRepair(intent: PostStatus): boolean {
-  return needsAPerson(intent) && !canApprove(intent)
+export function awaitsRepair(post: QueueSubject): boolean {
+  return needsAPerson(post) && !canApprove(post.intent)
 }
 
 export interface ApprovalQueue {
@@ -70,7 +100,7 @@ export interface ApprovalQueue {
  * (see `display-post.ts`).
  */
 export function splitQueue(posts: readonly DisplayPost[]): ApprovalQueue {
-  const decisions = posts.filter((post) => awaitsDecision(post.intent))
-  const repairs = posts.filter((post) => awaitsRepair(post.intent))
+  const decisions = posts.filter((post) => awaitsDecision(post))
+  const repairs = posts.filter((post) => awaitsRepair(post))
   return { decisions, repairs, total: decisions.length + repairs.length }
 }

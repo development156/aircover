@@ -67,6 +67,66 @@ async function workspaceIdFor(clerkUserId: string): Promise<string | null> {
   return data?.[0]?.id ?? null
 }
 
+/**
+ * Give the workspace one thing it has done, AND spend half its free credits.
+ *
+ * Since `7a8036ae` the offer waits for the first action (a post, a connection,
+ * a brain, a spend): a plan pitched at somebody who has not yet seen the
+ * product was the founder's ruling to remove. Since the 2026-09-06 /home audit
+ * it also waits until half of Free's monthly credits are gone
+ * (`OFFER_AT_OR_BELOW` in lib/billing/plan-offer.ts): MEASURED in a real
+ * browser, one saved draft alone put the dialog over the first dashboard a
+ * workspace ever saw, with 100 of 100 credits unspent.
+ *
+ * So the seed is two writes. One review-state post is the smallest true
+ * "started" signal; one 60-credit DEBIT through `app.apply_ledger_entry` — the
+ * ONLY legal writer of `credit_balances`, and reachable only over a direct
+ * connection because `app.*` is not exposed through PostgREST — is the smallest
+ * true "running low" signal. Both fail loudly when their credential is absent:
+ * a test that cannot run must not report as one that passed.
+ */
+async function seedFirstAction(clerkUserId: string): Promise<void> {
+  const admin = adminClient() as SupabaseClient | null
+  expect(
+    admin,
+    'no SUPABASE_SERVICE_ROLE_KEY: the started workspace cannot be set up, and a ' +
+      'test that cannot run must not report as one that passed',
+  ).not.toBeNull()
+  const workspaceId = await workspaceIdFor(clerkUserId)
+  expect(workspaceId, 'the bootstrap did not produce a workspace').not.toBeNull()
+  const { error } = await admin!.from('posts').insert({
+    workspace_id: workspaceId,
+    title: 'Saturday cupping, five seats',
+    body: 'Saturday cupping is open again. Five seats, no charge, 9am.',
+    status: 'review',
+    channels: ['instagram'],
+    created_by: clerkUserId,
+  })
+  expect(error, `could not seed the first post: ${error?.message}`).toBeNull()
+  await spendHalf(workspaceId as string)
+}
+
+/** Take the free grant below the offer threshold, through the ledger function. */
+async function spendHalf(workspaceId: string): Promise<void> {
+  const url = process.env.SUPABASE_DB_URL
+  expect(
+    url,
+    'no SUPABASE_DB_URL: the low-credits case cannot be set up, and a test that ' +
+      'cannot run must not report as one that passed',
+  ).toBeTruthy()
+  const { Client } = (await import('pg')).default
+  const client = new Client({ connectionString: url })
+  try {
+    await client.connect()
+    await client.query(
+      `select app.apply_ledger_entry($1::uuid, 'DEBIT', $2::int, $3::text, $4::text)`,
+      [workspaceId, 60, `plan-offer-${workspaceId}`, 'draft_post'],
+    )
+  } finally {
+    await client.end().catch(() => {})
+  }
+}
+
 test.describe('the plan offer @smoke', () => {
   test.setTimeout(4 * 60_000)
 
@@ -76,6 +136,16 @@ test.describe('the plan offer @smoke', () => {
   }) => {
     expect(signedIn).toBeTruthy()
     await bootstrap(page)
+
+    // ── AN EMPTY WORKSPACE GETS NO OFFER ────────────────────────────────────
+    // The ruling of 7a8036ae, asserted before the seed so a regression that
+    // opens the modal on first sight fails here and not somewhere vaguer.
+    await page.goto('/home')
+    await page.waitForLoadState('networkidle')
+    await expect(page.locator('#main')).toBeVisible()
+    await expect(page.getByRole('dialog').filter({ hasText: OFFER_TITLE })).toBeHidden()
+
+    await seedFirstAction(signedIn.clerkUserId)
     await page.goto('/home')
 
     const offer = page.getByRole('dialog').filter({ hasText: OFFER_TITLE })
@@ -111,6 +181,7 @@ test.describe('the plan offer @smoke', () => {
   test('closes on Escape as well as on the X', async ({ page, signedIn }) => {
     expect(signedIn).toBeTruthy()
     await bootstrap(page)
+    await seedFirstAction(signedIn.clerkUserId)
     await page.goto('/home')
 
     const offer = page.getByRole('dialog').filter({ hasText: OFFER_TITLE })
@@ -148,6 +219,9 @@ test.describe('the plan offer @smoke', () => {
       provider: 'stripe',
     })
     expect(error, `could not put the workspace on a plan: ${error?.message}`).toBeNull()
+    // Started AND paid: the stricter case. An empty paid workspace would stay
+    // silent for the wrong reason (not-started) and prove nothing about plans.
+    await seedFirstAction(signedIn.clerkUserId)
 
     await page.goto('/home')
     await page.waitForLoadState('networkidle')
@@ -165,6 +239,7 @@ test.describe('the plan offer @smoke', () => {
      */
     expect(signedIn).toBeTruthy()
     await bootstrap(page)
+    await seedFirstAction(signedIn.clerkUserId)
     await page.goto('/home')
 
     await expect(page.getByRole('dialog').filter({ hasText: OFFER_TITLE })).toBeVisible({

@@ -60,7 +60,7 @@ export function NeedsAttention({ posts }: { posts: DisplayPost[] }) {
   // `intent` — NOT `status`. `DisplayPost` seals `status` behind an
   // uninhabitable type precisely so a summary screen cannot read it and claim
   // an outcome the variant rows never reported (see display-post.ts).
-  const waiting = posts.filter((post) => needsAPerson(post.intent))
+  const waiting = posts.filter((post) => needsAPerson(post))
   const shown = waiting.slice(0, 4)
 
   return (
@@ -80,8 +80,8 @@ export function NeedsAttention({ posts }: { posts: DisplayPost[] }) {
            is left-aligned in the body's own padding rather than centred in a
            box, which is the shape `ChartSparse` exists to stop. */
         <p className="max-w-[var(--measure-prose)] type-sm text-muted">
-          Nothing is waiting on you. Anything sent for review, or that fails to go out, shows up
-          here.
+          Nothing is waiting on you. A post with a date and a channel, anything sent for review, and
+          anything that fails to go out shows up here.
         </p>
       ) : (
         /* See COLUMNS above. Its ancestor was a `wide:grid-cols-2` that put a

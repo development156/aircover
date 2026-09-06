@@ -90,6 +90,55 @@ change the schema; it matters only for choosing which direction to reconcile.
 And the four `20260902220001…220004` files written this week, which are new,
 unapplied, and expected to be.
 
+## What the customer gets meanwhile: the logo stamp
+
+Added 2026-09-04. The table above says of three of those files only that
+"shipped code reads what it adds". This is what that means on a screen, because
+a schema note nobody can picture does not get prioritised.
+
+**The stamp feature is fully built and reachable.** `/studio` renders a
+"Stamp your logo on this picture?" control with an anchor and a size step
+(`components/studio/studio-workbench.tsx`), the action calls
+`stampGeneratedPicture` (`app/actions/studio.ts`), and the compositor,
+placement, variant pick and dark-logo paths are all wired and tested. Nothing
+here is waiting on code.
+
+**Where `20260831150000_studio_stamped_asset.sql` is unapplied, the link is
+dropped by design.** `studio.ts` inserts `stamped_asset_id` and `stamp_outcome`
+and, on Postgres `42703` (undefined column), re-inserts the row without them.
+Its comment says why, and the reasoning is sound: a missing column must cost the
+LINK and never the record of a generation somebody paid for.
+
+So on such a deploy the customer turns the stamp on, is charged once for the
+picture, the stamped copy is composited and uploaded into their library — and
+the generation it belongs to has no pointer to it. The result screen's
+with-logo / without-logo switch has nothing to switch to.
+
+**MEASURED 2026-09-04, and fixed in the same change:** the message written for
+exactly this deploy could not be shown. `stampNote`'s `case null` says "Made
+before Sahoda placed logos… Nothing went wrong", and its own comment names "or
+the column is not applied on this deploy" as the case it serves. But `read.ts`
+builds the value from a `select('*')` row, so an ABSENT column yields
+`undefined`, not `null` — and a `switch` on `undefined` matches no case in an
+exhaustive switch with no `default`. `stampNote` returned nothing at all. Both
+the read boundary and the switch now coalesce, and
+`stamp-copy.test.ts`'s "a deploy where the column is not there yet" holds it.
+
+**What is still nobody's code to fix.** Applying the migrations. Direction A
+below, by a person with the project ref. Until then the honest description is:
+the feature works, the customer is charged correctly, and the stamped picture
+lands in their library unlinked to the generation that made it.
+
+**One table is orphaned on both sides.** `asset_logo_facts` (20260831120000) is
+unapplied AND nothing writes it — `logo-bytes.ts` says so deliberately:
+"measuring is cheap next to the generation it rides on, and a reader that writes
+is a reader that can fail." It recomputes the facts per request instead. But
+`lib/privacy/export-manifest.ts` lists the table in the GDPR export as "what
+Sahoda measured about each logo you uploaded", so the export names a category
+that can hold nothing. Either the writer arrives (`set-logo-variant.ts` at
+upload time) or the manifest entry goes. That one is a product decision and is
+NOT made here.
+
 ## Reconciliation: what a person with the ref would run
 
 Two directions are possible. **Direction A (rename the files) is recommended**:

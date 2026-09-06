@@ -101,6 +101,15 @@ vi.mock('@/app/actions/posts', () => ({ createPost: vi.fn() }))
  * second is a `'use server'` export that opens a real payment order.
  */
 vi.mock('@/lib/billing/read', () => ({ readSubscription: vi.fn() }))
+// The page reads the workspace row for its timezone. `cookies()` has no
+// request scope under vitest, so the cached reader is answered here; every
+// other reader on the page is mocked above and never reaches it.
+vi.mock('@/lib/workspaces', () => ({
+  activeWorkspaceRead: vi.fn(async () => ({
+    status: 'ok',
+    workspace: { id: 'w1', name: 'W', slug: 'w', timezone: null },
+  })),
+}))
 vi.mock('@clerk/nextjs/server', () => ({ auth: async () => ({ sessionId: 'sess_test' }) }))
 vi.mock('@/app/actions/wallet', () => ({ startCheckout: vi.fn() }))
 
@@ -185,7 +194,7 @@ beforeEach(() => {
   // a half-populated one.
   vi.mocked(readBrain).mockResolvedValue({ status: 'no-brain' })
   vi.mocked(listConnections).mockResolvedValue([])
-  vi.mocked(readLedger).mockResolvedValue({ entries: [], skipped: 0 })
+  vi.mocked(readLedger).mockResolvedValue({ entries: [], skipped: 0, unreadable: false })
   vi.mocked(readSpend).mockResolvedValue(EMPTY_SPEND)
   vi.mocked(readPostCounts).mockResolvedValue(EMPTY_COUNTS)
   vi.mocked(readPublishSummary).mockResolvedValue(EMPTY_PUBLISH)
@@ -373,6 +382,50 @@ describe('Home for a workspace that exists', () => {
  * asks for it and obeys the answer — the half a pure test cannot reach, and the
  * half that would silently stop working if someone deleted one line here.
  */
+describe('the setup ladder on the full dashboard', () => {
+  beforeEach(() => {
+    balanceRead.mockResolvedValue({
+      status: 'ok',
+      balance: { total: 100, held: 0, available: 100, hasHold: false, heldNote: null },
+    })
+    vi.mocked(listPosts).mockResolvedValue([A_POST])
+  })
+
+  test('says what is missing once, at the top, and the cards stop repeating the remedy', async () => {
+    // One draft, no brain, no channel: the state the audit measured stating
+    // the same two absences six times across four containers.
+    render(await HomePage())
+
+    expect(screen.getByRole('region', { name: /1 of 3 set up/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /teach sahoda your brand/i })).toHaveAttribute(
+      'href',
+      '/onboarding',
+    )
+    // The Performance card keeps its slots and drops its copy of the remedy.
+    expect(screen.queryByText(/connect a channel to start measuring/i)).toBeNull()
+  })
+
+  test('a workspace that is set up shows no ladder', async () => {
+    vi.mocked(readBrain).mockResolvedValue({
+      status: 'ok',
+      active: { voice: { descriptor: 'Warm', formality_label: 'Casual' } },
+      version: 1,
+      provenance: new Map(),
+      meta: undefined,
+      intake: undefined,
+      source: 'resolved',
+      appliedFromLearning: false,
+    } as unknown as Awaited<ReturnType<typeof readBrain>>)
+    vi.mocked(listConnections).mockResolvedValue([
+      { id: 'c1', platform: 'instagram', status: 'active' },
+    ] as unknown as Awaited<ReturnType<typeof listConnections>>)
+
+    render(await HomePage())
+
+    expect(screen.queryByRole('region', { name: /set up/i })).toBeNull()
+  })
+})
+
 describe('the landing rule on the page that lands', () => {
   beforeEach(() => {
     balanceRead.mockResolvedValue({
@@ -450,10 +503,31 @@ describe('the plan offer on the dashboard', () => {
    */
   const findOffer = () => screen.findByRole('heading', { name: OFFER })
 
-  test('a workspace on Free is offered the plans', async () => {
+  test('a workspace on Free that has done something AND spent most of its credits is offered the plans', async () => {
+    vi.mocked(listPosts).mockResolvedValue([A_POST])
+    balanceRead.mockResolvedValue({
+      status: 'ok',
+      balance: { total: 40, held: 0, available: 40, hasHold: false, heldNote: null },
+    })
     render(await HomePage())
 
     expect(await findOffer()).toBeInTheDocument()
+  })
+
+  test('a workspace that has done something but still holds most of its free credits is NOT', async () => {
+    // MEASURED 2026-09-06 on the wt-core preview: one saved draft, 100 of 100
+    // credits unspent, and the dialog over the first full dashboard. The
+    // founder delegated the signal; the decision now waits until half of the
+    // free grant is gone.
+    vi.mocked(listPosts).mockResolvedValue([A_POST])
+    balanceRead.mockResolvedValue({
+      status: 'ok',
+      balance: { total: 100, held: 0, available: 100, hasHold: false, heldNote: null },
+    })
+    render(await HomePage())
+
+    expect(screen.getByText(/needs your attention/i)).toBeInTheDocument()
+    expect(offerHeading()).toBeNull()
   })
 
   test('a workspace on a paid plan is NOT', async () => {
@@ -490,11 +564,14 @@ describe('the plan offer on the dashboard', () => {
     expect(offerHeading()).toBeNull()
   })
 
-  test('it rides the empty dashboard too, which is where most Free workspaces are', async () => {
-    // `GetStarted` is an early return with its own JSX, so the offer has to be
-    // added to that branch as well. It was easy to wire only the full dashboard
-    // and never notice, because the account most likely to be weighing a plan is
-    // exactly the one that sees this screen.
+  test('the empty dashboard gets NO offer: a plan is not the first thing a new workspace sees', async () => {
+    // This test used to pin the opposite, and its reasoning is worth keeping:
+    // the account most likely to be weighing a plan is the one on this screen.
+    // MEASURED 2026-09-05 in a real browser, the effect was that a workspace
+    // which had just finished onboarding met a pricing dialog before it had
+    // seen its own dashboard. Founder's ruling the same day: the offer waits
+    // until the workspace has done something. `planOfferDecision` takes
+    // `hasStarted` so the rule lives in the decision, not in this JSX.
     //
     // The balance is set here rather than left to the shared `beforeEach`, which
     // does not set it: `vi.clearAllMocks()` clears CALLS and leaves the
@@ -512,6 +589,7 @@ describe('the plan offer on the dashboard', () => {
     render(await HomePage())
 
     expect(screen.getByTestId('home-get-started')).toBeInTheDocument()
-    expect(await findOffer()).toBeInTheDocument()
+    // Absence needs no wait: a `silent` decision renders no mount at all.
+    expect(offerHeading()).toBeNull()
   })
 })

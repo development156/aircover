@@ -1,8 +1,8 @@
 import Link from 'next/link'
 import { Plug } from 'lucide-react'
-import { ChannelSchema } from '@sahoda/shared'
 
 import { CHANNEL_LABELS } from '@/components/posts/channel-label'
+import { offeredChannels } from '@/lib/connections/offered-channels'
 import type { ConnectedChannelsRead } from '@/lib/connections/read'
 
 /**
@@ -60,11 +60,18 @@ export function ConnectFirstNote({ connections }: { connections: ConnectedChanne
      * removed. Accent TEXT is legal where an accent FILL is not, so the link
      * carries the action at full strength and none of the area.
      *
-     * The channel names are read from `ChannelSchema.options`, never a literal
-     * list. `channel-label.ts` is explicit about why: the day eight connect-only
+     * The channel names come from `offeredChannels()`, never a literal list.
+     * `channel-label.ts` is explicit about why: the day eight connect-only
      * platforms landed, an exhaustive Record "handed those three over as a
      * to-do list". A hand-typed four-channel list here would silently omit the
      * fifth and sixth the product already publishes to.
+     *
+     * ── AND NOT FROM `ChannelSchema.options` EITHER, ANY MORE ────────────────
+     * That is what this read until 2026-09-06, and it named Telegram while the
+     * composer's channel row on the same screen did not (docs/51, Q-12): the
+     * picker had been taught `HIDDEN_FROM_OFFER` and this note had not. Both
+     * read one rule now, so "what connecting would buy" and "where this post
+     * can go" cannot disagree again.
      */
     <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
       <span
@@ -89,7 +96,9 @@ export function ConnectFirstNote({ connections }: { connections: ConnectedChanne
           three-line advisory about something that blocks nothing is the band
           this note stopped being. */}
       <span className="w-full truncate type-meta text-ink-mute">
-        {ChannelSchema.options.map((channel) => CHANNEL_LABELS[channel]).join(' · ')}
+        {offeredChannels()
+          .map((channel) => CHANNEL_LABELS[channel])
+          .join(' · ')}
       </span>
     </div>
   )

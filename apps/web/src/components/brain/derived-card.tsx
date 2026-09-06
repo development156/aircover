@@ -6,10 +6,29 @@ import { BRAIN_SECTIONS, DERIVED_FIELDS } from '@/lib/brand/fields'
 import type { Provenance } from '@/lib/brand/provenance'
 import { Badge, type Rung } from '@/components/ui/badge'
 
+/**
+ * THE BADGE SAYS THE VERDICT. THE CARD'S TITLE ALREADY SAYS WHAT OF.
+ *
+ * These read "Strong signal lock" / "Weak signal, inputs conflict" and sat
+ * beside a `CardLabel` reading "Signal lock", so the words "signal lock" landed
+ * twice in one header. MEASURED in a browser at 1280px: the long badge did not
+ * fit the 340px aside beside the title, and "SIGNAL LOCK" wrapped to two lines
+ * with the badge overlapping it.
+ *
+ * Shortening is not vaguer here, which is the only reason it is allowed: the
+ * title supplies "lock", and the CAUSE that "inputs conflict" named is still on
+ * screen directly beneath, in `alignment.note` — the model's own account, which
+ * `page.test.tsx` pins.
+ *
+ * `onboarding/cards/signal-lock-card.tsx` keeps its own copy of this map and is
+ * deliberately untouched: it is a different surface with a different width, and
+ * the two constants were already independent before this change rather than one
+ * being split.
+ */
 const LOCK_COPY: Record<BrandMemoryPayload['alignment']['signal_lock'], string> = {
-  strong: 'Strong signal lock',
-  moderate: 'Moderate signal lock',
-  weak: 'Weak signal, inputs conflict',
+  strong: 'Strong signal',
+  moderate: 'Moderate signal',
+  weak: 'Weak signal',
 }
 
 /**
@@ -60,37 +79,41 @@ export function DerivedCard({
 
   return (
     <Card data-guide="brain.section.alignment" className="flex flex-col gap-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <CardLabel className="mb-0">{derived.label}</CardLabel>
-        <span className="type-eyebrow shrink-0 text-muted">Derived, not counted</span>
-      </div>
+      {/* ── THE HEADER IS TITLE AND STATUS, NOT TWO EYEBROWS ─────────────────
+          Two `type-eyebrow` labels sat here under `justify-between`, and in the
+          340px aside they collided: "Signal lock" and "Derived, not counted"
+          wrapped through each other and rendered as the single unreadable line
+          "SIGNAL DERIVED, NOT COUNTED LOCK". MEASURED in a browser at 1280px on
+          2026-09-03, which is the width this column actually ships at.
 
-      <div className="flex flex-col gap-2">
-        <Badge rung={LOCK_RUNG[alignment.signal_lock]} className="w-fit">
+          The badge takes the right-hand slot, which is where a status belongs,
+          and the caveat moves to the card's foot, which is where a caveat
+          belongs. Its exact words are unchanged: `page.test.tsx` pins "Derived,
+          not counted" and the claim is the whole point of the card. */}
+      <div className="flex items-start justify-between gap-3">
+        <CardLabel className="mb-0">{derived.label}</CardLabel>
+        <Badge rung={LOCK_RUNG[alignment.signal_lock]} className="shrink-0">
           {LOCK_COPY[alignment.signal_lock]}
         </Badge>
-        <p className="text-[13px] text-muted">{alignment.note}</p>
       </div>
+      <p className="text-[13px] text-muted">{alignment.note}</p>
 
       <div className="border-t border-line pt-3">
         <p className="type-eyebrow mb-2 text-muted">Drawn from</p>
         <ul className="flex flex-col gap-1.5">
           {inputs.map((input) => (
+            /* The word "confirmed" was on all five rows and is on the eyebrow
+               above them; five repetitions of a label is the noise this pass
+               removes. The ratio is what the row is for. */
             <li key={input.title} className="flex items-baseline justify-between gap-3 text-[13px]">
               <span className="text-ink">{input.title}</span>
-              <span className="text-muted">
-                <span className="num">
-                  {input.tally.confirmed}/{input.tally.total}
-                </span>{' '}
-                confirmed
+              <span className="num text-muted">
+                {input.tally.confirmed}/{input.tally.total}
               </span>
             </li>
           ))}
         </ul>
-        <p className="mt-3 text-[12.5px] text-muted">
-          Sahoda computed this from the sections above. Confirm more of them and regenerate to draw
-          it from your answers instead of its guesses.
-        </p>
+        <p className="type-eyebrow mt-3 text-muted">Derived, not counted</p>
       </div>
     </Card>
   )

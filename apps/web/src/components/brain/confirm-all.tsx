@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { Check } from 'lucide-react'
 
-import { confirmBrainField } from '@/app/actions/brand-field'
+import { confirmBrainFields } from '@/app/actions/brain-resolve-fields'
 import { Button } from '@/components/ui/button'
 import type { BrainLeaf } from '@/lib/brand/leaf'
 
@@ -27,15 +27,18 @@ export interface ConfirmAllTarget {
  * see — one that spans tabs, or the whole brain from the header. It is scoped to
  * the section it sits in for that reason.
  *
- * ── ONE WRITE PER FIELD, SEQUENTIALLY ────────────────────────────────────────
- * `confirmBrainField` writes one version per field through the RPC; there is no
- * bulk action and this does not invent one by reaching past it. Sequential
- * because each is a workspace-scoped write behind RLS, and a burst of them at a
- * free-tier database to save a moment on a button press is the wrong trade.
+ * ── ONE WRITE FOR THE WHOLE GESTURE ─────────────────────────────────────────
+ * This looped `confirmBrainField` once per target. MEASURED 2026-09-06 on the
+ * wt-core preview against production: "Confirm all 4" fired four POSTs and
+ * wrote versions 4, 5, 6 and 7 inside 1.1 seconds, while the console's
+ * "Confirm selected" wrote two fields as one version in the same session.
+ * `confirmBrainFields` stamps every path in one `resolve_brand_memory` call:
+ * one version, one round trip, and no "1 of 4 could not be confirmed" to
+ * explain, because there is no half-done state to be in.
  *
- * A partial failure is REPORTED, not swallowed: the marks that changed have
- * changed, and the sentence names how many did not so the reader is not left
- * comparing counts to work it out.
+ * A transport failure (no network) is REPORTED in a sentence, never thrown out
+ * of the transition — a rejection escaping `startTransition` unmounts the whole
+ * route into the error boundary, which is what the per-row buttons did.
  */
 export function ConfirmAll({ targets }: { targets: readonly ConfirmAllTarget[] }) {
   const [error, setError] = useState<string | null>(null)
@@ -46,22 +49,12 @@ export function ConfirmAll({ targets }: { targets: readonly ConfirmAllTarget[] }
   function confirmAll() {
     setError(null)
     start(async () => {
-      let failed = 0
-      for (const target of targets) {
-        try {
-          const result = await confirmBrainField(target.path, target.value)
-          if (!result.ok) failed += 1
-        } catch {
-          // A throw and an `ok: false` read the same to the person: that one is
-          // still a guess.
-          failed += 1
-        }
+      try {
+        const result = await confirmBrainFields(targets.map((target) => target.path))
+        if (!result.ok) setError(result.message)
+      } catch {
+        setError('Could not reach Sahoda. Check your connection and try again. Nothing changed.')
       }
-      setError(
-        failed === 0
-          ? null
-          : `${failed} of ${targets.length} could not be confirmed. The rest were. Try those again.`,
-      )
     })
   }
 

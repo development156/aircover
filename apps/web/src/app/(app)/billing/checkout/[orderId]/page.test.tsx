@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 import { createCashfreeProvider, loadCashfreeEnv } from '@sahoda/billing'
+import { reportServerError } from '@/lib/observability/report'
 import { activeWorkspaceRead } from '@/lib/workspaces'
 
 import CheckoutBridgePage from './page'
@@ -176,5 +177,33 @@ describe('someone else’s order', () => {
   test('is a 404, so an order id cannot be used as an existence oracle', async () => {
     fetchOrder.mockResolvedValue(order({ tags: { workspace_id: 'other', plan_id: 'starter' } }))
     await expect(page()).rejects.toThrow('NEXT_NOT_FOUND')
+  })
+})
+
+/**
+ * Two different failures used to share one sentence. MEASURED 2026-09-05 in a
+ * browser: `/billing/checkout/nope` said "Sahoda could not reach the payment
+ * provider" for an order id Cashfree simply does not know, and reported it to
+ * Sentry as an outage. An unknown order is an old or mistyped link, not a
+ * problem at our end, and the honest answer is the same 404 an unknown post gets.
+ */
+describe('an order Cashfree does not know', () => {
+  test('is a 404, not an outage, and is not reported as one', async () => {
+    fetchOrder.mockRejectedValue(
+      Object.assign(new Error('cashfree get order failed (404 order_not_found): not found'), {
+        status: 404,
+        code: 'order_not_found',
+        transient: false,
+      }),
+    )
+    await expect(page()).rejects.toThrow('NEXT_NOT_FOUND')
+    expect(reportServerError).not.toHaveBeenCalled()
+  })
+
+  test('a provider that cannot be reached still says so, and is reported', async () => {
+    fetchOrder.mockRejectedValue(new TypeError('fetch failed'))
+    await page()
+    expect(screen.getByText(/could not reach the payment provider/i)).toBeInTheDocument()
+    expect(reportServerError).toHaveBeenCalledTimes(1)
   })
 })

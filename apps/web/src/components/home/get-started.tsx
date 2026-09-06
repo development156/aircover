@@ -89,7 +89,7 @@ export function GetStarted({ now, steps }: { now: Date; steps: StartStep[] }) {
              card holds a heading, a button and three rows with their own
              sub-lines, not a paragraph, and at 640 the primary and its price
              line started to crowd. */
-          className="surface-ring max-w-[var(--measure-form)] rounded-card bg-surface p-5"
+          className="surface-ring-lift max-w-[var(--measure-form)] rounded-card bg-surface p-5"
         >
           {/* Capped at the prose measure rather than left to the card. At 1440 the
             card is 1132px and every sentence in it is under 640 — letting the

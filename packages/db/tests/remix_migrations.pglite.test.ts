@@ -227,3 +227,97 @@ describe('tenant isolation, with the policies actually applied', () => {
     expect(result).toEqual({ rows: [] })
   })
 })
+
+/**
+ * remix_create_batch — the batch and its derivatives, atomic, under the caller's RLS.
+ *
+ * ── THE GUARANTEE, TESTED BY BREAKING IT ─────────────────────────────────────
+ * `store.ts createBatch` used to insert the batch, then the derivatives, as two
+ * separate statements. A refused second insert left an orphan batch a planner
+ * could read and never run. The RPC folds both into one function, so a raise on
+ * any derivative rolls the batch back with it. Proven by handing it a payload
+ * with a duplicate (kind, channel) — the unique index refuses the second row —
+ * and asserting the call is DENIED and NO batch row survives.
+ *
+ * ── AND THE BOUNDARY DID NOT MOVE ────────────────────────────────────────────
+ * The function is SECURITY INVOKER, so a member of B cannot use it to write into
+ * A: the same `WITH CHECK` policy that guards a direct insert guards the one
+ * inside the function.
+ */
+describe('remix_create_batch is atomic and RLS-bound', () => {
+  const derivs = (rows: Array<{ kind: string; channel: string; format: string }>): string =>
+    JSON.stringify(rows)
+
+  it('writes the batch and every derivative in one go', async () => {
+    await asMember(db, USER_A, async (tx) => {
+      const created = await probe<{ id: string }>(
+        tx,
+        `select public.remix_create_batch($1, $2, null, 'Source', 'by A', $3::jsonb) as id`,
+        [
+          WS_A,
+          USER_A,
+          derivs([
+            { kind: 'short', channel: 'x', format: 'text' },
+            { kind: 'hook', channel: 'linkedin', format: 'text' },
+          ]),
+        ],
+      )
+      expect(created).toHaveProperty('rows')
+      const batchId = (created as { rows: { id: string }[] }).rows[0]!.id
+
+      const written = await probe<{ kind: string }>(
+        tx,
+        `select kind from remix_derivatives where batch_id = $1 order by kind`,
+        [batchId],
+      )
+      expect((written as { rows: { kind: string }[] }).rows.map((r) => r.kind)).toEqual([
+        'hook',
+        'short',
+      ])
+    })
+  })
+
+  it('a derivative that violates a constraint leaves NO batch row', async () => {
+    await asMember(db, USER_A, async (tx) => {
+      const before = await probe<{ n: number }>(
+        tx,
+        `select count(*)::int as n from remix_batches where workspace_id = $1`,
+        [WS_A],
+      )
+      const beforeN = (before as { rows: { n: number }[] }).rows[0]!.n
+
+      // Two `short` rows for X — the second trips `unique (batch_id, kind, channel)`,
+      // so the whole function must abort and the batch it began must not survive.
+      const bad = await probe(
+        tx,
+        `select public.remix_create_batch($1, $2, null, null, null, $3::jsonb) as id`,
+        [
+          WS_A,
+          USER_A,
+          derivs([
+            { kind: 'short', channel: 'x', format: 'text' },
+            { kind: 'short', channel: 'x', format: 'text' },
+          ]),
+        ],
+      )
+      expect(bad).toHaveProperty('denied')
+
+      const after = await probe<{ n: number }>(
+        tx,
+        `select count(*)::int as n from remix_batches where workspace_id = $1`,
+        [WS_A],
+      )
+      expect((after as { rows: { n: number }[] }).rows[0]!.n).toBe(beforeN)
+    })
+  })
+
+  it('a member of B cannot create a batch in A through the function', async () => {
+    const result = await asMember(db, USER_B, (tx) =>
+      probe(tx, `select public.remix_create_batch($1, $2, null, null, null, '[]'::jsonb) as id`, [
+        WS_A,
+        USER_B,
+      ]),
+    )
+    expect(result).toHaveProperty('denied')
+  })
+})

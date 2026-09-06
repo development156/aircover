@@ -1,5 +1,7 @@
 'use client'
 
+import dynamic from 'next/dynamic'
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import type { BrandSignal } from '@sahoda/shared'
 
@@ -15,6 +17,25 @@ import type { StudioFormat } from '@/lib/studio/formats'
 import type { LibraryRead } from '@/lib/studio/read'
 import type { ComposerInitialValues } from '@/components/studio/composer'
 import type { ViewerVersions } from '@/lib/studio/viewer-read'
+
+/**
+ * Loaded on the press and not before: the canvas, its tools and its object
+ * model are the heaviest thing on this route, and most visits never draw.
+ * The wall did the same when it owned this modal.
+ */
+const DrawModal = dynamic(() =>
+  import('@/components/studio/draw-modal').then((mod) => mod.DrawModal),
+)
+
+/**
+ * Also split out, for a smaller reason: it is one underlined line and a
+ * confirmation dialog, and the dialog primitive was the only thing putting
+ * `ui/modal` on this route's first load. MEASURED 2026-09-05: mounting it
+ * statically took `/studio/[id]` 9.8 kB past the budget `d319d778` set.
+ */
+const DiscardGeneration = dynamic(() =>
+  import('@/components/studio/discard-generation').then((mod) => mod.DiscardGeneration),
+)
 
 /**
  * THE VIEWER. FULL-BLEED, DARK, AND ONE PICTURE LARGE.
@@ -56,6 +77,27 @@ export function ViewerScreen({
   const shownUrl = showing === 'stamped' ? (picture.stampedUrl ?? picture.url) : picture.url
 
   const libraryPictures = library.status === 'ok' ? library.pictures : []
+
+  /**
+   * ── DRAW ON IT, AND THEN CHANGE IT ─────────────────────────────────────────
+   * "Draw on it" was reachable from the wall until the two-screen split on
+   * 2026-09-05 and then from nowhere: `PictureActions` only offers it when
+   * handed `onDraw`, and nothing handed it. It lives here now, because marking
+   * a picture up is something you do to the one you are looking at.
+   *
+   * Offered only when the picture's size is recorded, since the canvas needs
+   * real pixels to draw at. A saved mark-up lands in the library as an asset,
+   * and the composer below is re-seeded to Edit with that asset picked: a
+   * marked picture left unselected is a press that led nowhere.
+   */
+  const router = useRouter()
+  const [drawing, setDrawing] = useState(false)
+  const [drawnAssetId, setDrawnAssetId] = useState<string | null>(null)
+  const canDraw = picture.width !== null && picture.height !== null
+  const composerValues: ComposerInitialValues =
+    drawnAssetId === null
+      ? initialValues
+      : { ...initialValues, mode: 'edit', referenceAssetIds: [drawnAssetId] }
 
   return (
     <div
@@ -102,11 +144,21 @@ export function ViewerScreen({
 
           <div className="flex flex-col gap-2">
             <span className="type-eyebrow text-muted">Change it</span>
+            {/* `composerValues`, never the raw `initialValues`: wt-core's draw
+                work switches the remix to `edit` mode seeded with the drawn
+                asset once somebody has drawn on this picture, and passing the
+                unmodified values would silently throw that away.
+
+                `balance` is NOT passed. This lane removed the whole prop chain
+                when the founder ruled the page must not print a figure the
+                topbar pill already carries, so `Composer` no longer accepts one
+                and `ViewerScreen` no longer takes one. */}
             <ViewerComposer
+              key={drawnAssetId ?? 'as-generated'}
               formats={formats}
               library={library}
               signals={signals}
-              initialValues={initialValues}
+              initialValues={composerValues}
               sourceGenerationId={sourceGenerationId}
               remixLocked={remixLocked}
             />
@@ -124,10 +176,42 @@ export function ViewerScreen({
 
           <div className="flex flex-col gap-2">
             <span className="type-eyebrow text-muted">Do something with it</span>
-            <PictureActions picture={picture} />
+            <PictureActions
+              picture={picture}
+              onDraw={canDraw ? () => setDrawing(true) : undefined}
+            />
+            {/* Removing the request was reachable from the history list until
+                the wall replaced it on 2026-09-05. This screen IS that record,
+                so it goes here, and the viewer leaves once the record is gone:
+                a reload of this route would be a 404 wearing a picture. */}
+            <DiscardGeneration
+              generationId={sourceGenerationId}
+              prompt={picture.prompt}
+              onRemoved={() => router.push('/studio')}
+            />
           </div>
         </div>
       </aside>
+
+      {canDraw ? (
+        <DrawModal
+          open={drawing}
+          onClose={() => setDrawing(false)}
+          picture={{
+            url: picture.url,
+            width: picture.width as number,
+            height: picture.height as number,
+            prompt: picture.prompt,
+          }}
+          onSaved={(assetId) => {
+            setDrawing(false)
+            setDrawnAssetId(assetId)
+            // The new asset is on the server; the library prop is not until
+            // this re-reads it, and the picked reference renders from that.
+            router.refresh()
+          }}
+        />
+      ) : null}
     </div>
   )
 }

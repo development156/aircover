@@ -42,7 +42,7 @@ const TYPE: ReadonlyArray<[string, string, string]> = [
   [
     'type-chip',
     '600 · 12/16',
-    'A chip\u2019s own label. NOT uppercase: a chip label is often a sentence fragment ("Not proven live").',
+    'A chip\u2019s own label. NOT uppercase: a chip label is often a sentence fragment ("Not yet confirmed live").',
   ],
   [
     'type-eyebrow',

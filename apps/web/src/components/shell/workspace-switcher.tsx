@@ -96,11 +96,23 @@ export function WorkspaceSwitcher({
   // its failure toast live in CreateWorkspaceButton, which /wallet's first-run
   // state renders too — one offer, one behaviour, in both places.
   if (workspaces.length === 0 || !active) {
-    return <CreateWorkspaceButton guideAnchor="topbar.workspace-create" />
+    // Compact on a phone, not hidden. MEASURED 2026-09-05 (smoke,
+    // no-truncated-labels at 390): the 167px label pushed the user menu to
+    // x=432 in a 390px viewport. The first repair hid the whole button there,
+    // and `shell-probe.spec.ts` (run 34012814133) refused it: this trigger is
+    // what tells the no-workspace state apart from every other, on every
+    // width. So the words go sr-only on a phone and the button stays.
+    return <CreateWorkspaceButton guideAnchor="topbar.workspace-create" compactOnNarrow />
   }
 
   return (
-    <div ref={containerRef} className="relative min-w-0">
+    <div
+      ref={containerRef}
+      // One workspace on a phone has nothing to switch to, and its trigger was
+      // 48px of a 35px overflow (see credit-chip.tsx for the measurement). The
+      // switcher returns the moment there is a second workspace to choose.
+      className={cn('relative min-w-0', workspaces.length === 1 && 'max-narrow:hidden')}
+    >
       <button
         ref={triggerRef}
         type="button"

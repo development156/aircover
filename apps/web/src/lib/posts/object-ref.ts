@@ -30,8 +30,3 @@ export function newVariantsObjectRef(workspaceId: string): string {
 export function newCaptionRewriteRef(workspaceId: string): string {
   return newRef('rewrite', workspaceId)
 }
-
-/** Fresh ref for one `image_generate` charge (6 credits). */
-export function newImageGenerateRef(workspaceId: string): string {
-  return newRef('image', workspaceId)
-}

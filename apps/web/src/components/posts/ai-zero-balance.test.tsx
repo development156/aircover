@@ -45,10 +45,6 @@ vi.mock('@/app/actions/posts-ai', () => ({
   generateVariants: vi.fn(async () => insufficient(3)),
   rewriteCaption: vi.fn(async () => insufficient(1)),
 }))
-vi.mock('@/app/actions/posts-image', () => ({
-  generateImage: vi.fn(async () => insufficient(6)),
-}))
-
 /** Both numbers, as digits, somewhere in the refusal. */
 function expectsShortfall(required: number) {
   const body = document.body.textContent ?? ''

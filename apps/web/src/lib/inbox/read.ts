@@ -18,6 +18,7 @@ import { cache } from 'react'
 
 import { postsCarryingComments } from '@/lib/inbox/commented-posts'
 import { inChronologicalOrder, newestInboundAt, threadPlatform } from '@/lib/inbox/messages'
+import { readStoredThreadMessages } from '@/lib/inbox/store-read'
 import {
   SURFACE_CONNECTION_PLATFORMS,
   decideSurface,
@@ -397,7 +398,13 @@ export async function readThread(
       limit: PAGE,
       sortOrder: 'desc',
     })
-    const messages = inChronologicalOrder(page.messages)
+    // ── THE STORE IS THE FALLBACK, NOT THE OVERWRITE ───────────────────────
+    // A live page with messages in it wins: it is the freshest view and it
+    // carries the pagination cursor. The store is consulted only when the live
+    // read produced NOTHING, which covers both an empty answer and the case
+    // this fallback exists for. It can only ADD messages, never replace them.
+    const live = inChronologicalOrder(page.messages)
+    const messages = live.length > 0 ? live : await storedMessages(conversationId)
     const platform = threadPlatform(messages)
     return {
       messages,
@@ -419,10 +426,41 @@ export async function readThread(
         result: { rows: messages.length, meta: undefined },
         fanOut: false,
       }),
-      nextCursor: page.pagination.nextCursor,
+      // Only the LIVE page has a cursor. Handing back Zernio's cursor beside
+      // stored messages would page from a list these rows did not come from.
+      nextCursor: live.length > 0 ? page.pagination.nextCursor : null,
     }
   } catch (error) {
     console.error('[inbox] thread read failed', error instanceof Error ? error.message : 'unknown')
+
+    // ── ZERNIO IS DOWN, AND THIS DATABASE STILL HOLDS THE CONVERSATION ──────
+    // The list already renders from the store on exactly this failure, so
+    // without this the list offered rows whose destination showed nothing.
+    const stored = await storedMessages(conversationId)
+    if (stored.length > 0) {
+      const platform = threadPlatform(stored)
+      return {
+        messages: stored,
+        // The send window is still modelled: it is measured from the newest
+        // INBOUND message, and the store holds those. What cannot be promised
+        // is that a reply will go out while Zernio is unreachable, and that is
+        // the send path's refusal to make rather than this read's.
+        affordance:
+          platform === null
+            ? null
+            : evaluateSendWindow({ platform, lastInboundAt: newestInboundAt(stored), now }),
+        // Rows, not a failure. The live call DID fail and the decision must not
+        // claim otherwise for the LIST — but this thread was read, from here.
+        decision: decideSurface({
+          surface: 'thread',
+          connectedAccounts,
+          result: { rows: stored.length, meta: undefined },
+          fanOut: false,
+        }),
+        nextCursor: null,
+      }
+    }
+
     return {
       messages: [],
       affordance: null,
@@ -430,6 +468,19 @@ export async function readThread(
       nextCursor: null,
     }
   }
+}
+
+/**
+ * The stored messages for one conversation, in the thread's own message shape.
+ *
+ * `conversationId` on this route IS the row's `platform_thread_id` — the list
+ * builds its hrefs from that column — so it is the right key to look the thread
+ * up by. Never throws: a store that could not answer contributes nothing rather
+ * than taking down a read that had already succeeded.
+ */
+async function storedMessages(conversationId: string): Promise<ZernioMessage[]> {
+  const rows = await readStoredThreadMessages(conversationId)
+  return inChronologicalOrder(rows as ZernioMessage[])
 }
 
 /**

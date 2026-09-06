@@ -304,7 +304,7 @@ and the reader is meeting a marketing tool for the first time on a cheap 720p pa
 | `type-body` | 14 / 22 / 400 | 0 | **The base.** |
 | `type-sm` | 13 / 18 / 400 | 0 | Secondary text. Absorbs the 12.5px block. |
 | `type-meta` | 12 / 16 / 400 | 0 | **New in v5.** Table cells, captions, timestamps, helper text — the 211 + 110 uses that had nowhere to go. |
-| `type-chip` | 12 / 16 / 600 | 0 | A chip's own label. Not uppercase — a chip label is often a sentence fragment ("Not proven live"). |
+| `type-chip` | 12 / 16 / 600 | 0 | A chip's own label. Not uppercase — a chip label is often a sentence fragment ("Not yet confirmed live"). |
 | `type-eyebrow` | 11 / 14 / 600 | +0.06em | Uppercase section label. Positive tracking because 11px uppercase set solid looks cramped. |
 | `type-input-embed` | 16 / 22 / 400 | 0 | The one rung that exists because a browser insists on it: iOS Safari zooms the viewport on focus for any input under 16px, and `/embed/*` renders inside somebody else's mobile page where that zoom cannot be undone. |
 

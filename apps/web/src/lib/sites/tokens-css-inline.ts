@@ -401,6 +401,27 @@ export const TOKENS_CSS = `/* ==================================================
      So a resting card gets NO shadow. A shadow means "this floats above the
      page", and only overlays float. */
   --sh-card: 0 1px 2px rgba(0, 0, 0, 0.03); /* barely there, and that is right */
+
+  /* ---------- THE RESTING CARD'S LIFT, AND IT REVERSES THE RULING ABOVE ------
+     The paragraph above says a resting card gets NO shadow, and that WAS the
+     ruling. Founder's ruling, 2026-09-03, reverses it for the light theme only:
+     the boxes should sit slightly above the white page. The value is his, to
+     the digit.
+
+     It is a separate token from \`--sh-card\` on purpose. \`--sh-card\` is 1px of
+     contact shadow used by the /admin screens and by the interactive card's
+     hover; this is a 18px diffusion used at REST by container cards. Folding
+     them together would have moved the hover state and every admin panel with
+     one edit, which is not what was asked for.
+
+     ── AND IT IS EXACTLY ZERO IN DARK ────────────────────────────────────────
+     Not a dimmer black: a fully transparent layer, so \`surface-ring-lift\`
+     composites to the
+     inset hairline alone and dark is byte-identical to what it renders today.
+     A soft black bloom on a #0d0d0d ground is invisible at best, and at worst
+     it muddies the edge the hairline is there to draw. The brief said light
+     theme; this is what that means in a file that has two. */
+  --sh-rest: 0 4px 18px rgba(0, 0, 0, 0.05);
   --sh-pop: 0 8px 28px rgba(0, 0, 0, 0.1); /* popovers, dropdowns */
   --sh-lg: 0 24px 64px rgba(0, 0, 0, 0.16); /* modals, drawers */
   --sh-brand: 0 8px 24px color-mix(in srgb, var(--p) 24%, transparent);
@@ -662,6 +683,9 @@ export const TOKENS_CSS = `/* ==================================================
   --sh-card: 0 1px 2px rgba(0, 0, 0, 0.5);
   --sh-pop: 0 8px 28px rgba(0, 0, 0, 0.6);
   --sh-lg: 0 24px 64px rgba(0, 0, 0, 0.7);
+  /* OFF in dark, deliberately. See the light block for why it is zero rather
+     than a dimmer black. */
+  --sh-rest: 0 0 rgba(0, 0, 0, 0);
 
   /* Glass over a near-black ground needs a LIGHTENING veil, not a white one at
      lower alpha: white at 72% over #0d0d0d is a white panel. */
@@ -711,6 +735,12 @@ export const TOKENS_CSS = `/* ==================================================
   --surface: #171717;
   --surface-2: #212121;
   --surface-3: #292929;
+  /* The inverse scope IS the dark ladder, so it takes dark's answer to the
+     resting lift as well: off. Without this line a card nested inside an
+     inverse subtree would inherit the LIGHT theme's soft black bloom onto a
+     near-black ground. Nothing renders one there today; the line is here so
+     that stays true rather than staying lucky. */
+  --sh-rest: 0 0 rgba(0, 0, 0, 0);
   --line: rgba(255, 255, 255, 0.1);
   --line-firm: rgba(255, 255, 255, 0.3);
   --line-soft: rgba(255, 255, 255, 0.07);

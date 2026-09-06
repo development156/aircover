@@ -2,12 +2,19 @@
 
 import { useState } from 'react'
 
+import { SiteDelete } from '@/components/sites/site-delete'
 import type { PreviewPage } from '@/lib/sites/preview'
 import { cn } from '@/lib/utils'
 
 export interface SitePreviewProps {
   siteName: string
   pages: PreviewPage[]
+  /**
+   * The row this preview was rendered from. Carried so the screen can offer a
+   * way OUT of a site somebody does not want: with the plan allowance counting
+   * drafts, a first generation with no delete was also a last one.
+   */
+  siteId: string
 }
 
 /**
@@ -17,7 +24,7 @@ export interface SitePreviewProps {
  * `renderBundle`, this is defense in depth). In-page links do not navigate
  * inside a srcdoc frame; the tab strip is the navigation.
  */
-export function SitePreview({ siteName, pages }: SitePreviewProps) {
+export function SitePreview({ siteName, pages, siteId }: SitePreviewProps) {
   const [activePath, setActivePath] = useState(pages[0]?.path ?? '')
   const active = pages.find((page) => page.path === activePath) ?? pages[0]
 
@@ -27,7 +34,10 @@ export function SitePreview({ siteName, pages }: SitePreviewProps) {
     <section className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-[15px] font-bold">{siteName}</h2>
-        <p className="text-[12.5px] text-muted">Draft preview · not published anywhere yet</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-[12.5px] text-muted">Draft preview · not published anywhere yet</p>
+          <SiteDelete siteId={siteId} siteName={siteName} />
+        </div>
       </div>
 
       {pages.length > 1 ? (

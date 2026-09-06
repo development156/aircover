@@ -157,7 +157,7 @@ describe('describeConditioning', () => {
 describe('buildPromptStarters', () => {
   test('no signals means the generic five, unchanged', () => {
     const { starters, source } = buildPromptStarters([])
-    expect(starters).toBe(PROMPT_STARTERS)
+    expect(starters).toEqual(PROMPT_STARTERS.map((starter) => starter.prompt))
     expect(source).toBe('generic')
   })
 

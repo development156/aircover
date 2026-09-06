@@ -6,6 +6,14 @@ import type { DisplayPost } from '@/lib/posts/display-post'
 import type { WeekBuckets } from '@/lib/planner/week'
 import type { PublishSummary } from '@/lib/home/publishing'
 import type { BalanceRead } from '@/lib/wallet/read'
+import type { PostStatus } from '@sahoda/shared'
+
+/** What "scheduled" means on this board: a commitment, not a date on a draft. */
+const COMMITTED: ReadonlySet<PostStatus> = new Set<PostStatus>([
+  'approved',
+  'scheduled',
+  'publishing',
+])
 
 /**
  * FOUR NUMBERS THIS PRODUCT CAN ALWAYS PROVE.
@@ -26,7 +34,9 @@ import type { BalanceRead } from '@/lib/wallet/read'
  *                    `NeedsAttention` filters on, so the strip and the card
  *                    below it cannot disagree (SPECIFICATION §7: one
  *                    collection, derived, never a stored count).
- *   Scheduled        posts in the rolling 7-day window, out of `bucketWeek`.
+ *   Scheduled        COMMITTED posts (approved, scheduled, publishing) in the
+ *                    rolling 7-day window, out of `bucketWeek`. A dated draft
+ *                    or a post in review is counted one cell to the left.
  *   Published        SUCCEEDED LIVE publishes. Not `attempts`, not
  *                    `succeeded` — `live`, because a fixture run succeeded at
  *                    simulating and published nothing.
@@ -61,8 +71,17 @@ export function AtAGlance({
   publish: PublishSummary
   balance: BalanceRead
 }) {
-  const waiting = posts.filter((post) => needsAPerson(post.intent)).length
-  const scheduled = buckets.days.reduce((n, day) => n + day.posts.length, 0)
+  const waiting = posts.filter((post) => needsAPerson(post)).length
+  // COMMITTED intents only — the same three the certainty ladder draws as
+  // solid. MEASURED 2026-09-06: a post in review, dated tomorrow, counted here
+  // as "Scheduled · 1 post" while the week strip beneath drew it as a neutral
+  // outline. A dated draft or a post still in review is waiting on a person,
+  // and the cell to the left already counts it; counting it here too claimed
+  // a commitment nobody had made.
+  const scheduled = buckets.days.reduce(
+    (n, day) => n + day.posts.filter((post) => COMMITTED.has(post.intent)).length,
+    0,
+  )
 
   // A read that THREW is `unreadable`, and it is the only absence these four
   // can take. `empty` is a successful read of nothing, which is a real zero and
@@ -87,7 +106,7 @@ export function AtAGlance({
         label="Scheduled"
         value={scheduled}
         unit={scheduled === 1 ? 'post' : 'posts'}
-        note="In the next seven days"
+        note="Approved for the next seven days"
         href="/planner"
       />
       <StatCard

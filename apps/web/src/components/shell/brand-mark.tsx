@@ -150,52 +150,63 @@ export function BrandMark({
 
   return (
     <div ref={containerRef} className="relative flex shrink-0 items-center">
-      <button
-        type="button"
-        // A switch, so it reports its state rather than merely being pressable.
-        // With no brand stored it is not a switch at all: it opens the panel, so
-        // it must not claim a state it does not have.
-        {...(hasTheme
-          ? { 'aria-pressed': on, 'aria-label': mounted ? skinToggleLabel(skin) : 'Your brand' }
-          : {
-              'aria-haspopup': 'dialog' as const,
-              'aria-expanded': open,
-              'aria-label': 'Your brand',
-            })}
-        data-guide="topbar.brand"
-        onClick={() => (hasTheme ? toggleSkin() : setOpen(true))}
-        className="surface-ring grid h-control min-w-control place-items-center overflow-hidden rounded-l-control bg-s2 px-1.5 transition-micro hover:bg-surface-3 active:scale-[.97] max-narrow:h-11 max-narrow:min-w-11"
-      >
-        {logoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={logoUrl} alt="" className="h-5 w-auto max-w-[88px] object-contain" />
-        ) : (
-          <span
-            aria-hidden
-            className="size-4 rounded-pill"
-            style={{ background: primary ?? 'var(--p)' }}
-          />
-        )}
-      </button>
+      {/* ONE ring around BOTH halves, drawn here, so the halves sit flush with a
+          hairline between them and neither paints into the other's box.
+          MEASURED 2026-09-05 (smoke, no-truncated-labels: topbar at 390/430/700/
+          1440): the chevron half used `-ml-px` to share the logo half's ring edge,
+          and its box therefore started 1px inside the logo half — "Your brand"
+          ends at 110, "Open brand options" starts at 109 — which the overlap
+          guard rightly refuses. The ring is an inset shadow, so it belongs on the
+          wrapper; the halves keep their rounding for the focus ring only. */}
+      <div className="surface-ring flex items-center rounded-control">
+        <button
+          type="button"
+          // A switch, so it reports its state rather than merely being pressable.
+          // With no brand stored it is not a switch at all: it opens the panel, so
+          // it must not claim a state it does not have.
+          {...(hasTheme
+            ? { 'aria-pressed': on, 'aria-label': mounted ? skinToggleLabel(skin) : 'Your brand' }
+            : {
+                'aria-haspopup': 'dialog' as const,
+                'aria-expanded': open,
+                'aria-label': 'Your brand',
+              })}
+          data-guide="topbar.brand"
+          onClick={() => (hasTheme ? toggleSkin() : setOpen(true))}
+          className="grid h-control min-w-control place-items-center overflow-hidden rounded-l-control bg-s2 px-1.5 transition-micro hover:bg-surface-3 active:scale-[.97] max-narrow:h-11 max-narrow:min-w-11"
+        >
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt="" className="h-5 w-auto max-w-[88px] object-contain" />
+          ) : (
+            <span
+              aria-hidden
+              className="size-4 rounded-pill"
+              style={{ background: primary ?? 'var(--p)' }}
+            />
+          )}
+        </button>
 
-      {/* The rarer half: which colour is primary, and replacing the file. Its own
-          button so the common act stays one press. `-ml-px` so the two share an
-          edge and read as one control rather than as two beside each other. */}
-      {/* `w-6`, not `w-5`. WCAG 2.5.8 asks 24x24 CSS pixels for a pointer
+        {/* The rarer half: which colour is primary, and replacing the file. Its own
+          button so the common act stays one press. The hairline between the two
+          is the chevron's own left border, inside its box, so the halves read as
+          one control without either box overlapping the other. */}
+        {/* `w-6`, not `w-5`. WCAG 2.5.8 asks 24x24 CSS pixels for a pointer
           target and this was 20 across — the smaller half of a split control,
           which is the half a shaky hand or a thumb misses. The height was
           already 32. One pixel column of the logo half pays for it. */}
-      <button
-        ref={chevronRef}
-        type="button"
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-label="Open brand options"
-        onClick={() => setOpen((was) => !was)}
-        className="surface-ring -ml-px grid h-control w-6 place-items-center rounded-r-control bg-s2 text-muted transition-micro hover:bg-surface-3 hover:text-ink active:scale-[.97] max-narrow:h-11 max-narrow:w-11"
-      >
-        <ChevronDown size={13} strokeWidth={1.8} aria-hidden />
-      </button>
+        <button
+          ref={chevronRef}
+          type="button"
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-label="Open brand options"
+          onClick={() => setOpen((was) => !was)}
+          className="grid h-control w-6 place-items-center rounded-r-control border-l border-line-soft bg-s2 text-muted transition-micro hover:bg-surface-3 hover:text-ink active:scale-[.97] max-narrow:h-11 max-narrow:w-11"
+        >
+          <ChevronDown size={13} strokeWidth={1.8} aria-hidden />
+        </button>
+      </div>
 
       {open ? (
         <BrandPanel

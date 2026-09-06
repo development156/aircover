@@ -83,15 +83,30 @@ c.connect().then(()=>c.query('select 1 ok')).then(r=>{console.log('  DB OK');ret
 number means the pooler credential is right. "Could not read balance" means step 2
 or 3 is wrong, most often percent-encoding.
 
-## 5 · Then tell GitHub the old objects are gone
+## 5 · Tell GitHub — this step is REQUIRED, not tidy-up
 
-The purge rewrote history, but GitHub still serves unreachable commits by SHA for a
-period. Ask them to garbage-collect:
+MEASURED 2026-09-04, after the force-push, by cloning the public repository fresh:
+**no branch carries the password. Sixteen pull-request refs still do.**
+
+    branches carrying it : 0  of 45
+    refs/pull/N/head     : 16  (PRs 20, 22, 28-41)
+
+GitHub creates `refs/pull/N/head` for every pull request and those refs are
+**immutable**. They cannot be force-pushed, rewritten or deleted by any git
+operation, they survive the PR being merged or closed, and on a public repository
+anyone can fetch them:
+
+    git fetch origin 'refs/pull/*:refs/pull/*'
+
+So the history rewrite closed the branches and could not close these. Only two
+things do: **rotating the credential**, which makes them worthless, or making the
+repository private, which hides them. Ask GitHub to garbage-collect:
 
 **<https://support.github.com/contact>** — say the repository is
 `development156/aircover`, that a credential was force-pushed out of history, and
-ask for the stale objects to be purged from the cache. Do this AFTER the rotation,
-never instead of it.
+ask for the stale objects AND the pull-request refs to be purged. Do this AFTER
+the rotation, never instead of it: Support may take days, and every hour until
+then the credential is still fetchable by anyone.
 
 ---
 

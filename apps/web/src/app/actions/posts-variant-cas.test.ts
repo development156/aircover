@@ -111,7 +111,12 @@ describe('before the migration — no expected version is supplied', () => {
     const result = await saveVariant(POST_ID, 'instagram', 'mine', {})
 
     expect(result.ok).toBe(true)
-    expect(result.ok === false && result.conflict).toBeFalsy()
+    // RETARGETED: `result.ok === false && result.conflict` is `false && …`
+    // whenever the save succeeds, so it evaluated to `false` — and passed —
+    // for ANY conflict shape, including one silently attached to a success
+    // result. Assert the actual claim: a success result carries no
+    // `conflict` key at all, on this path there is nothing to compare against.
+    expect('conflict' in result).toBe(false)
   })
 })
 
@@ -171,6 +176,18 @@ describe('after the migration — an expected version is supplied', () => {
     // The row was not updated. `ok: true` here would clear the editor's `dirty`
     // flag and label unsaved work as saved — the second way to lose it.
     expect(result.ok).toBe(false)
+    // RETARGETED: a bare `.ok` check passes identically whether cas-save.ts
+    // returned the refusal on purpose or `casSaveVariant` threw and the outer
+    // catch in `saveVariant` produced its OWN generic message. Assert the
+    // actual sentence conflictFor() returns, and the conflict it carries, and
+    // that the removed upsert safety net still never fires on this path.
+    expect(result.ok === false && result.message).toMatch(/your text is still here/i)
+    expect(result.ok === false && result.conflict).toEqual({
+      channel: 'instagram',
+      theirs: 'theirs',
+      version: 2,
+    })
+    expect(state.upserts).toEqual([])
   })
 
   test('still refuses honestly when the follow-up read cannot say what is stored', async () => {

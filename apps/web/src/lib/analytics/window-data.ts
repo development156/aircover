@@ -3,6 +3,7 @@ import 'server-only'
 import type { Channel } from '@sahoda/shared'
 
 import { commonAge } from '@/lib/analytics/week-report'
+import type { MetricKey } from '@/lib/analytics/compare'
 import { COMPARE_AGE_DAYS, type AgedPost } from '@/lib/analytics/like-age'
 import { timingGrid, type Timing, type TimedPost } from '@/lib/analytics/timing'
 import type { AnalyticsView } from '@/lib/analytics/view-params'
@@ -28,6 +29,24 @@ import { activeWorkspaceRead } from '@/lib/workspaces'
 export const ROW_CAP = 5000
 
 /**
+ * The three metrics `post_metric_snapshots` stores, and the cap for reading them
+ * in ONE query.
+ *
+ * The snapshot read used to ask for `reach` alone and cap at `ROW_CAP`. Asking
+ * for all three multiplies the rows by three for the same history, so a
+ * workspace that sat comfortably under the cap would cross it and the whole page
+ * would report itself unreadable — a regression that would look like a database
+ * fault and would only show up on the busiest accounts.
+ *
+ * The GUARANTEE is unchanged and is what the number is derived from: a read that
+ * comes back short of its limit was not truncated, so no metric is a subtotal
+ * wearing a total's clothes. Written as arithmetic rather than as 15000, so
+ * adding a fourth metric moves it without anyone doing the multiplication.
+ */
+export const SNAPSHOT_METRICS: readonly MetricKey[] = ['impressions', 'reach', 'engagement']
+export const SNAPSHOT_ROW_CAP = ROW_CAP * SNAPSHOT_METRICS.length
+
+/**
  * The zone every wall-clock claim on this page is made in.
  *
  * `workspaces.timezone` is nullable and, when the column was added, one of 33
@@ -45,6 +64,27 @@ export interface PublishedRow {
   publishedAt: string
   /** Reach at the shared age, or null. Never a lifetime total — see below. */
   reachAtAge: number | null
+  /**
+   * Impressions and engagement at THE SAME age, or null.
+   *
+   * ── WHY THESE ARRIVED LATE ───────────────────────────────────────────────
+   * `post_metric_snapshots` has stored all three metrics since it was created —
+   * `metric text not null check (metric in ('impressions', 'reach',
+   * 'engagement'))` — and the nightly job captures all three
+   * (`CAPTURED_METRICS`). This read asked for `reach` and nothing else, so
+   * /analytics could not show the other two at all, on any screen, however much
+   * of them we held.
+   *
+   * ── NULL IS NOT A ZERO, AND IT IS NOT THE PLATFORM'S FAULT EITHER ────────
+   * A null here means we hold no reading for this post, on this channel, for
+   * this metric, on the day `ageDays` lands on. That can be the platform not
+   * reporting OR the collecting job missing a day — `like-age.ts` says so in
+   * as many words — so nothing downstream may render it as a claim about the
+   * channel. It is the same null `reachAtAge` already carries, and the
+   * components already refuse to draw a number for it.
+   */
+  impressionsAtAge: number | null
+  engagementAtAge: number | null
 }
 
 export type WindowRead =
@@ -68,12 +108,20 @@ export type WindowRead =
 
 const DAY_MS = 86_400_000
 
-interface RawSnapshot {
+/**
+ * One stored reading, after parsing. Exported for `agedFor`'s tests: it is the
+ * only shape that function needs, and requiring a database to check which metric
+ * a reading belongs to would be checking the wrong thing.
+ */
+export interface SnapshotReading {
   postId: string
   channel: Channel
+  metric: MetricKey
   value: number
   measuredOn: string
 }
+
+type RawSnapshot = SnapshotReading
 
 /**
  * The `YYYY-MM-DD` an instant falls on, IN A NAMED ZONE.
@@ -199,7 +247,11 @@ export async function readWindow(view: AnalyticsView): Promise<WindowRead> {
     ])
     if (snapshots === 'unreadable') return { kind: 'unreadable' }
 
-    const aged = agedFor(legs, snapshots)
+    // One map per metric. Reach keeps its own name because the shared age below
+    // is derived from IT and from nothing else — see the note on `ageDays`.
+    const aged = agedFor(legs, snapshots, 'reach')
+    const agedImpressions = agedFor(legs, snapshots, 'impressions')
+    const agedEngagement = agedFor(legs, snapshots, 'engagement')
 
     /**
      * ── ONE AGE FOR THE WHOLE PAGE ─────────────────────────────────────────
@@ -209,6 +261,14 @@ export async function readWindow(view: AnalyticsView): Promise<WindowRead> {
      * something went out as how well it did. Sharing the age is also what makes
      * the numbers add up between sections: a reader who sums the table and
      * compares it with a card is entitled to get the same answer.
+     *
+     * IT IS STILL DERIVED FROM REACH ALONE, and that is deliberate. Impressions
+     * and engagement are read AT this age, never allowed to move it. Feeding all
+     * three to `commonAge` would pick the day on which SOME metric was recorded
+     * and could shift every reach figure on the page — changing numbers a
+     * customer has already seen, as a side effect of showing two new columns.
+     * Where the other two were not captured on that day they are null, which is
+     * the honest answer and the one the components already handle.
      */
     const ageDays = commonAge([...aged.values()], COMPARE_AGE_DAYS * 4, 2)
 
@@ -226,6 +286,14 @@ export async function readWindow(view: AnalyticsView): Promise<WindowRead> {
       title: titles.get(leg.postId) ?? 'Untitled post',
       reachAtAge:
         ageDays === null ? null : readingValue(aged.get(`${leg.postId}:${leg.channel}`), ageDays),
+      impressionsAtAge:
+        ageDays === null
+          ? null
+          : readingValue(agedImpressions.get(`${leg.postId}:${leg.channel}`), ageDays),
+      engagementAtAge:
+        ageDays === null
+          ? null
+          : readingValue(agedEngagement.get(`${leg.postId}:${leg.channel}`), ageDays),
     }))
 
     const previous = previousWindow(view)
@@ -321,9 +389,19 @@ function utcDayOf(iso: string): string | null {
   return Number.isFinite(at) ? new Date(at).toISOString().slice(0, 10) : null
 }
 
-function agedFor(
+/**
+ * One `AgedPost` per publish leg, for ONE metric.
+ *
+ * The metric is a parameter rather than a filter applied by the caller because
+ * an `AgedPost` whose `readings` mixed two metrics would be silently wrong:
+ * `readingAtAge` picks a reading by DAY, so a day carrying impressions but not
+ * reach would answer the reach question with an impressions number. Nothing
+ * downstream could detect that, because both are plain counts.
+ */
+export function agedFor(
   legs: ReadonlyArray<{ postId: string; channel: Channel; publishedAt: string }>,
-  snapshots: readonly RawSnapshot[],
+  snapshots: readonly SnapshotReading[],
+  metric: MetricKey,
 ): Map<string, AgedPost> {
   const byKey = new Map<string, AgedPost>()
   for (const leg of legs) {
@@ -335,7 +413,7 @@ function agedFor(
       postId: key,
       publishedOn,
       readings: snapshots
-        .filter((s) => s.postId === leg.postId && s.channel === leg.channel)
+        .filter((s) => s.metric === metric && s.postId === leg.postId && s.channel === leg.channel)
         .map((s) => ({ measuredOn: s.measuredOn, value: s.value })),
     })
   }
@@ -371,18 +449,23 @@ async function readSnapshots(
   supabase: ReturnType<typeof createServerSupabase>,
   workspaceId: string,
 ): Promise<RawSnapshot[] | 'unreadable'> {
+  // ONE query for all three metrics rather than three queries. The table's
+  // unique key is (workspace_id, post_id, channel, metric, measured_on) and
+  // there is an index on (workspace_id, metric, measured_on), so a per-metric
+  // read would be three round trips for rows this one already carries — and
+  // three chances for two of them to come back from different moments.
   const { data, error } = await supabase
     .from('post_metric_snapshots')
-    .select('post_id, channel, value, measured_on')
+    .select('post_id, channel, metric, value, measured_on')
     .eq('workspace_id', workspaceId)
-    .eq('metric', 'reach')
-    .limit(ROW_CAP)
+    .in('metric', SNAPSHOT_METRICS)
+    .limit(SNAPSHOT_ROW_CAP)
 
   // A refused read is reported as refused. Every figure downstream refuses
   // politely on an empty history, and that sentence is a claim about the
   // customer's account: saying it because a query failed would be a false one.
   if (error || !data) return 'unreadable'
-  if (data.length >= ROW_CAP) return 'unreadable'
+  if (data.length >= SNAPSHOT_ROW_CAP) return 'unreadable'
 
   const out: RawSnapshot[] = []
   for (const row of data) {
@@ -397,7 +480,13 @@ async function readSnapshots(
     // counted as zero: a zero here is a measurement of nothing.
     if (!Number.isFinite(value) || measuredOn === null) continue
     if (typeof row.post_id !== 'string' || typeof row.channel !== 'string') continue
-    out.push({ postId: row.post_id, channel: row.channel as Channel, value, measuredOn })
+    // A metric this build does not know is DROPPED, never bucketed into one it
+    // does. The column's CHECK allows exactly these three today; a fourth added
+    // by a migration ahead of this deploy would otherwise land in whichever
+    // bucket a cast happened to produce.
+    const metric = SNAPSHOT_METRICS.find((known) => known === row.metric)
+    if (metric === undefined) continue
+    out.push({ postId: row.post_id, channel: row.channel as Channel, metric, value, measuredOn })
   }
   return out
 }

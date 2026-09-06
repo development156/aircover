@@ -50,11 +50,17 @@ const CERTAINTY_CLASS: Record<string, string> = {
 
 function Entry({ post, variants }: { post: DisplayPost; variants: readonly VariantStatusRow[] }) {
   const certainty = certaintyFor(post.intent, outcomeOf(variants))
+  const title = post.title?.trim() || 'Untitled post'
 
   return (
     <Link
       href={`/posts/${post.id}`}
       data-certainty={certainty.level}
+      // A cell is ~110px at 1440 and the title truncates to about ten
+      // characters (MEASURED 2026-09-06 with a 200-character title). The
+      // tooltip is the cheapest way to keep the rest of the sentence reachable
+      // without widening the calendar.
+      title={title}
       className={cn(
         'flex flex-wrap items-center gap-x-1.5 gap-y-0.5 rounded-sm px-2.5 py-1.5 type-meta font-semibold transition-micro',
         // HOVER IS A GLOW, NOT A BRIGHTNESS FILTER. `hover:brightness-95` was
@@ -76,7 +82,7 @@ function Entry({ post, variants }: { post: DisplayPost; variants: readonly Varia
           wide, and `flex-1` is what makes it claim the space before the label
           does. Without the pair, the required simulated label starved the title
           down to a single character plus an ellipsis. */}
-      <span className="min-w-0 flex-1 truncate">{post.title?.trim() || 'Untitled post'}</span>
+      <span className="min-w-0 flex-1 truncate">{title}</span>
       {/* The hatch alone is not a claim — a simulated entry says so in words.
           `narrow:basis-full` gives it its OWN LINE from 700px up, where the strip
           is seven columns and a column is ~145px: sharing that line, the label
@@ -131,6 +137,7 @@ export function WeekStrip({ buckets, variantStates }: WeekStripProps) {
         {buckets.days.map((day, index) => (
           <li
             key={day.key}
+            aria-current={index === 0 ? 'date' : undefined}
             className={cn(
               // p-3 rather than p-2, and that also makes the radius ladder correct
               // rather than coincidental: tokens.css:305 sets a nested surface's
@@ -152,7 +159,10 @@ export function WeekStrip({ buckets, variantStates }: WeekStripProps) {
             <p
               className={cn(
                 'type-eyebrow mb-2.5 flex items-baseline gap-1 max-narrow:mb-0 max-narrow:w-16 max-narrow:shrink-0',
-                index === 0 ? 'text-brand-text' : 'text-ink-mute',
+                // `text-ink`, not `text-brand-text`: MEASURED 2.94:1 on the
+                // brand wash at 11px, below AA. The wash and the ring carry
+                // "today"; the label carries the day, in ink.
+                index === 0 ? 'text-ink' : 'text-ink-mute',
               )}
             >
               <span>{DAY_LABEL.format(day.date)}</span>

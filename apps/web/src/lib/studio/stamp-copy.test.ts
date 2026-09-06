@@ -105,6 +105,42 @@ describe('two versions exist for exactly one answer', () => {
   })
 })
 
+describe('a deploy where the column is not there yet', () => {
+  /**
+   * The situation `case null` was written for, arriving in the shape it actually
+   * arrives in.
+   *
+   * `read.ts` builds `stampOutcome` out of a `select('*')` row. Where
+   * `20260831150000_studio_stamped_asset.sql` has not been applied — which
+   * `docs/db/MIGRATION_DIVERGENCE_2026-09-02.md` lists as one of four files
+   * production has never recorded — the column is ABSENT, so the value is
+   * `undefined` and not `null`.
+   *
+   * MEASURED 2026-09-04: a `switch` on `undefined` matched no case, the switch
+   * is exhaustive with no `default`, and `stampNote` returned `undefined`. The
+   * one message that is about US rather than the customer could not be shown in
+   * the one situation it describes, and the screen got nothing instead.
+   *
+   * The cast is the point: TypeScript says this cannot happen, and the row this
+   * value comes from is not typed by TypeScript.
+   */
+  const absent = undefined as unknown as null
+
+  test('still returns a note, rather than nothing at all', () => {
+    expect(stampNote(absent)).toBeDefined()
+  })
+
+  test('gives the same answer as an explicit null, because it is the same fact', () => {
+    expect(stampNote(absent)).toEqual(stampNote(null))
+  })
+
+  test('does not blame the customer for a migration we have not applied', () => {
+    const note = stampNote(absent)
+    expect(`${note.title} ${note.body}`).not.toMatch(/could not|failed|error|no logo yet/i)
+    expect(note.remedy).toBeNull()
+  })
+})
+
 describe('the status dot is filled only where the logo is actually on the picture', () => {
   test('stamped is the one filled dot', () => {
     expect(stampNote('stamped').dotFilled).toBe(true)

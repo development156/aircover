@@ -12,7 +12,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
-import { isOfferedForConnect } from '@/lib/connections/offer'
+import { offeredChannels } from '@/lib/connections/offered-channels'
 
 import { ChannelMark } from './channel-mark'
 import { CHANNEL_LABELS } from './channel-label'
@@ -99,10 +99,14 @@ export function ChannelPicker({
    *
    * So take an id out of `HIDDEN_FROM_OFFER` and its chip comes straight back
    * here too, with no change to this file.
+   *
+   * ── AND THE RULE NOW LIVES IN `offered-channels.ts`, NOT HERE ──────────────
+   * The "Connect a channel" note on /posts and /planner kept mapping over the
+   * whole schema after this picker stopped, so the same screen named six
+   * channels above a row that offered five (docs/51, Q-12). Both read one
+   * function now; `connect-first-note.test.tsx` holds them to it.
    */
-  const offered = ChannelSchema.options.filter(
-    (channel) => isOfferedForConnect(channel) || selected.includes(channel),
-  )
+  const offered = offeredChannels(selected)
 
   return (
     <div className="space-y-2" data-guide="post-channels">

@@ -11,6 +11,8 @@ import {
 } from 'lucide-react'
 
 import { ObservationNote } from '@/components/brain/observation-note'
+import { CHANNEL_LABELS } from '@/components/posts/channel-label'
+import { metricInWords } from '@/lib/report/metric-words'
 import { AtAGlanceCard, CreditsCard, InsightPromiseCard } from '@/components/report/insights'
 import { ReportModule } from '@/components/report/module'
 import { PageTitle } from '@/components/page-title'
@@ -50,6 +52,25 @@ export const metadata = { title: 'CMO Report' }
  * there is no ranking to make — fewer than two posts measured — the block says
  * so, because one post is simultaneously the best and the worst and printing
  * that is worse than printing nothing.
+ *
+ * ── THERE WAS A SECOND, COMPLETE DESIGN OF THIS SCREEN. IT IS GONE ───────────
+ * `components/report/report-body.tsx` and the whole of `lib/report/` were a
+ * rival CMO Report: a verdict-first weekly note with a WhatsApp plain-text
+ * variant. Both designs were finished, both were argued for in their own
+ * headers, and one screen cannot have two.
+ *
+ * The choice was already made twice before anybody wrote it down. `87abe541`
+ * replaced the page with this one, and `af3c20cc` deleted the five readers the
+ * other design needed — `readReach`, `readReplies`, `readEnquiries`,
+ * `readPlanTimes`, `readPostTitles` — as dead code. So mounting it was never a
+ * missing import; it was rebuilding a data layer that had been removed on
+ * purpose, to reinstate a design that had been replaced on purpose.
+ *
+ * Deleted 2026-09-04: 11 modules and 4 test files, a closed cluster whose every
+ * product consumer was inside itself. Nothing outside it referred to any of it,
+ * which is why it could sit there complete and unreachable. If the verdict-first
+ * form is ever wanted back, it is in git and this comment names the commit that
+ * removed it — bring back the design AND its readers, and delete this one.
  */
 /**
  * The report's own table of contents, and it is the SAME list the filled report
@@ -262,8 +283,8 @@ export default async function ReportPage() {
               >
                 <p className="type-body max-w-[68ch] text-ink">{ranking.top.title}</p>
                 <p className="type-sm mt-1 text-muted">
-                  <span className="num">{ranking.top.value}</span> {ranking.top.metric} on{' '}
-                  {ranking.top.channel}.
+                  <span className="num">{ranking.top.value}</span>{' '}
+                  {metricInWords(ranking.top.metric)} on {CHANNEL_LABELS[ranking.top.channel]}.
                 </p>
               </ReportModule>
               <ReportModule
@@ -274,8 +295,9 @@ export default async function ReportPage() {
               >
                 <p className="type-body max-w-[68ch] text-ink">{ranking.bottom.title}</p>
                 <p className="type-sm mt-1 text-muted">
-                  <span className="num">{ranking.bottom.value}</span> {ranking.bottom.metric} on{' '}
-                  {ranking.bottom.channel}.
+                  <span className="num">{ranking.bottom.value}</span>{' '}
+                  {metricInWords(ranking.bottom.metric)} on {CHANNEL_LABELS[ranking.bottom.channel]}
+                  .
                 </p>
                 {/* NO REASON IS GIVEN, and its absence is deliberate. Every
                     candidate reason would be Sahoda asserting a CAUSE, and

@@ -19,13 +19,17 @@ export function ComposerStarters({
   return (
     <ul className="flex flex-wrap gap-2" data-guide="studio-starters">
       {PROMPT_STARTERS.map((starter) => (
-        <li key={starter}>
+        <li key={starter.prompt}>
+          {/* The chip SHOWS the subject and its tooltip carries the sentence the
+              box is about to get, so five sit on one line and a person can still
+              read the whole thing before pressing. See `PromptStarter`. */}
           <button
             type="button"
-            onClick={() => onPick(starter)}
+            title={starter.prompt}
+            onClick={() => onPick(starter.prompt)}
             className="surface-ring rounded-pill bg-s2 px-3 py-1 text-left type-sm text-muted transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
-            {starter}
+            {starter.label}
           </button>
         </li>
       ))}

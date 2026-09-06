@@ -53,11 +53,21 @@ export interface CreateWorkspaceButtonProps {
   variant?: keyof typeof VARIANTS
   /** Sahoda Guide anchor, when this instance is a tour target. */
   guideAnchor?: string
+  /**
+   * On a phone, keep the icon and put the label in the accessible name only.
+   * The topbar instance sets this: at 390px the 167px label overflowed the
+   * row (docs/51 Q, smoke run 33985674352), but HIDING the whole button there
+   * removed the one control that tells the no-workspace state apart from the
+   * rest (`shell-probe.spec.ts`, run 34012814133). The words leave; the
+   * button, its name and its 44px stay.
+   */
+  compactOnNarrow?: boolean
 }
 
 export function CreateWorkspaceButton({
   variant = 'quiet',
   guideAnchor,
+  compactOnNarrow = false,
 }: CreateWorkspaceButtonProps) {
   const [state, action, pending] = useActionState(createWorkspace, null)
 
@@ -78,12 +88,17 @@ export function CreateWorkspaceButton({
           // be broken across lines when the row runs short.
           'flex items-center gap-2 whitespace-nowrap transition-micro disabled:opacity-45',
           VARIANTS[variant],
+          // Compact = icon only on a phone, and an icon-only control still owes
+          // the 44px floor in BOTH axes: MEASURED run 34017127220, 40x44.
+          compactOnNarrow && 'max-narrow:min-w-[44px] max-narrow:justify-center',
         )}
       >
         <Plus size={16} className="shrink-0" aria-hidden />
         {/* The label keeps its accessible name while pending — a button that
             renames itself mid-flight is a different button to a screen reader. */}
-        <span>{CREATE_WORKSPACE_LABEL}</span>
+        <span className={compactOnNarrow ? 'max-narrow:sr-only' : undefined}>
+          {CREATE_WORKSPACE_LABEL}
+        </span>
         {pending ? <span className="text-[13px] font-normal opacity-80">creating…</span> : null}
       </button>
     </form>

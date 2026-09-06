@@ -122,7 +122,22 @@ export default async function WalletPage() {
       )}
 
       <section data-guide="wallet.ledger" className="space-y-3">
-        {ledger.entries.length === 0 ? (
+        {ledger.unreadable ? (
+          <>
+            <CardLabel>Credit activity</CardLabel>
+            {/* Tested BEFORE the empty branch, because an unreadable read also
+                carries zero entries. "No credit activity yet" is a claim about
+                this person's money that the read never established, and the
+                missing-workspace case returned above, so the reload works. */}
+            <div
+              role="alert"
+              className="rounded-input border border-danger-bg bg-danger-bg px-3 py-2.5 type-sm text-danger"
+            >
+              Sahoda could not read your credit activity just now. Reload to try again. Nothing has
+              been charged and your credits are unaffected.
+            </div>
+          </>
+        ) : ledger.entries.length === 0 ? (
           <>
             <CardLabel>Credit activity</CardLabel>
             <EmptyState

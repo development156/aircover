@@ -9,9 +9,26 @@
  * four places, which is why moving it broke three files and the person moving it
  * saw none of them.
  *
- * One export per screen whose heading is a sentence. Renaming the heading is now
- * a one-line change here, and a rename that forgets this file fails in the same
- * run rather than in production.
+ * One export per screen whose heading is a sentence, so the three specs share
+ * one pattern instead of four literals.
+ *
+ * ── IT IS TWO PLACES, NOT ONE, AND SOMETHING HAS TO HOLD THEM EQUAL ──────────
+ * This file used to claim renaming the heading was "a one-line change here". It
+ * is not: the sentence also lives in the page, so a rename needs two edits and
+ * forgetting the second is the exact failure this file exists to prevent.
+ * MEASURED 2026-09-01 — `grep` finds it in `radar/page.tsx:106` and on line 30
+ * below.
+ *
+ * They are not merged into one constant on purpose. The page importing from
+ * `e2e/` would ship test code into the bundle, and this file importing from
+ * `@/…` depends on module resolution inside Playwright's runner, which cannot be
+ * verified in this repository because the suite does not run here. An
+ * unverifiable change to a guard is what caused the original defect.
+ *
+ * So `radar/heading.guard.test.ts` asserts the two are equal, in the leg that
+ * DOES run. A rename that forgets this file now fails in `pnpm gate` seconds
+ * later, rather than in production where the smoke leg would have caught it if
+ * anyone could run it.
  *
  * The patterns are ANCHORED on purpose. Playwright's `name` option matches a
  * substring by default, so an unanchored pattern would keep passing against a

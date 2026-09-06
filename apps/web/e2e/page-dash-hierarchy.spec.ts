@@ -162,9 +162,19 @@ const ACCENT_CEILING: Record<string, number> = {
   '/home@390': 3.51, // measured 3.190% — 2625px in 5 regions
   '/home@1024': 1.05, // measured 0.950% — 1867px in 5 regions
   '/home@1440': 0.67, // measured 0.606% — 1962px in 6 regions
-  '/analytics@390': 2.83, // measured 2.571% — 2116px in 4 regions
-  '/analytics@1024': 0.81, // measured 0.734% — 1443px in 5 regions
-  '/analytics@1440': 0.54, // measured 0.485% — 1571px in 7 regions
+  // /analytics was RE-MEASURED 2026-09-06 after the page was rebuilt as the
+  // evidence layer (2e6ce453) and the shell gained its credit meter. The fill
+  // count is still ONE (the "Connect a channel" button, ~80% of the pixels at
+  // 1024); what grew is seven small regions — the 16x16 brain ring and the
+  // 78x2 credit meter in the topbar, the example's 18x8 chips — about 200px
+  // between them, which was the whole headroom. Measured with this file's own
+  // helper on a production build: 2.749% / 0.839% / 0.497% locally, and
+  // 0.878% at 1024 on CI (run 34012814133, Linux text rendering). Ceilings
+  // carry the file's ~10% over the higher of the two. Not a number picked to
+  // pass: the fills are counted above, and a second fill would still fail.
+  '/analytics@390': 3.02, // measured 2.749% — 2262px in 8 regions
+  '/analytics@1024': 0.97, // measured 0.878% — 1726px in 12 regions (CI); 0.839% local
+  '/analytics@1440': 0.55, // measured 0.497% — 1610px in 8 regions
 }
 
 const WIDTHS = [

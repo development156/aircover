@@ -172,12 +172,31 @@ export function describeConditioning(input: {
  *
  * Pure: no I/O, no clock, no database.
  */
-export const PROMPT_STARTERS: readonly string[] = [
-  'A plate of fresh samosas on a wooden counter, morning light',
-  'The shopfront at dusk with the lights just on',
-  'Hands wrapping an order in paper, close up',
-  'A cup of chai beside a rain-streaked window',
-  'The counter laid out for a festival, seen from above',
+/**
+ * ── WHY EACH ONE CARRIES A SHORT LABEL AS WELL ──────────────────────────────
+ * Five full sentences laid side by side wrap to four lines and read as a wall
+ * of text above the box they are meant to fill. The label is what the chip
+ * SHOWS; the sentence is what the box GETS, and the box is right there, so a
+ * person sees the whole thing the moment they press one and can edit it before
+ * spending anything. The label is never a different idea from the sentence: it
+ * is the same subject with the light and the surface left for the box to show.
+ */
+export type PromptStarter = {
+  /** What the chip says. Short enough that five sit on one line. */
+  readonly label: string
+  /** What lands in the box. The thing that actually goes to the model. */
+  readonly prompt: string
+}
+
+export const PROMPT_STARTERS: readonly PromptStarter[] = [
+  {
+    label: 'Samosas on a counter',
+    prompt: 'A plate of fresh samosas on a wooden counter, morning light',
+  },
+  { label: 'Shopfront at dusk', prompt: 'The shopfront at dusk with the lights just on' },
+  { label: 'Wrapping an order', prompt: 'Hands wrapping an order in paper, close up' },
+  { label: 'Chai by the window', prompt: 'A cup of chai beside a rain-streaked window' },
+  { label: 'Festival counter', prompt: 'The counter laid out for a festival, seen from above' },
 ]
 
 /**
@@ -212,7 +231,7 @@ export const PROMPT_STARTERS: readonly string[] = [
  */
 export interface PromptStarters {
   starters: readonly string[]
-  /** `'brand'` when at least one starter used a real brand fact; `'generic'` when nothing was available and PROMPT_STARTERS was returned unchanged. */
+  /** `'brand'` when at least one starter used a real brand fact; `'generic'` when nothing was available and the five sentences of PROMPT_STARTERS came back unchanged. */
   source: 'brand' | 'generic'
 }
 
@@ -227,7 +246,11 @@ function fieldValue(signals: readonly BrandSignal[], field: string): string | un
  * detail) — built from whatever the Brand Brain actually holds.
  */
 export function buildPromptStarters(signals: readonly BrandSignal[]): PromptStarters {
-  if (signals.length === 0) return { starters: PROMPT_STARTERS, source: 'generic' }
+  // The sentences, not the chips: this builder hands back what goes in the box,
+  // and the labels are the chip's concern (`PromptStarter`).
+  if (signals.length === 0) {
+    return { starters: PROMPT_STARTERS.map((starter) => starter.prompt), source: 'generic' }
+  }
 
   const oneLiner = fieldValue(signals, 'what the business is')
   const character = fieldValue(signals, 'character')

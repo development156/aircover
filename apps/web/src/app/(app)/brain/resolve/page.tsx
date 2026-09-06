@@ -180,8 +180,12 @@ export default async function ResolveConsolePage() {
           aria-labelledby="console-finding"
         >
           <h2 id="console-finding" className="type-h3 text-ink">
-            <span className="num">{tally.total}</span> of{' '}
-            <span className="num">{tally.registered}</span> fields are still Sahoda&rsquo;s guess
+            {/* One span for the fraction: split across three text nodes, Chrome's
+                accessible-name computation read it as "8 of15 fields". */}
+            <span className="num">
+              {tally.total} of {tally.registered}
+            </span>{' '}
+            fields are still Sahoda&rsquo;s guess
           </h2>
           <p className="type-body mt-1 text-muted">
             {tally.unearned > 0 ? (

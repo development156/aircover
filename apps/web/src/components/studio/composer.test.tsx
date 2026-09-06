@@ -8,9 +8,10 @@ import { queueGeneration } from '@/app/actions/studio'
 import { refineStudioPrompt } from '@/app/actions/studio-prompt'
 import { Composer } from '@/components/studio/composer'
 import { generatableFormats } from '@/lib/studio/formats'
-import { routedModels, unroutedModels } from '@/lib/studio/models'
+import { STUDIO_MODELS, routedModels, unroutedModels } from '@/lib/studio/models'
 import type { LibraryPicture, LibraryRead } from '@/lib/studio/read'
 import { uploadAccept } from '@/lib/studio/upload'
+import { PROMPT_STARTERS } from '@/lib/studio/prompt'
 import {
   MAX_TRIES_PER_PRESS,
   describeModeBlock,
@@ -206,13 +207,25 @@ describe('choosing which model draws it', () => {
     }
   })
 
-  test('a matching set is refused for a model that draws one at a time', () => {
-    expect(readyModes('google/gemini-3-pro-image').map((r) => r.mode)).not.toContain('series')
-  })
-
-  test('and offered for a model that draws the whole set in one call', () => {
-    expect(readyModes('openai/gpt-image-1').map((r) => r.mode)).toContain('series')
-    expect(readyModes('bytedance-seed/seedream-5-0-lite').map((r) => r.mode)).toContain('series')
+  /**
+   * RETARGETED. This pair asserted that the offer TRACKS the model: refused for
+   * one that draws a single picture, offered for one that draws four. Both
+   * halves read a measured fact about the provider, and that was the wrong
+   * question — the mesh can only ask for one picture whatever the model can
+   * draw, so offering the mode delivered separate pictures sold as a set.
+   *
+   * What the screen must hold now is that no model reaches it, which is the
+   * claim `modes.test.ts` binds to the schema. (4ec68060 retargeted this in
+   * `studio-workbench.test.tsx`; wt-girija had moved the pair here, and the
+   * 2026-09-05 merge carried the retarget across.)
+   */
+  test('a matching set is offered by no model, because none of them can be asked', () => {
+    for (const model of STUDIO_MODELS) {
+      expect(
+        readyModes(model.id).map((r) => r.mode),
+        model.id,
+      ).not.toContain('series')
+    }
   })
 
   test('the model also decides how many pictures may be matched against', () => {
@@ -411,17 +424,32 @@ describe('something to try, for a box nobody knows what to put in', () => {
     expect(within(starters).getAllByRole('button').length).toBeGreaterThan(2)
   })
 
+  /**
+   * ── THE CHIP SHOWS A SUBJECT, THE BOX GETS THE SENTENCE ───────────────────
+   * The chip carries a short label so five of them sit on one line above the
+   * box. This test used to read the chip's own text and expect it back out of
+   * the textarea, which pinned the two to the same string. The CLAIM was never
+   * that they were the same string: it is that pressing a chip fills the box
+   * with the starter it stands for and spends nothing. So the assertion moved
+   * onto `PROMPT_STARTERS`, and the second one keeps the chip honest — its
+   * tooltip must be exactly the sentence the box is about to get, so a person
+   * can see the whole thing before pressing.
+   */
   test('pressing one FILLS the box rather than spending anything', async () => {
     const user = userEvent.setup()
     const { container } = open()
     const starters = container.querySelector('[data-guide="studio-starters"]') as HTMLElement
     const first = within(starters).getAllByRole('button')[0]!
-    const words = first.textContent
+    const starter = PROMPT_STARTERS[0]!
+
+    expect(first.textContent).toBe(starter.label)
+    expect(first.getAttribute('title')).toBe(starter.prompt)
+
     await user.click(first)
 
     expect(
       (screen.getByLabelText(/what should the picture show/i) as HTMLTextAreaElement).value,
-    ).toBe(words)
+    ).toBe(starter.prompt)
     expect(queueGeneration).not.toHaveBeenCalled()
   })
 
@@ -742,6 +770,39 @@ describe('the bar', () => {
     await openApproach(user) // toggles it closed again
     expect(signalsFirst()).not.toBeNull()
     expect(comingSoonFirst()).not.toBeNull()
+  })
+
+  /**
+   * ── A REMEDY ONLY WHERE ONE WORKS ─────────────────────────────────────────
+   * The "Will send" disclosure offers "Open your Brand Brain" for the two
+   * answers a person can act on (a brain with guesses to confirm, an empty one
+   * to fill) and withholds it when the read FAILED, because opening the brain
+   * is not what fixes a read that could not be made. wt-jiban's claim, kept
+   * inside the closed disclosure the founder ruled for.
+   */
+  test('will send offers the Brand Brain when it has something, or nothing, to add', async () => {
+    const user = userEvent.setup()
+    open(LIBRARY, [{ field: 'voice', certainty: 'guessed', value: 'warm and direct' }])
+    expect(screen.queryByRole('link', { name: /open your brand brain/i })).toBeNull()
+    await user.click(screen.getByRole('button', { name: /will send/i }))
+    expect(screen.getByRole('link', { name: /open your brand brain/i }).getAttribute('href')).toBe(
+      '/brain',
+    )
+  })
+
+  test('and when the brain is empty, because filling it is the remedy', async () => {
+    const user = userEvent.setup()
+    open(LIBRARY, [])
+    await user.click(screen.getByRole('button', { name: /will send/i }))
+    expect(screen.getByRole('link', { name: /open your brand brain/i })).toBeTruthy()
+  })
+
+  test('but not when the read failed, because opening the brain does not fix a read', async () => {
+    const user = userEvent.setup()
+    open(LIBRARY, null)
+    await user.click(screen.getByRole('button', { name: /will send/i }))
+    expect(screen.getByText(/could not read your brand brain/i)).toBeTruthy()
+    expect(screen.queryByRole('link', { name: /open your brand brain/i })).toBeNull()
   })
 
   test('no panel is open by default, and the bar stays usable', () => {

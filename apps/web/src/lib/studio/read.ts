@@ -275,7 +275,13 @@ export async function picturesFor(
       mime: image.asset_id === null ? null : (mimes.get(image.asset_id) ?? null),
       stampedUrl:
         image.stamped_asset_id === null ? null : (urls.get(image.stamped_asset_id) ?? null),
-      stampOutcome: image.stamp_outcome,
+      // `?? null`, not a bare read. This row comes back through `select('*')`,
+      // so on a deploy where `20260831150000_studio_stamped_asset.sql` has not
+      // been applied the column is ABSENT and this field is `undefined` — and
+      // `stampNote`'s `case null`, written for exactly that situation, does not
+      // match `undefined`. Without this the switch fell through every case and
+      // returned nothing at all. MEASURED 2026-09-04.
+      stampOutcome: image.stamp_outcome ?? null,
       stampAnchor: anchor.stampAnchor,
       stampAnchorMovedReason: anchor.stampAnchorMovedReason,
     })

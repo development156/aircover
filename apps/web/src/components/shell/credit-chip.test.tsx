@@ -85,3 +85,20 @@ describe('a balance we genuinely could not read', () => {
     expect(screen.queryByText('0')).not.toBeInTheDocument()
   })
 })
+
+test('on a phone the word "credits" is for screen readers only; the number and the accessible name stay', () => {
+  // MEASURED 2026-09-05: at 390px the topbar's trailing cluster overran the
+  // viewport by 35px with a workspace and no brain, and this word was 50px of
+  // it. The link keeps "credits available" in its name, so nothing is lost
+  // but the width.
+  render(
+    <CreditChip
+      balance={{
+        status: 'ok',
+        balance: { total: 4200, held: 0, available: 4200, hasHold: false, heldNote: null },
+      }}
+    />,
+  )
+  expect(screen.getByText('credits')).toHaveClass('max-narrow:sr-only')
+  expect(screen.getByRole('link')).toHaveAccessibleName(/4,200 credits available/i)
+})
