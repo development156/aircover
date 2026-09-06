@@ -214,7 +214,10 @@ const ALLOWED: ReadonlyArray<readonly [string, readonly number[]]> = [
   // Each allows NOTHING: these five quote no price, so any digit on them is one
   // they invented. `/studio` used to sit here allowing `price('carousel')`; it
   // was built on 2026-08-28 and no longer quotes a figure at all.
-  ['/ads', []],
+  // `/ads` carries the gates ladder (components/ads/gates-ladder.tsx): three
+  // steps labelled "Step 1" to "Step 3". Ordinals of Sahoda's own process, not
+  // a claim about the reader's business. MEASURED run 34012814133.
+  ['/ads', [1, 2, 3]],
   ['/ads/creative', []],
   ['/ads/targeting', []],
   ['/ads/budget', []],

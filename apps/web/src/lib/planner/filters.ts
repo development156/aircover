@@ -58,7 +58,7 @@ export function matchesTab(post: DisplayPost, tab: PlannerTab): boolean {
     case 'scheduled':
       return post.intent === 'scheduled'
     case 'needs-approval':
-      return needsAPerson(post.intent)
+      return needsAPerson(post)
     case 'all':
       return true
   }

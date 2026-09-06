@@ -1,7 +1,8 @@
 'use server'
 
+import { randomUUID } from 'node:crypto'
 import { auth } from '@clerk/nextjs/server'
-import { createCashfreeProvider, loadCashfreeEnv, type PaymentProvider } from '@sahoda/billing'
+import { createCashfreeProvider, loadCashfreeEnv } from '@sahoda/billing'
 import { PlanIdSchema } from '@sahoda/shared'
 
 import { env } from '@/lib/env'
@@ -10,6 +11,8 @@ import { workspaceForWrite } from '@/lib/workspaces'
 import type { CheckoutState } from '@/lib/wallet/checkout-state'
 import { currentBillingPeriod } from '@/lib/wallet/checkout-state'
 import { checkoutFailureMessage } from '@/lib/billing/checkout-failure-copy'
+import { isDuplicateOrder } from '@/lib/billing/plan-change-order'
+import { reusedTopupState, topupOrderId } from '@/lib/wallet/topup-order'
 
 /**
  * Top-up entry point. This consumes the `PaymentProvider` INTERFACE only — it never
@@ -33,7 +36,9 @@ import { checkoutFailureMessage } from '@/lib/billing/checkout-failure-copy'
  * the SDK. Only the `live` branch below returns the URL; a sandbox session stays labelled
  * and inert here.
  */
-function provider(): PaymentProvider | null {
+// Returns the concrete Cashfree provider, not the `PaymentProvider` port: the
+// port has no `fetchOrder`, and the dedup below needs it (as billing.ts does).
+function provider(newId?: () => string) {
   // A missing/invalid Cashfree env is a deployment state, not an exception: the customer
   // must be told card payments are not connected, not shown a generic "try again" for
   // something that will fail identically every time.
@@ -47,7 +52,7 @@ function provider(): PaymentProvider | null {
   const appBaseUrl = env.NEXT_PUBLIC_APP_URL
   if (!appBaseUrl) return null
 
-  return createCashfreeProvider({ env: cashfree, appBaseUrl })
+  return createCashfreeProvider({ env: cashfree, appBaseUrl, ...(newId ? { newId } : {}) })
 }
 
 export async function startCheckout(planId: unknown): Promise<CheckoutState> {
@@ -65,7 +70,16 @@ export async function startCheckout(planId: unknown): Promise<CheckoutState> {
     const parsedPlan = PlanIdSchema.safeParse(planId)
     if (!parsedPlan.success) return { ok: false, message: 'Pick a plan to continue.' }
 
-    const rail = provider()
+    // Q-06, wallet half: two presses of "Top up" for the same pack in the same
+    // month land on ONE Cashfree order. The id is derived from what is bought
+    // (`topupOrderId`), the order is looked up before it is created, and the id
+    // flips to a fresh one only when the order it names is dead rather than
+    // absent. Same shape as `startPlanUpgrade`; see `lib/wallet/topup-order.ts`.
+    const period = currentBillingPeriod(new Date())
+    const orderId = topupOrderId(workspace.id, parsedPlan.data, period)
+    const fullOrderId = `sah_${orderId}`
+    let useFreshId = false
+    const rail = provider(() => (useFreshId ? randomUUID() : orderId))
     if (!rail) {
       return { ok: false, message: 'Card payments are not connected yet. Nothing was charged.' }
     }
@@ -76,13 +90,46 @@ export async function startCheckout(planId: unknown): Promise<CheckoutState> {
     const appBaseUrl = env.NEXT_PUBLIC_APP_URL as string
     const returnUrl = new URL('/wallet', appBaseUrl).toString()
 
-    const session = await rail.createCheckout({
-      workspaceId: workspace.id,
-      planId: parsedPlan.data,
-      period: currentBillingPeriod(new Date()),
-      successUrl: returnUrl,
-      cancelUrl: returnUrl,
-    })
+    // Any failure reading the order (404, timeout, bad secret) reads as "nothing
+    // to reuse" and falls through to create, for the reason billing.ts gives:
+    // a missed dedup costs one wasted create call that then fails on its own
+    // terms; a false "real failure" would block every first top-up.
+    let openOrder: Awaited<ReturnType<typeof rail.fetchOrder>> | null = null
+    try {
+      openOrder = await rail.fetchOrder(fullOrderId)
+    } catch {
+      openOrder = null
+    }
+    if (openOrder) {
+      const reused = reusedTopupState(
+        rail.mode,
+        openOrder,
+        fullOrderId,
+        parsedPlan.data,
+        appBaseUrl,
+      )
+      if (reused) return reused
+      useFreshId = true
+    }
+
+    let session: Awaited<ReturnType<typeof rail.createCheckout>>
+    try {
+      session = await rail.createCheckout({
+        workspaceId: workspace.id,
+        planId: parsedPlan.data,
+        period,
+        successUrl: returnUrl,
+        cancelUrl: returnUrl,
+      })
+    } catch (error) {
+      // Two genuinely concurrent calls both found nothing and both created under
+      // the same id; the loser reads back the winner's order.
+      if (useFreshId || !isDuplicateOrder(error)) throw error
+      const winner = await rail.fetchOrder(fullOrderId)
+      const reused = reusedTopupState(rail.mode, winner, fullOrderId, parsedPlan.data, appBaseUrl)
+      if (!reused) throw error
+      return reused
+    }
 
     // Guard the label rather than trusting the provider id: anything that is not
     // a real charge must reach the UI marked as such.

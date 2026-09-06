@@ -309,7 +309,13 @@ export default async function HomePage() {
   const started = workspaceHasStarted(signals)
   offer =
     session.sessionId !== null &&
-    planOfferDecision(subscription, { hasStarted: started }).kind === 'offer' ? (
+    planOfferDecision(subscription, {
+      hasStarted: started,
+      // The balance was read for the board; the offer reads the same number,
+      // so the dialog and the "Credits left" cell can never disagree about
+      // whether the free grant is running out.
+      creditsAvailable: balance.status === 'ok' ? balance.balance.available : null,
+    }).kind === 'offer' ? (
       <PlanOfferMount sessionKey={session.sessionId} plans={planOfferRows()} />
     ) : null
 

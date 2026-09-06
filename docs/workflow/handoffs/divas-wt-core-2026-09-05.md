@@ -155,3 +155,20 @@ replacement changed only the EXPIRE branch.
 **Not fixed, with reasons:** `/analytics` accent ceiling (a design ruling, ceilings are never raised); the composer and palette timeouts from the smoke run (no cause in the traces yet); `wallet.ts startCheckout` carries the same unguarded order id Q-06 closed for plans; negative `ADJUST` left because billing's reversal path relies on the raw error; `knowledge` count past 200 under-reports (needs its own query). The "first navigation after Create workspace shows first-run" was a harness race, not a product one: with the action allowed to settle (945 ms) every route renders its own heading.
 
 Smoke run 34008428577 on `08a15f97` was dispatched to measure the trunk against the earlier 24 failures; result in the next section or in the remember file.
+
+## Session 6 (6 Sep, 10:30–12:00 IST): the smoke leg's first complete run, and what it found
+
+**Trunk `8c3c76c3`, pushed.** Run 34012814133 (on `1be84909`, three shards) is the first smoke run ever to finish on CI: **122 tests, 107 passed, 15 failed, 0 skipped**, no shard near the 60-minute limit (shard 2 green, 49/49). The 15, grouped by cause from the traces and the database's own log:
+
+| Cause | Tests | What was done |
+| --- | --- | --- |
+| **Staging database password wrong in `E2E_SUPABASE_DB_URL`** | every-section-loads (`/playbooks`), and every ledger-backed page on staging | MEASURED: supavisor logged 104 `password authentication failed` in exactly the runs' windows, nothing else that day. `scripts/smoke-db-probe.mjs` + a gate step before the build refuse it in seconds and name the fix (`f6952164`, proven red/green four ways from this machine). **Only the founder can reset the password.** |
+| Specs pinning the product's past | composer ("Post now" choice, `2762b816`), analytics-history (worked example, `2e6ce453`), palette ×2 (double "do this later"), marketing-brain (two headings), rail-collapse (Remix/Sites/Playbooks removed 08-25), roadmap-honesty (/ads "Step 1..3"), templates (count moved into the browser) | retargeted `55a135b6`, `f74930d5`, `8c3c76c3`; never deleted |
+| My own Q-04 change | plan-offer ×3 | seeds one post before expecting the offer; asserts the empty dashboard shows none |
+| My own overflow repair | shell-probe (phone lost the no-workspace trigger) | button compact on narrow instead of hidden (`8c3c76c3`) |
+| Real defect | rail initials chip 2.75:1 in dark | ink on wash (`8c3c76c3`) |
+| Design ruling | page-dash-hierarchy (`/analytics` 0.878% vs 0.81% ceiling) | left; needs a decision |
+
+Also this session: **Q-06's wallet half** (`f7b9bd5b`, top-up orders idempotent, 4/5 mutants red), the audit doc's table now carries the closing SHA for 22 of 24 findings (`de4923e5`), and run 34015935570 was dispatched on `8c3c76c3` to watch the probe fire on CI.
+
+**Not done:** negative-ADJUST guard (applyReversal relies on the raw constraint); Q-09 unmeasured; Q-19 founder. **Decisions owed:** reset the staging DB password and update the secret; the ADJUST guard; production Clerk keys; the /analytics accent ceiling.

@@ -71,6 +71,12 @@ export async function createPost(title: string): Promise<SaveState> {
 
     revalidatePath('/posts')
     revalidatePath('/planner')
+    // /home counts drafts in its greeting and dates in its week strip, and
+    // Back from the composer serves the router cache. `approvals.ts` already
+    // revalidates it for the same reason; a post created or saved here has to
+    // as well, or the dashboard behind the Back button describes the workspace
+    // as it was before the edit.
+    revalidatePath('/home')
     return { ok: true, postId: parsed.data.id, updatedAt: parsed.data.updated_at }
   } catch (error) {
     reportServerError(error, { action: 'createPost', workspaceId })
@@ -174,6 +180,12 @@ export async function savePost(postId: string, patch: unknown): Promise<SaveStat
 
     revalidatePath('/posts')
     revalidatePath('/planner')
+    // /home counts drafts in its greeting and dates in its week strip, and
+    // Back from the composer serves the router cache. `approvals.ts` already
+    // revalidates it for the same reason; a post created or saved here has to
+    // as well, or the dashboard behind the Back button describes the workspace
+    // as it was before the edit.
+    revalidatePath('/home')
     return { ok: true, postId: parsed.data.id, updatedAt: parsed.data.updated_at }
   } catch (error) {
     reportServerError(error, { action: 'savePost', workspaceId })

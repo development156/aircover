@@ -81,8 +81,8 @@ export default async function ApprovalsPage() {
         <EmptyState
           icon={CheckCheck}
           title="Nothing is waiting on you"
-          body="Anything sent for review, and anything that failed to go out, appears here. That is a real answer. It is not a screen that has yet to load."
-          tip="Posts you are still writing live under Posts. They are not waiting on a decision, so they are not here."
+          body="A post with a date and a channel, anything sent for review, and anything that failed to go out appears here. That is a real answer. It is not a screen that has yet to load."
+          tip="Posts with no date yet live under Posts. They are not waiting on a decision, so they are not here."
         />
       ) : (
         <>
@@ -96,7 +96,7 @@ export default async function ApprovalsPage() {
         <Link href="/loop" className="font-[550] text-accent underline underline-offset-2">
           autonomy setting
         </Link>
-        . It is not built yet, so every post reaches this queue.
+        . It is not built yet, so a post with a date and a channel waits here until you approve it.
       </p>
     </div>
   )
