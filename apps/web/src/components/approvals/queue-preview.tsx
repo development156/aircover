@@ -1,8 +1,18 @@
 'use client'
 
+import dynamic from 'next/dynamic'
+
 import { CHANNEL_LABELS } from '@/components/posts/channel-label'
-import { PostComments } from '@/components/posts/comments/post-comments'
 import type { RowContext } from '@/lib/approvals/queue-context'
+
+// The comment thread opens under a queue row on demand, so its whole subtree
+// (the add/remove actions, the textarea) loads only when a reviewer expands a
+// preview rather than in /(app)/approvals' base chunk, which keeps the route
+// inside its js-budget.
+const PostComments = dynamic(
+  () => import('@/components/posts/comments/post-comments').then((m) => m.PostComments),
+  { ssr: false },
+)
 
 export interface QueuePreviewProps {
   postId: string
