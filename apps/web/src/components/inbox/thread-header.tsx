@@ -6,6 +6,7 @@ import { PlatformIcon } from '@/components/inbox/platform-icon'
 import { platformLabel } from '@/components/inbox/platform-label'
 import { dayLabel } from '@/lib/inbox/day-groups'
 import type { InboxListRow } from '@/lib/inbox/list-row'
+import { safeExternalUrl } from '@/lib/inbox/safe-external-url'
 
 /**
  * The thread pane's header: who this is, which platform, which account is replying,
@@ -29,6 +30,7 @@ export function ThreadHeader({
   const platform = conversation?.platform ?? messages.find((m) => m.platform)?.platform ?? null
   const newest = messages.length > 0 ? messages[messages.length - 1] : undefined
   const activeAt = newest?.createdAt
+  const externalUrl = safeExternalUrl(conversation?.url)
 
   return (
     <div className="flex items-center gap-2">
@@ -57,9 +59,9 @@ export function ThreadHeader({
         </p>
       </div>
 
-      {conversation?.url && platform ? (
+      {externalUrl && platform ? (
         <a
-          href={conversation.url}
+          href={externalUrl}
           target="_blank"
           rel="noreferrer noopener"
           className="surface-ring-firm inline-flex shrink-0 items-center gap-1 rounded-sm px-2 py-1 type-meta font-[550] text-ink transition-micro hover:text-accent"
