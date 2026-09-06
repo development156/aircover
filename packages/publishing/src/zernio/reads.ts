@@ -393,6 +393,128 @@ const qs = (parts: Record<string, string | number | undefined>): string => {
   return out.length === 0 ? '' : `?${out.join('&')}`
 }
 
+/** Shared filter shape across every `/analytics/inbox/*` endpoint. */
+export interface ZernioInboxAnalyticsFilter {
+  fromDate: string
+  toDate?: string
+  platform?: string
+  accountId?: ScopedAccountId
+  source?: string
+}
+
+export interface ZernioInboxVolumeSummary {
+  received: number
+  sent: number
+  read: number
+  failed: number
+  uniqueConversations: number
+}
+
+export interface ZernioInboxVolumeDay {
+  date: string
+  sent: number
+  received: number
+  read: number
+  failed: number
+}
+
+export interface ZernioInboxVolumePlatform {
+  platform: string
+  sent: number
+  received: number
+  read: number
+  failed: number
+}
+
+export interface ZernioInboxVolume {
+  from: string
+  to: string | null
+  summary: ZernioInboxVolumeSummary
+  timeseries: ZernioInboxVolumeDay[]
+  byPlatform: ZernioInboxVolumePlatform[]
+}
+
+export interface ZernioInboxHeatmapBucket {
+  /** 1 = Monday … 7 = Sunday, per ClickHouse's `toDayOfWeek`. */
+  dow: number
+  hour: number
+  received: number
+  sent: number
+  read: number
+}
+
+export interface ZernioInboxHeatmap {
+  from: string
+  to: string | null
+  buckets: ZernioInboxHeatmapBucket[]
+}
+
+export interface ZernioInboxSourcePlatform {
+  platform: string
+  received: number
+  sent: number
+  read: number
+}
+
+export interface ZernioInboxSourceRow {
+  source: string
+  received: number
+  sent: number
+  read: number
+  byPlatform: ZernioInboxSourcePlatform[]
+}
+
+export interface ZernioInboxSourceBreakdown {
+  from: string
+  to: string | null
+  sources: ZernioInboxSourceRow[]
+}
+
+export interface ZernioInboxResponseTimeSummary {
+  sampleSize: number
+  medianSeconds: number
+  p90Seconds: number
+  p99Seconds: number
+  meanSeconds: number
+  fastestSeconds: number
+  slowestSeconds: number
+}
+
+export interface ZernioInboxResponseTimeBucket {
+  bucket: string
+  lowerSeconds: number
+  upperSeconds: number | null
+  count: number
+}
+
+export interface ZernioInboxResponseTime {
+  from: string
+  to: string | null
+  summary: ZernioInboxResponseTimeSummary | null
+  histogram: ZernioInboxResponseTimeBucket[]
+}
+
+export interface ZernioInboxTopAccount {
+  accountId: string
+  platform: string
+  /** `(disconnected)` when the live SocialAccount no longer exists. */
+  displayName: string
+  username: string
+  received: number
+  sent: number
+  total: number
+  conversations: number
+  medianResponseSeconds: number
+  /** Zero here with `repliedCount === 0` means never replied, not an instant reply. */
+  repliedCount: number
+}
+
+export interface ZernioInboxTopAccounts {
+  from: string
+  to: string | null
+  accounts: ZernioInboxTopAccount[]
+}
+
 export interface ZernioReads {
   // ── analytics, profile-scoped ──────────────────────────────────────────────
   /**
@@ -511,6 +633,39 @@ export interface ZernioReads {
     profile: ScopedProfileId,
     opts?: ListOpts,
   ): Promise<ZernioPaged<ZernioReview, ZernioCursorPage>>
+
+  // ── inbox analytics, profile-scoped ─────────────────────────────────────────
+  /** Daily volume + KPI summary + per-platform split, for the analytics volume chart. */
+  inboxVolume(
+    profile: ScopedProfileId,
+    filter: ZernioInboxAnalyticsFilter,
+  ): Promise<ZernioInboxVolume>
+  /** Day-of-week × hour-of-day buckets. Sparse: zero-fill the 7×24 grid at render time. */
+  inboxHeatmap(
+    profile: ScopedProfileId,
+    filter: ZernioInboxAnalyticsFilter & {
+      action?: 'message.received' | 'message.sent' | 'message.read' | 'all'
+    },
+  ): Promise<ZernioInboxHeatmap>
+  /** Message volume by lineage source (human, workflow, sequence, broadcast, ...). */
+  inboxSourceBreakdown(
+    profile: ScopedProfileId,
+    filter: ZernioInboxAnalyticsFilter,
+  ): Promise<ZernioInboxSourceBreakdown>
+  /**
+   * Time-to-first-response. `summary` is null when `sampleSize` is 0 — no received
+   * message in the window ever got a reply, which is a different sentence from "every
+   * reply was instant" and must never render as a zero.
+   */
+  inboxResponseTime(
+    profile: ScopedProfileId,
+    filter: ZernioInboxAnalyticsFilter,
+  ): Promise<ZernioInboxResponseTime>
+  /** Leaderboard of accounts by inbox volume. */
+  inboxTopAccounts(
+    profile: ScopedProfileId,
+    filter: ZernioInboxAnalyticsFilter & { limit?: number },
+  ): Promise<ZernioInboxTopAccounts>
 }
 
 export function createZernioReads(deps: ZernioClientDeps): ZernioReads {
@@ -720,6 +875,147 @@ export function createZernioReads(deps: ZernioClientDeps): ZernioReads {
         pagination: cursor(data.pagination),
         meta: data.meta,
         rateLimit,
+      }
+    },
+
+    async inboxVolume(profile, filter) {
+      const { data } = await json<{
+        from?: string
+        to?: string | null
+        summary?: Partial<ZernioInboxVolumeSummary>
+        timeseries?: ZernioInboxVolumeDay[]
+        byPlatform?: ZernioInboxVolumePlatform[]
+      }>(
+        'GET',
+        `/analytics/inbox/volume${qs({
+          profileId: profile,
+          fromDate: filter.fromDate,
+          toDate: filter.toDate,
+          platform: filter.platform,
+          accountId: filter.accountId,
+          source: filter.source,
+        })}`,
+        'inboxVolume',
+      )
+      return {
+        from: data.from ?? filter.fromDate,
+        to: data.to ?? null,
+        summary: {
+          received: data.summary?.received ?? 0,
+          sent: data.summary?.sent ?? 0,
+          read: data.summary?.read ?? 0,
+          failed: data.summary?.failed ?? 0,
+          uniqueConversations: data.summary?.uniqueConversations ?? 0,
+        },
+        timeseries: data.timeseries ?? [],
+        byPlatform: data.byPlatform ?? [],
+      }
+    },
+
+    async inboxHeatmap(profile, filter) {
+      const { data } = await json<{
+        from?: string
+        to?: string | null
+        buckets?: ZernioInboxHeatmapBucket[]
+      }>(
+        'GET',
+        `/analytics/inbox/heatmap${qs({
+          profileId: profile,
+          fromDate: filter.fromDate,
+          toDate: filter.toDate,
+          platform: filter.platform,
+          accountId: filter.accountId,
+          source: filter.source,
+          action: filter.action,
+        })}`,
+        'inboxHeatmap',
+      )
+      return {
+        from: data.from ?? filter.fromDate,
+        to: data.to ?? null,
+        buckets: data.buckets ?? [],
+      }
+    },
+
+    async inboxSourceBreakdown(profile, filter) {
+      const { data } = await json<{
+        from?: string
+        to?: string | null
+        sources?: ZernioInboxSourceRow[]
+      }>(
+        'GET',
+        `/analytics/inbox/source-breakdown${qs({
+          profileId: profile,
+          fromDate: filter.fromDate,
+          toDate: filter.toDate,
+          platform: filter.platform,
+          accountId: filter.accountId,
+        })}`,
+        'inboxSourceBreakdown',
+      )
+      return {
+        from: data.from ?? filter.fromDate,
+        to: data.to ?? null,
+        sources: data.sources ?? [],
+      }
+    },
+
+    async inboxResponseTime(profile, filter) {
+      const { data } = await json<{
+        from?: string
+        to?: string | null
+        summary?: ZernioInboxResponseTimeSummary
+        histogram?: Partial<ZernioInboxResponseTimeBucket>[]
+      }>(
+        'GET',
+        `/analytics/inbox/response-time${qs({
+          profileId: profile,
+          fromDate: filter.fromDate,
+          toDate: filter.toDate,
+          platform: filter.platform,
+          accountId: filter.accountId,
+        })}`,
+        'inboxResponseTime',
+      )
+      // `sampleSize: 0` is Zernio's own answer for "nobody replied to anybody in the
+      // window" — `summary` is still an object then, not absent. Normalising it to
+      // `null` here is what lets the web layer render "no paired conversations" instead
+      // of a median of 0 seconds, without every caller re-deriving the same check.
+      const summary = data.summary && data.summary.sampleSize > 0 ? data.summary : null
+      return {
+        from: data.from ?? filter.fromDate,
+        to: data.to ?? null,
+        summary,
+        histogram: (data.histogram ?? []).map((b) => ({
+          bucket: b.bucket ?? '',
+          lowerSeconds: b.lowerSeconds ?? 0,
+          upperSeconds: b.upperSeconds ?? null,
+          count: b.count ?? 0,
+        })),
+      }
+    },
+
+    async inboxTopAccounts(profile, filter) {
+      const { data } = await json<{
+        from?: string
+        to?: string | null
+        accounts?: ZernioInboxTopAccount[]
+      }>(
+        'GET',
+        `/analytics/inbox/top-accounts${qs({
+          profileId: profile,
+          fromDate: filter.fromDate,
+          toDate: filter.toDate,
+          platform: filter.platform,
+          source: filter.source,
+          limit: filter.limit,
+        })}`,
+        'inboxTopAccounts',
+      )
+      return {
+        from: data.from ?? filter.fromDate,
+        to: data.to ?? null,
+        accounts: data.accounts ?? [],
       }
     },
   }

@@ -75,7 +75,7 @@ const STAGES: ReadonlyArray<{ icon: LucideIcon; name: string; what: string }> = 
   {
     icon: BarChart3,
     name: 'Collect',
-    what: 'Last week’s numbers, unanswered messages, and anything Radar picked up.',
+    what: 'Last week’s numbers, from every channel that reported them.',
   },
   {
     icon: Lightbulb,
@@ -95,7 +95,7 @@ const STAGES: ReadonlyArray<{ icon: LucideIcon; name: string; what: string }> = 
   {
     icon: FlaskConical,
     name: 'Test',
-    what: 'Each draft is read by your Audience Twin before anyone else sees it.',
+    what: 'Each draft is checked against each channel’s rules. One that fails stays a draft until you fix it.',
   },
   {
     icon: Send,
@@ -105,7 +105,7 @@ const STAGES: ReadonlyArray<{ icon: LucideIcon; name: string; what: string }> = 
   {
     icon: Sparkles,
     name: 'Report',
-    what: 'Monday morning: what worked, what did not, and what Sahoda learned.',
+    what: 'As soon as the week is written: what was planned, what it cost, and what Sahoda learned, on your Report page.',
   },
 ]
 

@@ -9,13 +9,29 @@ vi.mock('./store', () => ({
   readPublishedToday: vi.fn(),
   readCandidateRows: vi.fn(),
   readPendingAnnouncements: vi.fn(),
+  readWeekSpend: vi.fn(async () => 0),
   writeDecision: vi.fn(async () => 'row-id'),
   armForPublish: vi.fn(async () => true),
   cancelAnnouncement: vi.fn(async () => true),
 }))
 vi.mock('@/lib/cron/loop-enabled', () => ({ loopCronEnabled: vi.fn(() => true) }))
+// The real assembler, with a price that is not zero. `publishCostCredits()`
+// is 0 today (verdicts.ts says why), so the budget guardrail can only be
+// forced from here by giving the candidate a cost.
+let costCredits = 10
+vi.mock('./verdicts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./verdicts')>()
+  return {
+    ...actual,
+    toAutopilotCandidate: vi.fn((row, verdict) => ({
+      ...actual.toAutopilotCandidate(row, verdict),
+      costCredits,
+    })),
+  }
+})
 
 import { loopCronEnabled } from '@/lib/cron/loop-enabled'
+import { isoWeekOf } from '@/lib/loop/iso-week'
 import * as store from './store'
 import { runWorkspaceAutopilotTick } from './tick'
 
@@ -75,6 +91,7 @@ function world(over: Partial<Record<string, unknown>> = {}) {
     (over.rows as store.CandidateRow[]) ?? [candidateRow()],
   )
   vi.mocked(store.readPendingAnnouncements).mockResolvedValue((over.pending as never[]) ?? [])
+  vi.mocked(store.readWeekSpend).mockResolvedValue((over.weekSpend as number) ?? 0)
 }
 
 const deps = { workspaceId: 'ws-1', gateFor: async () => PASS }
@@ -230,5 +247,45 @@ describe("the customer's Stop reaches an announcement already made", () => {
     expect(store.writeDecision).not.toHaveBeenCalledWith(
       expect.objectContaining({ decision: 'cancelled' }),
     )
+  })
+})
+
+describe("the week's budget is what is LEFT, not what was set", () => {
+  // MEASURED 2026-09-06: the tick passed the whole `weekly_budget_credits` as
+  // `weeklyBudgetRemaining`, where decide.ts documents "credits left". A week
+  // that had spent 145 of its 150 still offered every candidate 150.
+  const now = new Date('2026-09-09T10:00:00.000Z') // a Wednesday, ISO week 37
+
+  it('reads the spend of the ISO week that contains now', async () => {
+    world()
+    await runWorkspaceAutopilotTick({ ...deps, now })
+    expect(store.readWeekSpend).toHaveBeenCalledWith('ws-1', isoWeekOf(now))
+    expect(isoWeekOf(now)).toEqual({ isoYear: 2026, isoWeek: 37 })
+  })
+
+  it('announces while the budget still covers the post', async () => {
+    world({ weekSpend: 140 }) // 150 - 140 = 10 left, and the post costs 10
+    const report = await runWorkspaceAutopilotTick({ ...deps, now })
+    expect(report.announced).toBe(1)
+  })
+
+  it("REFUSES by name once this week's cycles have spent the budget down", async () => {
+    world({ weekSpend: 145 }) // 5 left, the post costs 10
+    const report = await runWorkspaceAutopilotTick({ ...deps, now })
+    expect(report.announced).toBe(0)
+    expect(report.refusalsByReason).toEqual({ WEEKLY_BUDGET: 1 })
+  })
+
+  it('clamps at zero: a post that costs nothing is not refused by a week spent past its budget', async () => {
+    // Without the clamp the remainder is -350 and `0 > -350` refuses a post
+    // that would not spend a credit. Nothing left is 0, not a negative number.
+    costCredits = 0
+    try {
+      world({ weekSpend: 500 })
+      const report = await runWorkspaceAutopilotTick({ ...deps, now })
+      expect(report.announced).toBe(1)
+    } finally {
+      costCredits = 10
+    }
   })
 })
