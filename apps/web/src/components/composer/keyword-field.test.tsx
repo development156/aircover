@@ -74,6 +74,42 @@ function setupRerenderable(seed: string) {
   }
 }
 
+describe('the box reflects keywords written from outside it (generation)', () => {
+  // MEASURED live: "Adapt for N channels" filled extras.hashtags and the body
+  // updated, but this box stayed empty. `raw` was seeded once at mount and never
+  // heard the prop change. These pin the sync — and pin that it does not clobber
+  // what the writer is typing.
+  function view(hashtags: string[] | undefined) {
+    return (
+      <KeywordField
+        channel="x"
+        label="X"
+        hashtags={hashtags}
+        onChange={vi.fn()}
+        brackets={false}
+        onBracketsChange={vi.fn()}
+      />
+    )
+  }
+
+  test('an external write to hashtags shows up in the box', () => {
+    const r = render(view(undefined))
+    expect((box() as HTMLInputElement).value).toBe('')
+    r.rerender(view(['classics shelf', 'weekend browse']))
+    expect((box() as HTMLInputElement).value).toBe('classics shelf, weekend browse')
+  })
+
+  test("a writer's own typing is not reset by the round-trip", async () => {
+    // The value the writer types flows out through onChange and can come back as
+    // the `hashtags` prop; that must not wipe the caret. Simulate it: type, then
+    // rerender with the same list the box already holds.
+    const r = render(view(undefined))
+    await userEvent.type(box(), 'my own keyword')
+    r.rerender(view(['my own keyword']))
+    expect((box() as HTMLInputElement).value).toBe('my own keyword')
+  })
+})
+
 describe('what the box stores is what the engine publishes', () => {
   test('wraps a bare word exactly as the frozen normaliser does', async () => {
     // Retargeted from "adds the missing #". The CLAIM is unchanged and is the
