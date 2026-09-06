@@ -20,6 +20,12 @@ import { createServerSupabase } from '@/lib/supabase/server'
 import { autopilotRefusalMessage } from '@/lib/loop/autopilot-refusal-copy'
 import { LEVEL_EVERY_PLAN_ALLOWS, levelPlanSentence } from '@/lib/loop/level-plan-copy'
 import { workspaceForWrite } from '@/lib/workspaces'
+import {
+  getWorkspaceRole,
+  canManageLoop,
+  LOOP_ROLE_REFUSAL,
+  LOOP_ROLE_UNKNOWN,
+} from '@/lib/workspace-role'
 import { credits } from '@/lib/credit-words'
 
 /**
@@ -71,6 +77,14 @@ export async function setChannelAutonomy(channel: unknown, level: unknown): Prom
     const ws = await workspaceForWrite()
     if (!ws.ok) return { ok: false, message: ws.message }
     workspaceId = ws.workspace.id
+
+    // ── ROLE GATE ─────────────────────────────────────────────────────────
+    // A viewer may read the Loop but not change it. The durable wall is RLS on
+    // these tables; this is the application half, checked before the write.
+    const _role = await getWorkspaceRole(workspaceId)
+    if (!canManageLoop(_role)) {
+      return { ok: false, message: _role === null ? LOOP_ROLE_UNKNOWN : LOOP_ROLE_REFUSAL }
+    }
 
     const parsedChannel = ChannelSchema.safeParse(channel)
     if (!parsedChannel.success) return { ok: false, message: 'Pick a channel Sahoda supports.' }
@@ -150,6 +164,14 @@ export async function setLoopSettings(input: {
     const ws = await workspaceForWrite()
     if (!ws.ok) return { ok: false, message: ws.message }
     workspaceId = ws.workspace.id
+
+    // ── ROLE GATE ─────────────────────────────────────────────────────────
+    // A viewer may read the Loop but not change it. The durable wall is RLS on
+    // these tables; this is the application half, checked before the write.
+    const _role = await getWorkspaceRole(workspaceId)
+    if (!canManageLoop(_role)) {
+      return { ok: false, message: _role === null ? LOOP_ROLE_UNKNOWN : LOOP_ROLE_REFUSAL }
+    }
 
     const patch: Record<string, unknown> = { workspace_id: workspaceId }
     if (input.paused !== undefined) {

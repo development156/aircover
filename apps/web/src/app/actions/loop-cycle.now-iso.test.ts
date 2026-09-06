@@ -85,6 +85,13 @@ vi.mock('@/lib/supabase/server', () => ({
                 ? { data: [{ platform: 'x', status: 'active' }], error: null }
                 : { data: [], error: null },
             ),
+          // The brain gate reads `brand_memory` with two eq() and a head count.
+          // A resolved brain (count 1) lets the cycle proceed, which is what
+          // this suite exercises.
+          eq: () =>
+            Promise.resolve(
+              table === 'brand_memory' ? { count: 1, error: null } : { count: 0, error: null },
+            ),
         }),
       }),
     }),
@@ -105,6 +112,13 @@ vi.mock('@/lib/loop/store', () => ({
 
 // Recorded rather than swallowed: the action's catch turns any throw into
 // "Could not run the cycle", which would let a broken mock pass for a defect.
+vi.mock('@/lib/workspace-role', () => ({
+  getWorkspaceRole: async () => 'owner',
+  canManageLoop: (r: string | null) => r !== null && ['owner', 'editor', 'approver'].includes(r),
+  LOOP_ROLE_REFUSAL: 'refused',
+  LOOP_ROLE_UNKNOWN: 'unknown',
+}))
+
 vi.mock('@/lib/observability/report', () => ({
   reportServerError: (error: unknown) => {
     state.reported.push(error)

@@ -93,6 +93,13 @@ export interface CreateStageState {
    * say one.
    */
   cancelledMidRun?: boolean
+  /**
+   * A brief could not be created because the workspace ran out of credits
+   * mid-stage. The cycle is LEFT in `creating` (not advanced to staging) so the
+   * resume panel offers a way back once credits are topped up, and the week is
+   * not reported as done when some posts were never made.
+   */
+  insufficient?: boolean
   message?: string
 }
 
@@ -124,6 +131,14 @@ export async function runCreateStage(cycleId: string): Promise<CreateStageState>
         ok: false,
         message: 'Approve the cost preview first. Nothing has been spent.',
       }
+    }
+
+    // ── CONCURRENCY CLAIM ───────────────────────────────────────────────────
+    // One create run per cycle. A second concurrent request is turned away here,
+    // before it charges or inserts, so it cannot write a duplicate orphan post.
+    const claimed = await store.claimCreateStage(cycleId, workspaceId)
+    if (!claimed) {
+      return { ok: true, message: 'This week is already being created.' }
     }
 
     // Included, and not yet turned into a post. The second half is what makes
@@ -209,6 +224,28 @@ export async function runCreateStage(cycleId: string): Promise<CreateStageState>
       )
 
       if (!charged.ok || !postId) {
+        // Out of credits is not the same as this one brief failing: every brief
+        // after it will fail the same way. Stop, mark this brief failed, and
+        // leave the cycle in `creating` so nothing reports the week as done and
+        // the resume panel can pick it up after a top-up.
+        if (!charged.ok && charged.error.code === 'CREDIT_INSUFFICIENT') {
+          await store.linkBriefToPost(brief.id, workspaceId, null, 'failed')
+          revalidatePath('/loop')
+          revalidatePath('/planner')
+          revalidatePath('/posts')
+          revalidatePath('/approvals')
+          return {
+            ok: false,
+            created,
+            skipped,
+            spent,
+            insufficient: true,
+            message:
+              created > 0
+                ? `Created ${created} before credits ran out. Top up, then resume this week.`
+                : 'Not enough credits to create this week. Top up, then resume.',
+          }
+        }
         await store.linkBriefToPost(brief.id, workspaceId, null, 'failed')
         continue
       }

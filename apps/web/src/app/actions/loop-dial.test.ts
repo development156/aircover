@@ -26,10 +26,19 @@ const h = vi.hoisted(() => ({
   upsert: vi.fn(async () => ({ error: null })),
 }))
 
+const roleHolder = vi.hoisted(() => ({ role: 'owner' as string | null }))
+
 vi.mock('server-only', () => ({}))
 vi.mock('@clerk/nextjs/server', () => ({ auth: async () => ({ userId: 'user_a' }) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/observability/report', () => ({ reportServerError: vi.fn() }))
+vi.mock('@/lib/workspace-role', () => ({
+  getWorkspaceRole: async () => roleHolder.role,
+  canManageLoop: (r: string | null) => r !== null && ['owner', 'editor', 'approver'].includes(r),
+  LOOP_ROLE_REFUSAL: 'Only an owner, editor or approver can change the Loop.',
+  LOOP_ROLE_UNKNOWN:
+    'Sahoda could not confirm your role in this workspace, so nothing changed. Try again in a moment.',
+}))
 vi.mock('@/lib/workspaces', () => ({
   workspaceForWrite: async () => ({
     ok: true,
@@ -59,6 +68,7 @@ const denied = (planId: string, limit: number, currentUsage: number): Verdict =>
 beforeEach(() => {
   vi.clearAllMocks()
   h.upsert.mockResolvedValue({ error: null })
+  roleHolder.role = 'owner'
 })
 
 describe('setChannelAutonomy and the plan', () => {
@@ -136,5 +146,23 @@ describe('setChannelAutonomy and the plan', () => {
 
     expect(out.ok).toBe(false)
     expect(out.message).not.toMatch(/try again/i)
+  })
+})
+
+describe('setChannelAutonomy and the viewer', () => {
+  it('REFUSES a viewer and writes nothing — the role gate is before the upsert', async () => {
+    roleHolder.role = 'viewer'
+    const out = await setChannelAutonomy('instagram', 1)
+    expect(out.ok).toBe(false)
+    expect(out.message).toMatch(/owner, editor or approver/i)
+    expect(h.upsert).not.toHaveBeenCalled()
+  })
+
+  it('REFUSES when the role cannot be established, with the try-again message', async () => {
+    roleHolder.role = null
+    const out = await setChannelAutonomy('instagram', 1)
+    expect(out.ok).toBe(false)
+    expect(out.message).toMatch(/could not confirm your role/i)
+    expect(h.upsert).not.toHaveBeenCalled()
   })
 })

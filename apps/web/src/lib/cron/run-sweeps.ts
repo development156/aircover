@@ -1,10 +1,12 @@
 import 'server-only'
 import type { DispatchSweepReport, HoldSweepReport } from '@sahoda/jobs/sweeps'
 import type { ReconcileReport } from '@sahoda/jobs/publish'
+import type { LoopSweepReport } from '@/lib/loop/sweep'
 
 /** What went wrong, named but never described — the detail goes to the log, not the wire. */
 interface SweepError {
-  error: 'dispatch-sweep-failed' | 'hold-sweep-failed' | 'reconcile-sweep-failed'
+  error:
+    'dispatch-sweep-failed' | 'hold-sweep-failed' | 'reconcile-sweep-failed' | 'loop-sweep-failed'
 }
 
 /** The dispatch report minus `decisions`, which carries post and workspace ids. */
@@ -36,6 +38,8 @@ export interface CronSweepBody {
   holds: HoldSweepReport | SweepError
   /** The polling stand-in for webhooks. Counters only, same as the others. */
   reconcile: ReconcileReport | SweepError
+  /** The stale-Loop-cycle reaper. Counts only ({scanned, expired}); it carries no ids. */
+  loop: LoopSweepReport | SweepError
 }
 
 export interface CronSweepOutcome {
@@ -47,6 +51,7 @@ export interface CronSweepRunners {
   runDispatch(): Promise<DispatchSweepReport>
   runHolds(): Promise<HoldSweepReport>
   runReconcile(): Promise<ReconcileReport>
+  runLoop(): Promise<LoopSweepReport>
   /**
    * Required, not optional. An optional field here would be omitted by exactly the
    * caller that most needs it — the one that never thought about which rail it is on.
@@ -56,12 +61,13 @@ export interface CronSweepRunners {
   onError?(scope: SweepScope, error: unknown): void
 }
 
-type SweepScope = 'dispatch' | 'holds' | 'reconcile'
+type SweepScope = 'dispatch' | 'holds' | 'reconcile' | 'loop'
 
 const ERROR_FOR: Record<SweepScope, SweepError['error']> = {
   dispatch: 'dispatch-sweep-failed',
   holds: 'hold-sweep-failed',
   reconcile: 'reconcile-sweep-failed',
+  loop: 'loop-sweep-failed',
 }
 
 /**
@@ -93,9 +99,12 @@ const ERROR_FOR: Record<SweepScope, SweepError['error']> = {
 export async function runCronSweeps(runners: CronSweepRunners): Promise<CronSweepOutcome> {
   const reconcile = await attempt('reconcile', runners.runReconcile, runners.onError)
   const holds = await attempt('holds', runners.runHolds, runners.onError)
+  // Independent of the others, exactly like the hold reaper: a stranded Loop week is a
+  // slot nobody can reuse, and a dispatcher or reconcile failure must not stop it.
+  const loop = await attempt('loop', runners.runLoop, runners.onError)
   const dispatch = await attempt('dispatch', runners.runDispatch, runners.onError)
 
-  const ok = !isError(dispatch) && !isError(holds) && !isError(reconcile)
+  const ok = !isError(dispatch) && !isError(holds) && !isError(reconcile) && !isError(loop)
 
   return {
     status: ok ? 200 : 500,
@@ -107,6 +116,7 @@ export async function runCronSweeps(runners: CronSweepRunners): Promise<CronSwee
       dispatch: isError(dispatch) ? dispatch : stripDecisions(dispatch),
       holds,
       reconcile,
+      loop,
     },
   }
 }

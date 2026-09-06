@@ -44,3 +44,6 @@ export function noChannelsMessage(lapsed: readonly Channel[]): string {
 /** The refusal for a read that did not complete. Never a claim about the account. */
 export const CHANNELS_UNREADABLE_MESSAGE =
   'Sahoda couldn’t check your channels just now. Nothing was charged. Try again.'
+
+export const BRAIN_NOT_RESOLVED_MESSAGE =
+  'Sahoda has no resolved Brand Brain to plan from yet. Resolve your Brand Brain first, then plan your week.'
