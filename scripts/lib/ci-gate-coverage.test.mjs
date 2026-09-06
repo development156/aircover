@@ -144,6 +144,19 @@ describe('the CI workflow covers the gate, or says which part it does not', () =
     expect(group).not.toContain('sha')
   })
 
+  it('signs in to the database once before the suite, and before the build', () => {
+    // MEASURED 2026-09-06: a wrong pooler password cost three hour-long runs
+    // and surfaced as "/playbooks has no heading". The probe fails in seconds
+    // and names the fix; its place in the order is the point of it.
+    const probe = WORKFLOW.indexOf('node scripts/smoke-db-probe.mjs')
+    const build = WORKFLOW.indexOf('pnpm --filter @sahoda/web exec next build')
+    expect(probe, 'the smoke job never runs the database probe').toBeGreaterThan(-1)
+    expect(probe, 'the probe runs after the build it exists to spare').toBeLessThan(build)
+    expect(WORKFLOW).toMatch(
+      /SUPABASE_DB_URL: \$\{\{ secrets\.E2E_SUPABASE_DB_URL \}\}\n\s+SAHODA_E2E_ACK_TARGET: \$\{\{ inputs\.ack_target \}\}\n\s+run: node scripts\/smoke-db-probe\.mjs/,
+    )
+  })
+
   it('keeps the smoke job behind a typed acknowledgement, never a click', () => {
     // `SAHODA_E2E_ACK_TARGET=1` would be satisfiable by anyone who wanted the
     // error to go away. A defaulted input would be satisfiable by pressing a

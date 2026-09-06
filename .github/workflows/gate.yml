@@ -367,6 +367,20 @@ jobs:
             exit 1
           fi
 
+      # ── AND A DATABASE URL THAT CAN SIGN IN, BEFORE THE HOUR IS SPENT ───────
+      # The guard above checks the shape of E2E_SUPABASE_DB_URL. MEASURED
+      # 2026-09-06: with the right shape and the wrong password, staging's pooler
+      # logged 104 "password authentication failed" across three runs, every
+      # page that reads the ledger rendered "This screen didn't load", and the
+      # suite reported it as /playbooks missing its heading, three attempts each.
+      # scripts/smoke-db-probe.mjs signs in once, in seconds, names the fix, and
+      # refuses a pooler string whose project is not the acknowledged target.
+      - name: Refuse a database URL that cannot sign in
+        env:
+          SUPABASE_DB_URL: ${{ secrets.E2E_SUPABASE_DB_URL }}
+          SAHODA_E2E_ACK_TARGET: ${{ inputs.ack_target }}
+        run: node scripts/smoke-db-probe.mjs
+
       - name: Install Chromium
         run: pnpm --filter @sahoda/web exec playwright install --with-deps chromium
 
