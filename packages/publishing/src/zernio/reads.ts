@@ -393,12 +393,20 @@ const qs = (parts: Record<string, string | number | undefined>): string => {
   return out.length === 0 ? '' : `?${out.join('&')}`
 }
 
-/** Shared filter shape across every `/analytics/inbox/*` endpoint. */
+/**
+ * Shared filter shape across every `/analytics/inbox/*` endpoint.
+ *
+ * `accountId` is a plain string, not `ScopedAccountId`: unlike the messaging
+ * surface, `profileId` alone already scopes every one of these calls to the
+ * tenant, so `accountId` here is a narrowing filter WITHIN that tenant rather
+ * than the thing that establishes the tenant. Minting a `ScopedAccountId` would
+ * imply a second scoping check these endpoints do not need or perform.
+ */
 export interface ZernioInboxAnalyticsFilter {
   fromDate: string
   toDate?: string
   platform?: string
-  accountId?: ScopedAccountId
+  accountId?: string
   source?: string
 }
 

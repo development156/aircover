@@ -135,6 +135,12 @@ export {
   type ZernioInboxResponseTimeBucket,
   type ZernioInboxTopAccounts,
   type ZernioInboxTopAccount,
+  // ── posting analytics ──────────────────────────────────────────────────────
+  type ZernioDailyMetrics,
+  type ZernioDailyMetricsDay,
+  type ZernioDailyMetricValues,
+  type ZernioDailyMetricsFilter,
+  type ZernioDailyPlatformRow,
 } from './zernio/reads'
 
 // ── What an audience read is ALLOWED to claim ────────────────────────────────

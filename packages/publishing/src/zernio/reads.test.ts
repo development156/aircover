@@ -77,6 +77,31 @@ describe('every profile-scoped read puts profileId on the wire', () => {
       (r: ReturnType<typeof readsWith>['reads']) =>
         r.dailyMetrics(profile, { fromDate: '2026-08-01', attribution: 'publish' }),
     ],
+    [
+      'inboxVolume',
+      (r: ReturnType<typeof readsWith>['reads']) =>
+        r.inboxVolume(profile, { fromDate: '2026-08-01' }),
+    ],
+    [
+      'inboxHeatmap',
+      (r: ReturnType<typeof readsWith>['reads']) =>
+        r.inboxHeatmap(profile, { fromDate: '2026-08-01' }),
+    ],
+    [
+      'inboxSourceBreakdown',
+      (r: ReturnType<typeof readsWith>['reads']) =>
+        r.inboxSourceBreakdown(profile, { fromDate: '2026-08-01' }),
+    ],
+    [
+      'inboxResponseTime',
+      (r: ReturnType<typeof readsWith>['reads']) =>
+        r.inboxResponseTime(profile, { fromDate: '2026-08-01' }),
+    ],
+    [
+      'inboxTopAccounts',
+      (r: ReturnType<typeof readsWith>['reads']) =>
+        r.inboxTopAccounts(profile, { fromDate: '2026-08-01' }),
+    ],
   ])('%s sends profileId', async (_name, call) => {
     const { reads, cap } = readsWith()
     await call(reads)
@@ -353,5 +378,133 @@ describe('dailyMetrics', () => {
     await expect(
       reads.dailyMetrics(profile, { fromDate: '2026-08-01', attribution: 'publish' }),
     ).rejects.toThrow()
+  })
+})
+
+describe('inbox analytics reads', () => {
+  it('inboxVolume shapes the summary, timeseries and per-platform split', async () => {
+    const { reads, cap } = readsWith({
+      from: '2026-08-01',
+      to: '2026-08-31',
+      summary: { received: 40, sent: 22, read: 18, failed: 2, uniqueConversations: 9 },
+      timeseries: [{ date: '2026-08-01', sent: 1, received: 2, read: 1, failed: 0 }],
+      byPlatform: [{ platform: 'instagram', sent: 1, received: 2, read: 1, failed: 0 }],
+    })
+    const result = await reads.inboxVolume(profile, { fromDate: '2026-08-01', toDate: '2026-08-31' })
+    expect(result.summary.received).toBe(40)
+    expect(result.summary.uniqueConversations).toBe(9)
+    expect(result.timeseries).toHaveLength(1)
+    expect(result.byPlatform[0]?.platform).toBe('instagram')
+    expect(cap.last().url).toContain('fromDate=2026-08-01')
+    expect(cap.last().url).toContain('toDate=2026-08-31')
+  })
+
+  it('inboxVolume defaults an absent summary to zeroes, not undefined', async () => {
+    const { reads } = readsWith({ from: '2026-08-01', to: null })
+    const result = await reads.inboxVolume(profile, { fromDate: '2026-08-01' })
+    expect(result.summary).toEqual({
+      received: 0,
+      sent: 0,
+      read: 0,
+      failed: 0,
+      uniqueConversations: 0,
+    })
+    expect(result.timeseries).toEqual([])
+  })
+
+  it('inboxHeatmap passes the sparse buckets through and sends the action filter', async () => {
+    const { reads, cap } = readsWith({
+      from: '2026-08-01',
+      to: null,
+      buckets: [{ dow: 1, hour: 9, received: 3, sent: 1, read: 1 }],
+    })
+    const result = await reads.inboxHeatmap(profile, {
+      fromDate: '2026-08-01',
+      action: 'message.received',
+    })
+    expect(result.buckets).toEqual([{ dow: 1, hour: 9, received: 3, sent: 1, read: 1 }])
+    expect(cap.last().url).toContain('action=message.received')
+  })
+
+  it('inboxSourceBreakdown carries the per-source per-platform split', async () => {
+    const { reads } = readsWith({
+      from: '2026-08-01',
+      to: null,
+      sources: [
+        {
+          source: 'human',
+          received: 10,
+          sent: 8,
+          read: 6,
+          byPlatform: [{ platform: 'instagram', received: 10, sent: 8, read: 6 }],
+        },
+      ],
+    })
+    const result = await reads.inboxSourceBreakdown(profile, { fromDate: '2026-08-01' })
+    expect(result.sources[0]?.source).toBe('human')
+    expect(result.sources[0]?.byPlatform[0]?.platform).toBe('instagram')
+  })
+
+  it('inboxResponseTime turns a zero sampleSize summary into null, not a zero median', async () => {
+    const { reads } = readsWith({
+      from: '2026-08-01',
+      to: null,
+      summary: {
+        sampleSize: 0,
+        medianSeconds: 0,
+        p90Seconds: 0,
+        p99Seconds: 0,
+        meanSeconds: 0,
+        fastestSeconds: 0,
+        slowestSeconds: 0,
+      },
+      histogram: [],
+    })
+    const result = await reads.inboxResponseTime(profile, { fromDate: '2026-08-01' })
+    expect(result.summary).toBeNull()
+  })
+
+  it('inboxResponseTime keeps a real summary when sampleSize is positive', async () => {
+    const { reads } = readsWith({
+      from: '2026-08-01',
+      to: null,
+      summary: {
+        sampleSize: 12,
+        medianSeconds: 90,
+        p90Seconds: 400,
+        p99Seconds: 900,
+        meanSeconds: 150,
+        fastestSeconds: 5,
+        slowestSeconds: 1200,
+      },
+      histogram: [{ bucket: '1-5m', lowerSeconds: 60, upperSeconds: 300, count: 4 }],
+    })
+    const result = await reads.inboxResponseTime(profile, { fromDate: '2026-08-01' })
+    expect(result.summary?.medianSeconds).toBe(90)
+    expect(result.histogram[0]?.bucket).toBe('1-5m')
+  })
+
+  it('inboxTopAccounts sends limit and passes the leaderboard through', async () => {
+    const { reads, cap } = readsWith({
+      from: '2026-08-01',
+      to: null,
+      accounts: [
+        {
+          accountId: ACCOUNT,
+          platform: 'instagram',
+          displayName: 'Test Shop',
+          username: 'testshop',
+          received: 20,
+          sent: 15,
+          total: 35,
+          conversations: 10,
+          medianResponseSeconds: 0,
+          repliedCount: 0,
+        },
+      ],
+    })
+    const result = await reads.inboxTopAccounts(profile, { fromDate: '2026-08-01', limit: 5 })
+    expect(result.accounts[0]?.repliedCount).toBe(0)
+    expect(cap.last().url).toContain('limit=5')
   })
 })
