@@ -23,6 +23,11 @@ type CardState =
   | { kind: 'done'; previewUrl: string | null; formatLabel: string; note: string | null }
   | { kind: 'failed'; message: string }
 
+/** Sentences that mean the NEXT press would fail the same way. Compared by content, not identity. */
+function isRunStopper(message: string): boolean {
+  return /not (fully )?configured|sign in/i.test(message)
+}
+
 const DRAWING_LINES = [
   'Reading the draft…',
   'Choosing the shape for its channels…',
@@ -98,7 +103,13 @@ export function WeekIllustrator({ postIds, costPerPicture, onDone }: WeekIllustr
         setCards((current) =>
           current.map((card, j) => (j === i ? { kind: 'failed', message } : card)),
         )
-        break
+        // One refused picture is that picture's news, not the week's: the
+        // provider declined a prompt, and the next post's prompt is a
+        // different one (MEASURED 2026-09-07: a Google Business post was
+        // refused, the X post before it drew fine). Only a reason the next
+        // press would meet again stops the run: an empty wallet, or a
+        // deployment that cannot charge at all.
+        if (result.insufficient || isRunStopper(result.message)) break
       }
       onDone?.({ made, charged, balanceAfter })
     })()
@@ -197,8 +208,7 @@ export function WeekIllustrator({ postIds, costPerPicture, onDone }: WeekIllustr
       {cards.map((card, i) =>
         card.kind === 'failed' ? (
           <p key={postIds[i]} role="alert" className="mt-3 type-sm text-danger">
-            {card.message} Sahoda stopped there so the rest of the week did not meet the same
-            refusal.
+            {card.message}
           </p>
         ) : card.kind === 'done' && card.note !== null ? (
           <p key={postIds[i]} className="mt-3 type-sm text-muted">

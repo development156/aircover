@@ -46,20 +46,40 @@ describe('WeekIllustrator', () => {
     expect(madeLine('2 of 2 made')).toBeInTheDocument()
   })
 
-  test('a refusal stops the run: the later drafts are never asked for and the reason is shown', async () => {
+  test('one refused picture is reported and the run goes on to the next draft', async () => {
     calls.length = 0
-    results.push(made('p1'), {
-      ok: false,
-      insufficient: false,
-      message: 'Sahoda could not make this picture. Nothing was charged.',
-    })
+    results.push(
+      made('p1'),
+      {
+        ok: false,
+        insufficient: false,
+        message: 'Sahoda could not make this picture. Nothing was charged.',
+      },
+      made('p3'),
+    )
     const onDone = vi.fn()
     render(<WeekIllustrator postIds={['p1', 'p2', 'p3']} costPerPicture={6} onDone={onDone} />)
 
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1))
-    expect(calls).toEqual(['p1', 'p2'])
+    expect(calls).toEqual(['p1', 'p2', 'p3'])
     expect(screen.getByRole('alert')).toHaveTextContent(/Nothing was charged/)
-    expect(madeLine('1 of 3 made')).toBeInTheDocument()
+    expect(madeLine('2 of 3 made')).toBeInTheDocument()
+    expect(onDone).toHaveBeenCalledWith({ made: 2, charged: 12, balanceAfter: 40 })
+  })
+
+  test('an empty wallet stops the run: the later drafts are never asked for', async () => {
+    calls.length = 0
+    results.push({
+      ok: false,
+      insufficient: true,
+      required: 6,
+      available: 2,
+      message: '',
+    } as IllustrateState)
+    const onDone = vi.fn()
+    render(<WeekIllustrator postIds={['p1', 'p2', 'p3']} costPerPicture={6} onDone={onDone} />)
+    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1))
+    expect(calls).toEqual(['p1'])
   })
 
   test('an insufficient balance names the shortfall', async () => {
