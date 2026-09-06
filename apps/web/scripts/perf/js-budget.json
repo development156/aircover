@@ -81,5 +81,6 @@
   "/(app)/settings": 689406,
   "/(app)/settings/plan": 735601,
   "/(app)/settings/profile": 604176,
-  "/(app)/brain/audience": 609307
+  "/(app)/brain/audience": 609307,
+  "/(app)/inbox/threads/store/[threadId]": 642780
 }
