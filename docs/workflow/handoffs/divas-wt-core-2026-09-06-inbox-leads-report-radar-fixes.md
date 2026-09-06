@@ -20,11 +20,21 @@ Tests: 65 web files / 809 tests across the four areas green before my additions;
 - **Radar needs `APIFY_TOKEN`** in the Vercel production env for Instagram sources, and **`SAHODA_RADAR_SCAN_MODE=on`** now that the pass is fail-closed. Without both, "Read now" reports "could not read" honestly and charges nothing.
 - **Previews have no `SUPABASE_DB_URL`**, so Measure now and Read now fail soft there ("could not reach"); the attempts read returns empty and is reported to Sentry. Production has it.
 
+## Verified live (build `2c664a42`, deployment `dpl_GJztuZTv5QK5gchY4NDWwYyfAv5y`, QA workspace 83bcafc4)
+
+| Screen | What happened |
+|---|---|
+| /analytics | "Not measured yet · free" → pressed Measure now → "Nothing of yours has gone out live yet, so there was nothing to measure." |
+| /report | "Measured less than a minute ago · free" on the next load; one button, same stamp. |
+| /radar | Added a website watch, pressed Read now → "Sahoda read them just now. This is the first read, so there is nothing to compare it against yet."; row flipped to "READ 2026-09-06"; the feed showed "Checked QA probe site. Nothing changed" (the fetch-log binding rendering). Watch removed after; 5 credits spent from the QA workspace. |
+| /inbox, /leads | Render, no dead `/inbox/threads//` links; both empty for the QA workspace, with the empty-state claims intact. |
+
+Two build failures on the way: `6ea80509` and `4e481a84` failed js-budget because the Measure now island imported `ui/button` (+34 kB on two routes with no client code). Fixed in `2c664a42` with a plain button; the store route got its budget line. The Read now label lacked the number ("credits" alone), fixed in `870d86d2`.
+
 ## Not done
 
 - Inbox attachments (images in DMs): the projector, an `inbox_message_attachments` migration and the renderer. Not started; the agent that owned it died before writing a line of it.
 - Leads dedupe migration (unique partial index on the inbox conversation ref). Still advisory check-then-insert.
-- Live browser verification of the four screens on the `6ea80509` build: build was still running at handoff time.
 
 ## Traps met
 
