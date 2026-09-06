@@ -96,16 +96,27 @@ export function ImproveCopy({ target, body, onAccept }: ImproveCopyProps) {
     setFailure(null)
     setSuggestion(null)
     startTransition(async () => {
-      const result = await rewriteCaption(body, mode)
-      if (result.ok) {
-        setSuggestion(result.text)
-        return
+      try {
+        const result = await rewriteCaption(body, mode)
+        if (result.ok) {
+          setSuggestion(result.text)
+          return
+        }
+        setFailure(
+          result.insufficient
+            ? { kind: 'insufficient', required: result.required, available: result.available }
+            : { kind: 'message', message: result.message },
+        )
+      } catch {
+        // A server action REJECTS on a dropped connection rather than resolving
+        // to `{ ok: false }`. Unguarded, that rejection escapes the transition
+        // and falls to the route error boundary, taking the whole composer with
+        // it. Inline instead; the wallet, not this line, is the truth on spend.
+        setFailure({
+          kind: 'message',
+          message: 'Sahoda couldn’t finish that just now. Check your wallet, then try again.',
+        })
       }
-      setFailure(
-        result.insufficient
-          ? { kind: 'insufficient', required: result.required, available: result.available }
-          : { kind: 'message', message: result.message },
-      )
     })
   }
 

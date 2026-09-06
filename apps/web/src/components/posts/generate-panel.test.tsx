@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { ChannelSet } from '@sahoda/shared'
 
 import { GeneratePanel } from './generate-panel'
+import { generateVariants } from '@/app/actions/posts-ai'
 
 vi.mock('@/app/actions/posts-ai', () => ({ generateVariants: vi.fn() }))
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
 afterEach(cleanup)
 
@@ -57,5 +60,22 @@ describe('the line under the adapt button', () => {
     const root = panel([] as unknown as ChannelSet)
 
     expect(root.textContent ?? '').not.toMatch(/search for/i)
+  })
+})
+
+describe('a dropped connection does not crash the composer', () => {
+  test('shows an inline failure when the generate action rejects', async () => {
+    // MEASURED on the preview: a server action REJECTS on a dropped connection
+    // rather than resolving to `{ ok: false }`, and the unguarded await let the
+    // rejection escape the transition and fall to the route error boundary —
+    // the whole composer replaced by "This screen didn't load". Remove the
+    // try/catch and this rejection throws in act() and the test errors.
+    vi.mocked(generateVariants).mockRejectedValueOnce(new Error('Failed to fetch'))
+    const user = userEvent.setup()
+    panel()
+
+    await user.click(screen.getByRole('button', { name: /adapt for/i }))
+
+    expect(await screen.findByText(/couldn.t finish that just now/i)).toBeTruthy()
   })
 })

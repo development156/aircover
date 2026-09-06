@@ -70,41 +70,59 @@ export function GeneratePanel({
     setOutcome(null)
 
     startTransition(async () => {
-      const postId = await flush()
-      if (postId === null) {
-        // Component-owned copy, and the one failure where this side can speak to
-        // the charge: we never reached the action, so nothing was spent. It
-        // carries its own retry prompt because the shared branch below no longer
-        // appends one.
+      try {
+        const postId = await flush()
+        if (postId === null) {
+          // Component-owned copy, and the one failure where this side can speak to
+          // the charge: we never reached the action, so nothing was spent. It
+          // carries its own retry prompt because the shared branch below no longer
+          // appends one.
+          setOutcome({
+            kind: 'failed',
+            message:
+              'Your post body could not be saved, so nothing was generated and no credits were charged. Try again.',
+          })
+          return
+        }
+
+        const result = await generateVariants(postId, target)
+
+        if (result.ok) {
+          onGenerated(result.variants)
+          toast.success(
+            <span>
+              Wrote <span className="tabular-nums">{result.variants.length}</span> versions ·{' '}
+              <span className="tabular-nums">{result.creditsCharged}</span>{' '}
+              {creditWord(result.creditsCharged)} used ·{' '}
+              <span className="tabular-nums">{result.balanceAfter}</span> left
+            </span>,
+          )
+          setOutcome(
+            result.missing.length > 0 ? { kind: 'missing', channels: result.missing } : null,
+          )
+          return
+        }
+
+        setOutcome(
+          result.insufficient
+            ? { kind: 'insufficient', required: result.required, available: result.available }
+            : { kind: 'failed', message: result.message },
+        )
+      } catch {
+        // ── A DROPPED CONNECTION CRASHED THE WHOLE COMPOSER ──────────────────
+        // A server action REJECTS on a transport failure rather than resolving
+        // to `{ ok: false }` (the same fact `use-autosave` is built around).
+        // These two awaits were unguarded, so a request the network dropped —
+        // MEASURED on the preview, a POST redirected mid-flight — escaped the
+        // transition and fell to the route error boundary, replacing the entire
+        // composer with "This screen didn't load". Inline instead, and DO NOT
+        // claim the charge state: if the generate call reached the server it may
+        // have run, so the wallet is the source of truth, not this sentence.
         setOutcome({
           kind: 'failed',
-          message:
-            'Your post body could not be saved, so nothing was generated and no credits were charged. Try again.',
+          message: 'Sahoda couldn’t finish that just now. Check your wallet, then try again.',
         })
-        return
       }
-
-      const result = await generateVariants(postId, target)
-
-      if (result.ok) {
-        onGenerated(result.variants)
-        toast.success(
-          <span>
-            Wrote <span className="tabular-nums">{result.variants.length}</span> versions ·{' '}
-            <span className="tabular-nums">{result.creditsCharged}</span>{' '}
-            {creditWord(result.creditsCharged)} used ·{' '}
-            <span className="tabular-nums">{result.balanceAfter}</span> left
-          </span>,
-        )
-        setOutcome(result.missing.length > 0 ? { kind: 'missing', channels: result.missing } : null)
-        return
-      }
-
-      setOutcome(
-        result.insufficient
-          ? { kind: 'insufficient', required: result.required, available: result.available }
-          : { kind: 'failed', message: result.message },
-      )
     })
   }
 
