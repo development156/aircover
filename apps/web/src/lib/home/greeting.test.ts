@@ -61,8 +61,14 @@ describe('the greeting sentence agrees with the queue beneath it', () => {
       publish(4),
     )
     expect(sentence).toBe(
-      '2 drafts waiting, 1 post waiting for review, 3 posts approved, 4 posts out, 1 post failed.',
+      '2 drafts in progress, 1 post waiting for review, 3 posts approved, 4 posts out, 1 post failed.',
     )
+  })
+
+  test('a draft is "in progress", so the word "waiting" belongs to the board alone', () => {
+    // "1 draft waiting" sat 40px above "Waiting on you · 0" on the same
+    // screen (MEASURED 2026-09-06). Two different things, one word.
+    expect(greetingState(counts({ draft: 1 }), publish())).toBe('1 draft in progress.')
   })
 
   test('an empty workspace still gets the invitation, not a row of zeroes', () => {

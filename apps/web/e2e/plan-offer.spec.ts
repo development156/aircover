@@ -68,11 +68,22 @@ async function workspaceIdFor(clerkUserId: string): Promise<string | null> {
 }
 
 /**
- * Give the workspace one thing it has done. Since `7a8036ae` the offer waits
- * for the first action (a post, a connection, a brain, a spend): a plan pitched
- * at somebody who has not yet seen the product was the founder's ruling to
- * remove, and `planOfferDecision` answers `not-started` on an empty workspace.
- * One review-state post is the smallest true "started" signal.
+ * Give the workspace one thing it has done, AND spend half its free credits.
+ *
+ * Since `7a8036ae` the offer waits for the first action (a post, a connection,
+ * a brain, a spend): a plan pitched at somebody who has not yet seen the
+ * product was the founder's ruling to remove. Since the 2026-09-06 /home audit
+ * it also waits until half of Free's monthly credits are gone
+ * (`OFFER_AT_OR_BELOW` in lib/billing/plan-offer.ts): MEASURED in a real
+ * browser, one saved draft alone put the dialog over the first dashboard a
+ * workspace ever saw, with 100 of 100 credits unspent.
+ *
+ * So the seed is two writes. One review-state post is the smallest true
+ * "started" signal; one 60-credit DEBIT through `app.apply_ledger_entry` — the
+ * ONLY legal writer of `credit_balances`, and reachable only over a direct
+ * connection because `app.*` is not exposed through PostgREST — is the smallest
+ * true "running low" signal. Both fail loudly when their credential is absent:
+ * a test that cannot run must not report as one that passed.
  */
 async function seedFirstAction(clerkUserId: string): Promise<void> {
   const admin = adminClient() as SupabaseClient | null
@@ -92,6 +103,28 @@ async function seedFirstAction(clerkUserId: string): Promise<void> {
     created_by: clerkUserId,
   })
   expect(error, `could not seed the first post: ${error?.message}`).toBeNull()
+  await spendHalf(workspaceId as string)
+}
+
+/** Take the free grant below the offer threshold, through the ledger function. */
+async function spendHalf(workspaceId: string): Promise<void> {
+  const url = process.env.SUPABASE_DB_URL
+  expect(
+    url,
+    'no SUPABASE_DB_URL: the low-credits case cannot be set up, and a test that ' +
+      'cannot run must not report as one that passed',
+  ).toBeTruthy()
+  const { Client } = (await import('pg')).default
+  const client = new Client({ connectionString: url })
+  try {
+    await client.connect()
+    await client.query(
+      `select app.apply_ledger_entry($1::uuid, 'DEBIT', $2::int, $3::text, $4::text)`,
+      [workspaceId, 60, `plan-offer-${workspaceId}`, 'draft_post'],
+    )
+  } finally {
+    await client.end().catch(() => {})
+  }
 }
 
 test.describe('the plan offer @smoke', () => {

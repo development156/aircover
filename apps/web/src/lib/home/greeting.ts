@@ -34,7 +34,9 @@ export function greetingState(counts: PostCounts, publish: PublishSummary): stri
   const approved = counts.byStatus.approved ?? 0
   const clauses: string[] = []
 
-  if (drafts > 0) clauses.push(`${plural(drafts, 'draft', 'drafts')} waiting`)
+  // "in progress", not "waiting": the board 40px below owns the word
+  // "Waiting on you", and a draft with no date is not waiting on anyone.
+  if (drafts > 0) clauses.push(`${plural(drafts, 'draft', 'drafts')} in progress`)
   if (review > 0) clauses.push(`${plural(review, 'post', 'posts')} waiting for review`)
   if (approved > 0) clauses.push(`${plural(approved, 'post', 'posts')} approved`)
   // Only a SUCCEEDED live publish counts as "out". A fixture run is simulated

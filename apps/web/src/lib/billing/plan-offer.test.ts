@@ -31,15 +31,20 @@ const view = (over: Partial<SubscriptionView> = {}): SubscriptionView => ({
 
 const PAID: readonly PlanId[] = ['starter', 'growth', 'agency']
 
+/** A started workspace that has spent most of its free credits. */
+const LOW = { hasStarted: true, creditsAvailable: 30 }
+
 describe('planOfferDecision', () => {
   it('offers to a workspace with no subscription row, which reads as free and active', () => {
     // This IS the shape `readSubscription` synthesises when the table has no row
     // for the workspace: `freeSubscription()` returns planId free, status active.
-    expect(planOfferDecision({ status: 'ok', data: view() })).toEqual({ kind: 'offer' })
+    expect(planOfferDecision({ status: 'ok', data: view() }, LOW)).toEqual({ kind: 'offer' })
   })
 
   it.each(PAID)('stays silent for a live %s subscriber', (planId) => {
-    expect(planOfferDecision({ status: 'ok', data: view({ planId, status: 'active' }) })).toEqual({
+    expect(
+      planOfferDecision({ status: 'ok', data: view({ planId, status: 'active' }) }, LOW),
+    ).toEqual({
       kind: 'silent',
       because: 'has-plan',
     })
@@ -48,9 +53,9 @@ describe('planOfferDecision', () => {
   it.each(['trialing', 'past_due', 'grace'] as const)(
     'stays silent for a paid plan that is %s — still being served, still theirs',
     (status) => {
-      expect(planOfferDecision({ status: 'ok', data: view({ planId: 'growth', status }) })).toEqual(
-        { kind: 'silent', because: 'has-plan' },
-      )
+      expect(
+        planOfferDecision({ status: 'ok', data: view({ planId: 'growth', status }) }, LOW),
+      ).toEqual({ kind: 'silent', because: 'has-plan' })
     },
   )
 
@@ -61,9 +66,9 @@ describe('planOfferDecision', () => {
       // whatever its status, so a customer who cancelled Growth still arrives
       // carrying `planId: 'growth'`. A plain `planId === 'free'` test would
       // decide they have a plan and never offer them one again.
-      expect(planOfferDecision({ status: 'ok', data: view({ planId: 'growth', status }) })).toEqual(
-        { kind: 'offer' },
-      )
+      expect(
+        planOfferDecision({ status: 'ok', data: view({ planId: 'growth', status }) }, LOW),
+      ).toEqual({ kind: 'offer' })
     },
   )
 
@@ -71,13 +76,54 @@ describe('planOfferDecision', () => {
     // MEASURED 2026-09-05 in a browser: a workspace that had just finished
     // onboarding was met by this dialog before it had seen its own dashboard.
     // Founder's ruling the same day: the offer waits for the first action.
-    expect(planOfferDecision({ status: 'ok', data: view() }, { hasStarted: false })).toEqual({
+    expect(
+      planOfferDecision({ status: 'ok', data: view() }, { ...LOW, hasStarted: false }),
+    ).toEqual({
       kind: 'silent',
       because: 'not-started',
     })
-    expect(planOfferDecision({ status: 'ok', data: view() }, { hasStarted: true })).toEqual({
+    expect(planOfferDecision({ status: 'ok', data: view() }, LOW)).toEqual({
       kind: 'offer',
     })
+  })
+
+  /**
+   * ── AND UNTIL THE FREE CREDITS ARE HALF GONE ─────────────────────────────
+   * MEASURED 2026-09-06 on the wt-core preview: one saved draft satisfied
+   * "has done something" and the dialog covered the first real dashboard a
+   * workspace ever saw, with 100 of 100 credits unspent. A price list is an
+   * answer to a question the reader has not asked until the free grant is
+   * running out. The founder delegated the signal; this is it: fewer than half
+   * of Free's monthly credits left.
+   */
+  it('stays silent while more than half of the free credits remain', () => {
+    expect(
+      planOfferDecision(
+        { status: 'ok', data: view() },
+        { hasStarted: true, creditsAvailable: 100 },
+      ),
+    ).toEqual({ kind: 'silent', because: 'credits-remain' })
+    expect(
+      planOfferDecision({ status: 'ok', data: view() }, { hasStarted: true, creditsAvailable: 51 }),
+    ).toEqual({ kind: 'silent', because: 'credits-remain' })
+  })
+
+  it('offers once half or fewer of the free credits are left', () => {
+    expect(
+      planOfferDecision({ status: 'ok', data: view() }, { hasStarted: true, creditsAvailable: 50 }),
+    ).toEqual({ kind: 'offer' })
+    expect(
+      planOfferDecision({ status: 'ok', data: view() }, { hasStarted: true, creditsAvailable: 0 }),
+    ).toEqual({ kind: 'offer' })
+  })
+
+  it('stays silent when the balance could not be read, rather than guessing it is low', () => {
+    expect(
+      planOfferDecision(
+        { status: 'ok', data: view() },
+        { hasStarted: true, creditsAvailable: null },
+      ),
+    ).toEqual({ kind: 'silent', because: 'unknown' })
   })
 
   it('stays silent when there is no workspace, because checkout has nothing to charge for', () => {

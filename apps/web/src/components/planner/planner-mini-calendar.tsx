@@ -97,7 +97,7 @@ export function PlannerMiniCalendar({
           const isToday = bucket.key === todayKey
           const isSelected = bucket.key === selected
           const scheduled = bucket.posts.filter((p) => p.intent === 'scheduled').length
-          const waiting = bucket.posts.filter((p) => needsAPerson(p.intent)).length
+          const waiting = bucket.posts.filter((p) => needsAPerson(p)).length
           const other = bucket.posts.length - scheduled
 
           return (

@@ -54,7 +54,7 @@ export interface PlannerRowProps {
  */
 function rowGlyph(post: DisplayPost): typeof FileText {
   if (post.intent === 'scheduled') return CalendarClock
-  if (needsAPerson(post.intent)) return Timer
+  if (needsAPerson(post)) return Timer
   return FileText
 }
 

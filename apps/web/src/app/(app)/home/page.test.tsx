@@ -450,11 +450,31 @@ describe('the plan offer on the dashboard', () => {
    */
   const findOffer = () => screen.findByRole('heading', { name: OFFER })
 
-  test('a workspace on Free that has done something is offered the plans', async () => {
+  test('a workspace on Free that has done something AND spent most of its credits is offered the plans', async () => {
     vi.mocked(listPosts).mockResolvedValue([A_POST])
+    balanceRead.mockResolvedValue({
+      status: 'ok',
+      balance: { total: 40, held: 0, available: 40, hasHold: false, heldNote: null },
+    })
     render(await HomePage())
 
     expect(await findOffer()).toBeInTheDocument()
+  })
+
+  test('a workspace that has done something but still holds most of its free credits is NOT', async () => {
+    // MEASURED 2026-09-06 on the wt-core preview: one saved draft, 100 of 100
+    // credits unspent, and the dialog over the first full dashboard. The
+    // founder delegated the signal; the decision now waits until half of the
+    // free grant is gone.
+    vi.mocked(listPosts).mockResolvedValue([A_POST])
+    balanceRead.mockResolvedValue({
+      status: 'ok',
+      balance: { total: 100, held: 0, available: 100, hasHold: false, heldNote: null },
+    })
+    render(await HomePage())
+
+    expect(screen.getByText(/needs your attention/i)).toBeInTheDocument()
+    expect(offerHeading()).toBeNull()
   })
 
   test('a workspace on a paid plan is NOT', async () => {

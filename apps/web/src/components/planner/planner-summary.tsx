@@ -113,7 +113,7 @@ export function PlannerSummary({
   zone?: string | null
 }) {
   const scheduled = posts.filter((p) => p.intent === 'scheduled').length
-  const awaiting = posts.filter((p) => needsAPerson(p.intent)).length
+  const awaiting = posts.filter((p) => needsAPerson(p)).length
   const drafts = posts.filter((p) => p.intent === 'draft').length
 
   const todayKey = istDayKey(now)
