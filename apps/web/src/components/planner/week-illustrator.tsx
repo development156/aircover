@@ -51,21 +51,27 @@ export function WeekIllustrator({ postIds, costPerPicture, onDone }: WeekIllustr
   const [cards, setCards] = useState<CardState[]>(() => postIds.map(() => ({ kind: 'waiting' })))
   const [lineIndex, setLineIndex] = useState(0)
   const started = useRef(false)
+  // A ref, not a closure flag. React's development double-mount runs the
+  // effect, its cleanup, then the effect again: a closure flag set by the first
+  // cleanup would stay true for the loop the first run started, and every
+  // result would be thrown away while the cards read "drawing" for ever.
+  // MEASURED 2026-09-07 on a local dev server with a real picture charged.
+  const cancelled = useRef(false)
 
   useEffect(() => {
+    cancelled.current = false
     if (started.current) return
     started.current = true
-    let cancelled = false
     void (async () => {
       let made = 0
       let charged = 0
       let balanceAfter: number | null = null
       for (let i = 0; i < postIds.length; i += 1) {
-        if (cancelled) return
+        if (cancelled.current) return
         setLineIndex(0)
         setCards((current) => current.map((card, j) => (j === i ? { kind: 'drawing' } : card)))
         const result: IllustrateState = await illustratePost(postIds[i])
-        if (cancelled) return
+        if (cancelled.current) return
         if (result.ok) {
           made += 1
           charged += result.creditsCharged
@@ -97,7 +103,7 @@ export function WeekIllustrator({ postIds, costPerPicture, onDone }: WeekIllustr
       onDone?.({ made, charged, balanceAfter })
     })()
     return () => {
-      cancelled = true
+      cancelled.current = true
     }
     // Runs once for the ids it was mounted with. A new plan mounts a new one.
     // eslint-disable-next-line react-hooks/exhaustive-deps
