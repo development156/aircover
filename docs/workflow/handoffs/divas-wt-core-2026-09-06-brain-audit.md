@@ -54,6 +54,12 @@ The founder asked for the Brand Brain to be visually striking with feedback on e
 - MEASURED live: after Confirm on Archetype, node lit + halo + core pop + chip pop + value ring all present within 1.8 s (the round trip), settled by 2.7 s, level 0 → 1. Light, dark and 390 px checked; no horizontal overflow.
 - The first build failed the js-budget (+8.2 kB on the layout): the client map imported the field registry and, through provenance, `@sahoda/shared`. `cca5e7a0` moves geometry, counts and the spoken label to the server; the client draws plain data.
 
+## Plain English (`92ba4d81`)
+
+Founder's ask: every sentence on /brain readable by anyone. Renamed the sections (Your brand · Your customer · Your promise · How you sound · Never do this), the fifteen labels and questions (Brand type, If your brand were a person, What you stand for, Their problem, What they worry about, How they want to be seen, Your main promise, The feeling you give, Example first lines, Phrases that sound like you, How formal), the console (tab "Check guesses", "Still to check", "Sahoda wrote these for you", "Only you can answer these"), the header ("Answer this next", **"Rebuild Brand Brain"** replaces "Re-run resolve", "costs credits" replaces "paid"), the derived card ("How sure Sahoda is" · Very sure / Fairly sure / Not sure yet · "Based on" · "Worked out from the fields above. Not counted."), the origin notes, editor hints, chip tooltips and blank refusals. The model's note is now prompted for the owner in plain words with the jargon banned (`brand-guidelines.ts`, pinned by a test). No claim got vaguer; tests retargeted to the claims; `resolution-console.spec.ts` retargeted for four headings.
+
+Verified on the preview against a seeded fixture (the free-build limit refused a fourth build today: "3 times today, which is the daily limit", which is correct). Fixture deleted afterwards.
+
 ## Not done
 
 - The paid re-resolve was not spent. Two-session concurrency (BR-04) is INFERRED from code, not driven.
