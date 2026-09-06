@@ -161,12 +161,12 @@ export const ENTITLEMENT: Record<BrainFieldMetaKind, Entitlement> = {
   asked: {
     label: 'Only you know this',
     heading: 'Only you know these',
-    line: 'Sahoda is not entitled to answer these. It filled them in so the Brain would work at all, and its guesses here are worth less than yours on any day.',
+    line: 'Only you can answer these. Sahoda filled them in so it could start. Your answer is always better than its guess.',
   },
   negotiated: {
-    label: 'Sahoda proposed this',
-    heading: 'Sahoda proposed these',
-    line: 'These are the fields Sahoda is meant to draft: you have the instinct, it has the craft. Keep each one, or say it differently.',
+    label: 'Sahoda wrote this',
+    heading: 'Sahoda wrote these for you',
+    line: 'These are the things Sahoda is good at writing: how you sound, how formal you are, which phrases are yours. Keep each one, or change it.',
   },
 }
 
@@ -178,7 +178,7 @@ export function entitlementOf(field: BrainField): Entitlement {
 export const INTAKE_GROUP: Entitlement = {
   label: 'From your answer',
   heading: 'Check Sahoda kept your meaning',
-  line: 'You told Sahoda these at setup and it put them in its own words. Confirm if the wording is right, or correct it.',
+  line: 'You told Sahoda these when you set up. Sahoda wrote them in its own words. If the words are right, confirm them. If not, correct them.',
 }
 
 /** The heading, sentence and marker for a row: intake rows are grouped by state, the rest by kind. */

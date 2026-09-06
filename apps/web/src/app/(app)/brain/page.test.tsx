@@ -116,15 +116,15 @@ describe('/brain', () => {
     test('shows its evidence rather than a certainty', async () => {
       render(await BrainPage())
 
-      expect(screen.getByText('Signal lock')).toBeInTheDocument()
-      expect(screen.getByText('Drawn from')).toBeInTheDocument()
+      expect(screen.getByText('How sure Sahoda is')).toBeInTheDocument()
+      expect(screen.getByText('Based on')).toBeInTheDocument()
       // The model's own account of the verdict is the primary evidence.
       expect(screen.getByText(DEMO_FALLBACK_PAYLOAD.alignment.note)).toBeInTheDocument()
     })
 
     test('says outright that it is not counted', async () => {
       render(await BrainPage())
-      expect(screen.getByText('Derived, not counted')).toBeInTheDocument()
+      expect(screen.getByText('Worked out from the fields above. Not counted.')).toBeInTheDocument()
     })
 
     test('is not editable — a conclusion is not a question anyone can answer', async () => {
@@ -181,7 +181,7 @@ describe('/brain', () => {
       render(await BrainPage())
 
       expect(screen.getByRole('status')).toHaveTextContent(
-        /only started recording who wrote each field/,
+        /only started keeping track of who wrote each field/,
       )
     })
 
@@ -201,7 +201,7 @@ describe('/brain', () => {
       render(await BrainPage())
 
       expect(
-        screen.queryByText(/only started recording who wrote each field/),
+        screen.queryByText(/only started keeping track of who wrote each field/),
       ).not.toBeInTheDocument()
     })
 
@@ -217,7 +217,7 @@ describe('/brain', () => {
       render(await BrainPage())
 
       expect(
-        screen.queryByText(/only started recording who wrote each field/),
+        screen.queryByText(/only started keeping track of who wrote each field/),
       ).not.toBeInTheDocument()
     })
   })
@@ -232,7 +232,7 @@ describe('/brain', () => {
     // the sentence. It is a button now, so the label is verb-first and the
     // match moved with it; the claim the guard makes is unchanged and one
     // assertion stronger.
-    const resolve = screen.getByRole('link', { name: /re-run/i })
+    const resolve = screen.getByRole('link', { name: /rebuild/i })
     expect(resolve).toHaveAttribute('href', '/onboarding')
     // The affordance, checked on the assembled page and not only in the unit
     // test for the panel. `inline-flex` comes from buttonVariants; prose does

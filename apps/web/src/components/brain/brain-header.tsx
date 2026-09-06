@@ -84,7 +84,7 @@ export function BrainHeader({
 
       {ring.next ? (
         <div className="rounded-input border border-tint-300 bg-tint-50 px-3 py-2.5 dark:bg-s2">
-          <p className="type-eyebrow text-accent">Worth answering next</p>
+          <p className="type-eyebrow text-accent">Answer this next</p>
           <p className="mt-1 text-[13.5px] text-ink">{ring.next.question}</p>
           {/* The guess STAYS — it is the answer being offered and a real value
               from the brain — and "Editing it costs nothing" goes, because the
@@ -92,7 +92,7 @@ export function BrainHeader({
               card is the noise this pass exists to remove. */}
           <p className="mt-1 text-[12.5px] text-muted">
             {stateOf(provenance, ring.next.path) === 'intake'
-              ? 'Sahoda reworded your answer for'
+              ? 'Sahoda rewrote your answer for'
               : 'Sahoda guessed'}{' '}
             <span className="font-semibold">{ring.next.label}</span>
           </p>
@@ -114,8 +114,8 @@ export function BrainHeader({
            for less copy; it does not ask for a zero that looks like lost work.
            Two sentences instead of three, same claim. */
         <p role="status" className="type-meta text-muted">
-          Sahoda only started recording who wrote each field in this version, so setup corrections
-          are not counted. Edit a field and it becomes yours.
+          Sahoda only started keeping track of who wrote each field in this version, so changes you
+          made during setup are not counted. Edit a field and it becomes yours.
         </p>
       ) : null}
 
@@ -156,7 +156,7 @@ export function BrainHeader({
         aria-describedby={NOTE_ID}
         className={cn(buttonVariants({ variant: 'secondary' }), 'self-start')}
       >
-        Re-run resolve
+        Rebuild Brand Brain
       </Link>
       {/* SHORTENED, NOT DROPPED, and it is the note the button is described by.
           `page.test.tsx` pins /Editing a field here is free/ under the name "the
@@ -165,8 +165,8 @@ export function BrainHeader({
           button beneath rewrites fields they already confirmed, and it is the
           only place a screen reader hears it. */}
       <p id={NOTE_ID} className="type-meta text-muted">
-        Editing a field here is free. Re-running the resolve is paid, and rewrites every field
-        including the ones you confirmed.
+        Editing a field here is free. Rebuilding costs credits and replaces every field, including
+        the ones you confirmed.
       </p>
     </section>
   )

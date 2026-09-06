@@ -74,7 +74,7 @@ export async function BrainSections({ only }: { only: readonly BrainSectionKey[]
     return (
       <div className="space-y-grid">
         <p className="text-[13px] text-muted">
-          Nothing has been resolved yet. These are the fields Sahoda writes your captions, your
+          Nothing has been written yet. These are the fields Sahoda writes your captions, your
           weekly plan and your website from.
         </p>
         <div className="grid gap-grid wide:grid-cols-2">

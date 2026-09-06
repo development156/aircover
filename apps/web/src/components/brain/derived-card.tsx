@@ -26,9 +26,9 @@ import { Badge, type Rung } from '@/components/ui/badge'
  * being split.
  */
 const LOCK_COPY: Record<BrandMemoryPayload['alignment']['signal_lock'], string> = {
-  strong: 'Strong signal',
-  moderate: 'Moderate signal',
-  weak: 'Weak signal',
+  strong: 'Very sure',
+  moderate: 'Fairly sure',
+  weak: 'Not sure yet',
 }
 
 /**
@@ -99,7 +99,7 @@ export function DerivedCard({
       <p className="text-[13px] text-muted">{alignment.note}</p>
 
       <div className="border-t border-line pt-3">
-        <p className="type-eyebrow mb-2 text-muted">Drawn from</p>
+        <p className="type-eyebrow mb-2 text-muted">Based on</p>
         <ul className="flex flex-col gap-1.5">
           {inputs.map((input) => (
             /* The word "confirmed" was on all five rows and is on the eyebrow
@@ -113,7 +113,9 @@ export function DerivedCard({
             </li>
           ))}
         </ul>
-        <p className="type-eyebrow mt-3 text-muted">Derived, not counted</p>
+        <p className="type-eyebrow mt-3 text-muted">
+          Worked out from the fields above. Not counted.
+        </p>
       </div>
     </Card>
   )

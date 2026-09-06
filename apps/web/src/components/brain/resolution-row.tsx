@@ -346,21 +346,20 @@ export function ResolutionRow({
             </div>
             {clearable ? (
               <p className="type-sm text-muted">
-                Emptying this list records &ldquo;there are none&rdquo; as your answer, so it counts
-                as confirmed and Sahoda stops leaning on what it guessed here.
+                Emptying this list saves &ldquo;there are none&rdquo; as your answer. It counts as
+                confirmed, and Sahoda stops using its guess here.
               </p>
             ) : null}
             {field.fixedLength ? (
               <p className="type-sm text-muted">
-                This list always holds three entries, so it cannot be emptied. Replace the wording
+                This list always has three entries, so it cannot be emptied. Change the words
                 instead.
               </p>
             ) : null}
             {!clearable && !field.fixedLength ? (
               <p className="type-sm text-muted">
-                There is no way to record &ldquo;nothing&rdquo; here. A blank answer would be an
-                absence rather than a position, and Sahoda will not count one as yours. Say it in
-                your own words instead.
+                You cannot save &ldquo;nothing&rdquo; here. A blank is not an answer, and Sahoda
+                will not count it as yours. Say it in your own words instead.
               </p>
             ) : null}
           </div>

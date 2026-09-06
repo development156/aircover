@@ -101,7 +101,7 @@ export async function confirmBrainField(
       return {
         ok: false,
         message:
-          'This field changed since you opened the page. Reload to see the new wording before confirming it.',
+          'This field changed since you opened the page. Reload to see the new words before you confirm.',
       }
     }
     if (unchangedText && brain.meta?.[path]?.confirmed === true) {

@@ -105,9 +105,7 @@ export function ResolutionConsole({ payload, provenance, evidence }: ResolutionC
         return next
       })
       setPicked(new Set())
-      setDone(
-        `Confirmed ${result.confirmed} ${result.confirmed === 1 ? 'field' : 'fields'} as version ${result.version}.`,
-      )
+      setDone(`Confirmed ${result.confirmed} ${result.confirmed === 1 ? 'field' : 'fields'}.`)
     })
   }
 
@@ -127,11 +125,11 @@ export function ResolutionConsole({ payload, provenance, evidence }: ResolutionC
       <section className="surface-ring rounded-card bg-surface" aria-labelledby="console-clear">
         <div className="flex flex-col gap-2 px-4 py-6">
           <h2 id="console-clear" className="type-h2">
-            Nothing left to resolve
+            Nothing left to check
           </h2>
           <p className="type-body text-muted">
-            All {tally.registered} fields carry an answer a person stood behind. Sahoda writes from
-            your answers, not its guesses. Re-running the resolve would rewrite every one of them.
+            All {tally.registered} fields are confirmed by you. Sahoda writes from your answers, not
+            its guesses. Rebuilding would replace every one of them.
           </p>
         </div>
         {settled.length > 0 ? <Settled entries={settled} /> : null}
@@ -144,7 +142,7 @@ export function ResolutionConsole({ payload, provenance, evidence }: ResolutionC
       <section className="surface-ring rounded-card bg-surface" aria-labelledby="console-queue">
         <header className="flex flex-wrap items-center gap-3 border-b border-line-soft px-4 py-3">
           <h2 id="console-queue" className="type-h2">
-            Unresolved
+            Still to check
           </h2>
           <span className="num type-sm ml-auto text-muted">
             {open.length} of {tally.registered}
@@ -172,8 +170,7 @@ export function ResolutionConsole({ payload, provenance, evidence }: ResolutionC
             {allPicked ? 'Clear selection' : `Select all ${selectable.length}`}
           </Button>
           <p className="type-sm text-muted">
-            Tick the guesses you have read and agree with. Confirming is free and never re-runs the
-            model.
+            Tick the guesses you agree with. Confirming is free. It never rebuilds anything.
           </p>
         </div>
 
@@ -231,9 +228,8 @@ export function ResolutionConsole({ payload, provenance, evidence }: ResolutionC
             <p className="type-sm text-muted">Nothing selected yet.</p>
           ) : (
             <p className="type-sm text-muted">
-              Writes one new version and marks{' '}
-              <span className="num font-[550] text-ink">{chosen.length}</span>{' '}
-              {chosen.length === 1 ? 'field' : 'fields'} as yours. It changes no wording.
+              Marks <span className="num font-[550] text-ink">{chosen.length}</span>{' '}
+              {chosen.length === 1 ? 'field' : 'fields'} as yours. The words stay the same.
             </p>
           )}
         </div>
@@ -332,7 +328,7 @@ export function QueueLegend({
       </li>
       <li className="type-sm flex items-center gap-icon-gap text-muted">
         <Check className="size-[13px] shrink-0" aria-hidden />
-        <span className="num font-[550]">{proposed}</span> Sahoda is meant to draft
+        <span className="num font-[550]">{proposed}</span> Sahoda wrote for you
       </li>
     </ul>
   )

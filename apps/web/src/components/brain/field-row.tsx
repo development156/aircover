@@ -213,7 +213,7 @@ export function FieldRow({ field, value, state }: FieldRowProps) {
               <span className="text-[12.5px] text-muted">
                 {alreadyConfirmed
                   ? 'Already confirmed. Edit the text to change it.'
-                  : 'Saves this wording as yours, exactly as written.'}
+                  : 'Saves these words as yours, exactly as written.'}
               </span>
             ) : null}
           </div>

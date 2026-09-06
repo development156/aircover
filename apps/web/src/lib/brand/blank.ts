@@ -34,18 +34,18 @@ export function blankReason(field: BrainField, value: BrainLeaf): string | null 
     const blanks = value.filter((entry) => typeof entry !== 'string' || entry.trim() === '')
     if (field.fixedLength) {
       return blanks.length > 0
-        ? 'All three entries need words. A blank one cannot be recorded as yours.'
+        ? 'All three need words. A blank one cannot be saved as yours.'
         : null
     }
     // Empty is an answer; all-blank is not.
     if (value.length > 0 && blanks.length === value.length) {
-      return 'Every entry here is blank. Write one, or remove them all to record “none”.'
+      return 'Every line here is blank. Write one, or remove them all to say “none”.'
     }
     return null
   }
 
   if (typeof value !== 'string') return null
   return value.trim() === ''
-    ? 'This is blank. Write it in your own words, or cancel. A blank cannot be recorded as yours.'
+    ? 'This is blank. Write something, or cancel. A blank cannot be saved as yours.'
     : null
 }

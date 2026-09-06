@@ -69,9 +69,9 @@ export default async function BrainPage() {
         <EmptyState
           icon={BrainCircuit}
           title="Sahoda doesn't know your brand yet"
-          body="The Brand Brain is what Sahoda writes your captions, your weekly plan and your website from. Give Sahoda a spark and it will resolve a first draft you can correct."
+          body="The Brand Brain is what Sahoda writes your captions, your weekly plan and your website from. Tell Sahoda a little about your business and it will write a first draft you can correct."
           action={<OnboardingLink>Set up your Brand Brain</OnboardingLink>}
-          tip="You approve and correct what it resolves. You never start from a blank form."
+          tip="You check and correct what it writes. You never start from a blank form."
         />
 
         <section className="surface-ring rounded-card bg-surface" aria-labelledby="brain-will-hold">

@@ -11,7 +11,7 @@ import { readBrain } from '@/lib/brand/read-brain'
 import { readCitedPassages } from '@/lib/knowledge/store'
 import { queueTally, resolutionQueue } from '@/lib/brand/resolution-queue'
 
-export const metadata = { title: 'Signal Resolution Console' }
+export const metadata = { title: 'Check the guesses' }
 
 /**
  * The paragraph stating what a re-resolve costs and what it overwrites. The
@@ -97,14 +97,14 @@ export default async function ResolveConsolePage() {
     return (
       <EmptyState
         icon={BrainCircuit}
-        title="There is nothing to resolve yet"
-        body="The console is where you settle what Sahoda guessed about your brand. It has not guessed anything yet, because it has not read anything yet."
+        title="Nothing to check yet"
+        body="This is where you check what Sahoda guessed about your brand. It has not guessed anything yet, because it has not read anything yet."
         action={
           <Link href="/onboarding" className={buttonVariants({ variant: 'primary' })}>
             Set up your Brand Brain
           </Link>
         }
-        tip="Sahoda resolves a first draft from a link, a PDF or one sentence. Everything it writes lands here as a guess for you to confirm."
+        tip="Sahoda writes a first draft from a link, a PDF or one sentence. Everything it writes shows up here as a guess for you to confirm."
       />
     )
   }
@@ -191,14 +191,14 @@ export default async function ResolveConsolePage() {
             {tally.unearned > 0 ? (
               <>
                 <span className="num font-[550] text-ink">{tally.unearned}</span> of them are things
-                only you can actually know: what your customers fear, what Sahoda must never say,
-                what you promise. Those come first in the list below, because a guess there is worth
-                the least.
+                only you can know: what your customers worry about, what Sahoda must never say, what
+                you promise. They come first in the list below, because Sahoda’s guess is weakest
+                there.
               </>
             ) : (
               <>
-                What is left are the fields Sahoda is meant to draft: how you sound, how formal to
-                be, which phrases are yours. Keep them or say them differently.
+                The rest are things Sahoda is good at writing: how you sound, how formal you are,
+                which phrases are yours. Keep them, or change them.
               </>
             )}
           </p>
@@ -247,9 +247,8 @@ export default async function ResolveConsolePage() {
         the reader up to expect. A number here would have to be right.
       */}
       <p id={PAID_PATH_NOTE_ID} className="type-sm text-muted">
-        Confirming and correcting on this page is free and never calls a model. Re-running the whole
-        resolve is a separate, paid action that rewrites all {tally.registered} fields, including
-        every one you have already confirmed.
+        Confirming and correcting here is free. Rebuilding the whole Brand Brain costs credits and
+        replaces all {tally.registered} fields, including the ones you have already confirmed.
       </p>
 
       {/* A link wearing the button's clothes; `<Button asChild>` throws on the
@@ -261,7 +260,7 @@ export default async function ResolveConsolePage() {
         aria-describedby={PAID_PATH_NOTE_ID}
         className={cn(buttonVariants({ variant: 'secondary' }), 'self-start')}
       >
-        Re-run the whole resolve
+        Rebuild Brand Brain
       </Link>
     </div>
   )

@@ -106,8 +106,8 @@ export function brainOrigin(
   if (source === 'system' && context.appliedFromLearning) {
     return {
       kind: 'learned',
-      label: 'Updated by a learning you accepted',
-      line: 'This version is the previous one with a change you approved merged into it. Everything else is exactly as it was, and fields nobody has confirmed are still Sahoda’s.',
+      label: 'Updated with a change you approved',
+      line: 'This version is the last one plus a change you approved. Everything else is the same. Fields nobody has confirmed are still Sahoda’s.',
       isSample: false,
     }
   }
@@ -116,22 +116,22 @@ export function brainOrigin(
     case 'resolved':
       return {
         kind: 'resolved',
-        label: 'Resolved by Sahoda',
-        line: 'A model read what you gave it and wrote every field below in one pass. None of it is your answer until you say so.',
+        label: 'Written by Sahoda',
+        line: 'Sahoda read what you gave it and wrote every field below in one go. None of it is your answer until you say so.',
         isSample: false,
       }
     case 'manual':
       return {
         kind: 'manual',
-        label: 'Last edited by hand',
-        line: 'The most recent version was written by a person on this screen. Fields nobody has confirmed are still Sahoda’s.',
+        label: 'Last edited by a person',
+        line: 'The newest version was edited by a person on this screen. Fields nobody has confirmed are still Sahoda’s.',
         isSample: false,
       }
     case 'system':
       return {
         kind: 'system',
-        label: 'A sample, not your brand',
-        line: 'The model could not be reached, so Sahoda saved an example Brand Brain to show you the shape of one. These are not answers about your business. Re-run the resolve before confirming anything here.',
+        label: 'An example, not your brand',
+        line: 'Sahoda could not reach its writing model, so it saved an example Brand Brain to show you what one looks like. These are not answers about your business. Rebuild your Brand Brain before confirming anything here.',
         isSample: true,
       }
     default:
@@ -145,7 +145,7 @@ export function brainOrigin(
       return {
         kind: 'unknown',
         label: 'Not recorded',
-        line: 'Nothing was recorded about how this version was written. Treat every unconfirmed field as a guess, which is what the count below already does.',
+        line: 'We do not know how this version was written. Treat every unconfirmed field as a guess. The count below already does.',
         isSample: false,
       }
   }
@@ -175,4 +175,4 @@ export function brainOrigin(
  * that is showing exactly that would teach the reader to disbelieve the page.
  */
 export const NO_PER_FIELD_EVIDENCE =
-  'For anything Sahoda worked out from a link or a PDF at signup, it cannot show which sentence produced which field. It read everything in one pass and wrote the whole Brain at once, and it will not invent a source it does not have. A field drawn from your Knowledge library is different: it names the document and quotes the passage, underneath the field itself.'
+  'For anything Sahoda worked out from a link or a PDF at setup, it cannot show which sentence led to which field. It read everything at once and wrote the whole Brain at once. It will not invent a source it does not have. A field taken from your documents is different: it names the document and quotes the words, under the field.'

@@ -191,10 +191,10 @@ test.describe('signal resolution console @smoke', () => {
     await page.goto('/brain/resolve')
 
     // ── The origin, read off `brand_memory.source` and not invented.
-    await expect(page.getByRole('heading', { name: /resolved by sahoda/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /written by sahoda/i })).toBeVisible()
 
     // ── The absence of per-field evidence, stated rather than left to assume.
-    await expect(page.getByText(/cannot show which sentence produced which field/i)).toBeVisible()
+    await expect(page.getByText(/cannot show which sentence led to which field/i)).toBeVisible()
 
     // ── The finding, as TEXT, with numbers a query produced.
     const finding = page.getByRole('heading', { name: /fields are still Sahoda/i })
@@ -277,7 +277,7 @@ test.describe('signal resolution console @smoke', () => {
      * a person has edited is a different claim from one a model wrote, and the
      * page has to change its mind when the row does.
      */
-    await expect(page.getByRole('heading', { name: /last edited by hand/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /last edited by a person/i })).toBeVisible()
 
     /**
      * ── THE WIDTHS, INCLUDING THE BAND NOBODY SAMPLES ────────────────────────
@@ -306,7 +306,7 @@ test.describe('signal resolution console @smoke', () => {
         reports the stored column rather than remembering what the page said a
         moment ago. The queue heading is the stable thing at this point.
       */
-      await expect(page.getByRole('heading', { name: /^unresolved$/i })).toBeVisible()
+      await expect(page.getByRole('heading', { name: /^still to check$/i })).toBeVisible()
       const overflow = await page.evaluate(() => ({
         scrollWidth: document.documentElement.scrollWidth,
         clientWidth: document.documentElement.clientWidth,
@@ -346,7 +346,7 @@ test.describe('signal resolution console @smoke', () => {
     await seedResolvedBrain(admin!, workspaceId)
 
     await page.goto('/brain/resolve')
-    await expect(page.getByRole('heading', { name: /resolved by sahoda/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /written by sahoda/i })).toBeVisible()
 
     // Confirm the page really is in dark before measuring anything on it —
     // otherwise a theme that failed to apply would make this pass on the light

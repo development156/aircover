@@ -165,7 +165,7 @@ describe('ResolutionConsole', () => {
     await user.click(within(row).getByRole('button', { name: /correct/i }))
 
     expect(within(row).queryByRole('button', { name: /there are none/i })).toBeNull()
-    expect(within(row).getByText(/would be an absence rather than a position/i)).toBeInTheDocument()
+    expect(within(row).getByText(/a blank is not an answer/i)).toBeInTheDocument()
   })
 
   /**
@@ -183,7 +183,7 @@ describe('ResolutionConsole', () => {
     await user.click(within(row).getByRole('button', { name: /correct/i }))
 
     expect(within(row).queryByRole('button', { name: /there are none/i })).toBeNull()
-    expect(within(row).getByText(/always holds three entries/i)).toBeInTheDocument()
+    expect(within(row).getByText(/always has three entries/i)).toBeInTheDocument()
   })
 
   /**
@@ -223,17 +223,17 @@ describe('ResolutionConsole', () => {
     }
     render(<ResolutionConsole payload={emptied} provenance={ALL_CONFIRMED} />)
 
-    const settled = screen.getByText('Red lines').closest('li') as HTMLElement
+    const settled = screen.getByText('Never do this').closest('li') as HTMLElement
     expect(within(settled).getByText(/there are none/i)).toBeInTheDocument()
 
     // And a confirmed field that DOES hold a value says no such thing.
-    const other = screen.getByText('Core promise').closest('li') as HTMLElement
+    const other = screen.getByText('Your main promise').closest('li') as HTMLElement
     expect(within(other).queryByText(/there are none/i)).toBeNull()
   })
 
   test('a fully confirmed brain says so instead of showing an empty queue', () => {
     renderConsole(ALL_CONFIRMED)
-    expect(screen.getByText(/nothing left to resolve/i)).toBeInTheDocument()
+    expect(screen.getByText(/nothing left to check/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /confirm selected/i })).toBeNull()
   })
 
@@ -263,7 +263,7 @@ describe('ResolutionConsole', () => {
     await user.click(screen.getByRole('button', { name: /confirm 2 selected/i }))
 
     const status = await screen.findByRole('status')
-    expect(status).toHaveTextContent(/confirmed 2 fields as version 3/i)
+    expect(status).toHaveTextContent(/confirmed 2 fields/i)
   })
 
   /**
@@ -309,7 +309,7 @@ describe('ResolutionConsole', () => {
     renderConsole()
     for (const field of BRAIN_FIELDS) {
       const row = document.querySelector<HTMLElement>(`[data-field="${field.path}"]`)!
-      const want = field.metaKind === 'asked' ? /only you know this/i : /sahoda proposed this/i
+      const want = field.metaKind === 'asked' ? /only you know this/i : /sahoda wrote this/i
       expect(within(row).getByRole('checkbox', { name: want })).toBeInTheDocument()
     }
   })

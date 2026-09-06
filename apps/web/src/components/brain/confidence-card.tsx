@@ -35,7 +35,7 @@ export function ConfidenceCard({ provenance }: { provenance: Provenance }) {
     >
       <header className="flex min-h-[46px] items-center gap-3 border-b border-line-soft px-4 py-3">
         <h2 id="brain-confidence" className="text-[14px] font-semibold tracking-[-0.01em]">
-          Brand confidence
+          How much is confirmed
         </h2>
         <span className="ml-auto text-[13px] font-[650] tabular-nums">
           <PopNumber value={ring.confirmed} />/{ring.total}

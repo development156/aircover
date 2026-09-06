@@ -40,13 +40,13 @@ const MARKS: Record<
     label: 'Confirmed',
     className: 'is-real',
     Glyph: Check,
-    title: 'A person confirmed this value.',
+    title: 'A person confirmed this.',
   },
   guessed: {
     label: 'Guess',
     className: 'is-proposed',
     Glyph: Sparkles,
-    title: 'Sahoda inferred this. Nobody has confirmed it yet.',
+    title: 'Sahoda guessed this. Nobody has confirmed it yet.',
   },
   // Proposed treatment, not real: the SUBSTANCE is theirs and the WORDING is
   // Sahoda's, and until a person agrees to the wording it stays dashed. The
@@ -56,7 +56,7 @@ const MARKS: Record<
     className: 'is-proposed',
     Glyph: MessageSquareQuote,
     title:
-      'You told Sahoda this at setup and it put it in its own words. Confirm the wording or correct it.',
+      'You told Sahoda this at setup. Sahoda wrote it in its own words. Confirm the words or correct them.',
   },
 }
 
