@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Search } from 'lucide-react'
 
 import { listAssetsForPicker } from '@/app/actions/assets-picker'
@@ -106,11 +107,25 @@ export function AttachPicker({
 
         {cards !== null && !loadFailed ? (
           visible.length === 0 ? (
-            <p className="type-sm text-muted">
-              {pictures.length === 0
-                ? 'Your library holds no pictures yet. Add one from Assets and it will show up here.'
-                : `No picture matches “${query.trim()}”. Clear the search to see all ${pictures.length}.`}
-            </p>
+            pictures.length === 0 ? (
+              // Empty, with the one action that fixes it. "Add one from Assets" as prose
+              // leaves the reader to find Assets; a link is the same sentence that works.
+              <div>
+                <p className="type-sm text-muted">
+                  Your library holds no pictures yet. Add one and it will show up here.
+                </p>
+                <Link
+                  href="/assets"
+                  className="mt-3 inline-flex h-control items-center rounded-sm bg-primary px-3 type-sm font-[550] text-primary-foreground transition-micro hover:bg-ink active:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  Add a picture
+                </Link>
+              </div>
+            ) : (
+              <p className="type-sm text-muted">
+                No picture matches “{query.trim()}”. Clear the search to see all {pictures.length}.
+              </p>
+            )
           ) : (
             <ul className="grid grid-cols-3 gap-2 wide:grid-cols-4">
               {visible.map((card) => (

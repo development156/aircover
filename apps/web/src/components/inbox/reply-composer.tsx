@@ -7,7 +7,6 @@ import type { MessageTag, ReplyAffordance } from '@sahoda/shared'
 
 import { sendThreadReply, type InboxSendState } from '@/app/actions/inbox-send'
 import type { AssetCard } from '@/lib/assets/view'
-import { displayName } from '@/lib/assets/view'
 import { cn } from '@/lib/utils'
 
 import { SendResult } from './send-result'
@@ -123,6 +122,7 @@ export function ReplyComposer({ affordance, accountId, conversationId }: ReplyCo
           onClick={() => setPickerOpen(true)}
           disabled={!canAttach}
           aria-label={attachment === null ? 'Attach a picture' : 'Change the attached picture'}
+          data-guide="inbox.attach"
           className="inline-flex h-control items-center gap-1.5 rounded-sm border border-line bg-s2 px-3 type-sm font-[550] text-ink transition-micro hover:border-primary active:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-45"
         >
           <Paperclip size={13} strokeWidth={2} aria-hidden />
@@ -175,6 +175,11 @@ function AttachmentChip({
   onRemove: () => void
   busy: boolean
 }) {
+  // The library's own `displayName` is not imported here on purpose. It is a RUNTIME
+  // value from `lib/assets/view`, which pulls three more `@sahoda/shared` helpers into
+  // this route's base chunk and would partly undo the dynamic boundary above. The chip
+  // needs one fallback, and one fallback is not worth a module.
+  const name = card.title ?? card.alt ?? 'Unnamed file'
   return (
     <div className="mt-3 inline-flex max-w-full items-center gap-2 rounded-pill border border-line bg-s2 py-1 pr-1 pl-1">
       {(card.thumbUrl ?? card.previewUrl) ? (
@@ -191,12 +196,12 @@ function AttachmentChip({
           <Paperclip size={12} strokeWidth={2} aria-hidden />
         </span>
       )}
-      <span className="truncate type-meta text-ink">{displayName(card)}</span>
+      <span className="truncate type-meta text-ink">{name}</span>
       <button
         type="button"
         onClick={onRemove}
         disabled={busy}
-        aria-label={`Remove ${displayName(card)} from this reply`}
+        aria-label={`Remove ${name} from this reply`}
         className="grid size-6 shrink-0 place-items-center rounded-full text-muted transition-micro hover:bg-surface hover:text-ink active:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-45"
       >
         <X size={13} strokeWidth={2} aria-hidden />
