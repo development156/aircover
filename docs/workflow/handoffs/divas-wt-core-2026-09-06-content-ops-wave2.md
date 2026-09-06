@@ -1,21 +1,25 @@
-# Handoff — divas / wt-core (2026-09-06, content-ops wave 2, 20:30–21:00 IST)
+# Handoff — divas / wt-core (2026-09-06, content-ops wave 2, 20:30–22:20 IST)
 
-**Landed at `cd760f95`, pushed. Migration `20260906213000_content_ops_integrity` APPLIED to prod in one transaction (MEASURED: `COMMITTED.`, anon gets 401 on `send_post_for_review` and `delete_asset`, `post_approvals` / `post_comments` exist).**
+**Landed and verified live at `719517d7` (build dpl_DvwzpZkfqVEdVGfVDBZ7spxJcW3q). Migration `20260906213000_content_ops_integrity` APPLIED to production in one transaction.**
 
-Five implementer agents were stopped by the founder mid-wave ("finish fast, not that important"). What they had finished was kept, what they had not was dropped, and the result was gated in one session.
+The founder stopped the five implementer agents mid-wave ("finish fast"), then asked for everything implemented and working. The finished lib/DB/jobs work was kept, seven orphan tests for unbuilt UI were deleted, and the review round trip was wired to the screens in this session.
 
-| Area | Kept | Dropped (never built) |
-| --- | --- | --- |
-| DB | whole integrity batch, 32 PGlite tests, every part mutation-red | nothing |
-| Jobs | publish log + mark in one tx, idempotency_key, claim guard, index-shape test, storage reconcile task, quota fails closed | doctrine sentence + service-role allowlist test |
-| Assets | doors, paged/search reads, batched empty-trash with cursor, thumb minter, trash undo ids, storage meter fails closed | page-level trash count + folder counts (page.tsx reverted to HEAD + `thumbUrl`), URL state, picker/a11y/copy items |
-| Planner | week offset, plan order, windowed read (lib only, 37 tests) | every component change: month nav, day columns, focus, phone first screen, row Send back/Send for review |
-| Approvals | posts-review actions, comments action + components, history + context libs, review controls, send-back form, queue preview/row, composer address test | wiring those into /approvals page and the composer finish panel, approve-flow e2e |
+| Step, MEASURED headless on the preview | Result |
+| --- | --- |
+| /approvals row context | "09 Sept 2026, 10:00 am IST · Written by Sahoda · X: Not connected" + excerpt |
+| Preview → comment | stored in `post_comments`, shown in the row |
+| Send back on a dated draft | not offered (the RPC would refuse; fixed in 719517d7) |
+| Planner → Send for review | "Sent for review." → queue badge "In review", "Sent for review by you" |
+| Queue → Send back with reason | "Sent back to draft with your note." → `returned` row with the reason |
+| Approve your own post | first press arms "Approve my own post", second press: "Approved and scheduled.", `approved_by` set |
+| Composer | "Booked for 09 Sept 2026, 10:00 am IST", Send back to draft offered |
 
-Gate: apps/web tsc clean for this task's files; vitest green except nine files owned by the loop/inbox/webhooks/turbo sessions in the same worktree; apps/jobs 520/520; packages/db 1082 pass with the one pre-existing `loop_migrations` failure; packages/shared 507/507; eslint clean on the touched directories.
+Also: a peer session's budget bump (06338ff4) wrote kB as bytes and the build stayed red; fixed in 06e64dff (and independently in 386b0080). The mint-ticket script prints the token and never writes `ticket2.txt`: redirect it, or every run reuses a dead ticket and Clerk says "This link has expired".
 
-**Not done:** no headless preview verification of the new screens, because the new approvals UI is not wired to a page yet. The scorecard in the audit artifact was NOT re-scored; sections whose UI was dropped stay at their audited numbers.
+**Still open (scored as such in the artifact):** assets page-level cap notice, folder counts, URL state; planner month navigation, day columns, focus return; menu semantics; revision diff; the apps/jobs doctrine sentence + allowlist test.
 
-**Needs a decision:** whether `return_post_to_draft` should also walk scheduled variants back to `pending` (it does, mirroring `cancel_scheduled_post`).
+**QA workspace:** the wave-2 post, its approvals and comments deleted. One post `a681a2c4` remains that this session did not create.
+
+**Nothing needs a decision.** `return_post_to_draft` walks scheduled variants back to pending, by my ruling.
 
 Preview: https://sahodalabs-git-wt-core-development-4417s-projects.vercel.app/approvals
