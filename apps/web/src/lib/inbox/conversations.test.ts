@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { threadHref } from '@/components/inbox/thread-href'
+import { conversationHref, threadHref } from '@/components/inbox/thread-href'
 
 /**
  * A STORED CONVERSATION MUST BE OPENABLE.
@@ -28,6 +28,8 @@ const state = vi.hoisted(() => ({
   >,
   /** The filters the connections query applied, so the scope can be asserted. */
   filters: [] as string[],
+  /** Stored thread row ids whose newest message is inbound. */
+  needsReply: [] as string[],
 }))
 
 vi.mock('server-only', () => ({}))
@@ -42,6 +44,8 @@ vi.mock('@/lib/inbox/store-read', () => ({
       rows: state.storedRows,
       decision: { state: 'has_rows', showList: true },
     }),
+  threadsNeedingReply: (ids: string[]) =>
+    Promise.resolve(new Set(ids.filter((id) => state.needsReply.includes(id)))),
 }))
 vi.mock('@/lib/workspaces', () => ({
   activeWorkspaceRead: () => Promise.resolve(state.workspace),
@@ -90,6 +94,7 @@ beforeEach(() => {
   state.connectionsError = null
   state.workspace = { status: 'ok', workspace: { id: 'ws-1', name: 'W', slug: 'w' } }
   state.filters = []
+  state.needsReply = []
 })
 
 describe('a stored conversation carries a real account id', () => {
@@ -156,5 +161,65 @@ describe('a stored conversation carries a real account id', () => {
     // Obviously absent rather than plausibly wrong. A guessed id would open the
     // wrong account's thread; an empty one cannot open anything.
     expect(rows[0]!.accountId).toBe('')
+  })
+})
+
+describe('an account-less stored row still has a destination', () => {
+  it('carries our own row id so the list can open it without any account', async () => {
+    state.storedRows = [stored('orphan', 'telegram')]
+    const { rows } = await readConversationsList()
+    expect(rows[0]!.storedThreadId).toBe('row-orphan')
+    expect(conversationHref(rows[0]!)).toBe('/inbox/threads/store/row-orphan')
+  })
+
+  it('prefers the live route when an account did resolve', async () => {
+    state.storedRows = [stored('ig_conv_1', 'instagram')]
+    state.connections = [
+      { platform: 'instagram', external_account: { id: 'acc-1', profileId: 'p' } },
+    ]
+    const { rows } = await readConversationsList()
+    expect(conversationHref(rows[0]!)).toBe('/inbox/threads/acc-1/ig_conv_1')
+  })
+})
+
+describe('the merged list is in time order, not in read order', () => {
+  it('puts a newer LIVE row above an older STORED one', async () => {
+    // Before: every stored row, then every live row. A conversation from this
+    // morning sat under a six-month-old one because of which half found it.
+    state.storedRows = [{ ...stored('old', 'instagram'), postedAt: '2026-01-01T00:00:00.000Z' }]
+    state.liveRows = [
+      {
+        id: 'fresh',
+        platform: 'instagram',
+        accountId: 'acc-1',
+        updatedTime: '2026-09-06T09:00:00.000Z',
+      },
+    ]
+    const { rows } = await readConversationsList()
+    expect(rows.map((r) => r.id)).toEqual(['fresh', 'old'])
+  })
+
+  it('sorts a row with no timestamp LAST rather than treating absence as now', async () => {
+    state.storedRows = [
+      { ...stored('undated', 'instagram'), postedAt: null },
+      { ...stored('dated', 'instagram'), postedAt: '2026-05-05T00:00:00.000Z' },
+    ]
+    const { rows } = await readConversationsList()
+    expect(rows.map((r) => r.id)).toEqual(['dated', 'undated'])
+  })
+})
+
+describe('needs a reply', () => {
+  it('flags a stored thread whose newest message came from the customer', async () => {
+    state.storedRows = [stored('waiting', 'instagram')]
+    state.needsReply = ['row-waiting']
+    const { rows } = await readConversationsList()
+    expect(rows[0]!.needsReply).toBe(true)
+  })
+
+  it('leaves a live row unflagged: the store was never asked about it', async () => {
+    state.liveRows = [{ id: 'live-only', platform: 'instagram', accountId: 'acc-1' }]
+    const { rows } = await readConversationsList()
+    expect(rows[0]!.needsReply).toBeUndefined()
   })
 })

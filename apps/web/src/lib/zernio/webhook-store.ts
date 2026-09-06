@@ -1,7 +1,6 @@
 import 'server-only'
 
 import type { ZernioWebhookRouting } from '@sahoda/publishing'
-import { ChannelSchema, type Channel } from '@sahoda/shared'
 
 /**
  * The shared vocabulary and SQL primitives the webhook projections are built from.
@@ -53,38 +52,16 @@ export type ProjectionOutcome =
   | { kind: 'referent_absent'; what: string }
 
 /**
- * The two names Zernio uses that are not ours. `twitter` is Zernio's spelling
- * and `x` is ours; `googlebusiness` is theirs and `gbp` is ours. Zernio uses BOTH
- * spellings depending on the endpoint — its own publish, validate, edit and
- * unpublish surfaces disagree about the name of the same platform, and this map
- * is the one place that has to survive all four.
- */
-const ZERNIO_SPELLINGS: Readonly<Record<string, Channel>> = {
-  twitter: 'x',
-  googlebusiness: 'gbp',
-}
-
-/**
  * Zernio's platform names → this product's channels.
  *
- * NOT a lookup with a fallback. A fallback is how a Reddit comment becomes an
- * Instagram row. An unmapped platform returns undefined and the caller reports
- * `channel_not_representable`, which is a fact rather than a guess.
- *
- * ── DERIVED FROM `ChannelSchema`, NEVER LISTED HERE ──────────────────────────
- * This was a six-key literal typed `'x' | 'gbp' | 'linkedin' | 'instagram'`.
- * When `facebook` and `telegram` joined the schema on 2026-08-26, and
- * `inbox_threads.channel` was widened to admit them in the same migration, the
- * literal kept typechecking and every Facebook DM and comment the receiver stored
- * came back `channel_not_representable`: in the event log, never in the inbox.
- * Every channel the schema admits maps to itself; only the spellings above are
- * written by hand, and `whatsapp`, `sms`, `reddit` and the rest stay absent
- * because they are absent from the schema.
+ * Re-exported rather than defined here. The same two spellings were written out in
+ * three files (this one, `lib/inbox/conversations.ts` and `lib/inbox/store-read.ts`)
+ * and all three had to agree for a stored DM to render on the row it came from;
+ * `lib/inbox/platform-spelling.ts` is now the only copy, and it proves the two
+ * directions are inverses. Kept exported from here because the projections and the
+ * publish projector already import it by this name.
  */
-export const CHANNEL: Readonly<Record<string, Channel>> = Object.freeze({
-  ...Object.fromEntries(ChannelSchema.options.map((channel) => [channel, channel])),
-  ...ZERNIO_SPELLINGS,
-})
+export { CHANNEL } from '@/lib/inbox/platform-spelling'
 
 /** Read a nested string. Returns null for absent, non-string, or blank. */
 export function str(o: unknown, ...path: string[]): string | null {
@@ -220,16 +197,39 @@ export async function insertMessage(
     body: string
     platformMessageId: string
     sentAt: string | null
+    /**
+     * The Clerk subject who composed this, for a reply a PERSON sent from Sahoda.
+     *
+     * Absent on every webhook message and that is the measurement, not a gap: an
+     * inbound message has no author here, and an outbound one the platform told us
+     * about was authored somewhere we cannot see. The column's own comment says
+     * "a Clerk subject for an outbound reply a person composed", and only the send
+     * path can name one.
+     */
+    authorUserId?: string | null
+    /** What came attached, as Zernio described it. `[]`, never null — the column is NOT NULL. */
+    attachments?: readonly unknown[]
   },
 ): Promise<number> {
   const r = await db.query<{ id: string }>(
     `insert into inbox_messages
-       (workspace_id, thread_id, direction, body, platform_message_id, sent_at)
-     values ($1::uuid, $2::uuid, $3, $4, $5, coalesce($6::timestamptz, now()))
+       (workspace_id, thread_id, direction, body, platform_message_id, sent_at,
+        author_user_id, attachments)
+     values ($1::uuid, $2::uuid, $3, $4, $5, coalesce($6::timestamptz, now()),
+             $7, coalesce($8::jsonb, '[]'::jsonb))
      on conflict (workspace_id, platform_message_id) where platform_message_id is not null
        do nothing
      returning id`,
-    [m.workspaceId, m.threadId, m.direction, m.body, m.platformMessageId, m.sentAt],
+    [
+      m.workspaceId,
+      m.threadId,
+      m.direction,
+      m.body,
+      m.platformMessageId,
+      m.sentAt,
+      m.authorUserId ?? null,
+      JSON.stringify(m.attachments ?? []),
+    ],
   )
   return r.rows.length
 }

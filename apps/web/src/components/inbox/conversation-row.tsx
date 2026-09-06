@@ -1,9 +1,9 @@
-import type { ZernioConversation } from '@sahoda/publishing'
 import { ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 
 import { platformLabel } from './platform-label'
-import { threadHref } from './thread-href'
+import { conversationHref } from './thread-href'
+import type { InboxListRow } from '@/lib/inbox/list-row'
 import { DEFAULT_ZONE } from '@/lib/time/zone'
 
 const WHEN = new Intl.DateTimeFormat('en-IN', {
@@ -31,20 +31,21 @@ function formatWhen(value: string | undefined): string | null {
  * would be a guess dressed as a fact. The thread view reads the messages and can say
  * for certain; the list links to it instead of pretending.
  */
-export function ConversationRow({ conversation }: { conversation: ZernioConversation }) {
+export function ConversationRow({ conversation }: { conversation: InboxListRow }) {
   const when = formatWhen(conversation.updatedTime)
   const unread = conversation.unreadCount ?? 0
   const who = conversation.participantName ?? conversation.participantId ?? 'Unknown sender'
 
-  /* ── A THREAD NOBODY CAN OPEN IS NOT A LINK ────────────────────────────────
-     A stored thread carries no account of its own; `lib/inbox/conversations.ts`
-     resolves one through this workspace's connections and leaves it EMPTY when
-     no connected account on that channel can say. MEASURED 2026-09-06 on the
-     wt-core preview: the row still rendered `<a href="/inbox/threads//qa-thread-1">`
-     and the click landed on "This page isn't here". The message is real; the
-     door to it is not, and a row that looks like a door and opens on a wall is
-     worse than a row that says why. So: no account, no link, one sentence. */
-  const canOpen = conversation.accountId !== ''
+  /* ── EVERY ROW WITH A MESSAGE BEHIND IT IS NOW A DOOR ──────────────────────
+     A stored thread carries no account of its own, and this row used to render
+     `<a href="/inbox/threads//qa-thread-1">` — MEASURED 2026-09-06 on the
+     wt-core preview, where the click landed on "This page isn't here". That was
+     replaced with a sentence, which stopped the broken link and left the message
+     unreadable: it is in THIS database, and reading our own row needs no Zernio
+     account. `conversationHref` sends such a row to the store route instead, and
+     returns null only for a row with neither an account nor a row id of ours. */
+  const href = conversationHref(conversation)
+  const canOpen = href !== null
   const body = (
     <>
       <div className="min-w-0 flex-1">
@@ -59,6 +60,13 @@ export function ConversationRow({ conversation }: { conversation: ZernioConversa
               aria-label={`${unread} unread`}
             >
               {unread}
+            </span>
+          ) : conversation.needsReply ? (
+            /* WORDS, NOT A NUMERAL. `unreadCount` is Zernio's count and the store
+               has none to give; what the store knows is which side spoke last.
+               A "1" here would be a number nobody counted. */
+            <span className="rounded-pill bg-warn-bg px-2 py-0.5 type-chip font-semibold text-warn">
+              Needs a reply
             </span>
           ) : null}
         </div>
@@ -76,13 +84,13 @@ export function ConversationRow({ conversation }: { conversation: ZernioConversa
     </>
   )
 
-  if (!canOpen) {
+  if (href === null) {
     return (
       <div className="rounded-card border border-line bg-bg px-4 py-3 shadow-card">
         <div className="flex items-center gap-3">{body}</div>
         <p className="type-meta mt-1.5 text-muted">
-          No connected {platformLabel(conversation.platform)} account can open this thread.
-          Reconnect the account to read and reply.
+          Sahoda has no way to open this thread: it holds no copy of it, and no connected{' '}
+          {platformLabel(conversation.platform)} account can address it.
         </p>
       </div>
     )
@@ -90,7 +98,7 @@ export function ConversationRow({ conversation }: { conversation: ZernioConversa
 
   return (
     <Link
-      href={threadHref({ accountId: conversation.accountId, conversationId: conversation.id })}
+      href={href}
       className="flex items-center gap-3 rounded-card border border-line bg-bg px-4 py-3 shadow-card transition-micro hover:border-ink"
     >
       {body}
