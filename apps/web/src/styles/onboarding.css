@@ -2086,8 +2086,17 @@
     border-radius: var(--r-sm, 6px);
     font-size: 13px;
   }
-  .cta-row .enterkey {
+  /* The "Press Enter" hint has no meaning on a phone. The SAME element carries
+     the price on the last step ("Uses 50 credits" / "Free the first time"),
+     and hiding that below 960px hid the cost on the one screen that spends it
+     — MEASURED 2026-09-07 at 936 and 390. Costs are shown before any spend
+     (CLAUDE.md), so only the keyboard hint goes. */
+  .cta-row .enterkey:not(.enterkey--cost) {
     display: none;
+  }
+  .cta-row .enterkey--cost {
+    flex: 1 0 100%;
+    text-align: center;
   }
   .cta-row .btn--ghost {
     flex: 0 0 auto;

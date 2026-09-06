@@ -95,6 +95,15 @@ export function OnboardingStage({
   const [door, setDoor] = useState<DoorOutcome>({ kind: 'none' })
   const reduced = useRef(false)
 
+  const readStarted = useRef('')
+  const startSiteRead = useCallback((url: string) => {
+    const site = url.trim()
+    if (!site || readStarted.current === site) return
+    readStarted.current = site
+    setDoor({ kind: 'reading' })
+    void readSite(site).then(setDoor)
+  }, [])
+
   useEffect(() => {
     reduced.current = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const saved = loadState(workspaceId)
@@ -103,9 +112,17 @@ export function OnboardingStage({
       // Resume at the step they left. A saved `result` is not resumable —
       // the brain behind it was never built in this session.
       setStep(saved.step === 'result' ? 'comp' : saved.step)
+      /**
+       * The website read is NOT persisted, and it only ever started on the
+       * way out of step 01. A session resumed past that step therefore built
+       * with `door: none` — the site they typed was never opened, silently,
+       * and the result card showed no verdict about it. MEASURED 2026-09-07:
+       * resume at step 5, `data-onb-door="none"`, build proceeded.
+       */
+      if (saved.step !== 'intro' && saved.step !== '1') startSiteRead(saved.data.site)
     }
     setHydrated(true)
-  }, [workspaceId])
+  }, [startSiteRead, workspaceId])
 
   // Persist every move. Cheap, synchronous, and it is what makes Escape safe.
   useEffect(() => {
@@ -189,14 +206,6 @@ export function OnboardingStage({
    * they answer steps 02-06 costs them nothing and is finished by the time the
    * build needs it — and `useBuild` waits for it if it is not.
    */
-  const readStarted = useRef('')
-  const startSiteRead = useCallback((url: string) => {
-    const site = url.trim()
-    if (!site || readStarted.current === site) return
-    readStarted.current = site
-    setDoor({ kind: 'reading' })
-    void readSite(site).then(setDoor)
-  }, [])
 
   const advance = useCallback(() => {
     if (step === 'intro') return go('1', 1)
@@ -573,7 +582,7 @@ export function OnboardingStage({
                  figure is "shown again before you spend them", and this step
                  showed none — while BOTH buttons on it, one of them labelled
                  "Skip for now", start a charged resolve. */
-              <span className="enterkey">
+              <span className="enterkey enterkey--cost">
                 {build.failure?.kind === 'limit'
                   ? /* MEASURED 2026-09-05: "Free the first time" sat under a refusal
                        that said the day's free builds were spent (docs/51 Q-02). */

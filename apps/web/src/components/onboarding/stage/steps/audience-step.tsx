@@ -65,6 +65,10 @@ export function AudienceStep({ data, patch }: StepProps) {
                     <input
                       className="inp"
                       id={f.id}
+                      /* Collapsed is 0fr rows + overflow hidden, not
+                         display:none, so Tab reached four invisible fields
+                         and focus left the screen. MEASURED 2026-09-07. */
+                      tabIndex={open ? 0 : -1}
                       value={data[f.key]}
                       onChange={(e) => patch({ [f.key]: e.target.value })}
                       placeholder={f.label}
