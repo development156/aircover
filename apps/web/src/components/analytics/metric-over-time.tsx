@@ -222,6 +222,16 @@ function LiveChart({
       </ChartSparse>
     )
   }
+  if (live.read.kind === 'not-configured') {
+    // OURS, not theirs, and NO REMEDY: reloading cannot add a key to a
+    // deployment. `no-impossible-remedy.spec.ts` exists for exactly this.
+    return (
+      <ChartSparse compact>
+        This copy of Sahoda has no publishing key set, so no request for {label.toLowerCase()} went
+        out. Nothing is wrong with your accounts.
+      </ChartSparse>
+    )
+  }
   if (live.read.kind === 'unreadable') {
     // NOT "you have no likes" and NOT "connect an account". The request went out
     // and did not come back with an answer, and that is all this establishes.

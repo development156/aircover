@@ -75,15 +75,20 @@ describe('PlatformTable', () => {
     expect(screen.getByText('tiktok')).toBeTruthy()
   })
 
-  it('separates "nothing connected", "could not read" and "asked and got none"', () => {
+  it('separates all four kinds of nothing into four different sentences', () => {
     const sentences = new Set<string>()
-    const reads: DailyMetricsRead[] = [{ kind: 'not-connected' }, { kind: 'unreadable' }, READY]
+    const reads: DailyMetricsRead[] = [
+      { kind: 'not-connected' },
+      { kind: 'not-configured' },
+      { kind: 'unreadable' },
+      READY,
+    ]
     for (const read of reads) {
       const { unmount } = render(<PlatformTable read={read} rows={[]} windowLabel="Last 30 days" />)
       sentences.add(document.body.textContent ?? '')
       unmount()
     }
-    expect(sentences.size).toBe(3)
+    expect(sentences.size).toBe(4)
   })
 
   it('offers no remedy for a read that came back empty', () => {
@@ -94,5 +99,11 @@ describe('PlatformTable', () => {
       screen.getByText(/asked your connected accounts and none of them reported/i),
     ).toBeTruthy()
     expect(screen.queryByText(/Connecting a channel starts this table/i)).toBeNull()
+  })
+
+  it('offers no retry when the key is missing, because reloading cannot add one', () => {
+    render(<PlatformTable read={{ kind: 'not-configured' }} rows={[]} windowLabel="Last 30 days" />)
+    expect(screen.getByText(/no publishing key set/i)).toBeTruthy()
+    expect(screen.queryByText(/Reload to try again/i)).toBeNull()
   })
 })

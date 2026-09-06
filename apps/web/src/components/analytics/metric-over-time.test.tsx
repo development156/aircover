@@ -95,6 +95,7 @@ describe('the two sources say which one they are', () => {
 describe('the four kinds of nothing a live metric can be', () => {
   const cases = [
     ['not-connected', /no account is connected that reports them/i],
+    ['not-configured', /no publishing key set/i],
     ['unreadable', /could not read/i],
   ] as const
 
@@ -128,6 +129,18 @@ describe('the four kinds of nothing a live metric can be', () => {
     // The remedy that cannot work must not appear: nothing is broken and there
     // is nothing to connect.
     expect(screen.queryByText(/Connect a channel to start this chart/i)).toBeNull()
+  })
+
+  it('offers no retry for a missing key, because reloading cannot add one', () => {
+    render(
+      <MetricOverTime
+        metric="likes"
+        label="Likes"
+        legend={legend}
+        live={{ read: { kind: 'not-configured' }, points: [] }}
+      />,
+    )
+    expect(screen.queryByText(/Reload to try again/i)).toBeNull()
   })
 
   it('refuses a trend from two reported days', () => {

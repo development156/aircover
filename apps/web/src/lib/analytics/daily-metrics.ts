@@ -140,6 +140,16 @@ export type DailyMetricsRead =
     }
   /** No Zernio profile for this workspace, so no read was possible. */
   | { kind: 'not-connected' }
+  /**
+   * There is an account to read and this deployment has no publishing key.
+   *
+   * Split out of `unreadable` for the reason `account-insights.ts` split it:
+   * `unreadable` says "reload to try again", which is true of a timed-out call
+   * and FALSE of a missing environment variable. Reloading cannot conjure a
+   * key, and `e2e/no-impossible-remedy.spec.ts` fails a screen that promises a
+   * retry to somebody for whom nothing failed.
+   */
+  | { kind: 'not-configured' }
   /** We asked and did not get an answer, or the plan refused it. */
   | { kind: 'unreadable' }
 
@@ -161,9 +171,9 @@ export async function readDailyMetrics(view: {
     // The env proxy validates the WHOLE schema on first access, so one unrelated
     // missing variable throws from what reads like a null check. "We have no
     // usable reader" is the honest answer and it is ours, not the customer's.
-    return { kind: 'unreadable' }
+    return { kind: 'not-configured' }
   }
-  if (reads === null) return { kind: 'unreadable' }
+  if (reads === null) return { kind: 'not-configured' }
 
   let profile: ScopedProfileId
   try {

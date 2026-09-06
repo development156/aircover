@@ -72,6 +72,19 @@ export function PlatformTable({
     )
   }
 
+  if (read.kind === 'not-configured') {
+    return (
+      <Panel className="space-y-4">
+        <PanelHead title="Every metric, by channel" />
+        {/* No retry offered. A missing key is this deployment's problem and
+            reloading cannot fix it. */}
+        <ChartSparse compact>
+          This copy of Sahoda has no publishing key set, so no request for these figures went out.
+          Nothing is wrong with your channels.
+        </ChartSparse>
+      </Panel>
+    )
+  }
   if (read.kind === 'unreadable') {
     return (
       <Panel className="space-y-4">

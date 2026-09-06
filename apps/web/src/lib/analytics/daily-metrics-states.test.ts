@@ -76,11 +76,15 @@ describe('readDailyMetrics keeps its three answers apart', () => {
     expect((await (await load())(VIEW)).kind).toBe('not-connected')
   })
 
-  test('no publishing key in this environment is ours, not theirs', async () => {
+  test('no publishing key in this environment is ours, and earns no retry', async () => {
     // Nothing about the customer's accounts was established, so nothing about
-    // them may be claimed.
+    // them may be claimed — AND reloading cannot conjure an environment
+    // variable, so this may not be `unreadable`, whose sentence offers one.
     zernioClientReads.mockReturnValue(null)
-    expect((await (await load())(VIEW)).kind).toBe('unreadable')
+    const result = await (await load())(VIEW)
+    expect(result.kind).toBe('not-configured')
+    expect(result.kind).not.toBe('unreadable')
+    expect(result.kind).not.toBe('not-connected')
   })
 
   test('a good read carries the window and the attribution it asked for', async () => {
