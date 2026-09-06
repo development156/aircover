@@ -92,8 +92,8 @@ describe('the board draws only what it can prove', () => {
 
   test('the waiting cell wears the wash only while something waits', () => {
     board([post('r', 'review')])
-    expect(screen.getByRole('link', { name: /^Waiting on you/ }).className).toMatch(/bg-brand-wash/)
-    expect(screen.getByRole('link', { name: /^Published/ }).className).not.toMatch(/bg-brand-wash/)
+    expect(screen.getByRole('link', { name: /^Waiting on you/ }).className).toMatch(/--brand-wash/)
+    expect(screen.getByRole('link', { name: /^Published/ }).className).not.toMatch(/--brand-wash/)
   })
 
   test('the week bars say what is on which day', () => {

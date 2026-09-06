@@ -143,7 +143,16 @@ export function AtAGlance({
            the same treatment the week strip gives today, and it is spent only
            while there is something to decide. Nothing else on the board is
            tinted, so the eye lands here first and nowhere else. */
-        className={waiting > 0 ? 'bg-brand-wash' : undefined}
+        /* `--brand-wash` is a 6% orange OVER whatever is beneath it, and a
+           board cell sits on the board's line-coloured ground, not on a card
+           — MEASURED 2026-09-06: the bare wash rendered as a grey-brown pane
+           beside the week strip's peach. The gradient paints the same wash
+           over the cell's own opaque surface, so the two read as one colour. */
+        className={
+          waiting > 0
+            ? 'bg-surface [background-image:linear-gradient(var(--brand-wash),var(--brand-wash))]'
+            : undefined
+        }
         icon={<Inbox size={15} strokeWidth={1.9} />}
         label="Waiting on you"
         value={waiting}

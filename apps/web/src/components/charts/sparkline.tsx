@@ -27,9 +27,12 @@ function scale(values: readonly (number | null)[]) {
   const min = Math.min(...measured)
   const max = Math.max(...measured)
   const span = max - min || 1
-  const step = values.length > 1 ? W / (values.length - 1) : 0
+  // Inset by the endpoint's radius so the dot is never clipped by a cell
+  // that hides its overflow (the board does).
+  const inset = 3
+  const step = values.length > 1 ? (W - inset * 2) / (values.length - 1) : 0
   return {
-    x: (i: number) => (values.length > 1 ? i * step : W / 2),
+    x: (i: number) => (values.length > 1 ? inset + i * step : W / 2),
     // A flat series sits mid-height rather than on the floor, so a wallet that
     // did not move is a level line and not a line hugging the axis.
     y: (v: number) => (max === min ? H / 2 : PAD + (1 - (v - min) / span) * (H - PAD * 2)),
