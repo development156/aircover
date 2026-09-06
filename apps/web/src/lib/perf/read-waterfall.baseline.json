@@ -72,7 +72,8 @@
       "getOpsAdmin",
       "read",
       "soft",
-      "read"
+      "read",
+      "readInboxAnalytics"
     ]
   },
   {
