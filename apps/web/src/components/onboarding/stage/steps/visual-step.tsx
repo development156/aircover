@@ -27,6 +27,20 @@ import type { StepProps } from './types'
  * work, and one of the three could not be honoured at all: Brand Skin themes
  * seven tokens and the surface is not among them. They know their logo.
  *
+ * ── THE SECOND UPLOAD, FOR DARK BACKGROUNDS, IS GONE FROM THIS SCREEN ───────
+ * Founder's ruling, 2026-09-05, against a screenshot of it. It asked a shop
+ * owner on their first five minutes for a second file most of them do not have,
+ * to solve a problem they have not met yet — a mark that needs plating on a
+ * dark photo — and it explained plating to do it.
+ *
+ * THE FEATURE IS NOT GONE, and that is what makes removing the question safe
+ * rather than a loss. The dark variant is still offered where somebody has a
+ * reason to look for it: the brand panel in the topbar, `shell/brand-panel.tsx`,
+ * carries the same upload with the same sentence, and `setBrandLogoDark`, the
+ * reader and the stamping path are all untouched. A workspace that never adds
+ * one keeps getting the plate, which is what it got before and what the copy
+ * here promised.
+ *
  * ── EXTRACTION RUNS HERE, IN THE BROWSER, ON PURPOSE ────────────────────────
  * `extractPalette` needs a decoded image and a canvas. Doing it on the client
  * means the person sees the colours Sahoda found before they continue, which is
@@ -35,33 +49,11 @@ import type { StepProps } from './types'
  * build, and a file that yields no colours is reported here rather than saved as
  * a theme of nothing.
  */
-export function VisualStep({
-  data,
-  patch,
-  onLogo,
-  onLogoDark,
-}: StepProps & { onLogo?: (file: File) => void; onLogoDark?: (file: File) => void }) {
+export function VisualStep({ data, patch, onLogo }: StepProps & { onLogo?: (file: File) => void }) {
   const input = useRef<HTMLInputElement>(null)
-  const inputDark = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [unreadable, setUnreadable] = useState(false)
   const [reading, setReading] = useState(false)
-  /**
-   * ── THE DARK VARIANT, HELD SEPARATELY ─────────────────────────────────────
-   * No palette is read from this file: the workspace theme comes from the
-   * primary logo above, and reading a second, possibly different, palette out
-   * of this one would mean two files disagreeing about which colours are the
-   * brand's. This file has exactly one job, which is to give Sahoda a mark that
-   * already reads on dark backgrounds instead of one it has to plate.
-   */
-  const [previewDark, setPreviewDark] = useState<string | null>(null)
-  const [nameDark, setNameDark] = useState<string | null>(null)
-
-  function takeDark(file: File): void {
-    setPreviewDark(URL.createObjectURL(file))
-    setNameDark(file.name)
-    onLogoDark?.(file)
-  }
 
   async function take(file: File): Promise<void> {
     setReading(true)
@@ -159,51 +151,6 @@ export function VisualStep({
             mostly black reads this way. Try another file, or skip this and Sahoda reads your
             website instead.
           </p>
-        ) : null}
-      </div>
-
-      {/* ── THE DARK VARIANT, OPTIONAL AND CLEARLY A SECOND FILE ────────────────
-          Sahoda stamps this logo onto every picture it generates. Without a
-          second file for dark backgrounds, a dark photo gets a plate drawn
-          behind the mark so it stays legible; a file made for dark backgrounds
-          lets Sahoda place the mark itself instead. Said plainly, because
-          nobody would guess what a second upload button is for otherwise. */}
-      <div className="rise" style={{ marginTop: 24 }}>
-        <p className="label" style={{ margin: '0 0 4px' }}>
-          Optional: a version for dark backgrounds
-        </p>
-        <p className="lead step__lead" style={{ margin: '0 0 12px' }}>
-          Sahoda uses this on dark photos and dark posts instead of drawing a plate behind your
-          logo. Skip this and Sahoda keeps using the plate.
-        </p>
-        <input
-          ref={inputDark}
-          type="file"
-          accept={LOGO_FILE_ACCEPT}
-          className="sr-only"
-          onChange={(e) => {
-            const file = e.target.files?.[0]
-            if (file) takeDark(file)
-          }}
-        />
-        <button type="button" className="btn btn--ghost" onClick={() => inputDark.current?.click()}>
-          {nameDark ? 'Choose a different dark-background logo' : 'Add a dark-background logo'}
-        </button>
-
-        {nameDark ? (
-          <div style={{ marginTop: 16 }}>
-            <p className="label" style={{ margin: '0 0 12px' }}>
-              For dark backgrounds: {nameDark}
-            </p>
-            {previewDark ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={previewDark}
-                alt={`Your dark-background logo, ${nameDark}`}
-                style={{ height: 40, width: 'auto', objectFit: 'contain' }}
-              />
-            ) : null}
-          </div>
         ) : null}
       </div>
     </>
