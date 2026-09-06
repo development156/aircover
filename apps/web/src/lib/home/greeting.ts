@@ -41,6 +41,11 @@ export function greetingState(counts: PostCounts, publish: PublishSummary): stri
   if (drafts > 0) clauses.push(`${plural(drafts, 'draft', 'drafts')} in progress`)
   if (review > 0) clauses.push(`${plural(review, 'post', 'posts')} waiting for review`)
   if (approved > 0) clauses.push(`${plural(approved, 'post', 'posts')} approved`)
+  // The composer's Confirm schedule writes `scheduled` (MEASURED 2026-09-06),
+  // and the board counts it as committed; this sentence must not say "nothing
+  // in flight" over a "Scheduled · 1 post" cell.
+  const scheduled = (counts.byStatus.scheduled ?? 0) + (counts.byStatus.publishing ?? 0)
+  if (scheduled > 0) clauses.push(`${plural(scheduled, 'post', 'posts')} scheduled`)
   // Only a SUCCEEDED live publish counts as "out". A fixture run is simulated
   // and saying it went out would be the fabricated success state the whole
   // product rule forbids.

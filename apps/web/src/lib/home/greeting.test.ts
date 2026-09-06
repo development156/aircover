@@ -75,6 +75,16 @@ describe('the greeting sentence agrees with the queue beneath it', () => {
     )
   })
 
+  test('a scheduled post is in flight, and the sentence says so', () => {
+    // MEASURED 2026-09-06 on the preview: the composer's Confirm schedule
+    // writes `scheduled`, the board said "Scheduled · 1 post", and this line
+    // said "Nothing in flight yet" directly above it.
+    expect(greetingState(counts({ scheduled: 1 }), publish())).toBe('1 post scheduled.')
+    expect(greetingState(counts({ scheduled: 2, approved: 1 }), publish())).toBe(
+      '1 post approved, 2 posts scheduled.',
+    )
+  })
+
   test('a draft is "in progress", so the word "waiting" belongs to the board alone', () => {
     // "1 draft waiting" sat 40px above "Waiting on you · 0" on the same
     // screen (MEASURED 2026-09-06). Two different things, one word.
