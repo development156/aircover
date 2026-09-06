@@ -63,6 +63,16 @@ carries `prefetch={false}` (guarded by `shell-prefetch.test.ts`). `onboardingSta
 derives from the cached `readBrain`. The greeting reads the workspace timezone.
 697 tests green in the touched areas; typecheck, lint, prettier clean.
 
+## Close-out (14:05 IST, "proceed as is")
+
+The founder ruled the Preview stays on production. `15707051`: the composer's
+Confirm schedule writes `scheduled` (walked live), so the greeting now says
+"1 post scheduled." over the board's "Scheduled · 1 post" (mutation-proven);
+`readSubscription` is one select with a split-read fallback for a missing
+column (four tests count the selects). H-18 closed: on a clean session
+"Schedule it" renders presets, a calendar and a time picker; the earlier blank
+was the Vercel share cookie lapsing under the dynamic chunk.
+
 ## Cleanup done
 
 The audit's post `87e589c2` (and its one variant) was deleted from the QA
@@ -71,8 +81,9 @@ workspace in production. The QA workspace itself was left as found.
 ## Not done, and why
 
 - Smoke suite not run locally: needs the e2e keys, which this session may not read into a shell.
-- Composer "Schedule it" rendered no date field once (dynamic client chunk, share cookie refreshing at that moment). Needs a re-test on a clean session before it is called a defect.
-- H-16 (Preview → staging): ruled, not executed. Needs the staging service-role key and DB password, which only the Supabase dashboard holds; the staging password in the CI secret is already known to be wrong (session 6's finding).
+- H-16 (Preview → staging): the founder ruled, 14:05 IST, that the Preview stays on production. Not changed; QA on the preview keeps writing to prod, so delete what you create.
+- Not folded: the two logo pointer reads (`readBrandLogo`, `readBrandLogoDark`) each select `workspaces` once; one query, eleven mocked tests to retarget, left for a later pass.
+- No @smoke spec was added for the board's numbers: it cannot be run from this machine (the e2e target guard refuses production, and staging keys are not in `.env.local`), and an unrun guard is not a guard.
 - The retargeted `plan-offer.spec.ts` was not run: it needs `SUPABASE_DB_URL`.
 
 ## Needs a decision
