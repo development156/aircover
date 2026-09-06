@@ -14,6 +14,13 @@ import { HeadlineStrip } from '@/components/analytics/headline-strip'
 import { KpiStrip } from '@/components/analytics/kpi-strip'
 import { PostsOverTime, PostsPerPlatform } from '@/components/analytics/posts-per-platform'
 import { PlatformTable } from '@/components/analytics/platform-table'
+import {
+  ContentFormats,
+  EngagementAccumulation,
+  FollowerEvolution,
+  PostingCadence,
+} from '@/components/analytics/posting-shape'
+import { readPostingInsights } from '@/lib/analytics/posting-insights'
 import { platformRows } from '@/lib/analytics/platform-breakdown'
 import { postsPerChannel, postsPerWeek } from '@/lib/analytics/distribution'
 import { analyticsKpis, followersFromAccount } from '@/lib/analytics/kpi'
@@ -138,7 +145,7 @@ export default async function AnalyticsPage({
    * hiccup in any one costs its own section and nothing else: every read below
    * returns its own absence rather than rejecting.
    */
-  const [window, { account, hasPublished }, series, measured, daily] = await Promise.all([
+  const [window, { account, hasPublished }, series, measured, daily, posting] = await Promise.all([
     readWindow(view),
     readAnalyticsPage(),
     // The stored history for whichever stored metric was asked for. A live
@@ -149,6 +156,13 @@ export default async function AnalyticsPage({
     // Always, whatever metric is selected: the legend prints every metric's
     // total beside its name, and six of the nine can only come from here.
     readDailyMetrics(view),
+    /**
+     * Followers per channel, posting cadence and engagement arrival. ONE await
+     * for three endpoints: they share a workspace and a profile, so they
+     * resolve the scope once and then go out together, and the route gains one
+     * name rather than three (`read-waterfall.test.ts`).
+     */
+    readPostingInsights(view),
   ])
 
   const sort = isSortKey(params.sort) ? params.sort : DEFAULT_SORT
@@ -390,6 +404,7 @@ export default async function AnalyticsPage({
       </div>
 
       <MetricOverTime
+        legendBasis={`Totals for ${label.toLowerCase()}. Impressions, reach and engagement are summed from your own posts in the period; the rest are what your connected accounts reported. The chart's own dates are printed under it.`}
         metric={metric}
         label={metricLabel(metric)}
         legend={legend}
@@ -441,6 +456,19 @@ export default async function AnalyticsPage({
           single `engagement` figure, because this is the only source that
           keeps them apart. */}
       <PlatformTable read={daily} rows={breakdown} windowLabel={label} />
+
+      {/* ── THE SHAPE OF THE POSTING ITSELF ───────────────────────────────
+          What went out and what came back, rather than how much. The format
+          card is the only one here read from our own database; the other
+          three come from the platforms and each states its own absence. */}
+      <div className="grid grid-cols-2 gap-grid max-wide:grid-cols-1">
+        <ContentFormats breakdown={window.formats} />
+        <PostingCadence section={posting.frequency} />
+      </div>
+
+      <FollowerEvolution section={posting.followers} />
+
+      <EngagementAccumulation section={posting.decay} />
 
       <ChannelCards rows={window.rows} ageDays={window.ageDays} />
 

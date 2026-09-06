@@ -20,6 +20,7 @@ describe('the legend is also the switch', () => {
   it('offers every metric as a link that keeps the rest of the view', () => {
     render(
       <MetricOverTime
+        legendBasis="Totals for the last 30 days."
         metric="reach"
         label="Reach"
         legend={legend}
@@ -34,6 +35,7 @@ describe('the legend is also the switch', () => {
   it('marks the selected metric for a screen reader, not by colour alone', () => {
     render(
       <MetricOverTime
+        legendBasis="Totals for the last 30 days."
         metric="likes"
         label="Likes"
         legend={legend}
@@ -46,7 +48,13 @@ describe('the legend is also the switch', () => {
 
   it('shows the absence mark for a metric nothing reported, never a zero', () => {
     render(
-      <MetricOverTime metric="reach" label="Reach" legend={legend} stored={{ kind: 'empty' }} />,
+      <MetricOverTime
+        legendBasis="Totals for the last 30 days."
+        metric="reach"
+        label="Reach"
+        legend={legend}
+        stored={{ kind: 'empty' }}
+      />,
     )
     expect(screen.getByRole('link', { name: /Saves/ }).textContent).toContain('—')
     expect(screen.getByRole('link', { name: /Saves/ }).textContent).not.toContain('0')
@@ -57,6 +65,7 @@ describe('the two sources say which one they are', () => {
   it('calls a stored metric a running lifetime total', () => {
     render(
       <MetricOverTime
+        legendBasis="Totals for the last 30 days."
         metric="reach"
         label="Reach"
         legend={legend}
@@ -78,6 +87,7 @@ describe('the two sources say which one they are', () => {
   it('calls a live metric what came in on the day', () => {
     render(
       <MetricOverTime
+        legendBasis="Totals for the last 30 days."
         metric="likes"
         label="Likes"
         legend={legend}
@@ -102,6 +112,7 @@ describe('the four kinds of nothing a live metric can be', () => {
   it.each(cases)('%s gets its own sentence', (kind, pattern) => {
     render(
       <MetricOverTime
+        legendBasis="Totals for the last 30 days."
         metric="likes"
         label="Likes"
         legend={legend}
@@ -114,6 +125,7 @@ describe('the four kinds of nothing a live metric can be', () => {
   it('separates "we asked and got none" from "we could not ask"', () => {
     render(
       <MetricOverTime
+        legendBasis="Totals for the last 30 days."
         metric="likes"
         label="Likes"
         legend={legend}
@@ -134,6 +146,7 @@ describe('the four kinds of nothing a live metric can be', () => {
   it('offers no retry for a missing key, because reloading cannot add one', () => {
     render(
       <MetricOverTime
+        legendBasis="Totals for the last 30 days."
         metric="likes"
         label="Likes"
         legend={legend}
@@ -146,6 +159,7 @@ describe('the four kinds of nothing a live metric can be', () => {
   it('refuses a trend from two reported days', () => {
     render(
       <MetricOverTime
+        legendBasis="Totals for the last 30 days."
         metric="likes"
         label="Likes"
         legend={legend}
@@ -168,7 +182,15 @@ describe('the four kinds of nothing a live metric can be', () => {
  */
 describe('the six sentences the stored branch can say', () => {
   const show = (stored: Parameters<typeof MetricOverTime>[0]['stored']) =>
-    render(<MetricOverTime metric="reach" label="Reach" legend={legend} stored={stored} />)
+    render(
+      <MetricOverTime
+        legendBasis="Totals for the last 30 days."
+        metric="reach"
+        label="Reach"
+        legend={legend}
+        stored={stored}
+      />,
+    )
 
   it('before the migration, says Sahoda keeps no history yet', () => {
     show({ kind: 'unavailable' })

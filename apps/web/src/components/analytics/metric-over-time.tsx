@@ -49,6 +49,18 @@ export interface MetricOverTimeProps {
   metric: AnalyticsMetric
   label: string
   legend: readonly MetricLegendEntry[]
+  /**
+   * What the legend's totals are OF.
+   *
+   * Load-bearing, not decoration. The three stored metrics are summed from the
+   * window's own rows and the six live ones from Zernio's days, and the chart
+   * under the legend can be drawn over a DIFFERENT window again: the stored
+   * history is a fixed thirty days that ignores the date control. Two figures
+   * for the same word, side by side, with no way to tell they answer different
+   * questions is the shape this whole page exists to refuse. The chart prints
+   * its own dates; this prints the legend's.
+   */
+  legendBasis: string
   /** Set when the chosen metric is one of the three this database stores. */
   stored?: MetricSeries
   /** Set when it is one of the six read live from Zernio. */
@@ -93,7 +105,14 @@ function dayNumber(day: string): number {
   return Math.round(Date.parse(`${day}T00:00:00Z`) / 86_400_000)
 }
 
-export function MetricOverTime({ metric, label, legend, stored, live }: MetricOverTimeProps) {
+export function MetricOverTime({
+  metric,
+  label,
+  legend,
+  legendBasis,
+  stored,
+  live,
+}: MetricOverTimeProps) {
   const basis =
     stored !== undefined
       ? `${label}, as a running total since each post went out. Every post's lifetime figure, as it stood on that day.`
@@ -109,6 +128,7 @@ export function MetricOverTime({ metric, label, legend, stored, live }: MetricOv
         sub="Pick a metric. The link keeps your date range and your channel."
       />
       <Legend legend={legend} metric={metric} />
+      <p className="type-meta text-muted">{legendBasis}</p>
       {stored !== undefined ? (
         <StoredChart series={stored} label={label} basis={basis} />
       ) : (

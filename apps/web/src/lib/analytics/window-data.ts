@@ -6,6 +6,8 @@ import { commonAge } from '@/lib/analytics/week-report'
 import type { MetricKey } from '@/lib/analytics/compare'
 import { COMPARE_AGE_DAYS, type AgedPost } from '@/lib/analytics/like-age'
 import { timingGrid, type Timing, type TimedPost } from '@/lib/analytics/timing'
+import { formatBreakdown, type FormatBreakdown } from '@/lib/analytics/content-format'
+import { listPostMedia } from '@/lib/posts/read'
 import type { AnalyticsView } from '@/lib/analytics/view-params'
 import { previousWindow } from '@/lib/analytics/view-params'
 import { createServerSupabase } from '@/lib/supabase/server'
@@ -120,6 +122,16 @@ export type WindowRead =
       /** The age every reach figure on this page was read at. */
       ageDays: number | null
       timing: Timing
+      /**
+       * What the window's posts actually were: photos, video, or words.
+       *
+       * Read HERE rather than by the page, and in the same round trip as the
+       * titles, so the route gains no sequential await for it
+       * (`read-waterfall.test.ts`). Its own absence arm, like every other read
+       * in this file: a media read that failed is never reported as a window of
+       * text posts.
+       */
+      formats: FormatBreakdown
     }
 
 const DAY_MS = 86_400_000
@@ -246,6 +258,7 @@ export async function readWindow(view: AnalyticsView): Promise<WindowRead> {
         timezone,
         rows: [],
         previousRows: [],
+        formats: { kind: 'empty' },
         postsPublished: 0,
         postsPublishedPrevious: null,
         weeksOfHistory: 0,
@@ -254,13 +267,32 @@ export async function readWindow(view: AnalyticsView): Promise<WindowRead> {
       }
     }
 
-    const [titles, snapshots] = await Promise.all([
+    /**
+     * The window's own legs, cut on the workspace's clock and narrowed to the
+     * chosen channel.
+     *
+     * Computed BEFORE the reads below rather than after them, and only so the
+     * media read can be scoped to the posts actually on the screen. Nothing
+     * else moved: the same filter, in the same zone, for the same reason.
+     */
+    const inWindow = legs.filter((leg) => {
+      const day = dayIn(leg.publishedAt, timezone)
+      return day !== null && day >= view.from && day <= view.to
+    })
+    const channelOf = view.channel
+    const visible = channelOf === null ? inWindow : inWindow.filter((l) => l.channel === channelOf)
+    const visiblePostIds = [...new Set(visible.map((leg) => leg.postId))]
+
+    const [titles, snapshots, media] = await Promise.all([
       readTitles(
         supabase,
         workspaceId,
         [...new Set(legs.map((leg) => leg.postId))].slice(0, ROW_CAP),
       ),
       readSnapshots(supabase, workspaceId),
+      // Null on a failed read, which `formatBreakdown` turns into `unreadable`.
+      // An empty map would be byte-identical to a window of text posts.
+      listPostMedia(visiblePostIds.slice(0, ROW_CAP)).catch(() => null),
     ])
     if (snapshots === 'unreadable') return { kind: 'unreadable' }
 
@@ -288,13 +320,6 @@ export async function readWindow(view: AnalyticsView): Promise<WindowRead> {
      * the honest answer and the one the components already handle.
      */
     const ageDays = commonAge([...aged.values()], COMPARE_AGE_DAYS * 4, 2)
-
-    const inWindow = legs.filter((leg) => {
-      const day = dayIn(leg.publishedAt, timezone)
-      return day !== null && day >= view.from && day <= view.to
-    })
-    const channelOf = view.channel
-    const visible = channelOf === null ? inWindow : inWindow.filter((l) => l.channel === channelOf)
 
     const previous = previousWindow(view)
     const previousLegs = legs.filter((leg) => {
@@ -355,6 +380,7 @@ export async function readWindow(view: AnalyticsView): Promise<WindowRead> {
       timezone,
       rows,
       previousRows,
+      formats: formatBreakdown(visiblePostIds, media),
       postsPublished: new Set(visible.map((leg) => leg.postId)).size,
       postsPublishedPrevious: new Set(previousLegs.map((leg) => leg.postId)).size,
       weeksOfHistory,
