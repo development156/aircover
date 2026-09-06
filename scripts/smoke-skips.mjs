@@ -45,6 +45,13 @@ export function judge(report, env = process.env) {
   const lines = [
     `smoke: ${outcomes.length} tests, ${skipped.length} skipped, service key ${keyed ? 'set' : 'ABSENT'}`,
   ]
+  // MEASURED 2026-09-06, run 34008428577: a spec failed to LOAD, Playwright
+  // wrote a report with zero tests, and the first draft of this guard printed
+  // "0 tests, 0 skipped" and passed. A suite that ran nothing is not a pass.
+  if (outcomes.length === 0) {
+    lines.push('REFUSED: the report holds no tests. A suite that ran nothing cannot be green.')
+    return { ok: false, lines }
+  }
   if (skipped.length === 0) return { ok: true, lines }
   for (const t of skipped) lines.push(`  skipped: ${t.title}`)
   if (!keyed) {
