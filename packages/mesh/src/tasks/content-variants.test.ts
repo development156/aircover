@@ -69,6 +69,15 @@ describe('contentVariantsTask', () => {
     expect(user).toContain('gbp')
   })
 
+  it('gives each requested channel its own voice, not just a length', () => {
+    // The gap this closes: the brief carried char limits and nothing about how a
+    // post should READ, so every channel came back as the canonical post trimmed.
+    const user = contentVariantsTask.buildMessages(input, ctx).at(-1)!.content
+    expect(user).toContain('voice:')
+    expect(user).toMatch(/x:[\s\S]*punchy and short/) // X is not LinkedIn
+    expect(user).toMatch(/gbp:[\s\S]*no keyword list/) // GBP is indexed, takes no keywords
+  })
+
   it('resolves a valid model response into per-channel variants', async () => {
     const result = await runnerFor(fixedProvider([validOut])).run(contentVariantsTask, input, ctx)
     expect(result.ok).toBe(true)

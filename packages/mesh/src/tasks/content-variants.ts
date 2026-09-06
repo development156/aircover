@@ -48,13 +48,44 @@ ${PROSE_RULES}`
 
 export { KEYWORD_RULE }
 
-/** One-line limit brief per channel, sourced from the shared Constraint Engine (one source of truth). */
+/**
+ * ── PER-PLATFORM VOICE, NOT JUST PER-PLATFORM LIMITS ─────────────────────────
+ * `channelBrief` told the model how LONG a post could be and nothing about how it
+ * should READ, so every channel came back in one register — the canonical post,
+ * trimmed. A shop owner opening the X variant beside the LinkedIn one saw two
+ * lengths of a single voice, not two posts that belong on two different
+ * platforms. This is the "follow each platform's norms" the old prompt gestured
+ * at and never named.
+ *
+ * One line each, guidance not law: the body still carries the brand voice and the
+ * core message; this shapes HOW it lands. No em-dashes (PROSE_RULES still holds).
+ * Emoji are native to a social caption and are NOT the interface emoji ban
+ * (docs/22 §4), so Instagram is told they belong — stripping them there is a
+ * regression, not a fix.
+ */
+const CHANNEL_STYLE: Record<Channel, string> = {
+  x: 'punchy and short. Lead with the single most interesting thing, cut every warm-up word, one idea per post.',
+  instagram:
+    'warm and visual, written to sit under a photo. A friendly opening line, emoji where they feel natural, and let the keywords do the discovery.',
+  linkedin:
+    'professional and specific. A clear first line that states the value, then room to explain it plainly. No breathless hype.',
+  facebook:
+    'conversational and neighbourly, the way you would tell a regular. A hook or a question fits, and a link is fine.',
+  gbp: 'factual and local, the way a good listing reads. Say what is on offer and end on a clear next step. Google indexes the words, so no keyword list.',
+  telegram:
+    'direct and plain, a short broadcast to people who already follow you. Say the thing, add a link if there is one.',
+}
+
+/**
+ * Per-channel brief: the numeric limits from the shared Constraint Engine (one
+ * source of truth) on the first line, then the voice that channel is written in.
+ */
 function channelBrief(channel: Channel): string {
   const spec = CONSTRAINTS[channel]
   const parts = [`max ${spec.maxChars} chars`, `links ${spec.linkPolicy}`]
   if (spec.maxHashtags !== undefined) parts.push(`≤${spec.maxHashtags} keywords`)
   if (spec.gbp) parts.push(`CTA one of: ${spec.gbp.ctaTypes.join('/')}`)
-  return `- ${channel}: ${parts.join('; ')}`
+  return `- ${channel}: ${parts.join('; ')}\n    voice: ${CHANNEL_STYLE[channel]}`
 }
 
 const def: MeshTaskDef<ContentVariantsInput, ContentVariantsOutput> = {

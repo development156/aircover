@@ -16,6 +16,7 @@ import {
   charCountFor,
   creditCost,
   MESH_TASK_ACTION,
+  normalizeKeywords,
   toChannelSet,
   type WithCreditsFn,
 } from '@sahoda/shared'
@@ -159,15 +160,27 @@ export async function generateVariants(postId: string, channels: unknown): Promi
           throw new Error('MESH_EMPTY') // → RELEASE: nothing usable is not a delivery
         }
 
-        generated = filtered.variants.map((v) => ({
-          channel: v.channel,
-          body: v.body,
-          charCount: charCountFor(CONSTRAINTS[v.channel], {
+        generated = filtered.variants.map((v) => {
+          const spec = CONSTRAINTS[v.channel]
+          // Carry the model's keywords through instead of throwing them away.
+          // Bare and deduped (the store holds them un-bracketed; `keywordTail`
+          // brackets them at publish), a stray `#` stripped, and capped at the
+          // channel's own limit where it has one so an over-eager list can never
+          // arrive already failing `validateVariant`.
+          const keywords = normalizeKeywords(v.extras?.hashtags, false)
+          const hashtags =
+            spec.maxHashtags !== undefined ? keywords.slice(0, spec.maxHashtags) : keywords
+          return {
+            channel: v.channel,
             body: v.body,
-            hashtags: v.extras?.hashtags,
-            hasLink: hasLink(v.body),
-          }),
-        }))
+            charCount: charCountFor(spec, {
+              body: v.body,
+              hashtags,
+              hasLink: hasLink(v.body),
+            }),
+            hashtags,
+          }
+        })
         missing = filtered.missing
         // Last statement before the return: from here on the wrapper owns the
         // outcome, and any failure it reports may still have debited.
