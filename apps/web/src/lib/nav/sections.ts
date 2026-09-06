@@ -199,8 +199,29 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         label: 'Studio',
         icon: 'palette',
         guide: 'nav.studio',
-        hint: 'Carousels and quote cards, locked to your brand',
-        state: 'soon',
+        hint: 'Describe a picture and Sahoda draws it',
+        /**
+         * ── `soon` → `live` (2026-09-06), AND THE FLAG WAS STALE ─────────────
+         * Studio is built. Its page opens real reads (`readGenerations`,
+         * `readLibraryPictures`), its server action `queueGeneration` charges
+         * credits, and `app/actions/studio-charge.test.ts` covers that charge.
+         *
+         * This file's own header records finding FOUR stale `soon` flags before
+         * this one, and `e2e/roadmap-honesty.spec.ts` had already caught this
+         * one from the other end: it removed /studio from its allowed
+         * "this screen is a drawing" list with the note "it was built on
+         * 2026-08-28 and no longer quotes a figure at all". The rail kept
+         * saying otherwise for nine days.
+         *
+         * `RAIL_GROUPS` filters to `live`, so until now Studio was reachable
+         * only through the command palette and the phone's More sheet — a built,
+         * charging feature that the sidebar did not list.
+         *
+         * The hint changed with the flag. "Carousels and quote cards" describes
+         * a deterministic layer the page's own header says is NOT built yet; the
+         * new one describes what a press actually does today.
+         */
+        state: 'live',
       },
     ],
   },

@@ -84,13 +84,30 @@ beforeEach(() => {
   mocked.readBrain.mockResolvedValue({ status: 'no-brain' })
 })
 
+/**
+ * ── THE TOP BAR CARRIES NO BALANCE, AND THAT IS WHAT THESE NOW PIN ──────────
+ * Founder's ruling: credits live in the wallet and the chrome shows none. The
+ * chip that stood beside the Brand Brain ring is gone from all 59 routes, and
+ * the balance read went with it.
+ *
+ * Four assertions in this file read "the chip shows 4,200". They were REWRITTEN
+ * rather than deleted: the claim each test makes — the shell renders, and keeps
+ * rendering when a read fails — is unchanged, and the sentence it reads to check
+ * that has moved to the workspace name. The balance assertions became the
+ * opposite assertion, which is the rule that now has to hold.
+ */
+function noBalanceAnywhere(): boolean {
+  const text = document.body.textContent ?? ''
+  return !/credit/i.test(text) && screen.queryByText('4,200') === null
+}
+
 describe('Topbar', () => {
   test('renders the whole shell when every read succeeds', async () => {
     render(await Topbar())
 
     expect(screen.getByRole('banner')).toBeInTheDocument()
     expect(screen.getByText('Sahoda Labs')).toBeInTheDocument()
-    expect(screen.getByText('4,200')).toBeInTheDocument()
+    expect(noBalanceAnywhere()).toBe(true)
     expect(screen.getByTestId('user-button')).toBeInTheDocument()
   })
 
@@ -108,7 +125,7 @@ describe('Topbar', () => {
     // And the rest of the shell is intact, not just present-but-empty: the user
     // can still reach their account and their wallet from a degraded topbar.
     expect(screen.getByTestId('user-button')).toBeInTheDocument()
-    expect(screen.getByText('4,200')).toBeInTheDocument()
+    expect(noBalanceAnywhere()).toBe(true)
   })
 
   test('reports a swallowed read to Sentry, tagged with which read failed', async () => {
@@ -136,7 +153,7 @@ describe('Topbar', () => {
 
     // Workspaces survived the sibling failure...
     expect(screen.getByText('Sahoda Labs')).toBeInTheDocument()
-    expect(screen.getByText('4,200')).toBeInTheDocument()
+    expect(noBalanceAnywhere()).toBe(true)
     // ...and with no active-slug cookie, resolveActiveWorkspace falls back to
     // the first membership rather than rendering no workspace at all.
     expect(mocked.captureException).toHaveBeenCalledWith(expect.any(Error), {
@@ -153,24 +170,11 @@ describe('Topbar', () => {
     render(await Topbar())
 
     expect(screen.getByRole('banner')).toBeInTheDocument()
-    // The UNREADABLE MARK, not a zero. "We could not read your balance" and
-    // "you have no credits" are different claims and only one of them is true —
-    // telling a funded user they have 0 credits would stop them working for no
-    // reason.
-    //
-    // Asserted by its accessible name rather than by the glyph. Both controls
-    // used to render a bare '—', which docs/26 §4 retired: the same dash also
-    // meant "not yet measured", so the two claims were indistinguishable, and a
-    // dash with no name is a decoration a screen reader skips entirely.
-    //
-    // Still scoped by aria-label rather than matched globally: the ring degrades
-    // the same way, so an unscoped query would find two and fail without either
-    // one being wrong.
-    expect(
-      within(screen.getByLabelText('Credit balance unavailable. Open wallet')).getByText(
-        /could not be read/i,
-      ),
-    ).toBeInTheDocument()
+    // NO balance mark either. The chip is gone, so there is nothing here that
+    // could fail to read a balance — and an "unavailable" mark for a figure the
+    // bar no longer shows would be a fault reported about nothing.
+    expect(screen.queryByLabelText(/credit balance/i)).toBeNull()
+    expect(noBalanceAnywhere()).toBe(true)
     // The ring degrades the same way, and to the same claim: not 0/15, which
     // would report every confirmed field as unconfirmed.
     expect(
@@ -179,8 +183,10 @@ describe('Topbar', () => {
       ),
     ).toBeInTheDocument()
     // Each failure reported on its own, so the tags say which subsystem is down
-    // rather than collapsing four outages into one anonymous event.
-    expect(mocked.captureException).toHaveBeenCalledTimes(4)
+    // rather than collapsing outages into one anonymous event. THREE now, not
+    // four: the balance read went with the credit chip, so there is no longer a
+    // fourth thing on this bar that can fail.
+    expect(mocked.captureException).toHaveBeenCalledTimes(3)
     expect(mocked.captureException).toHaveBeenCalledWith(expect.any(Error), {
       tags: { shell_read: 'brand_brain' },
     })

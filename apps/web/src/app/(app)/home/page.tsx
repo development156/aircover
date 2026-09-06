@@ -19,6 +19,7 @@ import { InstagramInsights } from '@/components/home/instagram-insights'
 import { PerformanceStrip } from '@/components/analytics/performance-strip'
 import { SahodaRail } from '@/components/home/sahoda-rail'
 import { CommandBar } from '@/components/home/command-bar'
+import { StudioCard } from '@/components/home/studio-card'
 import { ContinueWorking } from '@/components/home/continue-working'
 import { WeekStrip } from '@/components/home/week-strip'
 import { StaggerItem } from '@/components/motion/stagger'
@@ -407,11 +408,20 @@ export default async function HomePage() {
       {/* The header. Carries the page's ONE primary action, which this screen
           previously did not have at all: it was a dashboard you could only
           read. No band behind it any more — see the component. */}
-      <GreetingBanner
-        greeting={greetingFor(now)}
-        name={signedInName}
-        state={greetingState(counts, publish)}
-      />
+      {/* ── THE WELCOME, AND STUDIO BESIDE IT ─────────────────────────────
+          A 1fr/380 split matching the rail below, so the Studio card's left
+          edge lines up with the rail's and the page has one vertical rhythm
+          rather than two. Below `wide` it stacks: at 1024 a 380px card beside a
+          greeting leaves the greeting under 600px, and the name is the widest
+          thing on it. */}
+      <div className="grid grid-cols-[minmax(0,1fr)_380px] items-center gap-6 max-wide:grid-cols-1 max-narrow:gap-5">
+        <GreetingBanner
+          greeting={greetingFor(now)}
+          name={signedInName}
+          state={greetingState(counts, publish)}
+        />
+        <StudioCard />
+      </div>
 
       {/* ── FOUR NUMBERS AS ONE BOARD, NOT FOUR BOXES ─────────────────────
           All four are counts of rows this product owns or a ledger balance, so
