@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic'
 import { CalendarClock, Send } from 'lucide-react'
 import type { Channel, ChannelSet } from '@sahoda/shared'
 
-import { ReviewControls, type ReviewState } from '@/components/approvals/review-controls'
+import type { ReviewState } from '@/components/approvals/review-controls'
 import { cn } from '@/lib/utils'
 import type { VariantStatusRow } from '@/lib/posts/variant-status'
 
@@ -29,6 +29,15 @@ import type { VariantStatusRow } from '@/lib/posts/variant-status'
  */
 const FinishSchedule = dynamic(() => import('./finish-schedule'), { ssr: false })
 const FinishPublish = dynamic(() => import('./finish-publish'), { ssr: false })
+// The review round-trip (send for review / send back) only renders for a post
+// already in an approval workflow, so its whole subtree — SendBackForm, the
+// posts-review actions, the approvals context — is loaded on demand rather than
+// in the composer's base chunk. This is what keeps /(app)/posts/[id] under its
+// js-budget after the content-ops controls landed on the finish panel.
+const ReviewControls = dynamic(
+  () => import('@/components/approvals/review-controls').then((m) => m.ReviewControls),
+  { ssr: false },
+)
 
 export interface FinishPanelProps {
   postId: string | null
