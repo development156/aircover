@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
-import { ArrowRight, Check, Coins, Radio, Sparkles, UserRound } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Check, Coins, Radio, Sparkles, UserRound } from 'lucide-react'
 
 import { askSahoda, pollLiveFeed } from '@/app/actions/home-live'
 import { HomeSection } from '@/components/home/section'
@@ -43,24 +42,26 @@ export function LiveConsole({ initial, readAt }: { initial: LiveLine[]; readAt: 
   const [now, setNow] = useState(() => new Date(readAt))
   const [asked, setAsked] = useState('')
   const [reply, setReply] = useState<string | null>(null)
-  const [busy, startAsking] = useTransition()
-  const router = useRouter()
+  const [busy, setBusy] = useState(false)
 
-  function ask(event: React.FormEvent<HTMLFormElement>) {
+  async function ask(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const text = asked.trim()
     if (!text || busy) return
-    startAsking(async () => {
-      try {
-        const result = await askSahoda(text)
-        setReply(result.said)
-        // The sentence is on screen before the move, so nothing happens unsaid.
-        if (result.href) router.push(result.href as Parameters<typeof router.push>[0])
-        if (result.did !== 'nothing') setAsked('')
-      } catch {
-        setReply('Sahoda could not do that just now. Try again.')
-      }
-    })
+    setBusy(true)
+    try {
+      const result = await askSahoda(text)
+      setReply(result.said)
+      if (result.did !== 'nothing') setAsked('')
+      // The sentence is on screen before the move, so nothing happens unsaid.
+      // A plain navigation, not the router: this card is inside the /home
+      // JS budget and the moved-to screen is a fresh server render anyway.
+      if (result.href) window.location.assign(result.href)
+    } catch {
+      setReply('Sahoda could not do that just now. Try again.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   useEffect(() => {
@@ -163,10 +164,9 @@ export function LiveConsole({ initial, readAt }: { initial: LiveLine[]; readAt: 
           <button
             type="submit"
             disabled={busy || asked.trim() === ''}
-            aria-label="Ask Sahoda"
-            className="grid size-control flex-none place-items-center rounded-input border border-line bg-surface text-ink transition-micro hover:bg-surface-2 disabled:opacity-50 max-narrow:size-11"
+            className="h-control flex-none rounded-input border border-line bg-surface px-3 type-sm font-[550] text-ink transition-micro hover:bg-surface-2 disabled:opacity-50 max-narrow:h-11"
           >
-            <ArrowRight size={16} aria-hidden />
+            Ask
           </button>
         </div>
         <p className="mt-2 type-meta text-muted" aria-live="polite">
