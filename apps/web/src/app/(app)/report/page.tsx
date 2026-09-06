@@ -20,6 +20,8 @@ import { PageTitle } from '@/components/page-title'
 import { reflectionWindow } from '@/lib/loop/iso-week'
 import { bestSlotSentence } from '@/lib/analytics/timing'
 import { readWindow } from '@/lib/analytics/window-data'
+import { measureLine } from '@/lib/analytics/measure-line'
+import { MeasureNow } from '@/components/analytics/measure-now'
 import { resolveView } from '@/lib/analytics/view-params'
 import { readBrainObservations, type BrainRead } from '@/lib/brain/read'
 import { brainWaiting } from '@/lib/brain/waiting'
@@ -118,7 +120,7 @@ export default async function ReportPage() {
   // Loop has still published captions, and "you have stopped using exclamation
   // marks" is computable from those alone. Gating this behind a cycle would have
   // hidden the one block that works before a customer has spent anything.
-  const [read, brain, balance] = await Promise.all([
+  const [read, brain, balance, measured] = await Promise.all([
     readLoop(),
     readBrainObservations(),
     /**
@@ -128,7 +130,9 @@ export default async function ReportPage() {
      * line would add a round trip in front of the two reads that were already
      * here, which `lib/perf/read-waterfall.test.ts` exists to refuse.
      */
+
     readBalance(),
+    measureLine(),
   ])
 
   // "You have no workspace" and "we could not look" are different claims with
@@ -139,7 +143,7 @@ export default async function ReportPage() {
   if (read.status !== 'ok') {
     return (
       <div className="space-y-6">
-        <ReportHeader week={null} />
+        <ReportHeader week={null} measured={measured} />
         <p className="surface-ring rounded-card bg-surface p-5 type-body text-muted">
           {read.status === 'no-workspace'
             ? 'Finish setting up your workspace and your reports appear here.'
@@ -177,7 +181,7 @@ export default async function ReportPage() {
      */
     return (
       <div className="space-y-6">
-        <ReportHeader week={null} />
+        <ReportHeader week={null} measured={measured} />
 
         <section className="surface-ring rounded-card bg-surface p-5 shadow-card">
           <h2 className="type-h2">No week has been reported yet</h2>
@@ -255,7 +259,7 @@ export default async function ReportPage() {
 
   return (
     <div className="space-y-6">
-      <ReportHeader week={`Week ${cycle.isoWeek}, ${cycle.isoYear}`} />
+      <ReportHeader week={`Week ${cycle.isoWeek}, ${cycle.isoYear}`} measured={measured} />
 
       {/* ── THE BRIEFING, AND A COLUMN BESIDE IT ────────────────────────────
           THE MEASURE IS ON THE PROSE, NOT ON THE COLUMN. The document was
@@ -501,7 +505,7 @@ export default async function ReportPage() {
  * the same defect class as a remedy that cannot work. It gets the calendar mark
  * and the pill, and no chevron, until something can be chosen.
  */
-function ReportHeader({ week }: { week: string | null }) {
+function ReportHeader({ week, measured }: { week: string | null; measured: string }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
       <div className="flex min-w-0 items-start gap-3">
@@ -515,12 +519,15 @@ function ReportHeader({ week }: { week: string | null }) {
           CMO Report
         </PageTitle>
       </div>
-      {week ? (
-        <p className="surface-ring inline-flex flex-none items-center gap-2 rounded-pill bg-surface px-3.5 py-2 type-sm font-[550] text-ink">
-          <CalendarDays size={15} strokeWidth={1.8} aria-hidden className="text-muted" />
-          <span className="num">{week}</span>
-        </p>
-      ) : null}
+      <div className="flex flex-col items-end gap-2">
+        {week ? (
+          <p className="surface-ring inline-flex flex-none items-center gap-2 rounded-pill bg-surface px-3.5 py-2 type-sm font-[550] text-ink">
+            <CalendarDays size={15} strokeWidth={1.8} aria-hidden className="text-muted" />
+            <span className="num">{week}</span>
+          </p>
+        ) : null}
+        <MeasureNow lastLine={measured} />
+      </div>
     </div>
   )
 }
