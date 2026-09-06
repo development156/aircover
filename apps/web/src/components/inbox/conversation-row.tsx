@@ -35,11 +35,17 @@ export function ConversationRow({ conversation }: { conversation: ZernioConversa
   const unread = conversation.unreadCount ?? 0
   const who = conversation.participantName ?? conversation.participantId ?? 'Unknown sender'
 
-  return (
-    <Link
-      href={threadHref({ accountId: conversation.accountId, conversationId: conversation.id })}
-      className="flex items-center gap-3 rounded-card border border-line bg-bg px-4 py-3 shadow-card transition-micro hover:border-ink"
-    >
+  /* ── A THREAD NOBODY CAN OPEN IS NOT A LINK ────────────────────────────────
+     A stored thread carries no account of its own; `lib/inbox/conversations.ts`
+     resolves one through this workspace's connections and leaves it EMPTY when
+     no connected account on that channel can say. MEASURED 2026-09-06 on the
+     wt-core preview: the row still rendered `<a href="/inbox/threads//qa-thread-1">`
+     and the click landed on "This page isn't here". The message is real; the
+     door to it is not, and a row that looks like a door and opens on a wall is
+     worse than a row that says why. So: no account, no link, one sentence. */
+  const canOpen = conversation.accountId !== ''
+  const body = (
+    <>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="truncate text-[15px] font-bold">{who}</span>
@@ -65,7 +71,28 @@ export function ConversationRow({ conversation }: { conversation: ZernioConversa
         ) : null}
       </div>
       {when ? <span className="shrink-0 text-[13px] text-muted tabular-nums">{when}</span> : null}
-      <ChevronRight size={16} className="shrink-0 text-muted" aria-hidden />
+      {canOpen ? <ChevronRight size={16} className="shrink-0 text-muted" aria-hidden /> : null}
+    </>
+  )
+
+  if (!canOpen) {
+    return (
+      <div className="rounded-card border border-line bg-bg px-4 py-3 shadow-card">
+        <div className="flex items-center gap-3">{body}</div>
+        <p className="type-meta mt-1.5 text-muted">
+          No connected {platformLabel(conversation.platform)} account can open this thread.
+          Reconnect the account to read and reply.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <Link
+      href={threadHref({ accountId: conversation.accountId, conversationId: conversation.id })}
+      className="flex items-center gap-3 rounded-card border border-line bg-bg px-4 py-3 shadow-card transition-micro hover:border-ink"
+    >
+      {body}
     </Link>
   )
 }

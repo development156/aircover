@@ -24,6 +24,17 @@ describe('the row carries both halves of the thread key', () => {
     )
   })
 
+  test('renders no link when no connected account can open the thread', () => {
+    // MEASURED 2026-09-06: a stored thread whose channel has no connected account
+    // rendered `/inbox/threads//<id>` and clicked through to a 404.
+    render(<ConversationRow conversation={{ ...conversation(), accountId: '' }} />)
+    expect(screen.queryByRole('link')).toBeNull()
+    expect(
+      screen.getByText(/no connected instagram account can open this thread/i),
+    ).toBeInTheDocument()
+    expect(document.querySelector('a[href*="/inbox/threads//"]')).toBeNull()
+  })
+
   test('a conversation id alone can never build a link — accountId is required', () => {
     // @ts-expect-error the account half is not optional; dropping it must not compile
     threadHref({ conversationId: 'conv_1' })

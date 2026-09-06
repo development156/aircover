@@ -169,11 +169,26 @@ export function WorkspaceSwitcher({
           {workspaces.map((ws) => {
             const isActive = ws.slug === active.slug
             return (
-              <form key={ws.id} action={setActiveWorkspace}>
+              /* ── SUBMIT FIRST, CLOSE AFTER ──────────────────────────────
+                 MEASURED 2026-09-06 (wt-core preview, Chromium): this button
+                 closed the menu from its own onClick. React committed that
+                 close in the microtask checkpoint the browser runs between the
+                 click listeners and the form's activation behaviour, so the
+                 form was gone before it could submit — "Form submission
+                 canceled because the form is not connected", and no workspace
+                 ever switched. The action now runs to completion first; the
+                 menu closes on the way back. `workspace-switcher.test.tsx`
+                 plays the browser's order by hand and fails on the old shape. */
+              <form
+                key={ws.id}
+                action={async (formData: FormData) => {
+                  await setActiveWorkspace(formData)
+                  closeToTrigger()
+                }}
+              >
                 <input type="hidden" name="slug" value={ws.slug} />
                 <button
                   type="submit"
-                  onClick={closeToTrigger}
                   aria-current={isActive ? 'true' : undefined}
                   className={cn(
                     'flex w-full items-center gap-2.5 rounded-input px-2.5 py-2 text-left transition-micro hover:bg-s1',

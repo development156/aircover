@@ -13,6 +13,7 @@ import {
 import { ObservationNote } from '@/components/brain/observation-note'
 import { CHANNEL_LABELS } from '@/components/posts/channel-label'
 import { metricInWords } from '@/lib/report/metric-words'
+import { moduleNumbers } from '@/lib/report/module-numbers'
 import { AtAGlanceCard, CreditsCard, InsightPromiseCard } from '@/components/report/insights'
 import { ReportModule } from '@/components/report/module'
 import { PageTitle } from '@/components/page-title'
@@ -101,6 +102,15 @@ const REPORT_OUTLINE: ReadonlyArray<{ title: string; what: string }> = [
   },
   { title: 'Credits used', what: 'What the cycle cost, entry by entry.' },
 ]
+
+/**
+ * A brief's channels are stored as keys (`instagram`). MEASURED 2026-09-06: the
+ * plan module printed "instagram. Scheduled…" at the reader — a key at the head
+ * of a sentence. A key with no label yet is shown as it is rather than dropped.
+ */
+function channelName(channel: string): string {
+  return (CHANNEL_LABELS as Readonly<Record<string, string>>)[channel] ?? channel
+}
 
 export default async function ReportPage() {
   // Read together, and the Marketing Brain read is NOT conditional on a cycle.
@@ -239,6 +249,10 @@ export default async function ReportPage() {
         ? 'none'
         : 'unknown'
 
+  // One counter for every module, in render order: a conditional module that
+  // stays out never takes a numeral, so the reader never meets 06 after 04.
+  const n = moduleNumbers()
+
   return (
     <div className="space-y-6">
       <ReportHeader week={`Week ${cycle.isoWeek}, ${cycle.isoYear}`} />
@@ -258,7 +272,7 @@ export default async function ReportPage() {
       <div className="grid items-start gap-6 wide:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-4">
           {/* ── 01 · LAST WEEK ──────────────────────────────────────────── */}
-          <ReportModule n={1} eyebrow="Last week" title="How it went" icon={TrendingUp}>
+          <ReportModule n={n.next()} eyebrow="Last week" title="How it went" icon={TrendingUp}>
             {ranking ? (
               <p className="type-body max-w-[68ch] text-muted">
                 <span className="num">{ranking.postsMeasured}</span> of your posts were measured
@@ -276,7 +290,7 @@ export default async function ReportPage() {
           {ranking ? (
             <>
               <ReportModule
-                n={2}
+                n={n.next()}
                 eyebrow="Then"
                 title="The post that reached the most people"
                 icon={TrendingUp}
@@ -288,7 +302,7 @@ export default async function ReportPage() {
                 </p>
               </ReportModule>
               <ReportModule
-                n={3}
+                n={n.next()}
                 eyebrow="And"
                 title="The one that reached the fewest"
                 icon={TrendingUp}
@@ -311,11 +325,11 @@ export default async function ReportPage() {
           ) : null}
 
           {/* ── WHAT IT NOTICED, UNPROMPTED ─────────────────────────────── */}
-          <BrainBlock brain={brain} n={ranking ? 4 : 2} />
+          <BrainBlock brain={brain} n={n.next()} />
 
           {/* ── WHAT IT LEARNED ─────────────────────────────────────────── */}
           <ReportModule
-            n={ranking ? 5 : 3}
+            n={n.next()}
             eyebrow="The part that changes things"
             title="What Sahoda learned"
             icon={Lightbulb}
@@ -346,7 +360,7 @@ export default async function ReportPage() {
 
           {/* ── THIS WEEK ───────────────────────────────────────────────── */}
           <ReportModule
-            n={ranking ? 6 : 4}
+            n={n.next()}
             eyebrow="Ends with"
             title="This week&rsquo;s plan"
             icon={ClipboardCheck}
@@ -361,9 +375,9 @@ export default async function ReportPage() {
                   <li key={brief.id} className="rounded-input bg-surface-2 p-3">
                     <p className="type-body text-ink">{brief.title}</p>
                     <p className="type-sm mt-1 text-muted">
-                      {brief.channels.join(' · ')}
+                      {brief.channels.map(channelName).join(' · ')}
                       {brief.stageOutcome === 'awaiting_approval'
-                        ? '. Scheduled, waiting for your approval'
+                        ? '. Sent to Approvals when the plan was written'
                         : '. A draft in your Planner'}
                     </p>
                   </li>
@@ -384,7 +398,7 @@ export default async function ReportPage() {
               reader to believe there is one and Sahoda is being coy. */}
           {slotSentence ? (
             <ReportModule
-              n={ranking ? 7 : 5}
+              n={n.next()}
               eyebrow="What the numbers say about timing"
               title="When to post"
               icon={Clock}
@@ -403,7 +417,7 @@ export default async function ReportPage() {
 
           {/* ── THE MONEY, and the one module that carries the accent ───── */}
           <ReportModule
-            n={ranking ? 8 : 6}
+            n={n.next()}
             eyebrow="And what it cost"
             title="Credits used"
             icon={Coins}
