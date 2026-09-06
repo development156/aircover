@@ -207,7 +207,7 @@ No P0/P1/P2. Verified end to end: Clerk webhook requires verified email + 5-minu
 | Q-19 | P3 | UX · Auth | return visit after idle | 1.8–3.4 s via `/sign-in` | MEASURED | Clerk development instance in production | move to production Clerk keys (founder item) | OPEN, founder item (production Clerk keys) |
 | Q-20 | P3 | Copy | `/connections` cards | "Not proven live", "Publishes today" | aria (MEASURED) | internal status leaking | "Ready to publish" / "Read-only for now" | **FIXED** `159872dc` |
 | Q-21 | P3 | Backend | `sweeps/route.ts` | `maxDuration=300` on a 5-minute schedule; comment claims no straddle | code (VERIFIED) | — | 240, or fix the comment | **FIXED** `9dff307f` (240) |
-| Q-22 | P3 | Database | `apply_ledger_entry` EXPIRE/ADJUST | no available-balance guard | code (VERIFIED), no caller | — | add the HOLD/DEBIT guard | EXPIRE **FIXED** `0d33eb41`, APPLIED; negative ADJUST deliberately left: `applyReversal` re-clamps on the raw constraint and a named error would stop that retry (needs a decision) |
+| Q-22 | P3 | Database | `apply_ledger_entry` EXPIRE/ADJUST | no available-balance guard | code (VERIFIED), no caller | — | add the HOLD/DEBIT guard | EXPIRE **FIXED** `0d33eb41`, APPLIED; negative ADJUST **RULED no change** 2026-09-06 (the raw constraint is what `applyReversal` retries on) |
 | Q-23 | P3 | Security | `export-drift.test.ts` | guard skipped without DB | code (VERIFIED) | — | diff against the migration-derived table list | **FIXED** `d85183d5` (always-on, migration-derived) |
 | Q-24 | P3 | Frontend | `onboarding-flow.tsx`, `coming-soon.tsx` | dead files | grep (VERIFIED) | — | delete | **FIXED** `03c1afca` (21 files) |
 
@@ -292,6 +292,6 @@ _Rewritten 2026-09-06 after the findings were executed. The earlier text of this
 ## Needs a decision
 
 1. **Reset the staging database password and update the `E2E_SUPABASE_DB_URL` repository secret** (Supabase → staging project → Settings → Database → Reset database password → copy the SESSION POOLER string). Nothing in the repository can do this, and until it is done the smoke leg cannot pass: every ledger-backed page fails on staging.
-2. Whether a negative `ADJUST` should gain the available-balance guard at the cost of changing `applyReversal`'s retry detection (Q-22, second half).
+2. ~~Whether a negative `ADJUST` should gain the available-balance guard~~ **RULED 2026-09-06 (delegated by the founder): no change.** The raw constraints (`balance_total_nonneg`, `balance_held_le_total`) already refuse an over-large negative ADJUST; the only caller is `applyReversal`, which relies on that exact error to re-clamp and retry. A named error would buy nothing and break the retry. Q-22 is closed.
 3. Production Clerk keys (Q-19), a founder item.
-4. `/analytics` exceeds the accent-area ceiling the `page-dash-hierarchy` guard enforces; the page is designed that way, so either the design or the ceiling changes.
+4. ~~`/analytics` exceeds the accent-area ceiling~~ **RULED 2026-09-06 (delegated): the ceilings were re-measured, not raised to pass.** MEASURED with the guard's own helper on a production build: one solid fill (the "Connect a channel" button, ~80% of the brand pixels), and seven small regions that did not exist on 2026-08-23 (the topbar's 16×16 brain ring and 78×2 credit meter, the example's 18×8 chips), ~200px between them. New constants carry the file's ~10% over the higher of local and CI readings (`/analytics@1024` 0.97 over 0.878%). A second fill still fails the count above the ceiling.
