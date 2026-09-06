@@ -49,6 +49,16 @@ import type { ScopedAccountId, ScopedProfileId } from './scope'
  */
 export type ReplyReceipt = { sent: true; platformId: string } | { sent: false; detail: string }
 
+/**
+ * Zernio's `attachmentType` enum, verbatim.
+ *
+ * Four values and no more: the spec defaults an unnamed type to `file`, so a fifth
+ * word invented here would not fail — it would silently send a photo as a document.
+ * A union rather than `string` makes that a compile error at the only place that can
+ * make the mistake, which is the caller mapping a mime.
+ */
+export type AttachmentType = 'image' | 'video' | 'audio' | 'file'
+
 export interface SendMessageInput {
   message: string
   /**
@@ -57,6 +67,17 @@ export interface SendMessageInput {
    * cannot be chosen here, only carried.
    */
   wire?: ReplyWireFields
+  /**
+   * One attachment, as a URL Zernio's own servers will fetch.
+   *
+   * `[DOC]`: the spec requires it to be "publicly accessible", which means whatever
+   * link is handed in must work without our credentials. This port does not check
+   * that and cannot: it never sees the object. It carries the string unchanged,
+   * because re-encoding a signed URL is how a working link becomes a 403.
+   */
+  attachmentUrl?: string
+  /** Absent means Zernio defaults to `file`, so the caller states it whenever it knows. */
+  attachmentType?: AttachmentType
 }
 
 export interface ReplyToCommentInput {
@@ -154,6 +175,11 @@ export function createZernioSends(deps: ZernioClientDeps): ZernioSends {
           // and explicit `undefined`s would serialise as absent anyway but read as
           // though a decision about tagging were being made here. It is not.
           ...(input.wire ?? {}),
+          // Same rule, and here it is load-bearing rather than tidy: a text-only reply
+          // must carry NO attachment key at all. `attachmentType` without a url is a
+          // claim about a file that is not there.
+          ...(input.attachmentUrl === undefined ? {} : { attachmentUrl: input.attachmentUrl }),
+          ...(input.attachmentType === undefined ? {} : { attachmentType: input.attachmentType }),
         },
       )
       return receipt(data.data?.messageId, 'reply')

@@ -168,6 +168,7 @@ export {
   createZernioSends,
   type ZernioSends,
   type ReplyReceipt,
+  type AttachmentType,
   type SendMessageInput,
   type ReplyToCommentInput,
   type ReplyToReviewInput,

@@ -69,6 +69,41 @@ describe('sendMessage — the DM reply', () => {
     expect(bodyOf(req)).toEqual({ accountId: ACCOUNT, message: 'On our way' })
   })
 
+  /**
+   * ── AN ATTACHMENT IS CARRIED VERBATIM, NEVER COMPOSED HERE ───────────────────
+   * `attachmentUrl` must be publicly reachable and `attachmentType` is Zernio's own
+   * four-value enum (`image`/`video`/`audio`/`file`, defaulting to `file`). Both are
+   * resolved by the caller from a row it already owns; this port's whole job is to put
+   * them on the wire unchanged, so a signed URL that works is not re-encoded into one
+   * that does not.
+   */
+  it('puts an attachment url and type on the wire verbatim', async () => {
+    const { sends, cap } = sendsWith({ success: true, data: { messageId: 'mid.att' } })
+    await sends.sendMessage(profile, account, 'conv-1', {
+      message: 'Here it is',
+      attachmentUrl: 'https://cdn.example.com/a.jpg?token=abc%2Fdef&x=1',
+      attachmentType: 'image',
+    })
+
+    expect(bodyOf(cap.last())).toEqual({
+      accountId: ACCOUNT,
+      message: 'Here it is',
+      attachmentUrl: 'https://cdn.example.com/a.jpg?token=abc%2Fdef&x=1',
+      attachmentType: 'image',
+    })
+  })
+
+  it('omits both attachment fields when no attachment is given', async () => {
+    const { sends, cap } = sendsWith({ success: true, data: { messageId: 'mid.plain' } })
+    await sends.sendMessage(profile, account, 'conv-1', { message: 'Just words' })
+
+    const body = bodyOf(cap.last())
+    // `toEqual` above would pass with an explicit `undefined` present, which serialises
+    // away on THIS transport and would not on a multipart one. The keys must be absent.
+    expect(Object.keys(body).sort()).toEqual(['accountId', 'message'])
+    expect(String(cap.last().body)).not.toContain('attachment')
+  })
+
   it('encodes a conversation id that is not URL-safe', async () => {
     const { sends, cap } = sendsWith({ success: true, data: { messageId: 'mid.abc' } })
     await sends.sendMessage(profile, account, 't_100/200', { message: 'hi' })
