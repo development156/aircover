@@ -33,6 +33,7 @@ import { planWeekTask } from './tasks/plan-week'
 import { siteGenerateTask } from './tasks/site-generate'
 import { gateClassifyTask } from './tasks/gate-classify'
 import { promptRefineTask } from './tasks/prompt-refine'
+import { brandStartersTask } from './tasks/brand-starters'
 
 /** Rough $/1M-token estimate for ai_provider_logs margin telemetry (not billing). */
 function estimateCostUsd(u: ProviderUsage): number {
@@ -194,6 +195,7 @@ export function createMesh(opts: CreateMeshOptions = {}): Mesh {
   // the class: it asserts EVERY exported task spec is reachable here.
   register(gateClassifyTask)
   register(promptRefineTask)
+  register(brandStartersTask)
 
   async function runTask<I, O>(
     def: MeshTaskDef<I, O>,

@@ -18,6 +18,7 @@ import { reportServerError } from '@/lib/observability/report'
 import { clearPendingBrain } from '@/lib/onboarding/pending-brain'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { getActiveWorkspace } from '@/lib/workspaces'
+import { writeBrandStartersBestEffort } from '@/lib/brand/write-starters'
 
 /**
  * The Brand Brain WRITE path, and nothing else.
@@ -167,6 +168,19 @@ export async function saveBrandMemory(
     }
 
     if (nextIntake.success) await mirrorIntakeToWorkspace(supabase, workspace.id, nextIntake.data)
+
+    // BEST-EFFORT, AND NEVER ON THE CRITICAL PATH TO A REFUSAL. Writes the
+    // Studio's picture ideas for the version that was JUST produced, once.
+    // Never throws (see the file's own header) — a failure here is a fact
+    // about the Studio's starters, never about whether this Brand Brain save
+    // succeeded, so it is deliberately not inside any branch that could turn
+    // it into a refusal.
+    await writeBrandStartersBestEffort({
+      workspaceId: workspace.id,
+      brandVersion: result.data.version,
+      payload,
+      fieldMeta,
+    })
 
     // The topbar ring lives in the app layout and reads the active brain. MEASURED
     // 2026-09-06: after onboarding's first save, "Review Brand Brain" opened

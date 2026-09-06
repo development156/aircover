@@ -14,8 +14,13 @@ neither read nor written by this file.
 | --- | --- | --- |
 | `workspace_id` | `uuid` → `workspaces(id)` | Tenancy, cascade on delete |
 | `brand_version` | `int` | The `brand_memory.version` the sentences were written from |
-| `starters` | `jsonb` | An array of 3 to 8 plain sentences, checked |
+| `starters` | `jsonb` | An array of 3 to 8 `{label, prompt}` pairs, checked |
 | `model_id` | `text` | What wrote them |
+
+Each idea is a pair rather than one plain sentence: a short chip label for the
+screen and the full prompt sentence for the box behind it. The CHECK still
+asserts an array of 3 to 8, which an array of `{label, prompt}` objects
+satisfies exactly as an array of strings would.
 
 ## Why it is needed
 

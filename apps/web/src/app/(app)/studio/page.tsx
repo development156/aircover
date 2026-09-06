@@ -4,6 +4,8 @@ import { brandSignalsFor } from '@/lib/studio/brand-signals'
 import { canvasPictures } from '@/lib/studio/canvas'
 import { generatableFormats } from '@/lib/studio/formats'
 import { readGenerations, readLibraryPictures } from '@/lib/studio/read'
+import { readStoredStartersForActiveBrand } from '@/lib/studio/starters-read'
+import { combineStudioStarters } from '@/lib/studio/starter-ladder'
 import { activeWorkspaceRead } from '@/lib/workspaces'
 
 export const metadata = { title: 'Studio' }
@@ -38,7 +40,7 @@ export default async function StudioPage() {
    * `cache()`d, so the workspace itself is read once for the whole request no
    * matter how many readers ask.
    */
-  const [recent, library, signals] = await Promise.all([
+  const [recent, library, signals, storedStarters] = await Promise.all([
     readGenerations(),
     readLibraryPictures(),
     // NULL is "could not read", which the composer states as its own sentence.
@@ -48,7 +50,14 @@ export default async function StudioPage() {
     activeWorkspaceRead().then((active) =>
       active.status === 'ok' ? brandSignalsFor(active.workspace.id).catch(() => null) : null,
     ),
+    // Step 1 of the starters ladder, raced alongside the other three rather
+    // than awaited afterwards — see `starters-read.ts`'s own header for why.
+    // Steps 2 and 3 are pure and applied below, once every promise here has
+    // settled.
+    readStoredStartersForActiveBrand(),
   ])
+
+  const starters = combineStudioStarters(storedStarters, signals)
 
   // ── NO BALANCE READ HERE ─────────────────────────────────────────────────
   // This page used to also read the wallet balance to print "N credits left"
@@ -80,7 +89,13 @@ export default async function StudioPage() {
         Studio
       </PageTitle>
 
-      <StudioWorkbench formats={formats} library={library} pictures={pictures} signals={signals} />
+      <StudioWorkbench
+        formats={formats}
+        library={library}
+        pictures={pictures}
+        signals={signals}
+        starters={starters}
+      />
     </div>
   )
 }

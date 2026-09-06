@@ -73,7 +73,10 @@ export function logoFactsFromRow(row: AssetLogoFacts): LogoFacts | null {
   if (row.ink_polarity === 'mixed') return null
 
   const trim =
-    row.trim_x === null || row.trim_y === null || row.trim_width === null || row.trim_height === null
+    row.trim_x === null ||
+    row.trim_y === null ||
+    row.trim_width === null ||
+    row.trim_height === null
       ? null
       : { x: row.trim_x, y: row.trim_y, width: row.trim_width, height: row.trim_height }
 

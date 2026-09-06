@@ -63,6 +63,7 @@ export * from './studio/generation'
 export * from './studio/presets'
 export * from './studio/paint'
 export * from './studio/svg'
+export * from './studio/starters'
 export * from './mesh/runner'
 export * from './mesh/tasks'
 // Messaging reply windows — what a platform will let you say, and when. Policy

@@ -21,6 +21,7 @@ import { ReferencePreview } from '@/components/studio/reference-preview'
 import { useComposer } from '@/components/studio/use-composer'
 import type { StudioFormat } from '@/lib/studio/formats'
 import type { LibraryRead } from '@/lib/studio/read'
+import { combineStudioStarters, type StudioStarters } from '@/lib/studio/starter-ladder'
 
 /**
  * THE COMPOSER. A BAR, NOT A CARD, AND NOW A COMPONENT OF ITS OWN.
@@ -100,6 +101,15 @@ export interface ComposerProps {
   library: LibraryRead
   /** What the Brand Brain will add to this request, shown before the press. Null means the read failed. */
   signals: BrandSignal[] | null
+  /**
+   * The three-step starter ladder (`lib/studio/starter-ladder.ts`), already
+   * resolved by a caller that could reach the database — `/studio`'s own page
+   * is the one that does. Omitted for a caller with no such read (the viewer,
+   * a post's own composer): this bar then falls back to steps 2 and 3 alone,
+   * computed here from `signals`, which is always a real improvement over
+   * nothing and never a network call of its own.
+   */
+  starters?: StudioStarters
   /** See this file's header. Omitted for a bar that starts from nothing. */
   initialValues?: ComposerInitialValues
   /** Fires with a successful press's own result, before this bar refreshes the router. See this file's header. */
@@ -119,12 +129,14 @@ export function Composer({
   formats,
   library,
   signals,
+  starters,
   initialValues,
   onGenerated,
   onBusyChange,
   extraControls,
 }: ComposerProps) {
   const c = useComposer({ formats, library, initialValues, onGenerated })
+  const effectiveStarters = starters ?? combineStudioStarters(null, signals)
 
   // `onBusyChange` mirrors `busy` for a caller outside this tree, whose
   // render already depends on it — done as a plain effect rather than inside
@@ -168,7 +180,11 @@ export function Composer({
 
         <PromptRefineControl wanted={c.wanted} onChange={c.setWanted} />
 
-        <ComposerStarters visible={c.wanted.trim() === ''} onPick={c.setWanted} />
+        <ComposerStarters
+          visible={c.wanted.trim() === ''}
+          starters={effectiveStarters.starters}
+          onPick={c.setWanted}
+        />
 
         <ComposerPickedReferences
           picked={c.picked}

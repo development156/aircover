@@ -53,9 +53,13 @@ create table if not exists brand_starters (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references workspaces (id) on delete cascade,
   brand_version int not null,
-  -- An array of plain sentences, each one a thing to type into the Studio box.
+  -- An array of {label, prompt} objects: `label` is the short chip text shown
+  -- on screen, `prompt` is the full sentence that lands in the Studio box.
   -- Bounded so a malformed model answer cannot write four hundred, and floored
-  -- at three because a screen offering one idea offers no choice at all.
+  -- at three because a screen offering one idea offers no choice at all. Shape
+  -- is enforced by `BrandStarterIdeasSchema` (packages/shared); this column
+  -- stays plain jsonb because Postgres cannot express a list of tagged
+  -- records cheaply, the same reason `studio_generations.brand_signals` does.
   starters jsonb not null,
   -- Which model wrote them, for the same reason every generation records one:
   -- when the sentences are bad, the first question is what wrote them.

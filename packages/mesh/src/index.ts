@@ -39,6 +39,17 @@ export {
   NO_SETTINGS_RULE,
 } from './tasks/prompt-refine'
 export type { PromptRefineInput, PromptRefineOutput } from './tasks/prompt-refine'
+// Studio brand starters. Free (folded into a Brand Brain resolve's own cost),
+// written once per brand version by the resolve write path, never charged and
+// never called from a read. See the task's own file header.
+export {
+  brandStartersTask,
+  BrandStartersInputSchema,
+  BrandStartersOutputSchema,
+  NO_INVENTION_RULE as BRAND_STARTERS_NO_INVENTION_RULE,
+  SERVICE_BUSINESS_RULE,
+} from './tasks/brand-starters'
+export type { BrandStartersInput, BrandStartersOutput } from './tasks/brand-starters'
 
 // Brand grounding (server-only) — the cache-controlled Brand Brain prefix.
 export { createPostgrestBrandContext, buildBrandMessage } from './brand-context'

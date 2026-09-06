@@ -10,6 +10,7 @@ import { Composer } from '@/components/studio/composer'
 import type { CanvasPicture } from '@/lib/studio/canvas'
 import type { StudioFormat } from '@/lib/studio/formats'
 import type { LibraryRead } from '@/lib/studio/read'
+import type { StudioStarters } from '@/lib/studio/starter-ladder'
 
 /**
  * THE WALL. THE PLACE A NEW PICTURE IS JUDGED AGAINST EVERY OTHER ONE.
@@ -99,12 +100,15 @@ export function StudioWorkbench({
   library,
   pictures,
   signals,
+  starters,
 }: {
   formats: StudioFormat[]
   library: LibraryRead
   /** What this workspace has already made, newest first, for the wall. */
   pictures: CanvasPicture[]
   signals: BrandSignal[] | null
+  /** The starter ladder's already-resolved answer. See `composer.tsx`'s own prop. */
+  starters?: StudioStarters
 }) {
   const [filter, setFilter] = useState<WorkFilter>('all')
   /**
@@ -127,7 +131,13 @@ export function StudioWorkbench({
         <h2 id="studio-make" className="sr-only">
           Make a picture
         </h2>
-        <Composer formats={formats} library={library} signals={signals} onBusyChange={setBusy} />
+        <Composer
+          formats={formats}
+          library={library}
+          signals={signals}
+          starters={starters}
+          onBusyChange={setBusy}
+        />
       </section>
 
       {pictures.length === 0 ? (
