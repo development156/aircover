@@ -73,6 +73,27 @@ column (four tests count the selects). H-18 closed: on a clean session
 "Schedule it" renders presets, a calendar and a time picker; the earlier blank
 was the Vercel share cookie lapsing under the dynamic chunk.
 
+## The visual pass (14:43 IST, "visually stunning, great contrast, graphs")
+
+`079e8d26` + `8e5f2e90`, inside docs/37. `lib/home/balance-history.ts` reads the
+wallet's total day by day off `balance_after` in the fifty ledger rows the feed
+already holds (no query; complete ledger → real zeroes before the first row,
+capped → `null`). `components/charts/sparkline.tsx`: a line with soft fill and
+endpoint (revealed once by `.spark-draw`, reduced-motion collapses it) and
+`MiniBars` with a baseline stub per bucket. The board: credits line, week bars
+(today in the accent), and "Waiting on you" wears the brand wash over its own
+opaque surface while something waits. MEASURED on the preview in both themes
+with a private headless Chromium (both MCP browsers were held by another
+session): washed figure 20.1:1 light / 19.4:1 dark, label 6.9 / 6.7; both
+charts announce themselves ("Credits over the last 30 days, from 0 to 100",
+"Approved posts by day: … Tue 1 … Thu 1"). 160 tests in the touched areas.
+
+`8e5f2e90`'s Vercel build failed on `/brain`'s js-budget (+8.2 kB), which is
+`1a3c6eb8` (another session's Brand Brain map), not Home; the same failure hit
+their own build. `079e8d26` is what the branch alias serves until that is fixed.
+The QA workspace holds three seeded posts for the capture (titles begin
+"Audit visual:"); delete them when done.
+
 ## Cleanup done
 
 The audit's post `87e589c2` (and its one variant) was deleted from the QA
