@@ -132,11 +132,11 @@ export function KeywordField({
    * already equals what the box holds. Adopt only when it DIFFERS — an external
    * write like generation, or a restored draft.
    */
-  const storedKey = normalizeKeywords(hashtags).join('')
+  const storedKey = JSON.stringify(normalizeKeywords(hashtags))
   const [syncedStored, setSyncedStored] = useState(storedKey)
   if (storedKey !== syncedStored) {
     setSyncedStored(storedKey)
-    if (storedKey !== tags.join('')) setRaw(settled(normalizeKeywords(hashtags, brackets)))
+    if (storedKey !== JSON.stringify(tags)) setRaw(settled(normalizeKeywords(hashtags, brackets)))
   }
 
   // Google Business posts are local business updates. `formatForPlatform`
