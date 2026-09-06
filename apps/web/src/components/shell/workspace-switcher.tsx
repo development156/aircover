@@ -96,18 +96,13 @@ export function WorkspaceSwitcher({
   // its failure toast live in CreateWorkspaceButton, which /wallet's first-run
   // state renders too — one offer, one behaviour, in both places.
   if (workspaces.length === 0 || !active) {
-    // Hidden on a phone, where it is the one thing that does not fit: MEASURED
-    // 2026-09-05 (smoke, no-truncated-labels at 390): this button is 167px wide
-    // and pushed the user menu to x=432 in a 390px viewport, on every route,
-    // because the (app) layout shows the first-run screen everywhere a workspace
-    // is missing — and THAT screen carries the same button as its one action.
-    // Carrying it twice on a phone is what overflowed; carrying it once is the
-    // rule the guard states ("carry fewer items").
-    return (
-      <div className="max-narrow:hidden">
-        <CreateWorkspaceButton guideAnchor="topbar.workspace-create" />
-      </div>
-    )
+    // Compact on a phone, not hidden. MEASURED 2026-09-05 (smoke,
+    // no-truncated-labels at 390): the 167px label pushed the user menu to
+    // x=432 in a 390px viewport. The first repair hid the whole button there,
+    // and `shell-probe.spec.ts` (run 34012814133) refused it: this trigger is
+    // what tells the no-workspace state apart from every other, on every
+    // width. So the words go sr-only on a phone and the button stays.
+    return <CreateWorkspaceButton guideAnchor="topbar.workspace-create" compactOnNarrow />
   }
 
   return (

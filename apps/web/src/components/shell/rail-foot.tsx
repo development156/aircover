@@ -196,7 +196,11 @@ export async function RailFoot() {
       >
         <span
           aria-hidden
-          className="grid size-[26px] flex-none place-items-center rounded-pill bg-brand-wash text-[11px] font-bold text-accent"
+          // `text-ink`, not `text-accent`: MEASURED run 34012814133, the
+          // collapsed rail in dark read these initials at 2.75:1 against the
+          // wash, the faintest label in the shell. The wash is a 6% tint of the
+          // rail, so ink on it clears 4.5:1 in both themes; accent on it does not.
+          className="grid size-[26px] flex-none place-items-center rounded-pill bg-brand-wash text-[11px] font-bold text-ink"
         >
           {initials(name)}
         </span>

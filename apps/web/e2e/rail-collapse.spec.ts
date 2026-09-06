@@ -171,22 +171,24 @@ function withRatios(readings: LabelReading[]): LabelReading[] {
  * expectation from the thing it is testing passes under any mutation of it. If
  * a section leaves the rail, this fails by name and somebody decides.
  */
+// `Remix`, `Sites` and `Playbooks` are NOT here: the founder's ruling of
+// 2026-08-25 removed all three from `lib/nav/sections.ts` (built, not "soon",
+// simply absent from the rail; `reachable.test.ts` says how each is reached).
+// This list still named them and the collapsed check failed on "Remix" for
+// three attempts (run 34012814133), pinning a menu the product no longer has.
 const RAIL_LABELS = [
   'Home',
   'Brand Brain',
   'Posts',
   'Campaigns',
   'Assets',
-  'Remix',
   'Planner',
   'Approvals',
-  'Sites',
   'Inbox',
   'Leads',
   'Analytics',
   'CMO Report',
   'The Loop',
-  'Playbooks',
 ] as const
 
 async function bootstrap(page: Page): Promise<void> {
