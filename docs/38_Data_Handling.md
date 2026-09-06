@@ -67,10 +67,11 @@ and `marketing_pass_runs`, which records when Sahoda last looked at your marketi
 `asset_folder_items` and `asset_smart_folders`. It read 48 on 2026-08-23; the forty-ninth was
 `marketing_observations`.)
 
-> **Production holds 52 of those 58 today.** MEASURED against production on 2026-08-28 by counting
-> `public` base tables carrying a `workspace_id` column, not inferred from the migration list, and
-> re-taken at the merge rather than carried over — the reading below it moved when the last two
-> lanes both edited this paragraph.
+> **Production held 52 of them when it was last counted, on 2026-08-28, against a list of 58.**
+> MEASURED then against production by counting `public` base tables carrying a `workspace_id`
+> column, not inferred from the migration list. **It has NOT been re-taken since**, and the list
+> has grown to 62, so the gap today is at least the four below and may be larger. The count needs
+> a credential this worktree does not hold; re-take it before this paragraph is quoted to anyone.
 >
 > **Four are missing, and all four are written-not-applied:** `loop_autopilot_log`,
 > `studio_designs`, `studio_exports` and `marketing_pass_runs`. MEASURED by asking the catalog for

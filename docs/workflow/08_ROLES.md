@@ -1,8 +1,8 @@
 # 08 · Lanes and permission
 
 **Founder's ruling, 25 August 2026.** Each lane is autonomous inside its own
-branch. There is exactly one gated step in this whole system, and it is
-`wt-core → wt-web`.
+branch. There are two gated steps: **`lane → wt-core`, which only Divas
+performs** (founder's ruling, 6 September 2026), and `wt-core → wt-web`.
 
 ---
 
@@ -16,17 +16,19 @@ branch. There is exactly one gated step in this whole system, and it is
       │   no approvals     │   no approvals     │   no approvals
       └────────────────────┼────────────────────┘
                            ▼
-                        wt-core          ← all three merge in here
+                        wt-core          ← DIVAS merges the lanes in here.
+                           │                 Everyone else pulls FROM it.
                            │
-                      (proven here)      ← THE one gate
+                      (proven here)      ← the second gate
                            ▼
                         wt-web           ← production. Vercel deploys this.
 ```
 
 | | Inside your own lane | Into `wt-core` | Into `wt-web` |
 |---|---|---|---|
-| **Write code** | **yes, anything** | yes, merge your own lane | **no** |
-| **Ask permission first** | **no. Never.** | no | — |
+| **Write code** | **yes, anything** | **Divas only** | **no** |
+| **Merge in** | — | **Divas only.** Others pull `wt-core` into their lane | **no** |
+| **Ask permission first** | **no. Never.** | say it is ready in the handoff | — |
 | **Run the gate** | yes, your own | yes | yes |
 | **Write a migration** | **yes** | yes | **no** |
 | **Apply a migration to production** | no | no | **only from `wt-core`, deliberately** |
@@ -35,8 +37,11 @@ branch. There is exactly one gated step in this whole system, and it is
 gone. You own your branch completely: edit any file, add any dependency, write
 any migration file, run anything, commit and push as often as you like.
 
-**The only thing you may not do is write to `wt-web`.** It is production, it is
-what Vercel deploys, and it is reached only by promoting a proven `wt-core`.
+**Two things you may not do: write to `wt-web`, and merge into `wt-core`.**
+`wt-web` is production, what Vercel deploys, reached only by promoting a proven
+`wt-core`. `wt-core` is the integration point, and one person holds it so that
+every merge is made by someone who can see all the lanes at once. Pulling
+`wt-core` into your lane is always allowed and always encouraged.
 
 ---
 
@@ -60,7 +65,26 @@ So the identity chain is: **handoff names the person · branch names the lane ·
 
 ## Merging into `wt-core`
 
-You may merge your own lane in. Before you do:
+**Only Divas merges into `wt-core`.** Founder's ruling, 2026-09-06. `wt-jiban*`
+and `wt-karunesh*` do not merge in, do not push to `wt-core`, and do not open a
+merge of their own. They **pull** `wt-core` into their lane as often as they
+like, which is how they stay current, and they push their own lane. When a
+lane's work is ready, say so in the handoff and stop there: Divas does the
+merge.
+
+`wt-girija*` is under the same rule. One person holds the integration point so
+that every merge into `wt-core` was made by someone who could see the other
+lanes' work at the same time, which is the failure described below and the one
+git will never raise.
+
+Pulling `wt-core` into your own lane, from any lane:
+
+```bash
+git fetch --all --prune
+git merge origin/wt-core        # into your lane, always allowed
+```
+
+**For Divas, merging a lane in.** Before you do:
 
 ```bash
 git fetch --all --prune

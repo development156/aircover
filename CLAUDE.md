@@ -153,9 +153,14 @@ so in the handoff. **Never abandon a branch another session or a PR is tracking*
 right.
 
 **You own your lane completely and need approval for nothing inside it**: any
-file, any dependency, any migration file, commit and push freely. Lanes merge
-into `wt-core`. The one gated step in the whole system is **`wt-core` →
-`wt-web`**, which is production. Never cut from `main` — every `main` here is
+file, any dependency, any migration file, commit and push freely.
+
+**Only Divas merges a lane into `wt-core`.** Founder's ruling, 2026-09-06.
+Every other lane, `wt-girija*`, `wt-jiban*` and `wt-karunesh*`, **pulls**
+`wt-core` into itself as often as it likes and pushes its own branch. It never
+merges into `wt-core` and never pushes to it. When a lane's work is ready, the
+handoff says so and stops there. There are two gated steps: `lane → wt-core`,
+and **`wt-core` → `wt-web`**, which is production. Never cut from `main` — every `main` here is
 800+ commits behind and carries a 12-route skeleton of a 59-route product. See
 `docs/workflow/08_ROLES.md`.
 

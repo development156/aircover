@@ -57,7 +57,9 @@ export type LoopSweepMode = 'off' | 'report' | 'on'
  * side that does nothing, the rule `loop-enabled.ts` gives for the Loop cron.
  * `report` reads the candidates and writes nothing, like the hold sweep.
  */
-export function readLoopSweepMode(source: NodeJS.ProcessEnv = process.env): LoopSweepMode {
+export function readLoopSweepMode(
+  source: Partial<Record<string, string | undefined>> = process.env,
+): LoopSweepMode {
   const raw = source.SAHODA_LOOP_SWEEP_MODE
   return raw === 'on' || raw === 'report' ? raw : 'off'
 }

@@ -83,7 +83,9 @@ async function main(): Promise<number> {
     )
   }
 
-  const report = await runStorageReconcile(storageReconcileDeps({ mode }))
+  const report = await runStorageReconcile(
+    storageReconcileDeps({ mode, log: (line) => console.log(line) }),
+  )
   console.log(JSON.stringify(report))
   return report.failedWorkspaces > 0 ? 1 : 0
 }

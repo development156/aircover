@@ -135,6 +135,12 @@ export function storageReconcileDeps(opts: StorageReconcileDepsOptions = {}): St
     listObjects: storage.listObjects,
     listKnownPaths: createKnownPathReader(pool),
     removeObjects: storage.removeObjects,
-    log: opts.log ?? ((line) => console.log(line)),
+    // No default sink. `reconcile.ts` treats an absent `log` as silence, and the
+    // one runner that wants the per-line trace is `scripts/storage-reconcile.ts`,
+    // which is a script and prints as its whole purpose. Defaulting to
+    // `console.log` here put debug output in shipped library source for every
+    // caller, including the Trigger.dev task, which wants the report and not a
+    // stream of lines.
+    log: opts.log,
   }
 }

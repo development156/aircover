@@ -114,7 +114,7 @@ export function ReviewRow({
 
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[13px] font-[550] text-ink">{title}</span>
+            <span className="type-sm font-medium text-ink">{title}</span>
             <Badge rung="urgent">{post.intent === 'review' ? 'In review' : 'Needs approval'}</Badge>
           </div>
           <p className="type-sm text-muted">
