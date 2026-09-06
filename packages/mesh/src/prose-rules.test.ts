@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { PROSE_RULES, findBannedDashes, obeysProseRules } from './prose-rules'
+import { PROSE_RULES, VOICE_INTEGRITY, findBannedDashes, obeysProseRules } from './prose-rules'
 import { contentVariantsTask } from './tasks/content-variants'
 import { captionRewriteTask } from './tasks/caption-rewrite'
 import { siteGenerateTask } from './tasks/site-generate'
@@ -116,6 +116,38 @@ describe('every task that writes a published caption carries the rule', () => {
       const messages = captionRewriteTask.buildMessages({ text: 'Fresh bread.', instruction }, ctx)
       const system = messages.find((m) => m.role === 'system')
       expect(system?.content, instruction).toContain(PROSE_RULES)
+    }
+  })
+})
+
+describe('the model must not reveal itself in a published caption', () => {
+  const ctx = { workspaceId: 'w', brand: null, knowledge: null } as never
+
+  test('the rule names the actual tells: self-reference and refusal', () => {
+    // Not the wording, the failures it must forbid. A rewrite that keeps the
+    // sentence but drops the AI/refusal clauses is a defect, not a tidy-up.
+    expect(VOICE_INTEGRITY).toMatch(/\bAI\b|assistant|model/)
+    expect(VOICE_INTEGRITY).toMatch(/never refuse/i)
+    expect(VOICE_INTEGRITY).toMatch(/no preamble/i)
+  })
+
+  test('obeys PROSE_RULES itself, so the anti-tell rule is not a tell', () => {
+    expect(obeysProseRules(VOICE_INTEGRITY)).toBe(true)
+  })
+
+  test('content_variants carries it', () => {
+    const system = contentVariantsTask
+      .buildMessages({ body: 'Fresh bread daily.', channels: ['x'] }, ctx)
+      .find((m) => m.role === 'system')
+    expect(system?.content).toContain(VOICE_INTEGRITY)
+  })
+
+  test('caption_rewrite carries it, on every instruction', () => {
+    for (const instruction of ['rewrite', 'shorten', 'hookify'] as const) {
+      const system = captionRewriteTask
+        .buildMessages({ text: 'Fresh bread.', instruction }, ctx)
+        .find((m) => m.role === 'system')
+      expect(system?.content, instruction).toContain(VOICE_INTEGRITY)
     }
   })
 })

@@ -51,6 +51,36 @@ export const PROSE_RULES =
   'Ordinary hyphens inside words are correct and must be kept: same-day, family-run, 20-minute.'
 
 /**
+ * THE MODEL MUST NOT GIVE ITSELF AWAY.
+ *
+ * ── THE GAP THIS CLOSES ──────────────────────────────────────────────────────
+ * MEASURED: on some briefs the generated caption arrived wearing the model
+ * rather than the business — a "Sure! Here's your post:" preamble, an "As an AI
+ * I can't…" hedge, a sign-off, or a sentence explaining the choices it made. The
+ * output of these tasks is published verbatim under the customer's own name, so
+ * any of those is the tell, and there is no proofreading step between the model
+ * and the platform.
+ *
+ * `content_variants`'s "no commentary" and `caption_rewrite`'s "no markdown, no
+ * commentary" were too thin: "commentary" did not, to the model, cover a cheery
+ * preamble or a refusal. This names the failures directly.
+ *
+ * ── PHRASED AS A REPLACEMENT WHERE IT CAN BE ─────────────────────────────────
+ * "Never refuse" alone leaves a model that judged a brief thin with nowhere to
+ * go, so it is paired with what to do instead: write the most plausible post in
+ * the brand voice. A prohibition with no alternative is how an empty or hedged
+ * caption gets returned as finished work.
+ *
+ * Obeys PROSE_RULES itself (no dash punctuation), asserted by its own test.
+ */
+export const VOICE_INTEGRITY =
+  'Write only the words that get published, in the voice of the business. ' +
+  'Never mention yourself, an assistant, an AI, a model, a prompt, or Sahoda, and never describe what you are doing. ' +
+  'No preamble, no sign-off, no apology, no note explaining your choices, and no quotation marks wrapped around the whole post. ' +
+  'Never refuse and never state what you cannot do: when a brief is thin, write the most plausible post in the brand voice. ' +
+  'Whatever you return is published exactly as written.'
+
+/**
  * Every banned dash in a piece of generated text, with where it sits.
  *
  * ── WHAT IT DELIBERATELY DOES NOT MATCH ──────────────────────────────────────

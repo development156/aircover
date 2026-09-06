@@ -7,7 +7,7 @@ import type {
 } from '@sahoda/shared'
 import type { ChatMessage } from '../providers/types'
 import type { MeshTaskSpec } from '../engine'
-import { PROSE_RULES } from '../prose-rules'
+import { PROSE_RULES, VOICE_INTEGRITY } from '../prose-rules'
 
 /**
  * A WHOLE-BODY BUDGET, NOT A FRAGMENT ONE.
@@ -88,7 +88,10 @@ function buildMessages(
   market?: ChatMessage,
 ): ChatMessage[] {
   return [
-    { role: 'system', content: `${SYSTEM_BASE} ${DIRECTIVES[input.instruction]} ${PROSE_RULES}` },
+    {
+      role: 'system',
+      content: `${SYSTEM_BASE} ${DIRECTIVES[input.instruction]} ${PROSE_RULES} ${VOICE_INTEGRITY}`,
+    },
     // Brand ABOVE market, always. docs/51 RULING 1: when the two hemispheres
     // disagree the Brand Brain wins, and reading order is the cheapest way to
     // say so to a model. Anyone reordering these two lines is changing a

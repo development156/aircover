@@ -3,7 +3,7 @@ import { ChannelSchema, ContentVariantsOutputSchema, CONSTRAINTS } from '@sahoda
 import type { Channel, ContentVariantsOutput, MeshContext, MeshTaskDef } from '@sahoda/shared'
 import type { ChatMessage } from '../providers/types'
 import type { MeshTaskSpec } from '../engine'
-import { PROSE_RULES } from '../prose-rules'
+import { PROSE_RULES, VOICE_INTEGRITY } from '../prose-rules'
 import { SEARCH_SURFACE_RULE, SEO_RULES } from '../seo-rules'
 
 /** 2048: measured 925 x 1.4 (token-budget.ts). 1024 left 10% headroom. */
@@ -44,7 +44,8 @@ the core message and the brand voice. No markdown, no commentary.
 ${KEYWORD_RULE}
 ${SEO_RULES}
 ${SEARCH_SURFACE_RULE}
-${PROSE_RULES}`
+${PROSE_RULES}
+${VOICE_INTEGRITY}`
 
 export { KEYWORD_RULE }
 
