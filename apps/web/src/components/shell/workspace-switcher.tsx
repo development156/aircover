@@ -111,7 +111,11 @@ export function WorkspaceSwitcher({
       // One workspace on a phone has nothing to switch to, and its trigger was
       // 48px of a 35px overflow (see credit-chip.tsx for the measurement). The
       // switcher returns the moment there is a second workspace to choose.
-      className={cn('relative min-w-0', workspaces.length === 1 && 'max-narrow:hidden')}
+      // Never hidden on a phone, even with one workspace: shell-probe.spec.ts
+      // (run 34020306051) needs the switcher to tell the bootstrapped state from
+      // the empty one, and the trigger below already compacts to its 44px badge
+      // under `narrow`, so it costs the row 44px and no words.
+      className="relative min-w-0"
     >
       <button
         ref={triggerRef}

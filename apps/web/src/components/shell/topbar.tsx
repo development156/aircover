@@ -124,7 +124,12 @@ export async function Topbar() {
          greeting under it. The inner wrapper below carries the same
          `mx-auto max-w-content` the page does, so the two share one left edge
          at every width. */
-      className="glass sticky top-0 z-5 h-topbar flex-none px-page max-narrow:px-page-mobile"
+      // `px-2.5` and `gap-1.5` under narrow, not the page's 14px and 8px:
+      // MEASURED 2026-09-06 on a production build at 360px with a workspace,
+      // seven 44px controls at the page spacing ended at x=373 in a 360px
+      // viewport (13px of sideways scroll). At 10px sides and 6px gaps the
+      // same row ends at 355. The controls themselves keep their 44px.
+      className="glass sticky top-0 z-5 h-topbar flex-none px-page max-narrow:px-2.5"
     >
       {/* ── THREE ZONES, AND THE OUTER TWO SHARE THE SPARE WIDTH ─────────────
           `flex-1 basis-0` on both flanks means they are handed EQUAL amounts of
@@ -139,7 +144,7 @@ export async function Topbar() {
           before the theme toggle: `justify-end` on the right zone does that job
           at every width, including the one where the search is hidden and the
           credit pill has stepped aside. */}
-      <div className="mx-auto flex h-full w-full max-w-content items-center gap-3 max-narrow:gap-2">
+      <div className="mx-auto flex h-full w-full max-w-content items-center gap-3 max-narrow:gap-1.5">
         {/* ── THE LEAD CLUSTER KEEPS ITS CONTENT FLOOR BELOW `wide` ────────────
             `min-w-0` is GATED at `wide` (1180) and is NOT unconditional, and that
             gate is the fix for an overlap this bar shipped with. The two children
@@ -163,7 +168,7 @@ export async function Topbar() {
             credit-chip trap: a `min-w-0` slot around a `shrink-0` child spills. */}
         <div
           data-slot="topbar-lead"
-          className="flex flex-1 basis-0 items-center gap-2 wide:min-w-0"
+          className="flex flex-1 basis-0 items-center gap-2 max-narrow:gap-1.5 wide:min-w-0"
         >
           {/* On a phone the rail is gone entirely, and the brand mark went with
               it — so it reappears here. Hidden ≥768px, where the rail carries
@@ -197,7 +202,7 @@ export async function Topbar() {
 
         <CommandPalette />
 
-        <div className="flex flex-1 basis-0 items-center justify-end gap-2">
+        <div className="flex flex-1 basis-0 items-center justify-end gap-2 max-narrow:gap-1.5">
           {/* Beside the credit chip, and before it: the brain is what Sahoda
               spends those credits ON, so it reads left-to-right as cause then
               cost. */}

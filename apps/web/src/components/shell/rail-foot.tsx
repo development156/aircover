@@ -113,7 +113,10 @@ function CreditsFootRow() {
       <span className="text-[12px] text-muted">Credits left</span>
       <Link
         href="/wallet"
-        className="rounded-sm text-[12px] font-semibold text-accent transition-micro hover:underline"
+        // Ink with an underline, not accent: #ff6600 on the rail ground is
+        // 2.94:1 (tokens.css), and rail-collapse.spec.ts measured exactly that
+        // here (run 34020306051). The underline is the link signal now.
+        className="rounded-sm text-[12px] font-semibold text-ink underline decoration-line underline-offset-2 transition-micro hover:decoration-ink"
       >
         Usage
       </Link>
