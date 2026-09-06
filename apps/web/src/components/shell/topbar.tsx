@@ -8,12 +8,13 @@ import { CreditChip } from '@/components/shell/credit-chip'
 import { ThemeToggle } from '@/components/shell/theme-toggle'
 import { WorkspaceSwitcher } from '@/components/shell/workspace-switcher'
 import { BrandMark } from '@/components/shell/brand-mark'
-import { readBrandLogo, type BrandLogo } from '@/lib/brand/logo'
+import { readBrandLogo, readBrandLogoDark, type BrandLogo } from '@/lib/brand/logo'
 import { activeThemeTokens } from '@/lib/brand/read-theme'
 import type { ThemeTokens } from '@sahoda/shared'
 import { readBrain, type BrainRead } from '@/lib/brand/read-brain'
 import { readBalance, type BalanceRead } from '@/lib/wallet/read'
 import {
+  currentUserId,
   getActiveWorkspaceSlug,
   readWorkspaces,
   resolveActiveWorkspace,
@@ -58,7 +59,7 @@ export async function Topbar() {
   // Promise.all: `Promise.all` rejects the moment ANY input rejects, so a single
   // failing read would throw away the two that succeeded and blank the whole
   // topbar over one bad row.
-  const [workspacesRead, activeSlug, balance, brain] = await Promise.all([
+  const [workspacesRead, activeSlug, balance, brain, userId] = await Promise.all([
     // The three-way read, not the lossy `listWorkspaces`. An empty array here
     // used to mean two different things — "this account has none" and "we could
     // not look" — and the switcher rendered "Create workspace" for both, telling
@@ -76,9 +77,12 @@ export async function Topbar() {
     // as unconfirmed. `readBrain` already catches internally — this wrapper is
     // the SHELL's guarantee, not a restatement of that module's internals.
     softRead<BrainRead>('brand_brain', readBrain, { status: 'unreadable' }),
+    // So the switcher names the same workspace the page renders: the no-cookie
+    // fallback prefers the one this user created (lib/workspaces.ts).
+    softRead<string | null>('current_user', currentUserId, null),
   ])
   const workspaces = workspacesRead.status === 'ok' ? workspacesRead.workspaces : []
-  const active = resolveActiveWorkspace(workspaces, activeSlug)
+  const active = resolveActiveWorkspace(workspaces, activeSlug, userId)
 
   /**
    * THE BRAND MARK'S TWO INPUTS, together, and only once the workspace is known.
@@ -88,12 +92,17 @@ export async function Topbar() {
    * workspace that has neither renders the chip in Sahoda's own colour, which is
    * the truthful thing to show when a customer has not given us a brand.
    */
-  const [logo, theme] = active
+  const [logo, logoDark, theme] = active
     ? await Promise.all([
         softRead<BrandLogo | null>('brand_logo', () => readBrandLogo(active.id), null),
+        // The dark-background variant, read beside the light one rather than
+        // after it. Its own `softRead` key, because a workspace with a light
+        // logo and no dark one is the ordinary case and must not read as a
+        // failure of the pair.
+        softRead<BrandLogo | null>('brand_logo_dark', () => readBrandLogoDark(active.id), null),
         softRead<ThemeTokens | null>('brand_theme', () => activeThemeTokens(active.id), null),
       ])
-    : [null, null]
+    : [null, null, null]
 
   return (
     <header
@@ -108,72 +117,112 @@ export async function Topbar() {
 
          `border-b` goes: the topbar now separates from the content by BLUR and
          by the gradient moving behind it, which is the same "separate by fill,
-         not by line" rule the card ladder follows. */
-      className="glass sticky top-0 z-5 flex h-topbar flex-none items-center gap-3 px-page max-narrow:gap-2 max-narrow:px-page-mobile"
+         not by line" rule the card ladder follows.
+
+         ── THE BAR SPANS THE WINDOW, ITS CONTENTS SPAN THE CONTENT ──────────
+         The glass has to reach both edges or the blur stops halfway across a
+         wide screen. Its CONTENTS must not: `<main>` is `mx-auto max-w-content
+         p-page`, so above 1320px the page's first column starts inboard of the
+         viewport while the topbar's first control sat flush at the padding.
+         MEASURED at 1920: the workspace switcher began 300px left of the
+         greeting under it. The inner wrapper below carries the same
+         `mx-auto max-w-content` the page does, so the two share one left edge
+         at every width. */
+      // `px-2.5` and `gap-1.5` under narrow, not the page's 14px and 8px:
+      // MEASURED 2026-09-06 on a production build at 360px with a workspace,
+      // seven 44px controls at the page spacing ended at x=373 in a 360px
+      // viewport (13px of sideways scroll). At 10px sides and 6px gaps the
+      // same row ends at 355. The controls themselves keep their 44px.
+      className="glass sticky top-0 z-5 h-topbar flex-none px-page max-narrow:px-2.5"
     >
-      {/* On a phone the rail is gone entirely, and the brand mark went with it —
-          so it reappears here. Hidden ≥768px, where the rail carries the full
-          lockup and a second mark would be a duplicate. */}
-      <MobileHeaderMark />
-      {/* ── min-w-0 SHRANK THE SLOT BELOW THE CONTROL INSIDE IT ─────────────────
-          `min-w-0` was added so a long workspace name could not push the credit
-          pill and avatar off the right edge at 375px. It let the SLOT shrink —
-          but the control inside is `shrink-0`, so the slot went narrower than the
-          control and the control painted outside it, under whichever sibling was
-          drawn next.
+      {/* ── THREE ZONES, AND THE OUTER TWO SHARE THE SPARE WIDTH ─────────────
+          `flex-1 basis-0` on both flanks means they are handed EQUAL amounts of
+          whatever is left after the search, so the search sits on the window's
+          true centre line. The previous version put `mx-auto` on the search
+          itself, which centres a flex item in the space its neighbours leave —
+          and those neighbours are not the same width (two controls on the left,
+          four on the right), so the search always sat left of centre by half
+          their difference.
 
-          MEASURED with no workspace: the slot was 105px and "Create workspace"
-          164px, so it spilled 59px — the credit pill covered 51px of it at 390px
-          and 11px at 430px, and the command palette 52px at 700px. Hiding the
-          pill on a phone moved the collision rather than ending it; this is where
-          it actually lives.
+          It also retires the `max-narrow:ml-auto` spacer that used to sit
+          before the theme toggle: `justify-end` on the right zone does that job
+          at every width, including the one where the search is hidden and the
+          credit pill has stepped aside. */}
+      <div className="mx-auto flex h-full w-full max-w-content items-center gap-3 max-narrow:gap-1.5">
+        {/* ── THE LEAD CLUSTER KEEPS ITS CONTENT FLOOR BELOW `wide` ────────────
+            `min-w-0` is GATED at `wide` (1180) and is NOT unconditional, and that
+            gate is the fix for an overlap this bar shipped with. The two children
+            below are `shrink-0` (brand mark) and wrap a `shrink-0` control (the
+            switcher). An UNCONDITIONAL `min-w-0` here let this zone shrink below
+            those fixed children while the centre search field stayed pinned at
+            its `max-w-[460px]`: the whole row's deficit fell on this zone, it
+            collapsed toward 0, and its shrink-0 children spilled past its right
+            edge and painted ON TOP of the search field. MEASURED in Chromium
+            against the shipped stylesheet, workspace name visible: at 1120 the
+            switcher (x 93–314) overlapped the search (x 278–738); at 1024 the
+            search began at x=182, fully under the 93–314 switcher — the founder's
+            "green icon and chevron over the search text" report, exactly.
 
-          `shrink-0` is safe here in a way it was not when that comment was
-          written: the switcher's trigger now carries its own `max-w-[16ch]
-          truncate` (`7ch` below 700px), so this slot is bounded by its control at
-          every width and can no longer be the thing that overflows. */}
-      {/* THE BRAND, BESIDE THE WORKSPACE IT BELONGS TO. Founder's ruling,
-          2026-08-29: the logo goes here, and it is the control that changes the
-          brand colour rather than a decoration. */}
-      <BrandMark
-        logoUrl={logo?.url ?? null}
-        primary={theme?.primary ?? null}
-        /* Whether there is anything to switch TO. A workspace that has never
-           given Sahoda a brand gets the panel on a press rather than a toggle
-           that reports a change which did not happen. */
-        hasTheme={theme !== null}
-      />
-      <div className="shrink-0">
-        <WorkspaceSwitcher
-          workspaces={workspaces}
-          active={active}
-          unreadable={workspacesRead.status !== 'ok'}
-        />
-      </div>
-      {/* Centred, and it does the centring itself via `mx-auto` — a spacer div
-          would centre it against the wrong axis the moment the switcher's width
-          changes with the workspace name. */}
-      <CommandPalette />
-      {/* Beside the credit chip, and before it: the brain is what Sahoda spends
-          those credits ON, so it reads left-to-right as cause then cost. */}
-      <BrainRing brain={brain} />
-      <CreditChip balance={balance} />
-      {/* The reference's right cluster ends icon, then avatar. The dark theme
-          was fully built and completely unreachable until this button existed —
-          see ThemeToggle. */}
-      {/* `ml-auto` below 700px, because the element that used to do the pushing
-          is not there. `CommandPalette` carries `mx-auto` and absorbs the free
-          space at ≥700px, but it is `max-narrow:hidden` — and once the credit
-          pill also steps aside (no workspace, narrow), nothing was left to fill
-          the row and the toggle and avatar drifted 74px short of the edge.
-          MEASURED: last control right=316 in a 390px viewport. */}
-      <div className="max-narrow:ml-auto" />
-      <ThemeToggle />
-      <div
-        data-guide="topbar.avatar"
-        className="grid size-8 flex-none place-items-center max-narrow:size-11"
-      >
-        <UserButton />
+            `min-w-0` is only NEEDED at `wide` and up, because that is the one
+            band where the switcher shows its name and must truncate (the name is
+            `max-wide:sr-only`, so below 1180 this cluster is all fixed widths and
+            has nothing to shrink). Gating it there makes the SEARCH the item that
+            yields — it shrinks from 460 toward 0 as the window narrows — instead
+            of the lead cluster being starved into overflow. Same family as the
+            credit-chip trap: a `min-w-0` slot around a `shrink-0` child spills. */}
+        <div
+          data-slot="topbar-lead"
+          className="flex flex-1 basis-0 items-center gap-2 max-narrow:gap-1.5 wide:min-w-0"
+        >
+          {/* On a phone the rail is gone entirely, and the brand mark went with
+              it — so it reappears here. Hidden ≥768px, where the rail carries
+              the full lockup and a second mark would be a duplicate. */}
+          <MobileHeaderMark />
+          {/* THE BRAND, BESIDE THE WORKSPACE IT BELONGS TO. Founder's ruling,
+              2026-08-29: the logo goes here, and it is the control that changes
+              the brand colour rather than a decoration. */}
+          <BrandMark
+            logoUrl={logo?.url ?? null}
+            logoUrlDark={logoDark?.url ?? null}
+            primary={theme?.primary ?? null}
+            /* Whether there is anything to switch TO. A workspace that has never
+               given Sahoda a brand gets the panel on a press rather than a
+               toggle that reports a change which did not happen. */
+            hasTheme={theme !== null}
+          />
+          {/* `shrink-0` is safe because the switcher's trigger carries its own
+              `max-w-[16ch] truncate` (`7ch` below 700px), so this slot is
+              bounded by its control at every width and cannot be the thing that
+              overflows. The zone around it is `min-w-0`, which is what lets the
+              truncation actually engage. */}
+          <div className="shrink-0">
+            <WorkspaceSwitcher
+              workspaces={workspaces}
+              active={active}
+              unreadable={workspacesRead.status !== 'ok'}
+            />
+          </div>
+        </div>
+
+        <CommandPalette />
+
+        <div className="flex flex-1 basis-0 items-center justify-end gap-2 max-narrow:gap-1.5">
+          {/* Beside the credit chip, and before it: the brain is what Sahoda
+              spends those credits ON, so it reads left-to-right as cause then
+              cost. */}
+          <BrainRing brain={brain} />
+          <CreditChip balance={balance} />
+          {/* The reference's right cluster ends icon, then avatar. The dark
+              theme was fully built and completely unreachable until this button
+              existed — see ThemeToggle. */}
+          <ThemeToggle />
+          <div
+            data-guide="topbar.avatar"
+            className="grid size-control flex-none place-items-center max-narrow:size-11"
+          >
+            <UserButton />
+          </div>
+        </div>
       </div>
     </header>
   )

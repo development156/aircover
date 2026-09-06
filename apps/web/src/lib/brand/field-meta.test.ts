@@ -133,3 +133,54 @@ describe('confirmPaths is the complete statement of what a write confirms', () =
     expect(stateOf(p, 'voice.descriptor')).toBe('confirmed')
   })
 })
+
+/**
+ * THE THIRD STATE. MEASURED 2026-09-06 on the wt-core preview: the red line a
+ * person typed on setup screen 02 came back on /brain paraphrased, chipped
+ * "Guess", sourced `model:brand_guidelines`, listed under "Only you know
+ * these". The model did reword it, so calling it confirmed would be false; but
+ * calling it a guess denies the one answer the person actually gave. A field
+ * seeded from an intake answer is stamped `source: 'intake'`, unconfirmed.
+ */
+describe('nextFieldMeta — fields seeded from what the person typed at setup', () => {
+  test('an intake-derived path is stamped intake, not model, and stays unconfirmed', () => {
+    const meta = nextFieldMeta(null, BASE, [], ['taboo.red_lines'])
+    expect(meta['taboo.red_lines']).toEqual({ kind: 'asked', confirmed: false, source: 'intake' })
+    expect(meta['voice.descriptor']?.source).toBe('model:brand_guidelines')
+  })
+
+  test('confirming outranks intake for the same path', () => {
+    const meta = nextFieldMeta(null, BASE, ['taboo.red_lines'], ['taboo.red_lines'])
+    expect(meta['taboo.red_lines']).toMatchObject({ confirmed: true, source: 'owner' })
+  })
+
+  test('an unchanged field keeps its intake source across an unrelated hand edit', () => {
+    const prior: BrandFieldMetaMap = {
+      'taboo.red_lines': { kind: 'asked', confirmed: false, source: 'intake' },
+    }
+    const next = writeLeaf(BASE, 'voice.descriptor', 'Blunt')
+    const meta = nextFieldMeta(previous(BASE, prior), next, ['voice.descriptor'])
+    expect(meta['taboo.red_lines']?.source).toBe('intake')
+  })
+
+  test('a changed field loses the intake source: the words are no longer theirs', () => {
+    const prior: BrandFieldMetaMap = {
+      'taboo.red_lines': { kind: 'asked', confirmed: false, source: 'intake' },
+    }
+    const next = writeLeaf(BASE, 'taboo.red_lines', ['something the model rewrote'])
+    const meta = nextFieldMeta(previous(BASE, prior), next)
+    expect(meta['taboo.red_lines']?.source).toBe('model:brand_guidelines')
+  })
+
+  test('an unchanged library-cited field keeps its citation too', () => {
+    // The same rule closes an older hole: a hand edit of a DIFFERENT field used
+    // to reset every unconfirmed `document:<id>` source back to the model, so
+    // the delete-impact count on /brain/knowledge drifted to zero.
+    const prior: BrandFieldMetaMap = {
+      'hook.core_promise': { kind: 'asked', confirmed: false, source: 'document:abc' },
+    }
+    const next = writeLeaf(BASE, 'voice.descriptor', 'Blunt')
+    const meta = nextFieldMeta(previous(BASE, prior), next, ['voice.descriptor'])
+    expect(meta['hook.core_promise']?.source).toBe('document:abc')
+  })
+})

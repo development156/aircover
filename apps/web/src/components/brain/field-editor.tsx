@@ -14,6 +14,13 @@ export interface FieldEditorProps {
   draft: BrainLeaf
   onDraftChange: (draft: BrainLeaf) => void
   disabled: boolean
+  /**
+   * Put the caret in the first control when the editor opens. MEASURED
+   * 2026-09-06: pressing Edit unmounted the button that had focus and left
+   * `document.activeElement` on `body`, so a keyboard user had to Tab back
+   * into a field they had just asked to edit.
+   */
+  autoFocus?: boolean
 }
 
 /**
@@ -25,7 +32,13 @@ export interface FieldEditorProps {
  * grow or shrink, and the open ones stop at 40. Enforcing it here means a save
  * can never fail on INVALID_PAYLOAD after the user has typed.
  */
-export function FieldEditor({ field, draft, onDraftChange, disabled }: FieldEditorProps) {
+export function FieldEditor({
+  field,
+  draft,
+  onDraftChange,
+  disabled,
+  autoFocus = false,
+}: FieldEditorProps) {
   if (field.kind === 'list') {
     const items = Array.isArray(draft) ? draft : []
     const atCap = !field.fixedLength && items.length >= MAX_OPEN_LIST_ENTRIES
@@ -40,6 +53,8 @@ export function FieldEditor({ field, draft, onDraftChange, disabled }: FieldEdit
               aria-label={`${field.label} ${index + 1}`}
               value={item}
               disabled={disabled}
+              // eslint-disable-next-line jsx-a11y/no-autofocus -- opened by the person's own press
+              autoFocus={autoFocus && index === 0}
               onChange={(event) =>
                 onDraftChange(items.map((entry, i) => (i === index ? event.target.value : entry)))
               }
@@ -93,6 +108,8 @@ export function FieldEditor({ field, draft, onDraftChange, disabled }: FieldEdit
       aria-label={field.label}
       value={value}
       disabled={disabled}
+      // eslint-disable-next-line jsx-a11y/no-autofocus -- opened by the person's own press
+      autoFocus={autoFocus}
       onChange={(event) => onDraftChange(event.target.value)}
       className="min-h-[56px]"
     />
@@ -101,6 +118,8 @@ export function FieldEditor({ field, draft, onDraftChange, disabled }: FieldEdit
       aria-label={field.label}
       value={value}
       disabled={disabled}
+      // eslint-disable-next-line jsx-a11y/no-autofocus -- opened by the person's own press
+      autoFocus={autoFocus}
       onChange={(event) => onDraftChange(event.target.value)}
     />
   )

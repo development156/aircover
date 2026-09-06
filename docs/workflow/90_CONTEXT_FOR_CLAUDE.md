@@ -45,7 +45,7 @@ packages/       shared (zod contracts, SOURCE OF TRUTH) · db (Supabase+RLS)
 | **Girija** | `wt-girija`, `2`, `3` | `/lead-research` | Research. |
 | **Karunesh** | `wt-karunesh`, `2`, `3` | `/lead-expert` | **Writes no code, ever.** |
 
-Merge priority when lanes collide: **divas > jiban > girija > karunesh.**
+Merge priority when lanes collide: **divas > jiban > girija > karunesh.** Divas performs every merge into `wt-core` (founder's ruling, 6 September 2026); the order is which lane's version wins, not who runs the merge.
 
 ### Karunesh is a special case
 
@@ -227,7 +227,7 @@ rather than reassuring you. The full procedure is
 git config core.hooksPath .githooks
 ```
 
-Without it the QA-scratch guard and the push block that keeps `wt-karunesh` out
+Without it the QA-scratch guard and the push block that keeps every lane but `divas` out
 of `wt-core` are **both silently off**. That exact state was found live on
 2026-08-28 — the guard had been built, tested, and then never armed in the
 worktree that needed it.

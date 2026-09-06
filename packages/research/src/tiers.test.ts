@@ -105,17 +105,17 @@ describe('the escalation ladder', () => {
   it('serves from tier 1 and never touches a vendor when the site is readable', async () => {
     const direct = source('direct', { [HOME]: PROSE })
     const reader = source('reader', { [HOME]: PROSE })
-    const firecrawl = source('firecrawl', { [HOME]: PROSE }, [], 1)
+    const vendor = source('tinyfish', { [HOME]: PROSE }, [], 0)
 
     const result = await openSite(HOME, {
-      sources: { direct, reader, firecrawl },
-      flags: { reader: true, firecrawl: true },
+      sources: { direct, reader, vendor },
+      flags: { reader: true, vendor: true },
     })
 
     expect(result.servedBy).toBe(1)
     expect(result.creditsUsed).toBe(0)
     expect(reader.calls).toEqual([])
-    expect(firecrawl.calls).toEqual([])
+    expect(vendor.calls).toEqual([])
   })
 
   it('escalates to tier 2 on js_only, and reads the pages tier 1 discovered', async () => {
@@ -155,29 +155,29 @@ describe('the escalation ladder', () => {
       },
     }
     const reader = source('reader', { [HOME]: PROSE })
-    const firecrawl = source('firecrawl', { [HOME]: PROSE }, [], 1)
+    const vendor = source('tinyfish', { [HOME]: PROSE }, [], 0)
 
     const result = await openSite(HOME, {
-      sources: { direct, reader, firecrawl },
-      flags: { reader: true, firecrawl: true },
+      sources: { direct, reader, vendor },
+      flags: { reader: true, vendor: true },
     })
 
     expect(result.attempts[0]!.reason).toBe('unreachable')
     expect(result.attempts).toHaveLength(1)
     expect(reader.calls).toEqual([])
-    expect(firecrawl.calls).toEqual([])
+    expect(vendor.calls).toEqual([])
     expect(result.creditsUsed).toBe(0)
   })
 
   it('leaves BOTH tier 2 and tier 3 off by default — one tier runs unless asked', async () => {
     const direct = source('direct', {}, [])
     const reader = source('reader', {}, [])
-    const firecrawl = source('firecrawl', { [HOME]: PROSE }, [], 1)
+    const vendor = source('tinyfish', { [HOME]: PROSE }, [], 0)
 
-    const result = await openSite(HOME, { sources: { direct, reader, firecrawl } })
+    const result = await openSite(HOME, { sources: { direct, reader, vendor } })
 
     expect(reader.calls).toEqual([])
-    expect(firecrawl.calls).toEqual([])
+    expect(vendor.calls).toEqual([])
     expect(result.servedBy).toBeNull()
     expect(result.creditsUsed).toBe(0)
     // Was [1, 2] while tier 2 defaulted on. Updated, not deleted: the default
@@ -188,11 +188,13 @@ describe('the escalation ladder', () => {
   it('uses tier 3 only when its flag is explicitly on, and bills only then', async () => {
     const direct = source('direct', {}, [])
     const reader = source('reader', {}, [])
-    const firecrawl = source('firecrawl', { [HOME]: PROSE }, [], 1)
+    // A PAID vendor fixture (1 per call), so the accounting through tier 3 is
+    // asserted even though the shipped tier 3 (TinyFish Fetch) declares 0.
+    const vendor = source('paid-vendor', { [HOME]: PROSE }, [], 1)
 
     const result = await openSite(HOME, {
-      sources: { direct, reader, firecrawl },
-      flags: { reader: true, firecrawl: true },
+      sources: { direct, reader, vendor },
+      flags: { reader: true, vendor: true },
     })
 
     expect(result.servedBy).toBe(3)

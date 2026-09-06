@@ -250,7 +250,10 @@ describe('the tonal ladder keeps its steps', () => {
       }
     }
 
-    expect(worst, `the card/page step collapsed to ${worst.toFixed(4)}:1 at hue ${at}`).toBeGreaterThanOrEqual(FLOOR)
+    expect(
+      worst,
+      `the card/page step collapsed to ${worst.toFixed(4)}:1 at hue ${at}`,
+    ).toBeGreaterThanOrEqual(FLOOR)
   })
 })
 

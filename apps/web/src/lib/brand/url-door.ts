@@ -1,7 +1,7 @@
 import 'server-only'
 
 import { crawlSite, quarantineCorpus, type CrawlFailureReason } from '@sahoda/research'
-import type { CrawlOutcome, FirecrawlClient } from '@sahoda/research'
+import type { CrawlOutcome, PageSource } from '@sahoda/research'
 import { attachProvenance, attachSingleSource } from '@sahoda/shared'
 import type { BrandExtractOutput, ExtractedField, MeshContext, ResolveInput } from '@sahoda/shared'
 
@@ -26,14 +26,14 @@ export type UrlDoorOutcome =
       gaps: string[]
       pagesRead: string[]
       pagesSkipped: string[]
-      firecrawlCredits: number
+      vendorCredits: number
     }
   | {
       ok: false
       reason: CrawlFailureReason | 'extract_failed'
       /** Founder-facing. Always falls back to asking; never invents a voice. */
       message: string
-      firecrawlCredits: number
+      vendorCredits: number
     }
 
 /** Just enough of the mesh to run one task — injected so this is testable. */
@@ -50,7 +50,7 @@ export interface ExtractRunner {
 }
 
 export interface UrlDoorOptions {
-  client: FirecrawlClient
+  client: PageSource
   extract: ExtractRunner
   ctx: MeshContext
   /** Injected only by tests that need to assert on a pre-built crawl. */
@@ -72,7 +72,7 @@ export async function openUrlDoor(
       ok: false,
       reason: outcome.reason,
       message: outcome.message,
-      firecrawlCredits: outcome.creditsUsed,
+      vendorCredits: outcome.creditsUsed,
     }
   }
 
@@ -87,7 +87,7 @@ export async function openUrlDoor(
       reason: 'extract_failed',
       message:
         'Read your website, but could not turn it into a brand just now. Tell us in your own words instead.',
-      firecrawlCredits: outcome.creditsUsed,
+      vendorCredits: outcome.creditsUsed,
     }
   }
 
@@ -101,7 +101,7 @@ export async function openUrlDoor(
     gaps: result.data.gaps,
     pagesRead: sources,
     pagesSkipped: outcome.skipped,
-    firecrawlCredits: outcome.creditsUsed,
+    vendorCredits: outcome.creditsUsed,
   }
 }
 

@@ -4,6 +4,19 @@ import { describe, expect, test, vi } from 'vitest'
 
 import { ScheduleField } from './schedule-field'
 import { toChannelSet } from '@sahoda/shared'
+import { combine, longLabel } from '@/lib/posts/calendar-month'
+import { addDaysInZone, dayKey } from '@/lib/time/day-key'
+import { partsInZone, zoneLabel } from '@/lib/time/zone'
+
+/**
+ * ── THE FIELD SPEAKS THE WORKSPACE'S CLOCK, AND THESE SAY WHICH ─────────────
+ * Every render names its zone. The assertions read days and hours back through
+ * `partsInZone` in that same zone rather than through the Date getters, which
+ * answer in whatever zone the test machine happens to be in — green on a
+ * laptop in Kolkata and red on CI in UTC, or the reverse, for the same code.
+ */
+const ZONE = 'Asia/Kolkata'
+const NY = 'America/New_York'
 
 /**
  * `draft` was seeded from `value` once and never re-synced, so restoring the
@@ -15,33 +28,6 @@ import { toChannelSet } from '@sahoda/shared'
  * legitimately disagree mid-typing. A re-sync keyed on that mismatch instead of
  * on the prop changing would eat keystrokes.
  */
-
-const input = () => screen.getByLabelText(/schedule/i) as HTMLInputElement
-
-/**
- * Reach the exact `datetime-local`, which is now behind a disclosure.
- *
- * ── THIS IS A CHANGE OF ROUTE, NOT A LOOSENED GUARD ──────────────────────────
- * Four assertions in this file used to reach the native input directly, because
- * it was the only control the field had — and that was the defect: `docs/34` §1
- * found the journey's stated goal, a scheduled post, unreachable by looking,
- * because a `dd/mm/yyyy` mask is not a control the reader can be assumed to
- * operate. The input is now one click behind "Pick an exact time".
- *
- * EVERY GUARANTEE THOSE FOUR ASSERTED IS UNCHANGED and still asserted below —
- * the wall-clock rendering, the re-sync on a replaced value, the clear, and the
- * keystroke that must not be eaten. What moved is how the test gets there,
- * which is a property of the screen rather than of the promise. Nothing was
- * weakened to let the new field pass; the named-time path added its own guards
- * rather than replacing these.
- *
- * With a stored value the disclosure is already open (a time nobody's shortcut
- * produced has to be visible), so this is only needed from an empty field.
- */
-async function openExact(user: ReturnType<typeof userEvent.setup>): Promise<void> {
-  const opener = screen.queryByText(/pick an exact time/i)
-  if (opener) await user.click(opener)
-}
 
 // Far enough ahead to clear every channel's 5-minute minimum lead.
 const future = (offsetMs: number) => new Date(Date.now() + offsetMs).toISOString()
@@ -65,41 +51,53 @@ describe('ScheduleField — a stored time, and what happens to it', () => {
 
   test('renders a stored time as words rather than a date mask', () => {
     const iso = future(86_400_000)
-    render(<ScheduleField channels={toChannelSet(['x'])} value={iso} onChange={vi.fn()} />)
+    render(
+      <ScheduleField zone={ZONE} channels={toChannelSet(['x'])} value={iso} onChange={vi.fn()} />,
+    )
 
     const at = new Date(iso)
     expect(committed()).toBeTruthy()
     // The DAY and the CLOCK, both on screen. "27/08/2026, 09:00" is a value;
-    // "Thursday, 27 August at 9:00 am" is a commitment, and that is the whole
-    // reason this panel replaced the mask.
-    expect(screen.getByText(new RegExp(`\\b${at.getDate()}\\b`))).toBeInTheDocument()
-    expect(screen.getByText(/\bat\b.*\d/)).toBeInTheDocument()
+    // "Thursday, 27 August at 9:00 am IST" is a commitment, and that is the
+    // whole reason this panel replaced the mask.
+    expect(screen.getByText(new RegExp(`\\b${partsInZone(ZONE, at).day}\\b`))).toBeInTheDocument()
+    expect(screen.getByText(/\bat\b.*\d.*IST/)).toBeInTheDocument()
   })
 
   test('re-syncs when the stored value is replaced underneath it', () => {
     const first = future(86_400_000)
     const second = future(3 * 86_400_000)
     const { rerender } = render(
-      <ScheduleField channels={toChannelSet(['x'])} value={first} onChange={vi.fn()} />,
+      <ScheduleField zone={ZONE} channels={toChannelSet(['x'])} value={first} onChange={vi.fn()} />,
     )
     const before = committed()?.textContent ?? ''
 
     // What `loadTheirs` does after a divergence.
-    rerender(<ScheduleField channels={toChannelSet(['x'])} value={second} onChange={vi.fn()} />)
+    rerender(
+      <ScheduleField
+        zone={ZONE}
+        channels={toChannelSet(['x'])}
+        value={second}
+        onChange={vi.fn()}
+      />,
+    )
 
     expect(committed()?.textContent).not.toBe(before)
-    expect(committed()?.textContent).toContain(String(new Date(second).getDate()))
+    expect(committed()?.textContent).toContain(String(partsInZone(ZONE, new Date(second)).day))
   })
 
   test('removing the stored value returns to the picker, not to a blank panel', () => {
     const { rerender } = render(
       <ScheduleField
+        zone={ZONE}
         channels={toChannelSet(['x'])}
         value={future(86_400_000)}
         onChange={vi.fn()}
       />,
     )
-    rerender(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />)
+    rerender(
+      <ScheduleField zone={ZONE} channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />,
+    )
 
     expect(committed()).toBeNull()
     // The state a person with no schedule should meet: something to pick with.
@@ -111,7 +109,7 @@ describe('ScheduleField — a stored time, and what happens to it', () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
     const { rerender } = render(
-      <ScheduleField channels={toChannelSet(['x'])} value={null} onChange={onChange} />,
+      <ScheduleField zone={ZONE} channels={toChannelSet(['x'])} value={null} onChange={onChange} />,
     )
 
     await user.click(screen.getAllByRole('button', { name: /^Tomorrow morning/ })[0]!)
@@ -122,7 +120,9 @@ describe('ScheduleField — a stored time, and what happens to it', () => {
     // re-sync keyed on a draft/value MISMATCH rather than on the prop changing
     // would throw the pick away here, which is the defect the original of this
     // test was written for.
-    rerender(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={onChange} />)
+    rerender(
+      <ScheduleField zone={ZONE} channels={toChannelSet(['x'])} value={null} onChange={onChange} />,
+    )
 
     expect(document.querySelector('[data-schedule-summary]')?.textContent).toBe(summary)
     // And nothing has been written: picking is not confirming.
@@ -136,7 +136,12 @@ describe('ScheduleField — a stored time, and what happens to it', () => {
       stored = iso
     })
     const { rerender } = render(
-      <ScheduleField channels={toChannelSet(['x'])} value={stored} onChange={onChange} />,
+      <ScheduleField
+        zone={ZONE}
+        channels={toChannelSet(['x'])}
+        value={stored}
+        onChange={onChange}
+      />,
     )
 
     await user.click(screen.getAllByRole('button', { name: /^Tomorrow morning/ })[0]!)
@@ -144,7 +149,14 @@ describe('ScheduleField — a stored time, and what happens to it', () => {
 
     expect(onChange).toHaveBeenCalledTimes(1)
     // Feed the committed value back the way the parent does.
-    rerender(<ScheduleField channels={toChannelSet(['x'])} value={stored} onChange={onChange} />)
+    rerender(
+      <ScheduleField
+        zone={ZONE}
+        channels={toChannelSet(['x'])}
+        value={stored}
+        onChange={onChange}
+      />,
+    )
 
     expect(committed()).toBeTruthy()
     expect(document.querySelector('[data-schedule-calendar]')).toBeNull()
@@ -165,7 +177,9 @@ describe('what setting a time actually does', () => {
     // date mask this replaced. Same claim, same moment in the journey: the
     // instant a reader forms the belief "this will go out then".
     const user = userEvent.setup()
-    render(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />)
+    render(
+      <ScheduleField zone={ZONE} channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />,
+    )
 
     await user.click(document.querySelector('[data-schedule-choice="hour"]') as HTMLElement)
 
@@ -175,6 +189,7 @@ describe('what setting a time actually does', () => {
   test('says it for a time restored from the server too', () => {
     render(
       <ScheduleField
+        zone={ZONE}
         channels={toChannelSet(['x'])}
         value={future(86_400_000)}
         onChange={vi.fn()}
@@ -185,7 +200,9 @@ describe('what setting a time actually does', () => {
   })
 
   test('stays quiet when no time is set — there is no promise to correct', () => {
-    render(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />)
+    render(
+      <ScheduleField zone={ZONE} channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />,
+    )
 
     expect(screen.queryByText(NOT_LIVE)).not.toBeInTheDocument()
   })
@@ -212,6 +229,7 @@ describe('ScheduleField warns about a channel that cannot receive the post', () 
   test('names the unconnected channel once a time is set', () => {
     render(
       <ScheduleField
+        zone={ZONE}
         channels={toChannelSet(['instagram', 'linkedin'])}
         value={future(86_400_000)}
         onChange={vi.fn()}
@@ -228,6 +246,7 @@ describe('ScheduleField warns about a channel that cannot receive the post', () 
   test('says nothing goes out when no picked channel is connected', () => {
     render(
       <ScheduleField
+        zone={ZONE}
         channels={toChannelSet(['linkedin'])}
         value={future(86_400_000)}
         onChange={vi.fn()}
@@ -245,6 +264,7 @@ describe('ScheduleField warns about a channel that cannot receive the post', () 
     // 1-of-2 here and promise the post goes out somewhere.
     render(
       <ScheduleField
+        zone={ZONE}
         channels={toChannelSet(['linkedin', 'linkedin'])}
         value={future(86_400_000)}
         onChange={vi.fn()}
@@ -262,6 +282,7 @@ describe('ScheduleField warns about a channel that cannot receive the post', () 
   test('stays quiet with no time set — there is no promise to correct yet', () => {
     render(
       <ScheduleField
+        zone={ZONE}
         channels={toChannelSet(['instagram', 'linkedin'])}
         value={null}
         onChange={vi.fn()}
@@ -278,6 +299,7 @@ describe('ScheduleField warns about a channel that cannot receive the post', () 
     // opposite of the truth. The existing note already says nothing auto-posts.
     render(
       <ScheduleField
+        zone={ZONE}
         channels={toChannelSet(['instagram', 'linkedin'])}
         value={future(86_400_000)}
         onChange={vi.fn()}
@@ -295,6 +317,7 @@ describe('ScheduleField warns about a channel that cannot receive the post', () 
   test('stays quiet when the connection state was not read at all', () => {
     render(
       <ScheduleField
+        zone={ZONE}
         channels={toChannelSet(['instagram', 'linkedin'])}
         value={future(86_400_000)}
         onChange={vi.fn()}
@@ -317,7 +340,9 @@ describe('ScheduleField warns about a channel that cannot receive the post', () 
  */
 describe('scheduling without knowing what a date input is', () => {
   test('offers named times before it offers a date mask', () => {
-    render(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />)
+    render(
+      <ScheduleField zone={ZONE} channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />,
+    )
 
     // The named choices are present...
     const named = screen.getAllByRole('button', { pressed: false })
@@ -335,6 +360,7 @@ describe('scheduling without knowing what a date input is', () => {
     let stored: string | null = null
     render(
       <ScheduleField
+        zone={ZONE}
         channels={toChannelSet(['x'])}
         value={null}
         onChange={(iso) => {
@@ -355,15 +381,19 @@ describe('scheduling without knowing what a date input is', () => {
 
     expect(stored).not.toBeNull()
     const committed = new Date(stored as unknown as string)
-    // The label prints a day and a time; the committed instant has to BE them.
-    expect(printed).toContain(String(committed.getDate()))
-    expect(committed.getHours()).toBe(9)
-    expect(committed.getMinutes()).toBe(0)
+    // The label prints a day and a time; the committed instant has to BE them,
+    // read in the zone the label was printed in.
+    const wall = partsInZone(ZONE, committed)
+    expect(printed).toContain(String(wall.day))
+    expect(wall.hour).toBe(9)
+    expect(wall.minute).toBe(0)
   })
 
   test('the chosen time reads as chosen, and to a screen reader too', async () => {
     const user = userEvent.setup()
-    render(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />)
+    render(
+      <ScheduleField zone={ZONE} channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />,
+    )
 
     const button = document.querySelector(
       '[data-schedule-choice="tomorrow-evening"]',
@@ -385,7 +415,9 @@ describe('scheduling without knowing what a date input is', () => {
     // input. A new path to the same state that skipped it would reintroduce the
     // promise this product refuses to make.
     const user = userEvent.setup()
-    render(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />)
+    render(
+      <ScheduleField zone={ZONE} channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />,
+    )
 
     await user.click(document.querySelector('[data-schedule-choice="hour"]') as HTMLElement)
 
@@ -397,6 +429,7 @@ describe('scheduling without knowing what a date input is', () => {
     let stored: string | null = null
     const { rerender } = render(
       <ScheduleField
+        zone={ZONE}
         channels={toChannelSet(['x'])}
         value={null}
         onChange={(iso) => {
@@ -410,6 +443,7 @@ describe('scheduling without knowing what a date input is', () => {
 
     rerender(
       <ScheduleField
+        zone={ZONE}
         channels={toChannelSet(['x'])}
         value={stored}
         onChange={(iso) => {
@@ -437,6 +471,7 @@ describe('what the picker promises about when it goes out', () => {
     const user = userEvent.setup()
     render(
       <ScheduleField
+        zone={ZONE}
         channels={toChannelSet(['x'])}
         value={null}
         onChange={vi.fn()}
@@ -461,6 +496,7 @@ describe('what the picker promises about when it goes out', () => {
     const user = userEvent.setup()
     render(
       <ScheduleField
+        zone={ZONE}
         channels={toChannelSet(['x'])}
         value={null}
         onChange={vi.fn()}
@@ -482,6 +518,7 @@ describe('what the picker promises about when it goes out', () => {
     const user = userEvent.setup()
     render(
       <ScheduleField
+        zone={ZONE}
         channels={toChannelSet(['x', 'linkedin'])}
         value={null}
         onChange={vi.fn()}
@@ -508,7 +545,9 @@ describe('picking a day, and only then committing it', () => {
   const dayCells = () => document.querySelectorAll('[data-schedule-calendar] [aria-pressed]')
 
   test('renders a full month grid rather than a date mask', () => {
-    render(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />)
+    render(
+      <ScheduleField zone={ZONE} channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />,
+    )
 
     // Six rows of seven, always, so the panel does not change height between
     // months. The number is the point: a ragged grid is not a calendar.
@@ -516,17 +555,12 @@ describe('picking a day, and only then committing it', () => {
   })
 
   test('a day before the channels own lead cannot be pressed', () => {
-    render(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />)
+    render(
+      <ScheduleField zone={ZONE} channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />,
+    )
 
-    const yesterday = new Date(Date.now() - 86_400_000)
-    const cell = screen.getByRole('button', {
-      name: yesterday.toLocaleDateString('en-GB', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      }),
-    })
+    const yesterday = addDaysInZone(ZONE, new Date(), -1)
+    const cell = screen.getByRole('button', { name: longLabel(ZONE, yesterday) })
 
     // Disabled, not merely styled: a control that accepts a value it is about
     // to refuse has wasted the click and taught the reader not to trust the grid.
@@ -536,19 +570,12 @@ describe('picking a day, and only then committing it', () => {
   test('picking a day writes nothing until Confirm schedule is pressed', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
-    render(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={onChange} />)
-
-    const soon = new Date(Date.now() + 3 * 86_400_000)
-    await user.click(
-      screen.getByRole('button', {
-        name: soon.toLocaleDateString('en-GB', {
-          weekday: 'long',
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric',
-        }),
-      }),
+    render(
+      <ScheduleField zone={ZONE} channels={toChannelSet(['x'])} value={null} onChange={onChange} />,
     )
+
+    const soon = addDaysInZone(ZONE, new Date(), 3)
+    await user.click(screen.getByRole('button', { name: longLabel(ZONE, soon) }))
 
     // THE CHANGE THAT MATTERS. A pick used to run `schedulePost`, which moves
     // the row out of `draft`, on one tap. A person exploring "what does Friday
@@ -560,11 +587,13 @@ describe('picking a day, and only then committing it', () => {
 
     expect(onChange).toHaveBeenCalledTimes(1)
     const committedAt = new Date(onChange.mock.calls[0]![0] as string)
-    expect(committedAt.getDate()).toBe(soon.getDate())
+    expect(dayKey(ZONE, committedAt)).toBe(dayKey(ZONE, soon))
   })
 
   test('Confirm schedule cannot be pressed before there is anything to confirm', () => {
-    render(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />)
+    render(
+      <ScheduleField zone={ZONE} channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />,
+    )
 
     expect(screen.getByRole('button', { name: /Confirm schedule/ })).toBeDisabled()
   })
@@ -574,6 +603,7 @@ describe('picking a day, and only then committing it', () => {
     const onChange = vi.fn()
     render(
       <ScheduleField
+        zone={ZONE}
         channels={toChannelSet(['x'])}
         value={future(86_400_000)}
         onChange={onChange}
@@ -593,6 +623,7 @@ describe('what the reader is told about where it is going', () => {
   test('names every channel the post is going to, with its own verdict', () => {
     render(
       <ScheduleField
+        zone={ZONE}
         channels={toChannelSet(['x', 'linkedin'])}
         value={null}
         onChange={vi.fn()}
@@ -613,10 +644,97 @@ describe('what the reader is told about where it is going', () => {
   test('an unread connection state says so, rather than claiming a channel is off', () => {
     // `connected === undefined` means the read did not happen. A red cross there
     // would send someone to reconnect an account that is fine.
-    render(<ScheduleField channels={toChannelSet(['linkedin'])} value={null} onChange={vi.fn()} />)
+    render(
+      <ScheduleField
+        zone={ZONE}
+        channels={toChannelSet(['linkedin'])}
+        value={null}
+        onChange={vi.fn()}
+      />,
+    )
 
     const status = document.querySelector('[data-channel-status="linkedin"]')?.textContent ?? ''
     expect(status).toMatch(/not checked/i)
     expect(status).not.toMatch(/connect it/i)
+  })
+})
+
+/**
+ * THE WORKSPACE'S ZONE, NOT THE DEVICE'S.
+ *
+ * MEASURED before this change: a customer in Dubai picks "tomorrow morning",
+ * the composer confirms 9:00 am, and the posts list calls the same post
+ * 10:30 am IST. The field built its instant with `setHours` on the browser,
+ * and every screen read it back in the workspace's zone. These render the same
+ * field for a New York workspace and prove the instant it commits is New
+ * York's 9:00 — and that the sentence the reader agreed to says so.
+ */
+describe('a New York workspace, on any device', () => {
+  test('"tomorrow morning" commits 9:00 am New York time, on New York’s tomorrow', async () => {
+    const user = userEvent.setup()
+    let stored: string | null = null
+    render(
+      <ScheduleField
+        zone={NY}
+        channels={toChannelSet(['x'])}
+        value={null}
+        onChange={(iso) => {
+          stored = iso
+        }}
+      />,
+    )
+
+    await user.click(
+      document.querySelector('[data-schedule-choice="tomorrow-morning"]') as HTMLElement,
+    )
+    await user.click(screen.getByRole('button', { name: /Confirm schedule/ }))
+
+    expect(stored).not.toBeNull()
+    const committed = new Date(stored as unknown as string)
+    expect(partsInZone(NY, committed)).toMatchObject({ hour: 9, minute: 0 })
+    expect(dayKey(NY, committed)).toBe(dayKey(NY, addDaysInZone(NY, new Date(), 1)))
+    // And it is NOT Kolkata's 9:00: the two are nine and a half hours apart
+    // (or ten and a half in winter), never the same instant.
+    expect(partsInZone(ZONE, committed).hour).not.toBe(9)
+  })
+
+  test('the sentence the reader agrees to names the zone it was built in', async () => {
+    const user = userEvent.setup()
+    render(
+      <ScheduleField zone={NY} channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />,
+    )
+
+    await user.click(
+      document.querySelector('[data-schedule-choice="tomorrow-morning"]') as HTMLElement,
+    )
+
+    const summary = document.querySelector('[data-schedule-summary]')?.textContent ?? ''
+    // The zone's own label, read at the instant the chip means (tomorrow, 9:00
+    // New York), so it is right on either side of daylight saving; never IST,
+    // and never a bare clock.
+    const label = zoneLabel(NY, combine(NY, addDaysInZone(NY, new Date(), 1), 9, 0))
+    expect(summary).toContain(`at 9:00 am ${label}`)
+    expect(summary).not.toMatch(/IST/)
+    // The chip printed the same clock and the same zone the sentence did.
+    const chip =
+      document.querySelector('[data-schedule-choice="tomorrow-morning"]')?.textContent ?? ''
+    expect(chip).toContain(`9:00 am ${label}`)
+  })
+
+  test('a stored instant is read back in New York, not in Kolkata', () => {
+    // 2026-09-02T20:00-04:00: Wednesday evening in New York, Thursday morning
+    // in Kolkata. The committed panel must say Wednesday.
+    render(
+      <ScheduleField
+        zone={NY}
+        channels={toChannelSet(['x'])}
+        value="2026-09-02T20:00:00-04:00"
+        onChange={vi.fn()}
+      />,
+    )
+    const at = new Date('2026-09-02T20:00:00-04:00')
+    const panel = document.querySelector('[data-schedule-committed]')?.textContent ?? ''
+    expect(panel).toMatch(new RegExp(`Wednesday,? 2 September at 8:00 pm ${zoneLabel(NY, at)}`))
+    expect(panel).not.toMatch(/Thursday/)
   })
 })

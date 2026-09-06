@@ -3,10 +3,16 @@ import { ensureZernioProfile } from '@sahoda/publishing'
 import { isZernioPlatform, type ZernioPlatform } from '@sahoda/shared'
 
 import { checkCountableLimit } from '@/lib/billing/entitlements'
+import { fixedWindowAllow } from '@/lib/ops/rate-limit'
 import { setPendingConnectHeader, type ConnectMode } from '@/lib/connections/pending-connect'
 import { readConnectionSlots } from '@/lib/connections/read'
 import { connectPlatformFor, needsPairingCode } from '@/lib/zernio/connect-platform'
-import { selectionPlatformFor } from '@/lib/zernio/selection'
+import {
+  mintConnectNonce,
+  RETURN_NONCE_PARAM,
+  selectionPlatformFor,
+  setConnectNonceHeader,
+} from '@/lib/zernio/selection'
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { readActiveWorkspace } from '@/lib/workspaces'
@@ -22,13 +28,18 @@ import { zernioClient, zernioReturnUrl } from '@/lib/zernio/server'
  *
  * Sequence:
  *   1. resolve the workspace from the Clerk session + active-workspace cookie
- *   2. find-or-create THAT workspace's Zernio profile (1:1, enforced in Postgres)
- *   3. record the mapping via ensure_zernio_profile — an RPC that takes identity
- *      from auth.jwt() and refuses Zernio's shared Default profile
+ *   2. read the profile this workspace is ALREADY bound to from `zernio_profiles`
+ *   3. only when there is none: find-or-create THAT workspace's Zernio profile
+ *      (1:1, enforced in Postgres) and record the mapping via
+ *      ensure_zernio_profile — an RPC that takes identity from auth.jwt() and
+ *      refuses Zernio's shared Default profile
  *   4. ask Zernio for an authUrl scoped to that profile, and redirect
  *
  * Nothing sensitive travels in the redirect, and nothing needs to: the return route
  * re-derives the workspace the same way rather than trusting anything sent back.
+ * What DOES travel is a per-press nonce, in an httpOnly cookie and on the return
+ * URL, so the return route can tell a trip this press started from a link somebody
+ * else built. See lib/zernio/selection.ts.
  */
 export const dynamic = 'force-dynamic'
 
@@ -93,6 +104,20 @@ export async function POST(request: Request): Promise<Response> {
     const workspace = workspaceRead.workspace
     workspaceId = workspace.id
 
+    // ── AN ABUSE CEILING BEFORE ANY EXTERNAL WORK ────────────────────────────
+    // Below this line the route provisions a Zernio profile and calls the
+    // provider, whose quota is shared across the whole tenant (the return route
+    // records a 60/min ceiling from Zernio). A loop here — a stuck page
+    // retrying, a script, a wedged popup — would burn that shared budget for
+    // every workspace. A real person presses Connect a handful of times a
+    // minute, so a generous per-workspace window costs them nothing and caps the
+    // runaway. FAILS OPEN (see the helper): this is abuse control, not the
+    // tenant boundary, which already stands on the session above.
+    const rate = await fixedWindowAllow(`oauth-start:${workspace.id}`, 20, 60)
+    if (!rate.allowed) {
+      return fail('Too many connection attempts just now. Wait a minute and try again.', 429)
+    }
+
     // ── THE CHANNELS PLAN LIMIT, ENFORCED BEFORE THE CONSENT SCREEN ──────────
     // The return route enforces this too, and has to — it is the only place that
     // knows what Zernio actually handed back. But enforcing ONLY there means the
@@ -118,30 +143,58 @@ export async function POST(request: Request): Promise<Response> {
     if (limit.kind === 'blocked') return fail(limit.sentence, 403)
     if (limit.kind === 'unknown') return fail('Couldn’t check your plan. Try again.', 503)
 
-    const profileId = await ensureZernioProfile(client, {
-      workspaceId: workspace.id,
-      workspaceName: workspace.name,
-    })
-
-    // Persist the mapping BEFORE sending the user away. If they connect and we have
-    // no record of which profile is theirs, the account exists at Zernio and is
-    // unreachable from here — an orphan we cannot even name.
+    /**
+     * ── THE STORED MAPPING FIRST, AND ZERNIO ONLY WHEN THERE IS NONE ─────────
+     * `zernio_profiles` holds the profile every workspace that ever connected is
+     * bound to, and this route never read it: it asked Zernio by NAME on every
+     * press, and the name embeds the workspace name. MEASURED (Sentry
+     * JAVASCRIPT-NEXTJS-1M, 2026-08-25): a renamed workspace, bound nine hours
+     * earlier, missed the lookup, re-sent the create under the old
+     * Idempotency-Key with a new body, and was refused on every channel and
+     * every retry. The row that would have answered was there the whole time.
+     *
+     * A read failure refuses rather than falling through to a create: minting a
+     * profile for a workspace whose binding we could not read is how a second,
+     * orphan profile gets made and PROFILE_ALREADY_BOUND becomes permanent.
+     */
     const supabase = createServerSupabase()
-    const { error } = await supabase.rpc('ensure_zernio_profile', {
-      p_workspace_id: workspace.id,
-      p_profile_id: profileId,
-    })
-    if (error) {
-      const msg = error.message ?? ''
-      if (msg.includes('FORBIDDEN_ROLE')) {
-        return fail('Only an owner or editor can connect an account.', 403)
+    const { data: mapping, error: mapErr } = await supabase
+      .from('zernio_profiles')
+      .select('profile_id')
+      .eq('workspace_id', workspace.id)
+      .maybeSingle()
+    if (mapErr) return fail('Couldn’t check your publishing profile. Try again.', 503)
+
+    const stored = (mapping as { profile_id?: unknown } | null)?.profile_id
+    let profileId: string
+    if (typeof stored === 'string' && stored !== '') {
+      profileId = stored
+    } else {
+      profileId = await ensureZernioProfile(client, {
+        workspaceId: workspace.id,
+        workspaceName: workspace.name,
+      })
+
+      // Persist the mapping BEFORE sending the user away. If they connect and we
+      // have no record of which profile is theirs, the account exists at Zernio
+      // and is unreachable from here — an orphan we cannot even name.
+      const { error } = await supabase.rpc('ensure_zernio_profile', {
+        p_workspace_id: workspace.id,
+        p_profile_id: profileId,
+      })
+      if (error) {
+        const msg = error.message ?? ''
+        if (msg.includes('FORBIDDEN_ROLE')) {
+          return fail('Only an owner or editor can connect an account.', 403)
+        }
+        if (msg.includes('PROFILE_ALREADY_BOUND') || msg.includes('PROFILE_IN_USE')) {
+          // Both mean the 1:1 already resolved differently. Refusing beats
+          // repointing a workspace at another profile, which moves a tenant
+          // boundary silently.
+          return fail('This workspace is already linked to a different publishing profile.', 409)
+        }
+        return fail('Couldn’t start the connection. Try again.', 500)
       }
-      if (msg.includes('PROFILE_ALREADY_BOUND') || msg.includes('PROFILE_IN_USE')) {
-        // Both mean the 1:1 already resolved differently. Refusing beats repointing
-        // a workspace at another profile, which moves a tenant boundary silently.
-        return fail('This workspace is already linked to a different publishing profile.', 409)
-      }
-      return fail('Couldn’t start the connection. Try again.', 500)
     }
 
     // ── REFUSE RATHER THAN SEND THEM SOMEWHERE THAT CANNOT RECEIVE THEM ──────
@@ -165,13 +218,27 @@ export async function POST(request: Request): Promise<Response> {
     // fallback for the trip it does not survive. RETURN_MODE_PARAM in
     // lib/zernio/return-url.ts carries the argument for why neither value can
     // widen anything.
-    const returnTo = zernioReturnUrl({ mode, platform })
-    if (!returnTo) {
+    const returnBase = zernioReturnUrl({ mode, platform })
+    if (!returnBase) {
       return fail(
         'Connecting isn’t available right now. This deployment has no return address.',
         503,
       )
     }
+
+    /**
+     * ── ONE RANDOM VALUE PER PRESS, ON THE URL AND IN A COOKIE ───────────────
+     * The return route only honours a picker's parameters, or a create scoped
+     * by the URL's `platform`, when the nonce on the URL matches the one in the
+     * httpOnly cookie set below. A link somebody else built cannot carry the
+     * cookie's value, and an old URL's value stops matching the moment the next
+     * press overwrites the cookie. Same preservation argument as `mode` and
+     * `platform`: Zernio appends its own parameters and keeps ours.
+     */
+    const nonce = mintConnectNonce()
+    const returnUrl = new URL(returnBase)
+    returnUrl.searchParams.set(RETURN_NONCE_PARAM, nonce)
+    const returnTo = returnUrl.toString()
 
     // ── OUR NAME FOR THE CHANNEL IS NOT ZERNIO'S ─────────────────────────────
     // `x` and `gbp` are OUR ids. Connect wants `twitter` and `googlebusiness`,
@@ -234,16 +301,13 @@ export async function POST(request: Request): Promise<Response> {
     //
     // Attached LAST, after every refusal above has had its chance. A cookie set
     // before a 403 would authorise a create for a connect that never happened.
-    return Response.json(
-      { ok: true, authUrl },
-      {
-        status: 200,
-        headers: {
-          'cache-control': 'no-store',
-          'set-cookie': setPendingConnectHeader({ platform, mode }),
-        },
-      },
-    )
+    //
+    // Two cookies, so a `Headers` object: a plain record can hold one
+    // `set-cookie` and the second would silently replace the first.
+    const headers = new Headers({ 'cache-control': 'no-store' })
+    headers.append('set-cookie', setPendingConnectHeader({ platform, mode }))
+    headers.append('set-cookie', setConnectNonceHeader(nonce))
+    return Response.json({ ok: true, authUrl }, { status: 200, headers })
   } catch (error) {
     await reportServerError(error, { action: 'zernioStart', workspaceId })
     return fail('Couldn’t start the connection. Try again.', 500)

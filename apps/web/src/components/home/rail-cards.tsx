@@ -75,12 +75,11 @@ export function BrainCard({
           <p className="flex items-baseline gap-2">
             <span className="type-h2 tabular-nums">{brainRing(brain.provenance).confirmed}</span>
             <span className="type-sm text-muted">
-              of {brainRing(brain.provenance).total} fields confirmed
+              of {brainRing(brain.provenance).total} answers checked by you
             </span>
           </p>
           <p className="mt-2 type-meta text-muted">
-            Confirmed means a person checked it. The rest are still Sahoda&rsquo;s reading of what
-            it found.
+            Checked means you said it is right. The rest are Sahoda&rsquo;s best guess.
           </p>
 
           {/* ── TWO TILES, NOT THE REFERENCE'S SIX ───────────────────────────
@@ -160,8 +159,8 @@ export function BrainCard({
       ) : (
         <p className="type-sm text-muted">
           {brain.status === 'unreadable'
-            ? 'Couldn’t read the Brand Brain just now.'
-            : 'Sahoda doesn’t know your brand yet.'}
+            ? 'Could not read the Brand Brain just now.'
+            : 'Sahoda does not know your business yet.'}
         </p>
       )}
     </RailCard>
@@ -180,7 +179,7 @@ export function ConnectionsCard({ connections }: { connections: Connection[] | n
   return (
     <RailCard id="home-connections" title="Connections" href="/connections" linkLabel="Manage">
       {connections === null ? (
-        <p className="type-sm text-muted">Couldn&rsquo;t check your connections just now.</p>
+        <p className="type-sm text-muted">Could not check your accounts just now.</p>
       ) : connections.length === 0 ? (
         /* ── THE TILES STAND EVEN WITH NOTHING CONNECTED ──────────────────────
            This was one sentence, so a new workspace — which is every workspace
@@ -211,7 +210,7 @@ export function ConnectionsCard({ connections }: { connections: Connection[] | n
             ))}
           </ul>
           <p className="mt-3 type-meta text-muted">
-            You can write and plan without one. Connecting is what lets a post actually go out.
+            You can write and plan without one. Connect an account to really post.
           </p>
         </>
       ) : (
@@ -228,7 +227,7 @@ export function ConnectionsCard({ connections }: { connections: Connection[] | n
                     {PLATFORM_LABELS[connection.platform]}
                   </span>
                   <span className="block type-meta text-muted">
-                    {connection.status === 'active' ? 'Connected' : 'Needs attention'}
+                    {connection.status === 'active' ? 'Connected' : 'Needs a fix'}
                   </span>
                 </span>
               </Link>

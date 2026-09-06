@@ -3,26 +3,39 @@
 import { CardEmpty } from '@/components/empty-state'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Search } from 'lucide-react'
+import { ArrowDownUp, Search } from 'lucide-react'
 
 import { PaneHeader, PaneScroll } from '@/components/inbox/inbox-panes'
 import { platformLabel } from '@/components/inbox/platform-label'
-import { threadHref } from '@/components/inbox/thread-href'
+import { PlatformIcon } from '@/components/inbox/platform-icon'
+import { conversationHref } from '@/components/inbox/thread-href'
+import {
+  EMPTY_LIST_FILTER,
+  applyListFilter,
+  isListFilterActive,
+  listAccountOptions,
+  listPlatformOptions,
+  type ListFilter,
+} from '@/lib/inbox/list-filter'
+import type { InboxListRow } from '@/lib/inbox/list-row'
 import { cn } from '@/lib/utils'
-import type { ZernioConversation } from '@sahoda/publishing'
 
 /**
  * The list pane (reference `.inbox__col--list`).
  *
- * Search and the channel chips filter rows ALREADY FETCHED — no request goes out
- * on a keystroke. That matches what the data allows: `readConversations` reads
- * every platform in one call precisely because the platform filter cannot
- * express WhatsApp, so filtering client-side over the full set is the honest
- * version and a per-channel refetch would silently drop a channel.
+ * Search, the platform filter, the account filter and the sort order all run over
+ * rows ALREADY FETCHED — no request goes out on a keystroke or a click. That matches
+ * what the data allows: `readConversations` reads every platform in one call precisely
+ * because Zernio's own filter cannot express WhatsApp, so filtering client-side over
+ * the full set is the honest version and a per-channel refetch would silently drop one.
  *
- * The chips are built from the platforms PRESENT in the rows, not from a fixed
- * list. A chip for a channel this workspace has never received a message on is
- * a filter that can only ever return nothing.
+ * The pure decision — which rows show, in which order — lives in `lib/inbox/list-filter`
+ * and is tested there without a DOM. This component owns only the controls and the
+ * rendering.
+ *
+ * The filter options are built from what is PRESENT in the rows, not from a fixed list.
+ * A filter for a channel this workspace has never received a message on is a control
+ * that can only ever return nothing.
  */
 
 /** Initials for the avatar, as the reference's `initials()` does. */
@@ -32,7 +45,7 @@ function initialsOf(name: string): string {
   return (letters || '?').toUpperCase()
 }
 
-function nameOf(c: ZernioConversation): string {
+function nameOf(c: InboxListRow): string {
   return c.participantName ?? c.participantId ?? 'Unknown sender'
 }
 
@@ -41,7 +54,7 @@ export function ConversationList({
   waitingLine,
   title = 'Conversations',
 }: {
-  conversations: ZernioConversation[]
+  conversations: InboxListRow[]
   /**
    * ── NOT AN EMPTY STATE. A STATEMENT OF WHAT THIS COLUMN HOLDS ─────────────
    * This prop used to be `emptyLine`, and the pages passed an absence claim into
@@ -64,25 +77,12 @@ export function ConversationList({
   /** The surface's own noun. NEVER "Inbox" — the page <h1> already says that. */
   title?: string
 }) {
-  const [query, setQuery] = useState('')
-  const [channel, setChannel] = useState<string>('all')
+  const [filter, setFilter] = useState<ListFilter>(EMPTY_LIST_FILTER)
 
-  const channels = useMemo(() => {
-    const present = new Set(conversations.map((c) => c.platform))
-    return ['all', ...Array.from(present)]
-  }, [conversations])
-
-  const shown = useMemo(() => {
-    const needle = query.trim().toLowerCase()
-    return conversations.filter((c) => {
-      if (channel !== 'all' && c.platform !== channel) return false
-      if (needle === '') return true
-      return (
-        nameOf(c).toLowerCase().includes(needle) ||
-        (c.lastMessage ?? '').toLowerCase().includes(needle)
-      )
-    })
-  }, [conversations, query, channel])
+  const platforms = useMemo(() => listPlatformOptions(conversations), [conversations])
+  const accounts = useMemo(() => listAccountOptions(conversations), [conversations])
+  const shown = useMemo(() => applyListFilter(conversations, filter), [conversations, filter])
+  const filterActive = isListFilterActive(filter)
 
   const unread = conversations.reduce((n, c) => n + (c.unreadCount ?? 0), 0)
 
@@ -96,48 +96,94 @@ export function ConversationList({
               which on a three-surface tab bar also says which one you are on. */}
           <h2 className="type-h3">{title}</h2>
           {unread > 0 ? (
-            <span className="ml-auto grid h-[18px] min-w-[18px] place-items-center rounded-full bg-brand-tint px-[5px] text-[11px] font-bold text-accent tabular-nums">
+            <span className="ml-auto grid h-[18px] min-w-[18px] place-items-center rounded-pill bg-brand-tint px-[5px] text-[11px] font-bold text-accent tabular-nums">
               {unread}
             </span>
           ) : null}
         </div>
 
-        {/* Both controls are hidden when there is nothing to filter — a search
+        {/* Every control is hidden when there is nothing to filter — a search
             box over zero rows is a control that cannot succeed. */}
         {conversations.length > 0 ? (
-          <>
-            <div className="surface-ring mb-3 flex h-9 items-center gap-2 rounded-sm bg-s2 px-[10px]">
+          <div className="space-y-2" data-guide="inbox.list-controls">
+            <div className="surface-ring flex h-9 items-center gap-2 rounded-sm bg-s2 px-[10px] transition-micro focus-within:shadow-[inset_0_0_0_1.5px_var(--brand)]">
               <Search size={15} className="shrink-0 text-muted" aria-hidden />
               <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                value={filter.query}
+                onChange={(event) => setFilter((f) => ({ ...f, query: event.target.value }))}
                 placeholder="Search conversations…"
                 aria-label="Search conversations"
                 className="w-full bg-transparent text-[13px] text-ink outline-none placeholder:text-muted"
               />
             </div>
 
-            {channels.length > 2 ? (
-              <div className="flex flex-wrap gap-[6px]">
-                {channels.map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setChannel(key)}
-                    aria-pressed={channel === key}
-                    className={cn(
-                      'inline-flex h-7 items-center rounded-full px-[10px] text-[12px] font-[550] transition-micro',
-                      channel === key
-                        ? 'bg-ink text-white dark:bg-white dark:text-[var(--canvas)]'
-                        : 'text-muted shadow-[inset_0_0_0_1px_var(--line)] hover:text-ink',
-                    )}
+            <div className="flex flex-wrap items-center gap-2">
+              {platforms.length > 1 ? (
+                <label className="flex items-center gap-1.5">
+                  <span className="sr-only">Filter by platform</span>
+                  <select
+                    value={filter.platform}
+                    onChange={(event) => setFilter((f) => ({ ...f, platform: event.target.value }))}
+                    className="surface-ring-firm h-7 rounded-pill bg-s2 px-2 type-meta font-[550] text-ink"
                   >
-                    {key === 'all' ? 'All' : platformLabel(key as ZernioConversation['platform'])}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </>
+                    <option value="all">All platforms</option>
+                    {platforms.map((platform) => (
+                      <option key={platform} value={platform}>
+                        {platformLabel(platform)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+
+              {accounts.length > 1 ? (
+                <label className="flex items-center gap-1.5">
+                  <span className="sr-only">Filter by account</span>
+                  <select
+                    value={filter.accountId}
+                    onChange={(event) =>
+                      setFilter((f) => ({ ...f, accountId: event.target.value }))
+                    }
+                    className="surface-ring-firm h-7 rounded-pill bg-s2 px-2 type-meta font-[550] text-ink"
+                  >
+                    <option value="all">All accounts</option>
+                    {accounts.map((account) => (
+                      <option key={account.accountId} value={account.accountId}>
+                        {account.accountUsername
+                          ? `@${account.accountUsername}`
+                          : platformLabel(account.platform)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+
+              <label className="ml-auto flex items-center gap-1.5">
+                <ArrowDownUp size={13} className="text-muted" aria-hidden />
+                <span className="sr-only">Sort</span>
+                <select
+                  value={filter.sort}
+                  onChange={(event) =>
+                    setFilter((f) => ({ ...f, sort: event.target.value as ListFilter['sort'] }))
+                  }
+                  className="surface-ring-firm h-7 rounded-pill bg-s2 px-2 type-meta font-[550] text-ink"
+                >
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                </select>
+              </label>
+
+              {filterActive ? (
+                <button
+                  type="button"
+                  onClick={() => setFilter(EMPTY_LIST_FILTER)}
+                  className="type-meta font-[550] text-accent transition-micro hover:underline"
+                >
+                  Clear filters
+                </button>
+              ) : null}
+            </div>
+          </div>
         ) : null}
       </PaneHeader>
 
@@ -149,49 +195,97 @@ export function ConversationList({
           <p className="p-3 type-meta text-muted">{waitingLine}</p>
         ) : shown.length === 0 ? (
           // Filtered to nothing is a DIFFERENT state from having nothing, and
-          // it has a different remedy: change the filter, not connect a channel.
-          <CardEmpty body="Nothing matches that. Clear the search or pick another channel." />
+          // it has a different remedy: change a filter, not connect a channel.
+          <CardEmpty
+            body="No conversations match these filters."
+            action={
+              filterActive ? (
+                <button
+                  type="button"
+                  onClick={() => setFilter(EMPTY_LIST_FILTER)}
+                  className="type-body font-[550] text-accent transition-micro hover:underline"
+                >
+                  Clear filters
+                </button>
+              ) : undefined
+            }
+          />
         ) : (
           <ul>
             {shown.map((conversation) => {
               const who = nameOf(conversation)
               const count = conversation.unreadCount ?? 0
+              /* ── EVERY ROW WITH A MESSAGE BEHIND IT IS A DOOR ───────────
+                 A stored thread carries no account; this row rendered
+                 `/inbox/threads//qa-thread-1` and the click landed on "This
+                 page isn't here" (MEASURED 2026-09-06, wt-core preview). The
+                 sentence that replaced the link stopped the 404 and left the
+                 message unreadable — it is in THIS database, and our own row
+                 needs no Zernio account. `conversationHref` routes such a row
+                 to the store thread instead. */
+              const href = conversationHref(conversation)
+              const rowClass =
+                'flex items-start gap-[10px] border-b border-line-soft px-3 py-3 last:border-b-0'
+              const body = (
+                <>
+                  <span
+                    aria-hidden
+                    className="grid size-8 shrink-0 place-items-center rounded-pill bg-ink text-[11px] font-bold text-white dark:bg-white dark:text-[var(--canvas)]"
+                  >
+                    {initialsOf(who)}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-baseline gap-2">
+                      <span className="min-w-0 flex-1 truncate text-[13px] font-[650] text-ink">
+                        {who}
+                      </span>
+                    </span>
+                    <span className="mt-[2px] flex items-center gap-1.5">
+                      <PlatformIcon
+                        platform={conversation.platform}
+                        size={12}
+                        className="shrink-0 text-muted"
+                      />
+                      <span className="shrink-0 text-[11px] text-muted">
+                        {platformLabel(conversation.platform)}
+                        {conversation.accountUsername
+                          ? ` · via @${conversation.accountUsername}`
+                          : ''}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-[12px] text-muted">
+                        {conversation.lastMessage ?? 'No message text'}
+                      </span>
+                      {count > 0 ? (
+                        <span className="grid h-[18px] min-w-[18px] shrink-0 place-items-center rounded-pill bg-brand px-[5px] text-[11px] font-bold text-primary-foreground tabular-nums">
+                          {count}
+                        </span>
+                      ) : conversation.needsReply ? (
+                        /* Words, not a numeral: `unreadCount` is Zernio's and
+                           the store has no read state to count. What it knows
+                           is which side spoke last. */
+                        <span className="shrink-0 rounded-pill bg-warn-bg px-1.5 type-chip font-semibold text-warn">
+                          Needs a reply
+                        </span>
+                      ) : null}
+                    </span>
+                    {href === null ? (
+                      <span className="mt-1 block type-meta text-muted">
+                        Sahoda holds no copy of this thread and no connected{' '}
+                        {platformLabel(conversation.platform)} account can address it.
+                      </span>
+                    ) : null}
+                  </span>
+                </>
+              )
               return (
                 <li key={`${conversation.accountId}:${conversation.id}`}>
-                  <Link
-                    href={threadHref({
-                      accountId: conversation.accountId,
-                      conversationId: conversation.id,
-                    })}
-                    className="flex items-start gap-[10px] border-b border-line-soft px-3 py-3 transition-micro last:border-b-0 hover:bg-s2"
-                  >
-                    <span
-                      aria-hidden
-                      className="grid size-8 shrink-0 place-items-center rounded-full bg-ink text-[11px] font-bold text-white dark:bg-white dark:text-[var(--canvas)]"
-                    >
-                      {initialsOf(who)}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-baseline gap-2">
-                        <span className="min-w-0 flex-1 truncate text-[13px] font-[650] text-ink">
-                          {who}
-                        </span>
-                      </span>
-                      <span className="mt-[2px] flex items-center gap-2">
-                        <span className="shrink-0 text-[11px] text-muted">
-                          {platformLabel(conversation.platform)}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate text-[12px] text-muted">
-                          {conversation.lastMessage ?? 'No message text'}
-                        </span>
-                        {count > 0 ? (
-                          <span className="grid h-[18px] min-w-[18px] shrink-0 place-items-center rounded-full bg-brand px-[5px] text-[11px] font-bold text-primary-foreground tabular-nums">
-                            {count}
-                          </span>
-                        ) : null}
-                      </span>
-                    </span>
-                  </Link>
+                  {href === null ? (
+                    <div className={rowClass}>{body}</div>
+                  ) : (
+                    <Link href={href} className={cn(rowClass, 'transition-micro hover:bg-s2')}>
+                      {body}
+                    </Link>
+                  )}
                 </li>
               )
             })}

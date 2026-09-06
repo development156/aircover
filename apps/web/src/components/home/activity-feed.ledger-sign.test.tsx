@@ -125,3 +125,35 @@ describe('Home reports a spend as a spend', () => {
     expect(new Set([debit, credit, neutral]).size).toBe(3)
   })
 })
+
+/**
+ * AND HOME'S HALF OF THE READ-FAILURE SPLIT.
+ *
+ * `readLedger` used to return `{ entries: [] }` for a dropped connection exactly
+ * as it did for a workspace that has genuinely never spent a credit, so this
+ * card printed "Nothing has happened yet" over a read that never got an answer.
+ * The wallet had the same defect and its own version of this guard.
+ */
+describe('a feed that could not be read is not an empty one', () => {
+  it('never claims nothing has happened when the read failed', () => {
+    render(<ActivityFeed entries={[]} unreadable />)
+
+    expect(screen.queryByText(/nothing yet/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('alert').textContent ?? '').toMatch(/could not load this/i)
+  })
+
+  it('repeats the guarantee, because this card is about money', () => {
+    render(<ActivityFeed entries={[]} unreadable />)
+
+    expect(screen.getByRole('alert').textContent ?? '').toMatch(/nothing was charged/i)
+  })
+
+  it('a feed that really is empty still says so', () => {
+    // The other half. A flag that were always true would tell every new
+    // workspace its wallet is broken on the first screen it ever sees.
+    render(<ActivityFeed entries={[]} />)
+
+    expect(screen.getByText(/nothing yet/i)).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})

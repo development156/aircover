@@ -11,6 +11,8 @@ import {
 } from './schedule-choices'
 import { SCHEDULE_DELIVERY_WINDOW_MS } from './delivery-window'
 import { earliestScheduleAt } from './schedule'
+import { addDaysInZone, dayKey } from '@/lib/time/day-key'
+import { partsInZone, zoneLabel } from '@/lib/time/zone'
 
 /**
  * THE NINTH CLICK, AND THE PROMISE IT MAKES.
@@ -27,19 +29,22 @@ import { earliestScheduleAt } from './schedule'
  * guarantee. So nothing below matches on prose it does not have to.
  */
 
+const IST = 'Asia/Kolkata'
+const NY = 'America/New_York'
+
 /** A Tuesday, mid-afternoon IST. Fixed, because a clock in a test is a flake. */
 const NOW = new Date('2026-08-25T15:40:00+05:30')
 
 describe('the named schedule choices', () => {
   it('offers a shortcut a person can say out loud, and prints the instant it means', () => {
-    const choices = scheduleChoices(['instagram'], NOW)
+    const choices = scheduleChoices(IST, ['instagram'], NOW)
     expect(choices.length).toBeGreaterThan(0)
     for (const choice of choices) {
       // The label is words, never a mask. The whole defect was a control that
       // only spoke dd/mm/yyyy.
       expect(choice.label).not.toMatch(/\d/)
       // And the exact instant is renderable beside it, so the words hide nothing.
-      expect(formatChoiceTime(choice.when)).toMatch(/\d/)
+      expect(formatChoiceTime(IST, choice.when)).toMatch(/\d/)
       expect(Number.isNaN(choice.when.getTime())).toBe(false)
     }
   })
@@ -51,14 +56,14 @@ describe('the named schedule choices', () => {
     const sets: Channel[][] = [['instagram'], ['x'], ['linkedin'], ['instagram', 'linkedin', 'x']]
     for (const channels of sets) {
       const floor = earliestScheduleAt(channels, NOW).getTime()
-      for (const choice of scheduleChoices(channels, NOW)) {
+      for (const choice of scheduleChoices(IST, channels, NOW)) {
         expect(choice.when.getTime()).toBeGreaterThanOrEqual(floor)
       }
     }
   })
 
   it('yields an empty list rather than Invalid Dates when the clock is unreadable', () => {
-    expect(scheduleChoices(['instagram'], new Date(Number.NaN))).toEqual([])
+    expect(scheduleChoices(IST, ['instagram'], new Date(Number.NaN))).toEqual([])
   })
 
   describe('the floor filter, at leads no channel declares today', () => {
@@ -69,7 +74,7 @@ describe('the named schedule choices', () => {
      * so the behaviour is covered before a platform needs it rather than after
      * a customer's click is refused.
      */
-    const candidates = candidateChoices(NOW)
+    const candidates = candidateChoices(IST, NOW)
 
     it('keeps everything when the floor is below the soonest choice', () => {
       expect(keepScheduleable(candidates, new Date(NOW.getTime() + 60_000))).toHaveLength(
@@ -96,15 +101,15 @@ describe('the named schedule choices', () => {
   })
 
   it('orders the choices from soonest to furthest', () => {
-    const times = scheduleChoices(['instagram'], NOW).map((c) => c.when.getTime())
+    const times = scheduleChoices(IST, ['instagram'], NOW).map((c) => c.when.getTime())
     expect([...times].sort((a, b) => a - b)).toEqual(times)
   })
 
   it('rounds "in an hour" onto a time somebody would actually say', () => {
-    const hour = scheduleChoices(['instagram'], NOW).find((c) => c.id === 'hour')
+    const hour = scheduleChoices(IST, ['instagram'], NOW).find((c) => c.id === 'hour')
     expect(hour).toBeDefined()
-    expect(hour!.when.getMinutes() % 5).toBe(0)
-    expect(hour!.when.getSeconds()).toBe(0)
+    expect(partsInZone(IST, hour!.when).minute % 5).toBe(0)
+    expect(hour!.when.getUTCSeconds()).toBe(0)
     // And it is genuinely about an hour away, not a rounding that ate the hour.
     const away = hour!.when.getTime() - NOW.getTime()
     expect(away).toBeGreaterThanOrEqual(3600_000)
@@ -112,16 +117,49 @@ describe('the named schedule choices', () => {
   })
 
   it('puts the named parts of the day on tomorrow, at the hour their name claims', () => {
-    const choices = scheduleChoices(['instagram'], NOW)
+    const choices = scheduleChoices(IST, ['instagram'], NOW)
     const morning = choices.find((c) => c.id === 'tomorrow-morning')!
     const evening = choices.find((c) => c.id === 'tomorrow-evening')!
-    // The label says tomorrow; the date has to be tomorrow, not today+0 and not
-    // a UTC day that is tomorrow only in another timezone.
-    expect(morning.when.getDate()).toBe(NOW.getDate() + 1)
-    expect(evening.when.getDate()).toBe(NOW.getDate() + 1)
+    // The label says tomorrow; the date has to be tomorrow ON THE WORKSPACE'S
+    // CALENDAR, not today+0 and not a UTC day that is tomorrow only elsewhere.
+    const tomorrow = dayKey(IST, addDaysInZone(IST, NOW, 1))
+    expect(dayKey(IST, morning.when)).toBe(tomorrow)
+    expect(dayKey(IST, evening.when)).toBe(tomorrow)
     // "Morning" before noon and "evening" after five, or the words are wrong.
-    expect(morning.when.getHours()).toBeLessThan(12)
-    expect(evening.when.getHours()).toBeGreaterThanOrEqual(17)
+    expect(partsInZone(IST, morning.when).hour).toBeLessThan(12)
+    expect(partsInZone(IST, evening.when).hour).toBeGreaterThanOrEqual(17)
+  })
+
+  it('builds "tomorrow morning" in the workspace’s zone, not the device’s', () => {
+    // THE DEFECT, AS AN INSTANT. The same "now", two workspaces: the Kolkata
+    // one means 03:30Z and the New York one means 13:00Z. The old `setHours`
+    // gave whichever the browser happened to be in, to both.
+    const now = new Date('2026-09-02T12:00:00Z')
+    const ist = candidateChoices(IST, now).find((c) => c.id === 'tomorrow-morning')!
+    const ny = candidateChoices(NY, now).find((c) => c.id === 'tomorrow-morning')!
+    expect(ist.when.toISOString()).toBe('2026-09-03T03:30:00.000Z')
+    expect(ny.when.toISOString()).toBe('2026-09-03T13:00:00.000Z')
+    expect(partsInZone(NY, ny.when)).toMatchObject({ day: 3, hour: 9, minute: 0 })
+  })
+
+  it('lands on 9:00 am the morning after New York falls back', () => {
+    // Saturday 31 October, afternoon. Tomorrow is the transition day and its
+    // 9:00 am is EST: 14:00Z. Adding 24h to a wall clock would say 13:00Z.
+    const now = new Date('2026-10-31T16:00:00-04:00')
+    const morning = candidateChoices(NY, now).find((c) => c.id === 'tomorrow-morning')!
+    expect(morning.when.toISOString()).toBe('2026-11-01T14:00:00.000Z')
+    expect(dayKey(NY, morning.when)).toBe('2026-11-01')
+  })
+
+  it('prints the zone once beside the instant, so the words hide no clock', () => {
+    // The label is whatever `zoneLabel` gives that zone (IST for Kolkata, an
+    // offset for a zone this locale has no short name for). The claim here is
+    // that it is THERE, it is the right zone's, and it is said once.
+    const at = new Date('2026-09-03T13:00:00Z')
+    expect(formatChoiceTime(NY, at).endsWith(`9:00 am ${zoneLabel(NY, at)}`)).toBe(true)
+    expect(formatChoiceTime(IST, at).endsWith('6:30 pm IST')).toBe(true)
+    expect(formatChoiceTime(IST, at).match(/IST/g)).toHaveLength(1)
+    expect(formatChoiceTime(NY, at)).not.toMatch(/IST/)
   })
 })
 
@@ -130,7 +168,7 @@ describe('the delivery promise', () => {
     // The lie being removed is a to-the-minute promise. A note that renders one
     // time is that promise however it is worded, so the shape is asserted: two
     // clock readings, and they differ.
-    const note = deliveryRangeNote(new Date('2026-08-25T18:00:00+05:30'))
+    const note = deliveryRangeNote(IST, new Date('2026-08-25T18:00:00+05:30'))
     const times = note.match(/\d{1,2}:\d{2}/g) ?? []
     expect(times.length).toBeGreaterThanOrEqual(2)
     expect(new Set(times).size).toBeGreaterThanOrEqual(2)
@@ -155,6 +193,15 @@ describe('the delivery promise', () => {
   it('names the interval it is derived from rather than a rounded story', () => {
     // The sentence has to carry the cron period, because "around that time" was
     // the version that told the user nothing measurable.
-    expect(deliveryRangeNote(NOW)).toMatch(/every 5 minutes/)
+    expect(deliveryRangeNote(IST, NOW)).toMatch(/every 5 minutes/)
+  })
+
+  it('reads the window in the workspace’s zone and names it', () => {
+    const at = new Date('2026-09-03T13:00:00Z')
+    expect(deliveryRangeNote(NY, at)).toContain(
+      `9:00 am and 9:${String(DELIVERY_WINDOW_MINUTES).padStart(2, '0')} am ${zoneLabel(NY, at)}`,
+    )
+    expect(deliveryRangeNote(IST, at)).toMatch(/6:30 pm and 6:\d\d pm IST/)
+    expect(deliveryRangeNote(NY, at)).not.toMatch(/IST/)
   })
 })

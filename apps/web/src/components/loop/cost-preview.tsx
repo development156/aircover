@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { CostLabel } from '@/components/ui/cost-label'
 import type { LoopBriefView } from '@/lib/loop/read'
 import { creditWord, credits } from '@/lib/credit-words'
+import { CHANNEL_LABELS } from '@sahoda/shared'
 
 /**
  * THE COST PREVIEW — every credit the cycle will spend, before it spends any.
@@ -149,43 +150,45 @@ export function CostPreview({ cycleId, briefs, budgetCredits }: CostPreviewProps
                   checked={on}
                   onChange={() => toggle(brief.id)}
                   disabled={pending}
-                  className="mt-icon-nudge size-4 shrink-0 accent-[var(--accent)]"
+                  className="mt-icon-nudge size-4 shrink-0 accent-accent"
                 />
                 <span className="min-w-0 flex-1">
                   <span className="type-h3 block text-ink">{brief.title}</span>
                   <span className="type-sm mt-0.5 block text-muted">{brief.body}</span>
                   {brief.channels.length > 0 ? (
                     <span className="type-sm mt-1 block text-muted">
-                      {brief.channels.join(' · ')}
+                      {brief.channels.map((c) => CHANNEL_LABELS[c] ?? c).join(' · ')}
                     </span>
                   ) : null}
                 </span>
-                <span className="type-sm num shrink-0 text-muted">{brief.estimatedCredits} cr</span>
+                <span className="type-sm num shrink-0 text-muted">
+                  {credits(brief.estimatedCredits)}
+                </span>
               </label>
             </li>
           )
         })}
       </ul>
 
-      <dl className="mt-4 grid gap-1 border-t border-[var(--hairline)] pt-3">
+      <dl className="mt-4 grid gap-1 border-t border-line-soft pt-3">
         <div className="flex justify-between gap-4">
           <dt className="type-body text-muted">
             {included.length} {included.length === 1 ? 'post' : 'posts'} to write
           </dt>
-          <dd className="type-body num text-ink">{preview.creationCredits} cr</dd>
+          <dd className="type-body num text-ink">{credits(preview.creationCredits)}</dd>
         </div>
         <div className="flex justify-between gap-4">
           <dt className="type-body text-muted">Planning this week, already charged</dt>
-          <dd className="type-body num text-muted">{preview.orchestrationCredits} cr</dd>
+          <dd className="type-body num text-muted">{credits(preview.orchestrationCredits)}</dd>
         </div>
-        <div className="flex justify-between gap-4 border-t border-[var(--hairline)] pt-2">
+        <div className="flex justify-between gap-4 border-t border-line-soft pt-2">
           <dt className="type-h3 text-ink">The week, in total</dt>
-          <dd className="type-h3 num text-ink">{preview.totalCredits} cr</dd>
+          <dd className="type-h3 num text-ink">{credits(preview.totalCredits)}</dd>
         </div>
         {preview.budgetCredits !== null ? (
           <div className="flex justify-between gap-4">
             <dt className="type-sm text-muted">Your weekly budget</dt>
-            <dd className="type-sm num text-muted">{preview.budgetCredits} cr</dd>
+            <dd className="type-sm num text-muted">{credits(preview.budgetCredits)}</dd>
           </div>
         ) : null}
       </dl>

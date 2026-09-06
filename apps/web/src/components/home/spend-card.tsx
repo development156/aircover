@@ -119,7 +119,7 @@ export function SpendCard({ spend }: { spend: SpendRead }) {
   return (
     <Panel className="space-y-4" data-guide="home.spend">
       <PanelHead
-        title="Credits spent"
+        title="Credits used"
         sub="last 30 days"
         trailing={
           <Link
@@ -127,7 +127,7 @@ export function SpendCard({ spend }: { spend: SpendRead }) {
             className="card-link inline-flex items-center gap-1.5 rounded-pill border border-brand-lift px-3 py-1.5 type-meta font-[550] text-accent transition-micro hover:bg-brand-wash max-narrow:min-h-[44px]"
           >
             <TrendingUp aria-hidden className="size-3.5" />
-            See activity
+            See details
           </Link>
         }
       />
@@ -145,7 +145,7 @@ export function SpendCard({ spend }: { spend: SpendRead }) {
             <span className="type-sm text-muted">credits</span>
           </>
         ) : (
-          <Unreadable what="Credits spent in the last 30 days" />
+          <Unreadable what="Credits used in the last 30 days" />
         )}
       </p>
 
@@ -160,8 +160,8 @@ export function SpendCard({ spend }: { spend: SpendRead }) {
             <p className="flex items-start gap-2 rounded-sm bg-surface-2 px-3 py-2 type-meta text-muted">
               <Info aria-hidden className="mt-icon-nudge size-3.5 shrink-0 text-ink-mute" />
               <span>
-                {activeDays === 1 ? 'One day' : `${activeDays} days`} with activity so far, not
-                enough to read as a trend.
+                Only {activeDays === 1 ? 'one day' : `${activeDays} days`} with credit use so far,
+                so there is no trend yet.
               </span>
             </p>
           ) : null}
@@ -185,10 +185,10 @@ export function SpendCard({ spend }: { spend: SpendRead }) {
           )}
         </>
       ) : (
-        <ChartSparse from={from} to={to}>
+        <ChartSparse from={from} to={to} compact>
           {readable
-            ? 'Nothing spent yet. Your first AI action shows up here, broken down by what it was for.'
-            : 'Sahoda could not read your spending just now. Nothing has been charged, and reloading will try again.'}
+            ? 'Nothing used yet. When Sahoda writes or plans for you, the credits it uses show up here.'
+            : 'Sahoda could not read your credit use just now. Nothing was charged. Reload to try again.'}
         </ChartSparse>
       )}
     </Panel>

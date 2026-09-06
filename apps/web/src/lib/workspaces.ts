@@ -2,6 +2,7 @@ import 'server-only'
 
 import { cache } from 'react'
 import { cookies } from 'next/headers'
+import { auth } from '@clerk/nextjs/server'
 
 import { createServerSupabase } from '@/lib/supabase/server'
 
@@ -28,6 +29,8 @@ export interface WorkspaceOption {
   name: string
   slug: string
   timezone: string | null
+  /** Clerk subject of whoever bootstrapped it. Read so the no-cookie fallback can prefer it. */
+  createdBy?: string | null
 }
 
 /**
@@ -63,14 +66,23 @@ export async function readWorkspaces(): Promise<WorkspacesRead> {
     const supabase = createServerSupabase()
     const { data, error } = await supabase
       .from('workspaces')
-      .select('id, name, slug, timezone')
+      .select('id, name, slug, timezone, created_by')
       .order('created_at', { ascending: true })
 
     if (error || !data) {
       if (error) console.error('[workspaces] read failed', error.code, error.message)
       return { status: 'unreadable' }
     }
-    return { status: 'ok', workspaces: data as WorkspaceOption[] }
+    return {
+      status: 'ok',
+      workspaces: (data as Array<Record<string, unknown>>).map((row) => ({
+        id: row.id as string,
+        name: row.name as string,
+        slug: row.slug as string,
+        timezone: (row.timezone as string | null) ?? null,
+        createdBy: (row.created_by as string | null) ?? null,
+      })),
+    }
   } catch (error) {
     console.error('[workspaces] read threw', error instanceof Error ? error.message : 'unknown')
     return { status: 'unreadable' }
@@ -98,16 +110,41 @@ export async function getActiveWorkspaceSlug(): Promise<string | null> {
 
 /**
  * Resolve which workspace is active: the cookie choice when it is still a
- * membership, otherwise the first. Returns null only when there are none.
+ * membership; otherwise the one this user created; otherwise the first.
+ * Returns null only when there are none.
+ *
+ * ── WHY "THE ONE YOU CREATED" SITS BETWEEN THE COOKIE AND "THE FIRST" ──────
+ * MEASURED 2026-09-06 on the wt-core preview: a user with no cookie set was
+ * added to a second, OLDER workspace; their very next request resolved to it,
+ * and a form they had filled in on their own workspace wrote into the other
+ * one. "First by created_at" is a fact about the table, not about the person.
+ * The workspace a person bootstrapped is the one they mean until they choose
+ * otherwise, and an invite must not move them without a click.
  */
 export function resolveActiveWorkspace(
   workspaces: readonly WorkspaceOption[],
   activeSlug: string | null,
+  userId: string | null = null,
 ): WorkspaceOption | null {
   const [first] = workspaces
   if (!first) return null
   const chosen = activeSlug ? workspaces.find((w) => w.slug === activeSlug) : undefined
-  return chosen ?? first
+  const own = userId ? workspaces.find((w) => w.createdBy === userId) : undefined
+  return chosen ?? own ?? first
+}
+
+/**
+ * The signed-in Clerk subject, or null outside a request (tests, build-time
+ * renders). Null only removes the "own workspace" preference; it never hides a
+ * workspace, because the list itself is already RLS-scoped to the caller.
+ */
+export async function currentUserId(): Promise<string | null> {
+  try {
+    const { userId } = await auth()
+    return userId ?? null
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -124,15 +161,38 @@ export type ActiveWorkspaceRead =
 
 /** The active workspace for the current request, with the reason when there is none. */
 export async function readActiveWorkspace(): Promise<ActiveWorkspaceRead> {
-  const [read, activeSlug] = await Promise.all([readWorkspaces(), getActiveWorkspaceSlug()])
+  const [read, activeSlug, userId] = await Promise.all([
+    readWorkspaces(),
+    getActiveWorkspaceSlug(),
+    currentUserId(),
+  ])
   if (read.status === 'unreadable') return { status: 'unreadable' }
-  const workspace = resolveActiveWorkspace(read.workspaces, activeSlug)
+  const workspace = resolveActiveWorkspace(read.workspaces, activeSlug, userId)
   return workspace === null ? { status: 'none' } : { status: 'ok', workspace }
 }
 
-/** The active workspace for the current request (RLS-scoped list + cookie pointer). */
+/**
+ * The active workspace for the current request (RLS-scoped list + cookie pointer).
+ *
+ * ── THROUGH THE MEMOISED READ, LIKE EVERYTHING ELSE ─────────────────────────
+ * This called `readActiveWorkspace` DIRECTLY, so every caller issued its own
+ * `workspaces` SELECT and its own cookie read on top of whatever the page's
+ * other readers had already done — `/posts` and `/planner` both do, beside
+ * `posts/read.ts`, `analytics/post-metrics.ts` and `loop/read.ts`, which all go
+ * through the memo.
+ *
+ * The cost is the smaller half. The reason `activeWorkspaceRead` exists at all
+ * is stated below: a private read per module is how two panels on one screen end
+ * up disagreeing about whether a workspace exists, and a page that resolved a
+ * DIFFERENT workspace from the reads whose rows it is labelling is the version
+ * of that with somebody's data in it.
+ *
+ * The `| null` collapse stays, and stays wrong for the reason the block above
+ * gives — `none` and `unreadable` are not the same answer. That is a separate
+ * change with its own callers to move; this one is about which read runs.
+ */
 export async function getActiveWorkspace(): Promise<WorkspaceOption | null> {
-  const read = await readActiveWorkspace()
+  const read = await activeWorkspaceRead()
   return read.status === 'ok' ? read.workspace : null
 }
 

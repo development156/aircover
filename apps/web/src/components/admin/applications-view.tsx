@@ -11,6 +11,7 @@ import {
   revokeApplicationInvite,
 } from '@/app/actions/ops-applications'
 import { cn } from '@/lib/utils'
+import { DEFAULT_ZONE } from '@/lib/time/zone'
 
 /**
  * A2 · The applications inbox (doc 13 §4).
@@ -28,7 +29,7 @@ const WHEN = new Intl.DateTimeFormat('en-IN', {
   month: 'short',
   hour: '2-digit',
   minute: '2-digit',
-  timeZone: 'Asia/Kolkata',
+  timeZone: DEFAULT_ZONE,
 })
 
 const STATUS_STYLE: Record<OpsApplicationStatus, string> = {
@@ -112,7 +113,7 @@ function Row({ application }: { application: OpsBetaApplication }) {
                 `Invitation sent to ${application.email}`,
               )
             }
-            className="rounded-pill bg-primary px-3 py-1 text-[12px] font-semibold text-primary-foreground transition-micro hover:bg-primary-strong hover:text-white disabled:pointer-events-none disabled:opacity-45"
+            className="rounded-pill bg-primary px-3 py-1 text-[12px] font-semibold text-primary-foreground transition-micro hover:bg-primary-strong hover:text-primary-strong-foreground disabled:pointer-events-none disabled:opacity-45"
           >
             {pending ? 'Working…' : 'Approve & invite'}
           </button>

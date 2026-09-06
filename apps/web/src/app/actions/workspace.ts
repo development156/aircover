@@ -6,6 +6,8 @@ import { redirect } from 'next/navigation'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { z } from 'zod'
 
+import { describeZoneRefusal, isKnownZone } from '@/lib/time/zone'
+
 import { slugify } from '@/lib/slug'
 import { createServerSupabase } from '@/lib/supabase/server'
 import {
@@ -17,6 +19,12 @@ import {
   type CreateWorkspaceState,
   type RpcEnvelope,
 } from '@/lib/workspace-bootstrap'
+import {
+  WORKSPACE_ROLE_REFUSAL,
+  WORKSPACE_ROLE_UNKNOWN,
+  canManageWorkspace,
+  getWorkspaceRole,
+} from '@/lib/workspace-role'
 import { ACTIVE_WORKSPACE_COOKIE } from '@/lib/workspaces'
 
 // NOTE: a `'use server'` module may only export async functions. Do NOT re-export
@@ -141,25 +149,30 @@ export async function setActiveWorkspace(formData: FormData): Promise<void> {
  * stays out: it IS a pointer, and this is not.
  */
 /**
- * A zone name this runtime can actually resolve.
+ * A zone name this runtime can actually resolve — THE SAME TEST THE READERS USE.
  *
- * `Intl.DateTimeFormat` throws `RangeError` on a zone it does not know, which
- * makes it the real test rather than a shape test. `Asia/Kolkatta` is one
- * keystroke from the real zone, would pass any regex, and would then quietly
- * shift every hour this product ever reports for that customer.
+ * ── THE WRITE GATE WAS WIDER THAN THE READ GATE ──────────────────────────────
+ * This used to be a local `isRealTimezone`: a bare `new Intl.DateTimeFormat`
+ * try/catch. `lib/time/zone.ts`'s `isKnownZone`, which every screen consults
+ * before rendering a time, additionally refuses a leading `+`/`-` and anything
+ * without a `/` (except `UTC`). So the two disagreed, and the save side was the
+ * generous one.
  *
- * The database trigger `workspaces_timezone_is_real` refuses the same value, so
- * this is the first of two independent checks rather than the only one. It is
- * here so the customer gets a sentence instead of a failed write.
+ * MEASURED on this Node: `IST`, `Japan`, `Singapore`, `Egypt`, `EST5EDT` and
+ * `+05:30` were all ACCEPTED and stored, and `isKnownZone` rejects every one.
+ * The customer saved, the field read the value back to them as saved, and every
+ * screen went on rendering IST with nothing anywhere saying the setting had been
+ * ignored. A setting that silently changes nothing is the defect this file's own
+ * comment names two paragraphs down.
+ *
+ * Importing the reader's predicate rather than restating it is the point: two
+ * copies of a rule are two rules, and these two had already drifted.
+ *
+ * The database trigger `workspaces_timezone_is_real` is a second, INDEPENDENT
+ * check and is deliberately not described as equivalent: it refuses
+ * `Asia/Kolkatta` and accepts `IST`, so it is wider than this. Narrowing it
+ * needs a migration, which is wt-db's to write.
  */
-function isRealTimezone(zone: string): boolean {
-  try {
-    new Intl.DateTimeFormat('en', { timeZone: zone })
-    return true
-  } catch {
-    return false
-  }
-}
 
 /**
  * Record where this business is, or withdraw the answer.
@@ -169,11 +182,17 @@ function isRealTimezone(zone: string): boolean {
  * that exist. Somebody who set the wrong zone has to be able to take it back to
  * "unknown" rather than being forced to leave a wrong answer standing.
  *
- * ── WHAT THIS DOES NOT DO ────────────────────────────────────────────────────
- * Nothing in the product reads this column yet. Every time on every screen is
- * still rendered in IST, from 38 hardcoded sites. The field says so, because a
- * setting that silently changes nothing is the same defect as a figure no query
- * produced.
+ * ── WHAT THIS DOES, AND WHAT IT STILL DOES NOT ───────────────────────────────
+ * This block used to read "Nothing in the product reads this column yet", and
+ * that stopped being true when `lib/time/zone.ts` landed and Posts began
+ * resolving times through it. The copy on the settings screen was rewritten in
+ * the same change; this comment was not, so the stale claim sat directly above
+ * the action the change had just made meaningful.
+ *
+ * Since 2026-09-06 the Planner is fully on it (every view, the mini calendar,
+ * the today count) and so is the schedule picker. What is still NOT on it: the
+ * inbox, the wallet, the asset library and the admin screens, which render in
+ * `DEFAULT_ZONE`; the settings copy says exactly that.
  */
 export async function setWorkspaceTimezone(
   workspaceId: string,
@@ -188,8 +207,18 @@ export async function setWorkspaceTimezone(
 
     const trimmed = timezone === null ? null : timezone.trim()
     const next = trimmed === null || trimmed.length === 0 ? null : trimmed
-    if (next !== null && !isRealTimezone(next)) {
-      return { ok: false, message: `Sahoda does not recognise the time zone ${next}.` }
+    if (next !== null && !isKnownZone(next)) {
+      // Which of the three refusals it was. "Sahoda does not recognise IST" is
+      // false — it is recognised and ambiguous, and those need different words.
+      return { ok: false, message: describeZoneRefusal(next) }
+    }
+
+    // A viewer may read the workspace but not move its clock. RLS does not
+    // close this (`ws_update` has no role predicate), so it is checked here,
+    // before the write.
+    const role = await getWorkspaceRole(id.data)
+    if (!canManageWorkspace(role)) {
+      return { ok: false, message: role === null ? WORKSPACE_ROLE_UNKNOWN : WORKSPACE_ROLE_REFUSAL }
     }
 
     const supabase = createServerSupabase()
@@ -221,10 +250,80 @@ export async function setWorkspaceTimezone(
      */
     if (!data) return { ok: false, message: 'That workspace could not be found.' }
 
+    // The same set the auto-detect write refreshes. Until 2026-09-07 a zone set
+    // by hand refreshed only /settings, so the Planner kept showing the old
+    // hours the settings copy had just promised it would not.
+    revalidatePath('/posts')
+    revalidatePath('/planner')
+    revalidatePath('/home')
     revalidatePath('/settings')
     return { ok: true, timezone: (data as { timezone: string | null }).timezone }
   } catch {
     return { ok: false, message: 'Could not save the time zone. Try again.' }
+  }
+}
+
+/**
+ * Auto-detect: store the browser's own zone as the workspace's, but ONLY when
+ * the workspace has none. Called on load from the client with
+ * `Intl.DateTimeFormat().resolvedOptions().timeZone`.
+ *
+ * ── WHY THIS IS NOT `setWorkspaceTimezone` ───────────────────────────────────
+ * That one OVERWRITES, because a person opened Settings and chose. This runs
+ * unbidden on every visit, so it must never move a chosen zone. `.is('timezone',
+ * null)` makes "only if unset" a condition of the UPDATE itself rather than a
+ * read-then-write two tabs could both pass — the write matches no row the moment
+ * a zone exists.
+ *
+ * ── WHY STORING A DETECTED ZONE IS HONEST, WHERE A DEFAULT IS NOT ─────────────
+ * `lib/time/zone.ts` refuses to write a DISPLAY fallback (IST/UTC) into the
+ * column because that fabricates a claim about where somebody lives. A zone the
+ * browser resolved is the reader's ACTUAL clock, not a fabrication — the same
+ * signal a person would type in Settings, arriving without the typing. It is
+ * validated by the same `isKnownZone` gate, so auto-detect can never store what
+ * a person could not, and Settings still overrides it.
+ *
+ * No row is not a failure: it means the zone was already set (every visit after
+ * the first) or RLS declined. Either way nothing changed and nothing is
+ * revalidated. Only a zone that actually landed revalidates the screens that
+ * render a scheduled time, so the display and the picker agree from that load.
+ */
+export async function autoDetectWorkspaceTimezone(
+  workspaceId: string,
+  detected: string,
+): Promise<{ ok: true; timezone: string | null } | { ok: false; message: string }> {
+  try {
+    const { userId } = await auth()
+    if (!userId) return { ok: false, message: 'Sign in first.' }
+
+    const id = z.uuid().safeParse(workspaceId)
+    if (!id.success) return { ok: false, message: 'That workspace could not be found.' }
+
+    // The same gate Settings applies: an offset, an abbreviation, or a name Intl
+    // cannot resolve is refused. Auto-detect must never write what a person could
+    // not type.
+    if (!isKnownZone(detected)) return { ok: false, message: 'Unrecognised time zone.' }
+
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase
+      .from('workspaces')
+      .update({ timezone: detected })
+      .eq('id', id.data)
+      .is('timezone', null) // never moves a zone a person chose
+      .select('timezone')
+      .maybeSingle()
+
+    if (error) return { ok: false, message: 'Could not save the time zone.' }
+    // Already set, or RLS declined — a no-op, not a write we may claim.
+    if (!data) return { ok: true, timezone: null }
+
+    revalidatePath('/posts')
+    revalidatePath('/planner')
+    revalidatePath('/home')
+    revalidatePath('/settings')
+    return { ok: true, timezone: (data as { timezone: string | null }).timezone }
+  } catch {
+    return { ok: false, message: 'Could not save the time zone.' }
   }
 }
 
@@ -242,6 +341,11 @@ export async function renameWorkspace(
 
     const id = z.uuid().safeParse(workspaceId)
     if (!id.success) return { ok: false, message: 'That workspace could not be found.' }
+
+    const role = await getWorkspaceRole(id.data)
+    if (!canManageWorkspace(role)) {
+      return { ok: false, message: role === null ? WORKSPACE_ROLE_UNKNOWN : WORKSPACE_ROLE_REFUSAL }
+    }
 
     const supabase = createServerSupabase()
     // `.select()` is not decorative: PostgREST returns a null error for an

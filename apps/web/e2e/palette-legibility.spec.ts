@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures/seeded-user'
-import { bootstrapWorkspace, leaveOnboarding } from './fixtures/compose'
+import { bootstrapWorkspace, dismissPlanOffer } from './fixtures/compose'
 import { decodePng, luminanceAt } from './helpers/png'
 
 /**
@@ -74,6 +74,8 @@ for (const theme of ['light', 'dark'] as const) {
     page,
     signedIn,
   }) => {
+    // Destructured to activate the fixture; `void` because the value itself is unused.
+    void signedIn
     await page.addInitScript((t) => {
       try {
         window.localStorage.setItem('sahoda-theme', t as string)
@@ -83,9 +85,12 @@ for (const theme of ['light', 'dark'] as const) {
     }, theme)
     await page.emulateMedia({ colorScheme: theme })
 
+    // `bootstrapWorkspace` already presses "I'll do this later" on the way out
+    // of onboarding. A second `leaveOnboarding` here waited 60s for a button
+    // that is not on /home (run 34009643341, both themes).
     await bootstrapWorkspace(page)
-    await leaveOnboarding(page)
     await page.goto('/home')
+    await dismissPlanOffer(page)
 
     const viewport = page.viewportSize()!
     // A fixed point well away from where the panel will open, so the only thing

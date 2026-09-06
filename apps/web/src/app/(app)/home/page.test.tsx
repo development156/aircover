@@ -10,6 +10,7 @@ import { readBalance, readLedger } from '@/lib/wallet/read'
 import { readBrain } from '@/lib/brand/read-brain'
 import { listConnections } from '@/lib/connections/read'
 
+import { readSubscription } from '@/lib/billing/read'
 import { hasDeferredOnboarding } from '@/lib/onboarding/defer'
 import { onboardingStateRead } from '@/lib/onboarding/read-onboarding-state'
 
@@ -85,6 +86,33 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('@/app/actions/posts', () => ({ createPost: vi.fn() }))
 
+/**
+ * ── THE PLAN OFFER'S THREE DEPENDENCIES, MOCKED FOR THE SAME REASON AS THE
+ *    NINE ABOVE ─────────────────────────────────────────────────────────────
+ * `readSubscription` decides whether the dialog is mounted at all, so it has to
+ * be steerable from here or the offer can never be asserted either way. Before
+ * it was mocked the real module ran, threw inside its own try/catch and returned
+ * `unreadable` — which is `silent`, so every test in this file passed while
+ * proving nothing about the offer. A read that fails quietly into the answer you
+ * were hoping for is the worst kind of green.
+ *
+ * `auth` and `startCheckout` are the other two: the first scopes a dismissal to
+ * a sign-in and pulls `server-only`, which throws in this environment; the
+ * second is a `'use server'` export that opens a real payment order.
+ */
+vi.mock('@/lib/billing/read', () => ({ readSubscription: vi.fn() }))
+// The page reads the workspace row for its timezone. `cookies()` has no
+// request scope under vitest, so the cached reader is answered here; every
+// other reader on the page is mocked above and never reaches it.
+vi.mock('@/lib/workspaces', () => ({
+  activeWorkspaceRead: vi.fn(async () => ({
+    status: 'ok',
+    workspace: { id: 'w1', name: 'W', slug: 'w', timezone: null },
+  })),
+}))
+vi.mock('@clerk/nextjs/server', () => ({ auth: async () => ({ sessionId: 'sess_test' }) }))
+vi.mock('@/app/actions/wallet', () => ({ startCheckout: vi.fn() }))
+
 const balanceRead = vi.mocked(readBalance)
 
 // The EMPTY sentinels each read returns for a workspace-less session, copied
@@ -119,8 +147,42 @@ const EMPTY_PUBLISH = {
   coveredFrom: null,
 }
 
+const FREE_SUBSCRIPTION = {
+  status: 'ok' as const,
+  data: {
+    workspaceId: '00000000-0000-4000-8000-000000000001',
+    planId: 'free' as const,
+    status: 'active' as const,
+    currentPeriodStart: null,
+    currentPeriodEnd: null,
+    cancelAtPeriodEnd: false,
+    pendingPlanId: null,
+    pendingPlanEffectiveAt: null,
+    graceEndsAt: null,
+    dunningAttempts: 0,
+    lastFailureAt: null,
+    lastFailureCode: null,
+  },
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.mocked(readSubscription).mockResolvedValue(FREE_SUBSCRIPTION)
+  /**
+   * jsdom implements no `<dialog>` at all, and the plan offer is a `<dialog>`
+   * that opens ITSELF on mount rather than on a click. Without these two, every
+   * test in this file throws `el.showModal is not a function` from the modal's
+   * effect — which is worth knowing about the real browser too: a client without
+   * `<dialog>` support would take the whole dashboard down, where the product's
+   * other fourteen modals would only fail to open when pressed. Every browser
+   * this product supports has shipped it since 2022.
+   */
+  HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
+    this.open = true
+  })
+  HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) {
+    this.open = false
+  })
   // The default is a finished account, which is what every assertion in this
   // file below the landing block is about. The landing block sets its own.
   vi.mocked(hasDeferredOnboarding).mockResolvedValue(false)
@@ -132,7 +194,7 @@ beforeEach(() => {
   // a half-populated one.
   vi.mocked(readBrain).mockResolvedValue({ status: 'no-brain' })
   vi.mocked(listConnections).mockResolvedValue([])
-  vi.mocked(readLedger).mockResolvedValue({ entries: [], skipped: 0 })
+  vi.mocked(readLedger).mockResolvedValue({ entries: [], skipped: 0, unreadable: false })
   vi.mocked(readSpend).mockResolvedValue(EMPTY_SPEND)
   vi.mocked(readPostCounts).mockResolvedValue(EMPTY_COUNTS)
   vi.mocked(readPublishSummary).mockResolvedValue(EMPTY_PUBLISH)
@@ -175,7 +237,7 @@ describe('Home for a user with no workspace yet', () => {
 
     // The credits card, the week strip and the spend chart all describe a
     // workspace. None of them has one to describe.
-    expect(screen.queryByText(/needs your attention/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /needs your ok/i })).not.toBeInTheDocument()
     expect(screen.queryByText(/credits to spend/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/nothing in flight yet/i)).not.toBeInTheDocument()
   })
@@ -239,8 +301,8 @@ describe('Home for a workspace with nothing in it', () => {
 
     expect(screen.getByTestId('home-get-started')).toBeInTheDocument()
     // The dashboard's containers, each of which owned its own empty state.
-    expect(screen.queryByText(/needs your attention/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/needs your attention/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /needs your ok/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /needs your ok/i })).not.toBeInTheDocument()
     expect(screen.queryByText(/credits spent/i)).not.toBeInTheDocument()
   })
 
@@ -261,7 +323,7 @@ describe('Home for a workspace with nothing in it', () => {
     render(await HomePage())
 
     expect(screen.queryByTestId('home-get-started')).not.toBeInTheDocument()
-    expect(screen.getByText(/needs your attention/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /needs your ok/i })).toBeInTheDocument()
   })
 
   test('an unreadable brain read does the same', async () => {
@@ -279,7 +341,7 @@ describe('Home for a workspace with nothing in it', () => {
     render(await HomePage())
 
     expect(screen.queryByTestId('home-get-started')).not.toBeInTheDocument()
-    expect(screen.getByText(/needs your attention/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /needs your ok/i })).toBeInTheDocument()
   })
 })
 
@@ -296,7 +358,7 @@ describe('Home for a workspace that exists', () => {
   test('renders the dashboard, not the first run', async () => {
     render(await HomePage())
 
-    expect(screen.getByText(/needs your attention/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /needs your ok/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /create workspace/i })).not.toBeInTheDocument()
   })
 
@@ -309,7 +371,7 @@ describe('Home for a workspace that exists', () => {
     // one first-run screen instead — a funded user told to create a workspace
     // they already have is the same lie pointing the other way.
     expect(screen.queryByRole('button', { name: /create workspace/i })).not.toBeInTheDocument()
-    expect(screen.getByText(/needs your attention/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /needs your ok/i })).toBeInTheDocument()
   })
 })
 
@@ -320,6 +382,50 @@ describe('Home for a workspace that exists', () => {
  * asks for it and obeys the answer — the half a pure test cannot reach, and the
  * half that would silently stop working if someone deleted one line here.
  */
+describe('the setup ladder on the full dashboard', () => {
+  beforeEach(() => {
+    balanceRead.mockResolvedValue({
+      status: 'ok',
+      balance: { total: 100, held: 0, available: 100, hasHold: false, heldNote: null },
+    })
+    vi.mocked(listPosts).mockResolvedValue([A_POST])
+  })
+
+  test('says what is missing once, at the top, and the cards stop repeating the remedy', async () => {
+    // One draft, no brain, no channel: the state the audit measured stating
+    // the same two absences six times across four containers.
+    render(await HomePage())
+
+    expect(screen.getByRole('region', { name: /1 of 3 set up/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /teach sahoda about your business/i })).toHaveAttribute(
+      'href',
+      '/onboarding',
+    )
+    // The Performance card keeps its slots and drops its copy of the remedy.
+    expect(screen.queryByText(/connect a social account to start counting/i)).toBeNull()
+  })
+
+  test('a workspace that is set up shows no ladder', async () => {
+    vi.mocked(readBrain).mockResolvedValue({
+      status: 'ok',
+      active: { voice: { descriptor: 'Warm', formality_label: 'Casual' } },
+      version: 1,
+      provenance: new Map(),
+      meta: undefined,
+      intake: undefined,
+      source: 'resolved',
+      appliedFromLearning: false,
+    } as unknown as Awaited<ReturnType<typeof readBrain>>)
+    vi.mocked(listConnections).mockResolvedValue([
+      { id: 'c1', platform: 'instagram', status: 'active' },
+    ] as unknown as Awaited<ReturnType<typeof listConnections>>)
+
+    render(await HomePage())
+
+    expect(screen.queryByRole('region', { name: /set up/i })).toBeNull()
+  })
+})
+
 describe('the landing rule on the page that lands', () => {
   beforeEach(() => {
     balanceRead.mockResolvedValue({
@@ -341,7 +447,7 @@ describe('the landing rule on the page that lands', () => {
     // `redirect` throws, so the JSX below it is never reached. If it were a
     // silent spy this would be a dashboard drawn under a passing assertion.
     expect(screen.queryByTestId('home-get-started')).not.toBeInTheDocument()
-    expect(screen.queryByText(/needs your attention/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /needs your ok/i })).not.toBeInTheDocument()
   })
 
   test('a finished account gets the dashboard', async () => {
@@ -372,5 +478,118 @@ describe('the landing rule on the page that lands', () => {
     render(await HomePage())
 
     expect(screen.getByTestId('home-get-started')).toBeInTheDocument()
+  })
+})
+
+/**
+ * ── DOES THE DASHBOARD ACTUALLY MOUNT THE PLAN OFFER? ────────────────────────
+ *
+ * `lib/billing/plan-offer.test.ts` proves the DECISION and
+ * `components/billing/plan-offer-modal.test.tsx` proves the DIALOG. Both mount
+ * the component by hand, so between them they would still pass if this page had
+ * never been wired up at all. This block is the join: the real page, the real
+ * decision, and a subscription read steered to each of the two answers that
+ * matter.
+ */
+describe('the plan offer on the dashboard', () => {
+  const OFFER = 'Choose the right plan for you'
+  const offerHeading = () => screen.queryByRole('heading', { name: OFFER })
+  /**
+   * AWAITED, because the dialog is fetched on demand. `plan-offer-mount.tsx`
+   * loads it with `next/dynamic` so its weight stays out of /home's first load,
+   * and the budget that decision came from is recorded there. A synchronous
+   * lookup finds nothing and would read as "the page does not mount the offer",
+   * which is the opposite of what it means.
+   */
+  const findOffer = () => screen.findByRole('heading', { name: OFFER })
+
+  test('a workspace on Free that has done something AND spent most of its credits is offered the plans', async () => {
+    vi.mocked(listPosts).mockResolvedValue([A_POST])
+    balanceRead.mockResolvedValue({
+      status: 'ok',
+      balance: { total: 40, held: 0, available: 40, hasHold: false, heldNote: null },
+    })
+    render(await HomePage())
+
+    expect(await findOffer()).toBeInTheDocument()
+  })
+
+  test('a workspace that has done something but still holds most of its free credits is NOT', async () => {
+    // MEASURED 2026-09-06 on the wt-core preview: one saved draft, 100 of 100
+    // credits unspent, and the dialog over the first full dashboard. The
+    // founder delegated the signal; the decision now waits until half of the
+    // free grant is gone.
+    vi.mocked(listPosts).mockResolvedValue([A_POST])
+    balanceRead.mockResolvedValue({
+      status: 'ok',
+      balance: { total: 100, held: 0, available: 100, hasHold: false, heldNote: null },
+    })
+    render(await HomePage())
+
+    expect(screen.getByRole('heading', { name: /needs your ok/i })).toBeInTheDocument()
+    expect(offerHeading()).toBeNull()
+  })
+
+  test('a workspace on a paid plan is NOT', async () => {
+    // The expensive failure this whole feature can produce: a pricing wall in
+    // front of somebody who has already paid.
+    vi.mocked(readSubscription).mockResolvedValue({
+      ...FREE_SUBSCRIPTION,
+      data: { ...FREE_SUBSCRIPTION.data, planId: 'growth', status: 'active' },
+    })
+
+    render(await HomePage())
+
+    // Absence needs no wait: when the decision is `silent` the page renders no
+    // mount at all, so there is no chunk on its way. The positive cases above
+    // prove the awaited form does resolve, which is what stops this from being
+    // a test that passes because the dialog is merely slow.
+    expect(offerHeading()).toBeNull()
+  })
+
+  test('a subscription read that failed offers nothing, rather than guessing Free', async () => {
+    vi.mocked(readSubscription).mockResolvedValue({ status: 'unreadable' })
+
+    render(await HomePage())
+
+    expect(offerHeading()).toBeNull()
+  })
+
+  test('an account with no workspace is offered nothing, because it cannot check out', async () => {
+    vi.mocked(readSubscription).mockResolvedValue({ status: 'no-workspace' })
+    balanceRead.mockResolvedValue({ status: 'no-workspace' })
+
+    render(await HomePage())
+
+    expect(offerHeading()).toBeNull()
+  })
+
+  test('the empty dashboard gets NO offer: a plan is not the first thing a new workspace sees', async () => {
+    // This test used to pin the opposite, and its reasoning is worth keeping:
+    // the account most likely to be weighing a plan is the one on this screen.
+    // MEASURED 2026-09-05 in a real browser, the effect was that a workspace
+    // which had just finished onboarding met a pricing dialog before it had
+    // seen its own dashboard. Founder's ruling the same day: the offer waits
+    // until the workspace has done something. `planOfferDecision` takes
+    // `hasStarted` so the rule lives in the decision, not in this JSX.
+    //
+    // The balance is set here rather than left to the shared `beforeEach`, which
+    // does not set it: `vi.clearAllMocks()` clears CALLS and leaves the
+    // IMPLEMENTATION, so whichever test ran last is still answering. Written
+    // without this line, this test inherited a `no-workspace` balance from four
+    // tests earlier and rendered the first-run screen.
+    balanceRead.mockResolvedValue({
+      status: 'ok',
+      balance: { total: 100, held: 0, available: 100, hasHold: false, heldNote: null },
+    })
+    vi.mocked(listPosts).mockResolvedValue([])
+    vi.mocked(listConnections).mockResolvedValue([])
+    vi.mocked(readBrain).mockResolvedValue({ status: 'no-brain' })
+
+    render(await HomePage())
+
+    expect(screen.getByTestId('home-get-started')).toBeInTheDocument()
+    // Absence needs no wait: a `silent` decision renders no mount at all.
+    expect(offerHeading()).toBeNull()
   })
 })

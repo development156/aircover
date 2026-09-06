@@ -11,9 +11,22 @@ function variant(
   channel: Channel,
   publishStatus: VariantPublishStatus,
   publishedMode: PublishMode | null = null,
+  over: Partial<CandidateVariant> = {},
 ): CandidateVariant {
-  return { variantId: `v-${channel}`, channel, publishStatus, publishedMode }
+  return {
+    variantId: `v-${channel}`,
+    channel,
+    publishStatus,
+    publishedMode,
+    claimedAt: null,
+    awaitingPlatform: false,
+    ...over,
+  }
 }
+
+/** A claim taken `ageSeconds` before NOW. */
+const claimedAgo = (ageSeconds: number): string =>
+  new Date(NOW.getTime() - ageSeconds * 1000).toISOString()
 
 function candidate(
   postId: string,
@@ -348,5 +361,109 @@ describe('runDispatchSweep — a deployment with no publish queue', () => {
     expect(enqueuePublish).not.toHaveBeenCalled()
     expect(report.queueUnavailable).toBe(0)
     expect(report.wouldDispatch).toBe(1)
+  })
+})
+
+/**
+ * apps/jobs/CLAUDE.md rule 5: a sweep may not hide its own failure. These catches
+ * used to be bare `catch { report.failed += 1 }` — the tick answered 200 with
+ * `dispatch.failed: 25` and no stack trace anywhere, and the same 25 posts failed
+ * every five minutes with a counter in a JSON body as the only evidence.
+ */
+describe('runDispatchSweep — the real error reaches onFailure', () => {
+  it('hands a throwing settlePost to onFailure, once, with the error itself', async () => {
+    const boom = new Error('permission denied for table posts')
+    const onFailure = vi.fn()
+    const d = deps({
+      listCandidates: async () => [candidate('p1', 10, [variant('x', 'published', 'live')])],
+      settlePost: vi.fn(async () => {
+        throw boom
+      }),
+      onFailure,
+    })
+
+    const report = await runDispatchSweep(d)
+
+    expect(report.failed).toBe(1)
+    expect(onFailure).toHaveBeenCalledTimes(1)
+    expect(onFailure).toHaveBeenCalledWith({ stage: 'settle', postId: 'p1', error: boom })
+  })
+
+  it('hands a throwing expirePost to onFailure', async () => {
+    const boom = new Error('deadlock detected')
+    const onFailure = vi.fn()
+    const d = deps({
+      listCandidates: async () => [candidate('p1', 120, [variant('x', 'pending')])],
+      expirePost: vi.fn(async () => {
+        throw boom
+      }),
+      onFailure,
+    })
+
+    await runDispatchSweep(d)
+
+    expect(onFailure).toHaveBeenCalledWith({ stage: 'expire', postId: 'p1', error: boom })
+  })
+
+  it('hands a real enqueue failure to onFailure, but not a refused queue', async () => {
+    // `queueUnavailable` is a deliberate refusal in a deployment with no queue: nothing
+    // was attempted, so there is no failure to report.
+    const boom = new Error('connection terminated')
+    const onFailure = vi.fn()
+    const d = deps({
+      listCandidates: async () => [
+        candidate('p1', 10, [variant('x', 'pending')]),
+        candidate('p2', 10, [variant('x', 'pending')]),
+      ],
+      enqueuePublish: vi.fn(async (intent: { postId: string }) => {
+        if (intent.postId === 'p1') throw boom
+        throw new PublishQueueUnavailableError()
+      }),
+      onFailure,
+    })
+
+    const report = await runDispatchSweep(d)
+
+    expect(report.failed).toBe(1)
+    expect(report.queueUnavailable).toBe(1)
+    expect(onFailure).toHaveBeenCalledTimes(1)
+    expect(onFailure).toHaveBeenCalledWith({ stage: 'enqueue', postId: 'p1', error: boom })
+  })
+})
+
+/**
+ * The lease reaches the classifier through the sweep. Without this a `publishing`
+ * variant whose publisher died was held as in-flight on every tick for ever.
+ */
+describe('runDispatchSweep — a dead publisher is re-dispatched', () => {
+  it('enqueues a `publishing` variant whose claim is older than the default lease', async () => {
+    const d = deps({
+      listCandidates: async () => [
+        candidate('p1', 10, [
+          variant('instagram', 'publishing', null, { claimedAt: claimedAgo(601) }),
+        ]),
+      ],
+    })
+
+    const report = await runDispatchSweep(d)
+
+    expect(report.enqueued).toBe(1)
+    expect(report.holdsByReason['in-flight']).toBeUndefined()
+  })
+
+  it('honours a longer lease when the caller passes one', async () => {
+    const d = deps({
+      leaseSeconds: 3600,
+      listCandidates: async () => [
+        candidate('p1', 10, [
+          variant('instagram', 'publishing', null, { claimedAt: claimedAgo(601) }),
+        ]),
+      ],
+    })
+
+    const report = await runDispatchSweep(d)
+
+    expect(report.enqueued).toBe(0)
+    expect(report.holdsByReason['in-flight']).toBe(1)
   })
 })

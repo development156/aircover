@@ -4,6 +4,7 @@ import { FileInput, Inbox, Users } from 'lucide-react'
 import { EmptyState } from '@/components/empty-state'
 import { PageTitle } from '@/components/page-title'
 import { Board } from '@/components/leads/board'
+import { embedOrigin } from '@/lib/leads/embed-origin'
 import { LEADS_LIMIT, readLeads } from '@/lib/leads/read'
 import { recentSites } from '@/lib/sites/read'
 
@@ -100,7 +101,7 @@ export default async function LeadsPage() {
  * own contact form yet, and the reason is specific and checkable.
  */
 function Doors({ slug }: { slug: string | null }) {
-  const origin = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.sahodalabs.com'
+  const origin = embedOrigin(process.env.NEXT_PUBLIC_APP_URL)
   return (
     <section aria-labelledby="leads-doors" className="flex flex-col gap-3">
       <div>
@@ -111,7 +112,7 @@ function Doors({ slug }: { slug: string | null }) {
       </div>
 
       <div className="grid gap-3 wide:grid-cols-2">
-        <article className="surface-ring rounded-card bg-surface p-4">
+        <article className="surface-ring min-w-0 rounded-card bg-surface p-4">
           <FileInput size={16} strokeWidth={1.8} aria-hidden className="text-muted" />
           <h3 className="type-h3 mt-1.5 text-ink">A contact form on your site</h3>
           <p className="type-sm mt-1 text-muted">
@@ -140,7 +141,7 @@ function Doors({ slug }: { slug: string | null }) {
           </p>
         </article>
 
-        <article className="surface-ring rounded-card bg-surface p-4">
+        <article className="surface-ring min-w-0 rounded-card bg-surface p-4">
           <Inbox size={16} strokeWidth={1.8} aria-hidden className="text-muted" />
           <h3 className="type-h3 mt-1.5 text-ink">A message in your inbox</h3>
           <p className="type-sm mt-1 text-muted">

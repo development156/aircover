@@ -57,6 +57,12 @@ export interface AutopilotSettings {
   dailyCap: number | null
   cancelMinutes: number | null
   weeklyBudgetCredits: number | null
+  /**
+   * `loop_settings.paused`: the kill switch a person can press. False for a
+   * workspace with no row, because "never opened the Loop" is already refused
+   * by the nulls above and must not read as "stopped by the customer".
+   */
+  paused: boolean
 }
 
 export async function readSettings(workspaceId: string): Promise<AutopilotSettings> {
@@ -66,12 +72,14 @@ export async function readSettings(workspaceId: string): Promise<AutopilotSettin
         autopilot_daily_cap: number | null
         autopilot_cancel_minutes: number | null
         weekly_budget_credits: number | null
+        paused: boolean | null
       }
     | undefined
   return {
     dailyCap: row?.autopilot_daily_cap ?? null,
     cancelMinutes: row?.autopilot_cancel_minutes ?? null,
     weeklyBudgetCredits: row?.weekly_budget_credits ?? null,
+    paused: row?.paused === true,
   }
 }
 

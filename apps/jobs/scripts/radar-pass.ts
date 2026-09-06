@@ -15,11 +15,20 @@
  * no environment value. GitHub Actions logs are retained and readable by anyone
  * with repository access, and a secret printed once is a secret to rotate.
  *
+ * ── WHAT IT DOES SPEND ───────────────────────────────────────────────────────
+ * It CHARGES `radar_scan`, because it runs the same pass the weekly cron does
+ * and that pass is what makes /radar's "5 credits each" true. This paragraph
+ * used to say the script would never charge a customer's credits; that stopped
+ * being true the day the charge was wired in, and a stale reassurance about
+ * money is worse than none. A page that will not load is held for and released,
+ * so a gap still costs nobody anything.
+ *
  * ── WHAT IT WILL NOT DO ──────────────────────────────────────────────────────
- * Publish, reply, charge a customer's credits, or touch a post. It reads public
- * pages and writes four Radar tables, two of which refuse UPDATE outright.
+ * Publish, reply, or touch a post. It reads public pages and writes four Radar
+ * tables, two of which refuse UPDATE outright.
  */
 import pg from 'pg'
+import { createPgLedgerPort, createWithCredits } from '@sahoda/billing'
 
 import { createRadarPgDb } from '../src/radar/pg'
 import { runRadarPass, type RadarPassReport } from '../src/radar/run'
@@ -99,13 +108,15 @@ function print(report: RadarPassReport): void {
   console.log(`changed           ${report.changed}`)
   console.log(`could not check   ${report.couldNotCheck}   <- GAPS, not quiet days`)
   console.log(`refused by cap    ${report.refused.length}`)
+  console.log(`scans charged     ${report.credits.debited}`)
+  console.log(`skipped, no funds ${report.credits.unpaid}`)
   for (const r of report.refused.slice(0, 5)) console.log(`  · ${r.reason}`)
   console.log(`snapshots written ${report.snapshotsWritten}`)
   console.log(`changes written   ${report.changesWritten}`)
   console.log(`free-check rate   ${(report.freeCheckRate * 100).toFixed(1)}%`)
-  // Split, never summed into one figure: Zyte reports cost nowhere, so an
-  // estimate added to a measurement is not a total, it is a guess with a
-  // decimal point.
+  // Split, never summed into one figure: an estimate added to a measurement is
+  // not a total, it is a guess with a decimal point. (Website renders are free
+  // since TinyFish replaced Zyte and land in the free column.)
   console.log(`spend measured    ${usd(s.measured)}`)
   console.log(`spend estimated   ${usd(s.estimated)}   <- list price, unverifiable`)
 }
@@ -121,7 +132,7 @@ async function main(): Promise<number> {
   }
   console.log(await classifyHost(dbUrl))
 
-  for (const name of ['APIFY_TOKEN', 'ZYTE_API_KEY'] as const) {
+  for (const name of ['APIFY_TOKEN', 'TINYFISH_API_KEY'] as const) {
     // Named, never echoed. A missing provider is not fatal: the sources it would
     // serve are recorded as gaps and the rest of the pass still runs.
     if (!process.env[name]) console.log(`${name}: absent — its sources will be recorded as gaps`)
@@ -136,14 +147,18 @@ async function main(): Promise<number> {
   try {
     const report = await runRadarPass({
       db: createRadarPgDb(pool),
-      // The PROVIDER transport only — Apify and Zyte, whose URLs this repository
+      // The customer's per-scan credits, settled through `app.apply_ledger_entry`
+      // like every other charge. Same pool: one connection budget, one place a
+      // failure shows up.
+      withCredits: createWithCredits(createPgLedgerPort({ connectionString: dbUrl, pool })),
+      // The PROVIDER transport only — Apify and TinyFish, whose URLs this repository
       // writes. The competitor's own page is fetched by `fetchPage`, which is
       // deliberately NOT named here so it takes its guarded default. Handing the
       // raw global to both is the defect this split closes: it made
       // `http://169.254.169.254/` a fetchable competitor.
       fetch: globalThis.fetch as never,
       ...(process.env.APIFY_TOKEN ? { apifyToken: process.env.APIFY_TOKEN } : {}),
-      ...(process.env.ZYTE_API_KEY ? { zyteApiKey: process.env.ZYTE_API_KEY } : {}),
+      ...(process.env.TINYFISH_API_KEY ? { tinyfishApiKey: process.env.TINYFISH_API_KEY } : {}),
       batch: Number(arg('batch') ?? DEFAULT_BATCH),
     })
     print(report)

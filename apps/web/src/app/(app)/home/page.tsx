@@ -1,5 +1,11 @@
 import { redirect } from 'next/navigation'
+import { auth } from '@clerk/nextjs/server'
 import { creditCost } from '@sahoda/shared'
+
+import { PlanOfferMount } from '@/components/billing/plan-offer-mount'
+import { planOfferDecision } from '@/lib/billing/plan-offer'
+import { planOfferRows } from '@/lib/billing/plan-offer-rows'
+import { readSubscription } from '@/lib/billing/read'
 
 import { AtAGlance } from '@/components/home/at-a-glance'
 import { FirstRun } from '@/components/home/first-run'
@@ -11,7 +17,9 @@ import { BrainCard, ConnectionsCard } from '@/components/home/rail-cards'
 import { countIndexedDocuments } from '@/lib/knowledge/store'
 import { InstagramInsights } from '@/components/home/instagram-insights'
 import { PerformanceStrip } from '@/components/analytics/performance-strip'
+import { LiveConsole } from '@/components/home/live-console'
 import { SahodaRail } from '@/components/home/sahoda-rail'
+import { SetupStrip } from '@/components/home/setup-strip'
 import { SpendCard } from '@/components/home/spend-card'
 import { WeekStrip } from '@/components/home/week-strip'
 import { StaggerItem } from '@/components/motion/stagger'
@@ -26,7 +34,13 @@ import { onboardingStateRead } from '@/lib/onboarding/read-onboarding-state'
 import { readPostCounts } from '@/lib/home/posts'
 import { readPublishSummary } from '@/lib/home/publishing'
 import { readSpend } from '@/lib/home/spend'
+import { readCronRun } from '@/lib/cron/heartbeat-store'
+import { balanceSeries } from '@/lib/home/balance-history'
+import { liveLines } from '@/lib/home/live'
+import { setupLadder } from '@/lib/home/setup'
 import { startSteps, workspaceHasStarted, type StartedSignals } from '@/lib/home/started'
+import { resolveDisplayZone } from '@/lib/time/zone'
+import { activeWorkspaceRead } from '@/lib/workspaces'
 import { bucketWeek } from '@/lib/planner/week'
 import { forDisplay } from '@/lib/posts/display-post'
 import { listPosts, listVariantStates } from '@/lib/posts/read'
@@ -156,6 +170,10 @@ export default async function HomePage() {
     brain,
     connections,
     knowledgeDocuments,
+    subscription,
+    session,
+    workspace,
+    sweepRanAt,
   ] = await Promise.all([
     /**
      * IN THE BATCH, NOT IN FRONT OF IT.
@@ -196,7 +214,39 @@ export default async function HomePage() {
      * rather than a zero: a failed read is not an empty library.
      */
     countIndexedDocuments(),
+    /**
+     * The plan offer's read. In the batch rather than on its own line below —
+     * see the offer's own note for the guard that decided that. It short-circuits
+     * on a null workspace without touching the database, like the rest of them.
+     */
+    readSubscription(),
+    /**
+     * The Clerk session, for the plan offer's dismissal key. In the batch for
+     * the same reason `readSubscription` is: `lib/perf/read-waterfall.test.ts`
+     * counts a bare `await` below this block as a sequential read and refuses
+     * it, and it was right both times — a round trip in front of the dashboard
+     * costs every returning customer, where being in the batch costs only the
+     * accounts on their way into onboarding one throwaway call.
+     */
+    auth(),
+    /**
+     * The workspace row, for its timezone. Already `cache()`d by every reader
+     * above, so this is the shared promise and not a fourteenth query.
+     */
+    activeWorkspaceRead(),
+    /**
+     * When the publishing sweep last ran, for the live console's last line.
+     * One Upstash GET; null without credentials, which the console renders as
+     * the schedule rather than as a failure.
+     */
+    readCronRun('sweeps').catch(() => null),
   ])
+
+  // The greeting's clock is the workspace's, not Kolkata's. `resolveDisplayZone`
+  // falls back to IST for a workspace that never set one.
+  const zone = resolveDisplayZone(
+    workspace.status === 'ok' ? workspace.workspace.timezone : null,
+  ).zone
 
   // THE RULING, ACTED ON. Everything above was read in parallel with the
   // decision; nothing below this line renders for an account that belongs in
@@ -208,6 +258,54 @@ export default async function HomePage() {
   // workspace WITHOUT touching the database, so this branch costs nothing and the
   // dashboard is replaced rather than rendered empty. See FirstRun for why.
   if (balance.status === 'no-workspace') return <FirstRun now={now} />
+
+  /**
+   * ── THE PLANS, OFFERED ONCE TO A WORKSPACE THAT IS NOT ON ONE ──────────────
+   *
+   * /home is where a session lands (see the landing rule above), so it is where
+   * "on arriving at the dashboard" happens. Mounting this in the `(app)` layout
+   * was the other candidate and was refused for the same reason the landing rule
+   * is not there: the layout runs for every route in the group, so the offer
+   * would appear over /posts, over a typed URL and over every refresh. That is a
+   * wall, not an offer.
+   *
+   * ── AND ITS READ IS IN THE BATCH ABOVE, BECAUSE A GUARD INSISTED ──────────
+   * It was written as its own `await` on this line, with a comment arguing that
+   * only accounts which actually reach the dashboard should pay for it.
+   * `lib/perf/read-waterfall.test.ts` refused: "/(app)/home: 7 to 8 sequential
+   * reads (new: readSubscription)". The guard is right and the argument was
+   * wrong. A sequential read is a whole extra round trip in front of EVERY
+   * returning customer's dashboard, and what it was buying was one saved query
+   * for an account on its way into onboarding. That is the same trade the batch
+   * already makes for its other nine reads, and its own comment says so.
+   *
+   * ── THE SESSION ID IS READ ON THE CLIENT, NOT HERE ────────────────────────
+   * The dismissal is scoped to the Clerk session so that closing it lasts for
+   * one sign-in and no longer. The obvious way to get that id is `auth()` on
+   * this server component, and it was written that way first. It broke four
+   * tests in this page's own suite: `auth()` pulls in `server-only`, which
+   * throws under the component test environment, and every existing assertion
+   * about the landing rule went red naming a Realtime auth token.
+   *
+   * That was the test telling the truth about a real cost — a whole Clerk
+   * server module dragged into the dashboard's render for one string the
+   * browser already has. `useAuth()` in the modal reads it where it is used, and
+   * this page keeps exactly one new read.
+   *
+   * ── AND IT SHOWS RUPEES, WITH NO LOCAL APPROXIMATION ──────────────────────
+   * /wallet converts its prices for the reader's country, which costs two more
+   * reads: the billing profile for a declared country and today's FX rates. Both
+   * on the hottest route in the product, for an approximation, when the rupee
+   * figure IS the charge — `plans.ts` is explicit that every plan is billed in
+   * rupees and anything else is an approximation of one. So the dialog states
+   * the charge and says it is in rupees, and /wallet stays the screen that
+   * converts. The component keeps the props for a caller that wants to pay for
+   * them.
+   */
+  // Decided below, once `workspaceHasStarted` has spoken: the offer waits for
+  // the workspace's first action, and that verdict is the same one that picks
+  // the empty dashboard over the full one.
+  let offer: React.ReactNode = null
 
   /**
    * ── AND A WORKSPACE THAT EXISTS AND HOLDS NOTHING GETS ITS OWN SCREEN TOO ──
@@ -235,8 +333,49 @@ export default async function HomePage() {
     // shop with an Instagram following has something to report on day one.
     accountReported: instagram.kind === 'ready' && instagram.insights.length > 0,
   }
-  if (!workspaceHasStarted(signals)) {
-    return <GetStarted now={now} steps={startSteps()} />
+  const started = workspaceHasStarted(signals)
+  /**
+   * ── THE THREE DOORS, WITH A TICK EACH ──────────────────────────────────────
+   * The same list `GetStarted` shows a workspace with nothing in it, for the
+   * workspace that has begun but not finished — which is most of them, most
+   * of the time. docs/37 §15: one absence, one statement, at the top, with the
+   * action. The cards below keep their structure and stop repeating it.
+   */
+  const ladder = setupLadder({
+    hasBrain: signals.hasBrain,
+    connections: signals.connections,
+    posts: posts.length,
+  })
+  const channelStated = !ladder.steps.some((step) => step.id === 'connect' && step.done)
+  offer =
+    session.sessionId !== null &&
+    planOfferDecision(subscription, {
+      hasStarted: started,
+      // The balance was read for the board; the offer reads the same number,
+      // so the dialog and the "Credits left" cell can never disagree about
+      // whether the free grant is running out.
+      creditsAvailable: balance.status === 'ok' ? balance.balance.available : null,
+    }).kind === 'offer' ? (
+      <PlanOfferMount sessionKey={session.sessionId} plans={planOfferRows()} />
+    ) : null
+
+  if (!started) {
+    /* The offer rides BOTH dashboard states. A workspace with nothing in it yet
+       is still a workspace on Free, and it is the account most likely to be
+       weighing a plan. It used to ride this branch for that reason. MEASURED
+       2026-09-05 in a real browser, the effect was a pricing dialog over the
+       first dashboard a workspace ever saw, before it had done anything, and
+       the founder ruled the same day that the offer waits for the first action.
+       `planOfferDecision` takes `hasStarted` and returns `silent` here, exactly
+       as it does for an account with NO workspace (which cannot check out at
+       all): both exclusions live in the decision rather than in this JSX, so
+       `{offer}` stays on every branch and is null on the ones it must not reach. */
+    return (
+      <>
+        <GetStarted now={now} steps={startSteps()} />
+        {offer}
+      </>
+    )
   }
 
   // The evidence behind `.is-real` on the strip. This page read publish-log
@@ -252,7 +391,7 @@ export default async function HomePage() {
   // display posts, and calling `forDisplay` twice would be two chances to leak
   // a raw `post.status` into a component.
   const displayPosts = posts.map(forDisplay)
-  const buckets = bucketWeek(displayPosts, now)
+  const buckets = bucketWeek(zone, displayPosts, now)
 
   const weekIds = new Set(buckets.days.flatMap((day) => day.posts.map((post) => post.id)))
   const draftedThisWeek = posts.filter(
@@ -284,7 +423,11 @@ export default async function HomePage() {
       {/* The header. Carries the page's ONE primary action, which this screen
           previously did not have at all: it was a dashboard you could only
           read. No band behind it any more — see the component. */}
-      <GreetingBanner greeting={greetingFor(now)} state={greetingState(counts, publish)} />
+      <GreetingBanner greeting={greetingFor(now, zone)} state={greetingState(counts, publish)} />
+
+      {/* Renders nothing once the three doors are done. Not staggered: it is
+          the greeting's second line, not a region arriving. */}
+      <SetupStrip ladder={ladder} />
 
       {/* ── FOUR NUMBERS AS ONE BOARD, NOT FOUR BOXES ─────────────────────
           All four are counts of rows this product owns or a ledger balance, so
@@ -294,7 +437,19 @@ export default async function HomePage() {
           for the argument, which is that thirteen separate boxes down one page
           is most of what made this screen read as assembled parts. */}
       <StaggerItem i={0}>
-        <AtAGlance posts={displayPosts} buckets={buckets} publish={publish} balance={balance} />
+        <AtAGlance
+          zone={zone}
+          posts={displayPosts}
+          buckets={buckets}
+          publish={publish}
+          balance={balance}
+          /* From the fifty ledger rows the activity feed already holds: the
+             one series every workspace can draw on day one, at no extra read.
+             An unreadable ledger is an empty list, and the cell keeps its
+             figure without a line — a chart is never drawn from a read that
+             did not answer. */
+          history={ledger.unreadable ? [] : balanceSeries(ledger.entries, now)}
+        />
       </StaggerItem>
 
       {/* ── WHAT NEEDS ME — FULL WIDTH, AND THAT IS THE RESTRUCTURE ───────
@@ -328,7 +483,10 @@ export default async function HomePage() {
               reader unable to tell "we measured nothing" from "this product
               does not measure". */}
           <StaggerItem i={2}>
-            <PerformanceStrip analytics={instagram} />
+            {/* `reasonStated` while the ladder above already says "Connect a
+                channel": the card keeps its four named slots and drops the
+                second copy of the remedy. */}
+            <PerformanceStrip analytics={instagram} reasonStated={channelStated} />
           </StaggerItem>
 
           <StaggerItem i={3}>
@@ -342,50 +500,110 @@ export default async function HomePage() {
           </StaggerItem>
 
           <StaggerItem i={5}>
-            <WeekStrip buckets={buckets} variantStates={variantStates} />
+            <WeekStrip buckets={buckets} variantStates={variantStates} zone={zone} />
           </StaggerItem>
         </div>
 
-        <div className="flex flex-col gap-6 max-narrow:gap-5">
-          {/* 1 — WHAT HAPPENED. The reference puts the activity feed at the
-                  top of the rail; this app had it as a full-width table at the
-                  very bottom, which is the least-read position on the page. */}
-          <StaggerItem i={6}>
-            {/* `flush`: the feed's rows run to the card's own edge, so the body
-                may not carry the standard 20px inset. The header still does, so
-                this heading sits on the same line as every other card's. */}
-            <HomeSection
-              id="home-activity"
-              title="Recent activity"
-              action={{ href: '/wallet', label: 'View all' }}
-              flush
-            >
-              <ActivityFeed entries={ledger.entries.slice(0, 4)} />
-            </HomeSection>
+        {/* ── THE RAIL: TWO COLUMNS IN THE MIDDLE BAND ─────────────────────
+            Below `wide` the split collapses and the rail stacks under the
+            report. MEASURED 2026-09-06 at 1024 and 768: four 380px-designed
+            cards stretched to ~900px, one holding a single sentence, and the
+            page ran 2,014px. Two columns from `narrow` up, back to one at
+            `wide` where the rail is a rail again. */}
+        <div className="grid grid-cols-1 items-start gap-6 narrow:grid-cols-2 wide:grid-cols-1 max-narrow:gap-5">
+          {/* ── WHAT NEXT BEFORE WHAT HAPPENED, UNTIL SETUP IS DONE ───────────
+              The reference puts the activity feed at the top of the rail, and
+              for a workspace that is set up it belongs there: the ledger is
+              the money. A workspace still missing a channel or a brain opens
+              the app to finish setting up, so its rail leads with the two
+              cards that are doors — Connections, then Brand Brain — and the
+              feed follows. One order per state, decided by the same ladder
+              that renders the strip above. */}
+          {/* ── RIGHT NOW: what Sahoda is doing, in plain words, refreshed while
+              the page is open. First render is the server's, from the rows
+              this page already read; the client polls the same reads. */}
+          <StaggerItem i={5}>
+            <LiveConsole
+              initial={liveLines({
+                posts: displayPosts.map((post) => ({
+                  id: post.id,
+                  title: post.title,
+                  intent: post.intent,
+                  updated_at: post.updated_at,
+                  scheduled_at: post.scheduled_at,
+                  origin: post.origin,
+                })),
+                ledger: ledger.unreadable ? [] : ledger.entries,
+                sweepRanAt,
+                now,
+              })}
+              readAt={now.toISOString()}
+            />
           </StaggerItem>
-
-          {/* ── WHERE `Available credits` USED TO BE ────────────────────────
-              docs/40 §2.3 counted the balance THREE times on this one screen —
-              the topbar chip, the rail foot and a card here — and demoted this
-              copy from `type-display` to `type-h2` rather than removing it. It
-              is removed now: the figure leads the page in `AtAGlance`, where it
-              is one of four things you can act on, and the rail foot's copy is
-              hidden whenever the rail is minimised, which is the default. Two
-              copies, down from three, and the biggest one is at the top. */}
-
-          {/* WHAT NEXT: what Sahoda knows, and what it can post to. */}
-          <StaggerItem i={7}>
-            <BrainCard brain={brain} knowledgeDocuments={knowledgeDocuments} />
-          </StaggerItem>
-          <StaggerItem i={8}>
-            <ConnectionsCard connections={connections} />
-          </StaggerItem>
+          {ladder.remaining > 0 ? (
+            <>
+              <StaggerItem i={6}>
+                <ConnectionsCard connections={connections} />
+              </StaggerItem>
+              <StaggerItem i={7}>
+                <BrainCard brain={brain} knowledgeDocuments={knowledgeDocuments} />
+              </StaggerItem>
+              <StaggerItem i={8}>
+                <HomeSection
+                  id="home-activity"
+                  title="What happened"
+                  action={{ href: '/wallet', label: 'View all' }}
+                  flush
+                >
+                  <ActivityFeed
+                    entries={ledger.entries.slice(0, 4)}
+                    unreadable={ledger.unreadable}
+                  />
+                </HomeSection>
+              </StaggerItem>
+            </>
+          ) : (
+            <>
+              {/* 1 — WHAT HAPPENED. The reference puts the activity feed at
+                  the top of the rail; this app had it as a full-width table at
+                  the very bottom, which is the least-read position on the page. */}
+              <StaggerItem i={6}>
+                {/* `flush`: the feed's rows run to the card's own edge, so the
+                    body may not carry the standard 20px inset. The header still
+                    does, so this heading sits on the same line as every other
+                    card's. */}
+                <HomeSection
+                  id="home-activity"
+                  title="What happened"
+                  action={{ href: '/wallet', label: 'View all' }}
+                  flush
+                >
+                  <ActivityFeed
+                    entries={ledger.entries.slice(0, 4)}
+                    unreadable={ledger.unreadable}
+                  />
+                </HomeSection>
+              </StaggerItem>
+              {/* WHAT NEXT: what Sahoda knows, and what it can post to. */}
+              <StaggerItem i={7}>
+                <BrainCard brain={brain} knowledgeDocuments={knowledgeDocuments} />
+              </StaggerItem>
+              <StaggerItem i={8}>
+                <ConnectionsCard connections={connections} />
+              </StaggerItem>
+            </>
+          )}
 
           <StaggerItem i={9}>
             <SahodaRail drafted={draftedThisWeek} planCost={creditCost('loop_cycle')} />
           </StaggerItem>
         </div>
       </div>
+
+      {/* Last child, and a closed `<dialog>` is `display: none`, so the
+          `space-y-5` above it costs nothing while it is shut. Open, it is in the
+          browser's top layer and no ancestor's spacing reaches it at all. */}
+      {offer}
     </div>
   )
 }

@@ -78,10 +78,22 @@ test.describe('@smoke the Marketing Brain', () => {
     await expect(page.getByRole('heading', { name: 'CMO Report', level: 1 })).toBeVisible({
       timeout: 30_000,
     })
-    const block = page.getByRole('heading', { name: 'What Sahoda noticed' })
+    // "What Sahoda noticed", not "What I noticed on my own": Sahoda speaks in the
+    // third person (CLAUDE.md, Copy style), and the report page has said so since
+    // the voice sweep. MEASURED stale on the first CI smoke run to reach this spec
+    // (2026-09-05, run 33985674352).
+    // `.first()`: the report renders this heading twice — once as the lead
+    // module's title and once in the "what Monday's report says" preview list —
+    // and a strict locator threw on the pair (run 34009643341). The lead module
+    // is the one whose body the assertions below read.
+    const block = page.getByRole('heading', { name: 'What Sahoda noticed' }).first()
     await expect(block).toBeVisible()
     // It names the FLOOR, so the reader knows what would change it.
-    await expect(page.getByText(/takes a run of posts, not a few/i)).toBeVisible()
+    // The floor sentence, so the reader knows what would change it. The string
+    // this line used to look for existed nowhere in `src` and had not for as
+    // long as git remembers, so the assertion could only ever fail. This is the
+    // sentence the never-examined branch actually renders.
+    await expect(page.getByText(/reads your published posts once a week/i)).toBeVisible()
     // And it never claims a failure. This is the assertion that would catch a
     // read error being rendered as an absence.
     await expect(page.getByText(/couldn.t read what it has noticed/i)).toHaveCount(0)
@@ -107,6 +119,6 @@ test.describe('@smoke the Marketing Brain', () => {
     await expect(page.getByText('Exclamation marks per post, earlier')).toBeVisible()
     await expect(page.getByText(/Sahoda did not ask a model for this/i)).toBeVisible()
     // The floor sentence is gone now that there is something to say.
-    await expect(page.getByText(/takes a run of posts, not a few/i)).toHaveCount(0)
+    await expect(page.getByText(/reads your published posts once a week/i)).toHaveCount(0)
   })
 })

@@ -8,6 +8,7 @@ import { groupCorrections, type LedgerRow } from '@/lib/wallet/group-entries'
 import { cogsUsd } from '@/lib/wallet/parse-entries'
 import { cn } from '@/lib/utils'
 import { creditWord } from '@/lib/credit-words'
+import { DEFAULT_ZONE } from '@/lib/time/zone'
 
 export interface LedgerTableProps {
   entries: readonly LedgerEntry[]
@@ -37,6 +38,24 @@ export interface LedgerTableProps {
    * for any caller rendering every entry it holds.
    */
   settled?: ReadonlySet<string>
+  /**
+   * Which entries a later entry has corrected, computed over EVERY entry read.
+   *
+   * ── THE SIBLING OF `settled`, AND IT WAS LEFT OPEN ──────────────────────────
+   * The prop above was added because a page-scoped derivation is wrong for a
+   * paginated caller. `correctedSeqs` comes out of the same `groupCorrections`
+   * call and has the identical problem, and it was not passed: a correction is
+   * written as a reversal plus a re-issue whose `corrects_seq` points at an
+   * entry that is usually far older, so in any workspace with more than one page
+   * of history the original and its correction land on DIFFERENT pages. The
+   * original then renders with no note at all, which reads as though it still
+   * stands. That is precisely the claim the note exists to prevent.
+   *
+   * `rows` stays per-page, because `rows` is what gets drawn. Only the corrected
+   * SET is window-scoped. Omitted, the page-scoped derivation still applies,
+   * which is correct for a caller rendering every entry it holds.
+   */
+  correctedSeqs?: ReadonlySet<number>
   /** Adds the running balance column. Every row records `balance_after`. */
   showBalance?: boolean
   /**
@@ -58,7 +77,7 @@ const WHEN = new Intl.DateTimeFormat('en-IN', {
   year: 'numeric',
   hour: '2-digit',
   minute: '2-digit',
-  timeZone: 'Asia/Kolkata',
+  timeZone: DEFAULT_ZONE,
 })
 
 /**
@@ -74,7 +93,7 @@ const WHEN = new Intl.DateTimeFormat('en-IN', {
 const WHEN_SHORT = new Intl.DateTimeFormat('en-IN', {
   day: '2-digit',
   month: 'short',
-  timeZone: 'Asia/Kolkata',
+  timeZone: DEFAULT_ZONE,
 })
 
 function formatWhen(iso: string): string | null {
@@ -112,7 +131,8 @@ const AMOUNT_TONE: Record<Direction, string> = {
   neutral: 'text-muted',
 }
 
-const CELL = 'px-3 py-3 align-top'
+// The DataTable recipe (ui/data-table.tsx): 12px inset, 10px of row padding.
+const CELL = 'px-3 py-2.5 align-top'
 
 const formatCredits = (value: number): string => Math.abs(value).toLocaleString('en-IN')
 
@@ -146,7 +166,18 @@ function EntryRow({
   showBalance,
 }: {
   entry: LedgerEntry
-  corrected: boolean
+  /**
+   * Where the correcting entry is, from this row's point of view.
+   *
+   * `'above'` means it is on screen. `'elsewhere'` means it exists but is on
+   * another page, which is the ordinary case once the list paginates: a
+   * correction points at an entry far older than itself. `false` means none.
+   *
+   * Three states rather than a boolean because the sentence differs. Telling a
+   * reader to "see the correction above" when it is forty rows back on page one
+   * sends them looking for something that is not there.
+   */
+  corrected: 'above' | 'elsewhere' | false
   /** Credits frozen RIGHT NOW — a HOLD with no settling entry in the window. */
   open: boolean
   showBalance: boolean
@@ -163,12 +194,12 @@ function EntryRow({
       // `proposed` never occur here: both describe things that have not
       // happened, and every row is a fact.
       data-certainty={open ? 'committed' : 'real'}
-      className="border-b border-line last:border-b-0"
+      className="border-b border-line-soft transition-micro last:border-b-0 hover:bg-s2"
     >
       {/* `whitespace-normal` below `narrow`: "30 Aug 2026, 02:30 pm" on one
           line is ~150px of a 390px screen, and wrapping it to two costs a row
           of height and buys back the width the amount column needs. */}
-      <td className={cn(CELL, 'text-[13px] text-muted narrow:whitespace-nowrap')}>
+      <td className={cn(CELL, 'type-sm text-muted narrow:whitespace-nowrap')}>
         {when === null ? (
           <span className="text-muted">Date not recorded</span>
         ) : (
@@ -184,7 +215,7 @@ function EntryRow({
           {isSahodaActor(entry.actor) ? (
             <span className="blade" role="img" aria-label="Sahoda did this on its own" />
           ) : null}
-          <span className="text-[14px] font-semibold">{display.label}</span>
+          <span className="type-body font-semibold">{display.label}</span>
           {open ? (
             // Credits reserved and not yet resolved: committed, not real. Only
             // an UNSETTLED hold earns this — a settled one is history, and
@@ -193,19 +224,18 @@ function EntryRow({
           ) : null}
         </span>
         {display.why !== null ? (
-          <span
-            data-testid={`ledger-why-${entry.seq}`}
-            className="mt-1 block text-[13px] text-muted"
-          >
+          <span data-testid={`ledger-why-${entry.seq}`} className="mt-1 block type-sm text-muted">
             {display.why}
           </span>
         ) : null}
-        {corrected ? (
+        {corrected !== false ? (
           // Left in place, never rewritten: the ledger is append-only and this
           // row is still exactly what happened. But an entry that a later
           // correction has superseded must not read as though it still stands.
           <span className="mt-1 block text-[13px] text-warn">
-            Corrected by a later entry. See the correction above.
+            {corrected === 'above'
+              ? 'Corrected by a later entry. See the correction above.'
+              : 'Corrected by a later entry, on a newer page.'}
           </span>
         ) : null}
       </td>
@@ -232,9 +262,12 @@ function EntryRow({
           over a WINDOW of the history would be wrong for everyone whose ledger
           is longer than the window, and wrong about their money.
 
-          A HOLD's `balance_after` is the spendable total, which a hold does not
-          move — so the column repeats the row above it on a reservation, which
-          is correct and is what the ledger says. */}
+          `balance_after` is AVAILABLE credits (`v_total - v_held`, see
+          `apply_ledger_entry`), not the wallet total. So a HOLD row does move
+          it: the column drops by the reserved amount and comes back on the
+          settling DEBIT or RELEASE. MEASURED 2026-09-07 on the QA workspace:
+          Welcome +100 → 100, HOLD 3 → 97, DEBIT -3 → 97. The sentence above
+          the table says the same thing in the customer's words. */}
       {showBalance ? (
         /* ── HIDDEN ON A PHONE, AND THE CHOICE OF WHICH COLUMN GOES MATTERS ──
            MEASURED at 400px: with five columns the table needed 560px inside a
@@ -270,12 +303,13 @@ function EntryRow({
  */
 function CorrectionGroup({
   row,
-  correctedSeqs,
+  correctionPlace,
   settled,
   showBalance,
 }: {
   row: Extract<LedgerRow, { kind: 'correction' }>
-  correctedSeqs: ReadonlySet<number>
+  /** Passed rather than a set, so "above" means the same thing in both places. */
+  correctionPlace: (seq: number) => 'above' | 'elsewhere' | false
   /** Ids of holds closed by an entry in the window — see hold-settlement.ts. */
   settled: ReadonlySet<string>
   showBalance: boolean
@@ -303,7 +337,7 @@ function CorrectionGroup({
               {netEffectCopy(row.net)}
             </span>
           </span>
-          <span className="mt-1 block text-[13px] text-muted">
+          <span className="mt-1 block type-sm text-muted">
             {row.entries.length === 1
               ? 'Part of a correction to an earlier entry. Its other half is outside the entries shown here.'
               : 'These entries were written together to correct an earlier one. Nothing was charged for them.'}
@@ -316,7 +350,7 @@ function CorrectionGroup({
               user can scroll to it. When nothing was recorded, this says
               nothing rather than guessing. */}
           {corrects.length > 0 ? (
-            <span className="mt-1 block text-[13px] text-muted">
+            <span className="mt-1 block type-sm text-muted">
               {corrects.length === 1 ? 'Corrects entry ' : 'Corrects entries '}
               {corrects.map((seq, index) => (
                 <span key={seq}>
@@ -333,7 +367,7 @@ function CorrectionGroup({
         <EntryRow
           key={entry.id}
           entry={entry}
-          corrected={correctedSeqs.has(entry.seq)}
+          corrected={correctionPlace(entry.seq)}
           open={isOpenHold(entry, settled)}
           showBalance={showBalance}
         />
@@ -347,6 +381,7 @@ export function LedgerTable({
   skipped,
   limit,
   settled: settledProp,
+  correctedSeqs: correctedSeqsProp,
   showBalance = false,
   notes = true,
 }: LedgerTableProps) {
@@ -372,7 +407,19 @@ export function LedgerTable({
   // A correction is written as two or more append-only rows that undo and
   // re-issue an earlier entry. Read as separate lines they look like a
   // clawback; grouped, they read as the one event they are.
-  const { rows, correctedSeqs } = groupCorrections(entries)
+  const { rows, correctedSeqs: pageCorrectedSeqs } = groupCorrections(entries)
+  // Window-scoped when the caller paginates, page-scoped otherwise. Same rule as
+  // `settled` directly below, and for the same reason.
+  const correctedSeqs = correctedSeqsProp ?? pageCorrectedSeqs
+
+  /**
+   * `pageCorrectedSeqs` is the subset whose correcting entry is on THIS page, so
+   * it is exactly the test for whether "above" is a true word to use.
+   */
+  const correctionPlace = (seq: number): 'above' | 'elsewhere' | false => {
+    if (pageCorrectedSeqs.has(seq)) return 'above'
+    return correctedSeqs.has(seq) ? 'elsewhere' : false
+  }
 
   // Derived once for the page, not per row. Safe to read from this page alone:
   // a settling entry always has a higher `seq` than its hold, and the page is
@@ -390,20 +437,22 @@ export function LedgerTable({
               : 'Credit activity, newest first'}
           </caption>
           <thead>
-            <tr className="border-b border-line text-[12px] text-muted">
-              <th scope="col" className={cn(CELL, 'font-semibold')}>
+            {/* `type-eyebrow` headers: the one header recipe every table in
+                the product shares (ui/data-table.tsx). This one had its own. */}
+            <tr className="border-b border-line-soft text-muted">
+              <th scope="col" className={cn(CELL, 'type-eyebrow')}>
                 When
               </th>
-              <th scope="col" className={cn(CELL, 'font-semibold')}>
+              <th scope="col" className={cn(CELL, 'type-eyebrow')}>
                 Activity
               </th>
-              <th scope="col" className={cn(CELL, 'text-right font-semibold')}>
+              <th scope="col" className={cn(CELL, 'type-eyebrow text-right')}>
                 Credits
               </th>
               {showBalance ? (
                 <th
                   scope="col"
-                  className={cn(CELL, 'hidden text-right font-semibold narrow:table-cell')}
+                  className={cn(CELL, 'type-eyebrow hidden text-right narrow:table-cell')}
                 >
                   Balance
                 </th>
@@ -415,7 +464,7 @@ export function LedgerTable({
               <CorrectionGroup
                 key={row.id}
                 row={row}
-                correctedSeqs={correctedSeqs}
+                correctionPlace={correctionPlace}
                 settled={settled}
                 showBalance={showBalance}
               />
@@ -423,7 +472,7 @@ export function LedgerTable({
               <tbody key={row.entry.id}>
                 <EntryRow
                   entry={row.entry}
-                  corrected={correctedSeqs.has(row.entry.seq)}
+                  corrected={correctionPlace(row.entry.seq)}
                   open={isOpenHold(row.entry, settled)}
                   showBalance={showBalance}
                 />

@@ -14,8 +14,11 @@ import {
 import { commentsHref } from '@/components/inbox/commented-post-row'
 import { threadHref } from '@/components/inbox/thread-href'
 import { scopedAccount } from '@/lib/inbox/read'
+import { recordSentReply } from '@/lib/inbox/record-sent'
+import { resolveAttachment, type ResolvedAttachment } from '@/lib/inbox/attachment-asset'
 import { reportServerError } from '@/lib/observability/report'
 import { zernioClientSends } from '@/lib/zernio/server'
+import { activeWorkspaceRead } from '@/lib/workspaces'
 
 /**
  * Sending an inbox reply through Zernio: a DM, a comment, a review.
@@ -26,28 +29,34 @@ import { zernioClientSends } from '@/lib/zernio/server'
  * actually see live. They are two different inboxes today and merging them would
  * suggest a link that does not exist.
  *
- * ── NOTHING IS RECORDED LOCALLY, AND THAT IS THE HONEST CHOICE ───────────────
- * A sent reply is NOT written to `inbox_messages`. Three reasons, in order of weight:
+ * ── A CONFIRMED REPLY IS NOW RECORDED LOCALLY ────────────────────────────────
+ * It used to be recorded nowhere, for three stated reasons, and all three expired:
  *
- *  1. `inbox_threads.channel` is `check (channel in ('x','gbp','linkedin','instagram'))`
- *     — it cannot express facebook or whatsapp, which are two of the three platforms
- *     with a send window. Half the replies would be unrecordable.
- *  2. `inbox_threads` has no INSERT policy for `authenticated` at all, by design: a
- *     thread is something a platform told us about, not something a member may invent.
- *     There is no row to hang a message on.
- *  3. Nothing reads those tables. The thread view reads Zernio directly, so a row
- *     written here would be invisible — and a record nobody reads is worse than none,
- *     because it looks like provenance while proving nothing.
+ *  1. "`inbox_threads.channel` cannot express facebook" — widened on 2026-08-26 by
+ *     `20260826120001_widen_channels_facebook_telegram.sql`. It admits all six
+ *     channels `ChannelSchema` names.
+ *  2. "`inbox_threads` has no INSERT policy for `authenticated`" — true, and beside
+ *     the point. The webhook receiver writes these tables over a direct Postgres
+ *     connection precisely because it is not a member; `recordSentReply` uses the
+ *     same door, for the same reason, and weakens neither the policy nor its CHECK.
+ *  3. "Nothing reads those tables" — the list and both thread routes read them now.
  *
- * So the RECEIPT is the record, and Zernio is the source of truth: after a confirmed
- * send the thread is revalidated and the reply comes back from the platform with its
- * own id. Widening that CHECK and adding a service_role writer is owed work for wt-db;
- * it is named in this lane's PR rather than done here, since only wt-db edits migrations.
+ * What made the old choice safe was the thread re-reading Zernio on every render.
+ * The list is store-first today, so a reply the customer had just sent was missing
+ * from the screen they sent it from until a webhook happened to bring it back.
  *
  * ── THE ID RULE SURVIVES THE ROUND TRIP ──────────────────────────────────────
- * `SendOutcome` has no branch that reports success without a platform id, and
- * `revalidatePath` runs ONLY on `sent`. An unconfirmed reply does not refresh the
- * thread, so the UI cannot show it arriving as though it had.
+ * `SendOutcome` has no branch that reports success without a platform id, and the
+ * store write happens ONLY on `sent` — the row's `platform_message_id` is the
+ * platform's own receipt, which is the only evidence this codebase accepts. An
+ * unconfirmed reply writes nothing, because "it may have gone" is not a message.
+ *
+ * ── REVALIDATION, HOWEVER, RUNS ON EVERY OUTCOME ─────────────────────────────
+ * It used to run only on `sent`, on the reasoning that a refused send has nothing
+ * new to show. It does: an `unconfirmed` reply MAY have landed, and the thread's
+ * next render is the only way the customer finds out. Leaving the cached page in
+ * place is what turns "we do not know" into "nothing happened". Revalidation shows
+ * what is there; it never claims anything.
  *
  * ── THE REVALIDATED PATH COMES FROM THE LINK HELPERS ─────────────────────────
  * `threadHref` / `commentsHref` build these URLs for the links that got the user here,
@@ -68,11 +77,24 @@ export type InboxSendState =
   | { ok: false; status: 'refused' | 'unconfirmed' | 'failed'; message: string }
 
 /** Every branch that is not a confirmed send becomes a sentence, never a silent false. */
-function toState(outcome: SendOutcome, path: string): InboxSendState {
+async function toState(
+  outcome: SendOutcome,
+  path: string,
+  /** How to file a confirmed reply. Absent where the surface has no thread to file it on. */
+  record?: (platformId: string) => Promise<unknown>,
+): Promise<InboxSendState> {
+  // BOTH paths, and always. A refused send leaves the thread exactly as it was and
+  // re-rendering it costs one read; an UNCONFIRMED one may have landed, and the
+  // re-render is the only way the customer ever finds out. The list is revalidated
+  // beside the thread because a reply that lands changes the row's preview and its
+  // place in a list now ordered by time.
+  revalidatePath(path)
+  revalidatePath('/inbox')
+
   if (outcome.status === 'sent') {
-    // Only here. The thread re-reads from Zernio and the reply returns carrying the id
-    // the platform issued — which is the only evidence this codebase accepts.
-    revalidatePath(path)
+    // Only here. The platform named the message, and its id is what makes the row
+    // a record rather than a claim.
+    if (record) await record(outcome.platformId)
     return { ok: true, platformId: outcome.platformId }
   }
   return { ok: false, status: outcome.status, message: outcome.message }
@@ -88,7 +110,7 @@ function toState(outcome: SendOutcome, path: string): InboxSendState {
  */
 async function sendDeps(
   accountId: string,
-): Promise<{ ok: true; deps: ReplyDeps } | { ok: false; message: string }> {
+): Promise<{ ok: true; deps: ReplyDeps; userId: string } | { ok: false; message: string }> {
   const { userId } = await auth()
   if (!userId) return { ok: false, message: 'Sign in to reply.' }
 
@@ -106,6 +128,7 @@ async function sendDeps(
 
   return {
     ok: true,
+    userId,
     deps: {
       reads: scoped.reads,
       sends,
@@ -131,10 +154,34 @@ export async function sendThreadReply(
   conversationId: string,
   message: string,
   tag?: unknown,
+  /**
+   * One file from the customer's own library, named by id.
+   *
+   * An ID and never a url. A url parameter here would let this action send any
+   * link on the internet into a conversation, under the customer's name — the
+   * browser is not a place a tenancy decision can be made. `resolveAttachment`
+   * reads the row inside the active workspace and mints the link itself.
+   */
+  attachment?: { assetId: string },
 ): Promise<InboxSendState> {
   try {
     const resolved = await sendDeps(accountId)
     if (!resolved.ok) return { ok: false, status: 'failed', message: resolved.message }
+
+    let file: ResolvedAttachment | undefined
+    if (attachment !== undefined) {
+      const workspace = await activeWorkspaceRead()
+      if (workspace.status !== 'ok') {
+        return { ok: false, status: 'failed', message: 'Sahoda could not open your library.' }
+      }
+      const found = await resolveAttachment(workspace.workspace.id, attachment.assetId)
+      // REFUSED, not failed, and nothing is sent: a file that is not this
+      // workspace's is a statement about the request, not about the network. The
+      // words are not sent on their own either — a reply that quietly lost its
+      // photo reads on screen as a success.
+      if (!found.ok) return { ok: false, status: 'refused', message: found.message }
+      file = found.attachment
+    }
 
     let intent: ReplyIntent = { kind: 'free_form' }
     if (tag !== undefined && tag !== null && tag !== '') {
@@ -144,8 +191,24 @@ export async function sendThreadReply(
       intent = { kind: 'tagged', tag: parsed.data }
     }
 
-    const outcome = await performThreadReply(resolved.deps, { conversationId, message, intent })
-    return toState(outcome, threadHref({ accountId, conversationId }))
+    const outcome = await performThreadReply(resolved.deps, {
+      conversationId,
+      message,
+      intent,
+      ...(file === undefined ? {} : { attachment: file }),
+    })
+    return await toState(outcome, threadHref({ accountId, conversationId }), (platformId) =>
+      recordSentReply({
+        accountId,
+        kind: 'dm',
+        platformThreadId: conversationId,
+        body: message,
+        platformMessageId: platformId,
+        sentAt: resolved.deps.now,
+        authorUserId: resolved.userId,
+        ...(file === undefined ? {} : { attachments: [{ type: file.type, url: file.url }] }),
+      }),
+    )
   } catch (error) {
     reportServerError(error, { action: 'sendThreadReply' })
     return { ok: false, status: 'failed', message: 'Could not send that reply. Try again.' }
@@ -168,7 +231,20 @@ export async function sendCommentReply(
       message,
       ...(commentId === undefined || commentId === '' ? {} : { commentId }),
     })
-    return toState(outcome, commentsHref({ accountId, platformPostId }))
+    return await toState(outcome, commentsHref({ accountId, platformPostId }), (platformId) =>
+      recordSentReply({
+        accountId,
+        kind: 'comment',
+        // THE THREAD IS THE POST, exactly as the webhook projector files it — so a
+        // reply joins the comments already on that post rather than opening a row
+        // beside them.
+        platformThreadId: platformPostId,
+        body: message,
+        platformMessageId: platformId,
+        sentAt: resolved.deps.now,
+        authorUserId: resolved.userId,
+      }),
+    )
   } catch (error) {
     reportServerError(error, { action: 'sendCommentReply' })
     return { ok: false, status: 'failed', message: 'Could not send that reply. Try again.' }
@@ -192,7 +268,17 @@ export async function sendReviewReply(
     if (!resolved.ok) return { ok: false, status: 'failed', message: resolved.message }
 
     const outcome = await performReviewReply(resolved.deps, { reviewId, message })
-    return toState(outcome, '/inbox/reviews')
+    return await toState(outcome, '/inbox/reviews', (platformId) =>
+      recordSentReply({
+        accountId,
+        kind: 'review',
+        platformThreadId: reviewId,
+        body: message,
+        platformMessageId: platformId,
+        sentAt: resolved.deps.now,
+        authorUserId: resolved.userId,
+      }),
+    )
   } catch (error) {
     reportServerError(error, { action: 'sendReviewReply' })
     return { ok: false, status: 'failed', message: 'Could not send that reply. Try again.' }

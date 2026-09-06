@@ -57,6 +57,7 @@ const { confirmBrainField } = await import('./brand-field')
 
 beforeEach(() => {
   vi.clearAllMocks()
+  state.saveResult = { ok: true, version: 4, replayed: false }
   state.brainRead = {
     status: 'ok',
     active: BRAIN,
@@ -79,6 +80,8 @@ describe('confirmBrainField', () => {
       writeLeaf(BRAIN, 'hook.primary_emotion', 'Confidence'),
       'manual',
       ['hook.primary_emotion'],
+      null,
+      { expectedVersion: 3 },
     )
   })
 
@@ -136,14 +139,18 @@ describe('confirmBrainField', () => {
     const result = await confirmBrainField('hook.primary_emotion', BRAIN.hook.primary_emotion)
 
     expect(result).toEqual({ ok: true, version: 4, unchanged: false })
-    expect(saveBrandMemory).toHaveBeenCalledWith(BRAIN, 'manual', ['hook.primary_emotion'])
+    expect(saveBrandMemory).toHaveBeenCalledWith(BRAIN, 'manual', ['hook.primary_emotion'], null, {
+      expectedVersion: 3,
+    })
   })
 
   test('an unchanged LIST confirms too', async () => {
     const result = await confirmBrainField('taboo.red_lines', [...BRAIN.taboo.red_lines])
 
     expect(result).toEqual({ ok: true, version: 4, unchanged: false })
-    expect(saveBrandMemory).toHaveBeenCalledWith(BRAIN, 'manual', ['taboo.red_lines'])
+    expect(saveBrandMemory).toHaveBeenCalledWith(BRAIN, 'manual', ['taboo.red_lines'], null, {
+      expectedVersion: 3,
+    })
   })
 
   test('unchanged text on an ALREADY-confirmed field writes nothing', async () => {
@@ -239,5 +246,89 @@ describe('confirmBrainField', () => {
     const result = await confirmBrainField('hook.primary_emotion', 'Confidence')
 
     expect(result).toEqual({ ok: false, message: 'Reload — someone else saved first.' })
+  })
+})
+
+/**
+ * MEASURED 2026-09-06 on the wt-core preview against production: three spaces
+ * were saved as `hook.core_promise` (version 11, `confirmed: true`, source
+ * `owner`) and a single space as the third core value (version 8). `validate`
+ * checked type and length and nothing else, so the field the console calls
+ * "worth the least as a guess" became a confirmed blank. Mesh prepends the
+ * active brain to every model call, so that blank was the promise every caption
+ * would have been written from.
+ */
+describe('confirmBrainField refuses a blank', () => {
+  test('whitespace text is refused before any read or write', async () => {
+    const result = await confirmBrainField('hook.core_promise', '   ')
+
+    expect(result.ok).toBe(false)
+    expect(result).toMatchObject({ message: expect.stringMatching(/blank/i) })
+    expect(saveBrandMemory).not.toHaveBeenCalled()
+  })
+
+  test('a fixed list with a whitespace entry is refused', async () => {
+    const result = await confirmBrainField('brand_persona.core_values', ['Craft', 'Care', ' '])
+
+    expect(result.ok).toBe(false)
+    expect(saveBrandMemory).not.toHaveBeenCalled()
+  })
+
+  test('an EMPTY open list still saves — "there are none" is an answer', async () => {
+    const result = await confirmBrainField('taboo.red_lines', [])
+
+    expect(result.ok).toBe(true)
+    expect(saveBrandMemory).toHaveBeenCalledTimes(1)
+  })
+})
+
+/**
+ * BR-04. Two overlapping confirms each read the payload and each wrote the whole
+ * thing back; the later one stamped provenance against a stale base and
+ * silently reverted the earlier confirmation. The RPC's compare-and-set has
+ * existed since 2026-08-12 and no hand-edit path sent the version it read.
+ */
+describe('confirmBrainField sends the version it read', () => {
+  test('the save carries expectedVersion from the brain it modified', async () => {
+    await confirmBrainField('hook.primary_emotion', 'Confidence')
+    const [, , , , options] = saveBrandMemory.mock.calls[0]!
+    expect(options).toEqual({ expectedVersion: 3 })
+  })
+
+  test('a version conflict is returned as the reload sentence, not swallowed', async () => {
+    state.saveResult = {
+      ok: false,
+      message: 'The Brand Brain changed while you were editing. Reload and try again.',
+    }
+    const result = await confirmBrainField('hook.primary_emotion', 'Confidence')
+    expect(result).toMatchObject({ ok: false, message: expect.stringMatching(/reload/i) })
+  })
+})
+
+/**
+ * MEASURED 2026-09-06 in two tabs on the preview: tab B pressed Confirm on the
+ * wording it had on screen after tab A had already changed that field. The
+ * version check did not catch it — the action's own read is fresh — so B's
+ * agreement would have written A's text back over as confirmed.
+ */
+describe('confirmBrainField asSeen', () => {
+  test('refuses to confirm a wording the store no longer holds', async () => {
+    const result = await confirmBrainField('hook.primary_emotion', 'an older wording', {
+      asSeen: true,
+    })
+    expect(result).toMatchObject({ ok: false, message: expect.stringMatching(/reload/i) })
+    expect(saveBrandMemory).not.toHaveBeenCalled()
+  })
+
+  test('agrees when the wording on screen is the wording stored', async () => {
+    const result = await confirmBrainField('hook.primary_emotion', BRAIN.hook.primary_emotion, {
+      asSeen: true,
+    })
+    expect(result.ok).toBe(true)
+  })
+
+  test('an explicit edit is never refused for being different — that is the point of it', async () => {
+    const result = await confirmBrainField('hook.primary_emotion', 'a new wording')
+    expect(result.ok).toBe(true)
   })
 })

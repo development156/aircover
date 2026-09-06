@@ -9,7 +9,7 @@ import { ThemeToggle } from '@/components/shell/theme-toggle'
 import { creditWord } from '@/lib/credit-words'
 
 import { BootVideo } from './boot-video'
-import { doorColors, doorText, type DoorOutcome } from './door-outcome'
+import { type DoorOutcome } from './door-outcome'
 import { OrbColumn } from './orb-column'
 import { useBootVideo } from './use-boot-video'
 import { ProcessingOverlay } from './processing-overlay'
@@ -17,6 +17,7 @@ import { ProgressBar } from './progress-bar'
 import { readSite } from './read-site'
 import { useBuild } from './use-build'
 import { useOrb } from './use-orb'
+import { useStepFocus } from './use-step-focus'
 import { useStepHistory } from './use-step-history'
 import {
   canAdvance,
@@ -25,7 +26,6 @@ import {
   DEFAULT_DATA,
   energyOf,
   loadState,
-  NUMBERED,
   ORDER,
   saveState,
   signalCount,
@@ -95,6 +95,15 @@ export function OnboardingStage({
   const [door, setDoor] = useState<DoorOutcome>({ kind: 'none' })
   const reduced = useRef(false)
 
+  const readStarted = useRef('')
+  const startSiteRead = useCallback((url: string) => {
+    const site = url.trim()
+    if (!site || readStarted.current === site) return
+    readStarted.current = site
+    setDoor({ kind: 'reading' })
+    void readSite(site).then(setDoor)
+  }, [])
+
   useEffect(() => {
     reduced.current = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const saved = loadState(workspaceId)
@@ -103,9 +112,17 @@ export function OnboardingStage({
       // Resume at the step they left. A saved `result` is not resumable —
       // the brain behind it was never built in this session.
       setStep(saved.step === 'result' ? 'comp' : saved.step)
+      /**
+       * The website read is NOT persisted, and it only ever started on the
+       * way out of step 01. A session resumed past that step therefore built
+       * with `door: none` — the site they typed was never opened, silently,
+       * and the result card showed no verdict about it. MEASURED 2026-09-07:
+       * resume at step 5, `data-onb-door="none"`, build proceeded.
+       */
+      if (saved.step !== 'intro' && saved.step !== '1') startSiteRead(saved.data.site)
     }
     setHydrated(true)
-  }, [workspaceId])
+  }, [startSiteRead, workspaceId])
 
   // Persist every move. Cheap, synchronous, and it is what makes Escape safe.
   useEffect(() => {
@@ -117,6 +134,12 @@ export function OnboardingStage({
 
   const orbWrapRef = useRef<HTMLDivElement | null>(null)
   const procSlotRef = useRef<HTMLDivElement | null>(null)
+  const paneRef = useRef<HTMLDivElement | null>(null)
+
+  // Q-03: move focus onto the new step's own heading. See `use-step-focus.ts`
+  // for why `#pane` is the right container and why intro is deliberately left
+  // alone.
+  useStepFocus(step, paneRef)
 
   const patch = useCallback((next: Partial<OnboardingData>) => {
     setData((current) => ({ ...current, ...next }))
@@ -183,14 +206,6 @@ export function OnboardingStage({
    * they answer steps 02-06 costs them nothing and is finished by the time the
    * build needs it — and `useBuild` waits for it if it is not.
    */
-  const readStarted = useRef('')
-  const startSiteRead = useCallback((url: string) => {
-    const site = url.trim()
-    if (!site || readStarted.current === site) return
-    readStarted.current = site
-    setDoor({ kind: 'reading' })
-    void readSite(site).then(setDoor)
-  }, [])
 
   const advance = useCallback(() => {
     if (step === 'intro') return go('1', 1)
@@ -435,7 +450,6 @@ export function OnboardingStage({
 
   /* ─────────────────────────────────────────────────────────────── render ── */
 
-  const numbered = NUMBERED.includes(step)
   const showRail = step !== 'intro' && step !== 'result'
   const showBack = step !== 'intro' && step !== 'result' && step !== '1'
 
@@ -457,7 +471,12 @@ export function OnboardingStage({
     ) : step === '3' ? (
       <AudienceStep data={data} patch={patch} />
     ) : step === '4' ? (
-      <VisualStep data={data} patch={patch} onLogo={build.takeLogo} />
+      <VisualStep
+        data={data}
+        patch={patch}
+        onLogo={build.takeLogo}
+        onLogoDark={build.takeLogoDark}
+      />
     ) : step === '5' ? (
       <KnowledgeStep data={data} patch={patch} />
     ) : step === 'comp' ? (
@@ -497,7 +516,7 @@ export function OnboardingStage({
         <ProgressBar step={step} />
 
         <main className="frame">
-          <div className="pane" id="pane">
+          <div className="pane" id="pane" ref={paneRef}>
             {/* Keyed so the entry animation restarts on every move — the source
                 strips the class, forces a reflow and re-adds it; a remount is
                 the same thing without touching the DOM by hand. */}
@@ -563,8 +582,14 @@ export function OnboardingStage({
                  figure is "shown again before you spend them", and this step
                  showed none — while BOTH buttons on it, one of them labelled
                  "Skip for now", start a charged resolve. */
-              <span className="enterkey">
-                {isFree ? 'Free the first time' : `Uses ${cost} ${creditWord(cost)}`}
+              <span className="enterkey enterkey--cost">
+                {build.failure?.kind === 'limit'
+                  ? /* MEASURED 2026-09-05: "Free the first time" sat under a refusal
+                       that said the day's free builds were spent (docs/51 Q-02). */
+                    'Free builds used up for today'
+                  : isFree
+                    ? 'Free the first time'
+                    : `Uses ${cost} ${creditWord(cost)}`}
               </span>
             ) : (
               <span className="enterkey">

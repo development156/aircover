@@ -1,4 +1,4 @@
-import { Check, Sparkles } from 'lucide-react'
+import { Check, MessageSquareQuote, Sparkles } from 'lucide-react'
 
 import type { FieldState } from '@/lib/brand/provenance'
 import { cn } from '@/lib/utils'
@@ -40,23 +40,44 @@ const MARKS: Record<
     label: 'Confirmed',
     className: 'is-real',
     Glyph: Check,
-    title: 'A person confirmed this value.',
+    title: 'A person confirmed this.',
   },
   guessed: {
     label: 'Guess',
     className: 'is-proposed',
     Glyph: Sparkles,
-    title: 'Sahoda inferred this. Nobody has confirmed it yet.',
+    title: 'Sahoda guessed this. Nobody has confirmed it yet.',
+  },
+  // Proposed treatment, not real: the SUBSTANCE is theirs and the WORDING is
+  // Sahoda's, and until a person agrees to the wording it stays dashed. The
+  // glyph and label are the difference from a guess — a quote, not a sparkle.
+  intake: {
+    label: 'From your answer',
+    className: 'is-proposed',
+    Glyph: MessageSquareQuote,
+    title:
+      'You told Sahoda this at setup. Sahoda wrote it in its own words. Confirm the words or correct them.',
   },
 }
 
-export function CertaintyMark({ state, className }: { state: FieldState; className?: string }) {
+export function CertaintyMark({
+  state,
+  className,
+  justChanged = false,
+}: {
+  state: FieldState
+  className?: string
+  /** True for a beat after the state changed under it: the chip pops once. Approval is a visible event (docs/37 §9). */
+  justChanged?: boolean
+}) {
   const mark = MARKS[state]
   return (
     <span
       data-certainty={state === 'confirmed' ? 'real' : 'proposed'}
+      data-just={justChanged ? 'true' : undefined}
       title={mark.title}
       className={cn(
+        justChanged && 'certainty-pop',
         'inline-flex shrink-0 items-center gap-1 rounded-sm px-[7px] py-[2px] text-[11px] leading-[16px] font-semibold',
         mark.className,
         className,

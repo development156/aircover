@@ -10,8 +10,6 @@
     "apps/web/src/components/client-imports-server-only.test.ts",
     "apps/web/src/components/knowledge/add-document.test.tsx",
     "apps/web/src/components/motion/count-up.guard.test.ts",
-    "apps/web/src/components/onboarding/intake-persisted.test.ts",
-    "apps/web/src/components/onboarding/intake-recovery-wired.test.ts",
     "apps/web/src/components/radar/marks.rung.test.tsx",
     "apps/web/src/components/ui/button.disabled-contrast.test.tsx",
     "apps/web/src/lib/brand/guard-neutrals.test.ts",

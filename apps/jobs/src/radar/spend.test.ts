@@ -39,6 +39,12 @@ function fakeDb(options: FakeDbOptions) {
     async dueSources() {
       return []
     },
+    async sourcesForCompetitor() {
+      return []
+    },
+    async subscribers() {
+      return []
+    },
     async beginFetch(request) {
       began.push(request)
       return options.permission

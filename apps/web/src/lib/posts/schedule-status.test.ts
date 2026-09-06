@@ -2,7 +2,12 @@ import { describe, expect, test } from 'vitest'
 import type { Channel, VariantPublishStatus } from '@sahoda/shared'
 
 import { SCHEDULE_DELIVERY_WINDOW_MS } from './delivery-window'
-import { autoPublishTruth, AUTO_PUBLISH_COPY, AUTO_PUBLISH_COPY_LIVE } from './schedule-status'
+import {
+  autoPublishTruth,
+  AUTO_PUBLISH_COPY,
+  AUTO_PUBLISH_COPY_LIVE,
+  NO_CHANNEL_COPY,
+} from './schedule-status'
 import type { VariantStatusRow } from './variant-status'
 
 /**
@@ -336,6 +341,15 @@ describe('the copy itself', () => {
       // sent users to publish a post twice.
       expect(copy.note).not.toMatch(/nothing was published/i)
     }
+  })
+
+  test('with no channel, says nothing can go out and names the remedy', () => {
+    // MEASURED 2026-09-06: a post with zero channels read "Goes out on its own
+    // at this time." The dispatcher has nothing to send to.
+    expect(NO_CHANNEL_COPY.note).toMatch(/nothing can go out/i)
+    expect(NO_CHANNEL_COPY.note).toMatch(/pick one/i)
+    expect(NO_CHANNEL_COPY.note).not.toMatch(/goes out on its own|will (publish|post|go out)/i)
+    expect(NO_CHANNEL_COPY.short.length).toBeLessThanOrEqual(20)
   })
 
   test('carries a short form for tight surfaces that still reads as a warning', () => {

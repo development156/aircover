@@ -1,5 +1,3 @@
-import { Toaster } from 'sonner'
-
 import { hasDeferredOnboarding } from '@/lib/onboarding/defer'
 import { landingDecision } from '@/lib/onboarding/landing'
 import { onboardingStateRead } from '@/lib/onboarding/read-onboarding-state'
@@ -10,6 +8,8 @@ import { activeWorkspaceRead } from '@/lib/workspaces'
 import { FirstRun } from '@/components/home/first-run'
 import { BottomNav } from '@/components/shell/bottom-nav'
 import { Rail } from '@/components/shell/rail'
+import { AppToaster } from '@/components/shell/app-toaster'
+import { TimezoneAutodetect } from '@/components/shell/timezone-autodetect'
 import { Topbar } from '@/components/shell/topbar'
 
 /**
@@ -103,6 +103,28 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="grid min-h-dvh grid-cols-[auto_1fr] max-narrow:grid-cols-1">
+      {/* Q-10 — THE FIRST FOCUSABLE ELEMENT IN THE SHELL, ON PURPOSE.
+          MEASURED (docs/51_Full_App_Audit_2026-09-05.md): 14 Tabs stay inside
+          the rail before reaching `<main>`, with no way past it. This has to
+          render before `<Rail />` in the markup — a skip link after the thing
+          it skips is not one — and it targets `#main` below, which is why
+          that id is never renamed without checking here first.
+
+          Positioned off-screen with a transform rather than `sr-only`:
+          `not-sr-only` sets `position: static` and this needs `position:
+          fixed` to sit above the rail without taking a cell in the shell's
+          own grid, and which of the two wins when both live in the `focus:`
+          layer is Tailwind's generated source order, not intent. One
+          unconditional position avoids the collision — always `fixed`,
+          moved off-screen by `-translate-y-full` and slid back into view by
+          `focus:translate-y-0` — so it stays in the accessibility tree at
+          every width and is never a grid child fighting the rail for space. */}
+      <a
+        href="#main"
+        className="fixed top-0 left-0 z-50 -translate-y-full rounded-sm bg-surface px-4 py-2.5 type-sm font-semibold text-ink shadow-lg transition-transform focus:translate-y-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--acc)]"
+      >
+        Skip to content
+      </a>
       {/* Scoped to `[data-brand-skin]`, which the brand mark carries and nothing
           else does. A workspace with no theme emits no element at all, so the
           default palette is the absence of this rather than a second rule
@@ -124,7 +146,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <Topbar />
         <main
           id="main"
-          className="mx-auto w-full max-w-content p-page max-narrow:p-page-mobile max-narrow:pb-[76px]"
+          // The skip link above moves the browser's SCROLL to this fragment
+          // regardless, but a fragment target with no tabindex is not
+          // FOCUSABLE — so without this, the very next Tab after the link
+          // returns focus to the rail rather than continuing from the page,
+          // and the link would have moved the view without moving where
+          // keyboard input actually goes.
+          tabIndex={-1}
+          className="mx-auto w-full max-w-content p-page max-narrow:p-page-mobile max-narrow:pb-[76px] focus:outline-none"
         >
           {/* THE PAGE IS REPLACED, NOT DEGRADED. An account with no workspace
               has nothing any of these routes can read — every one of them
@@ -136,8 +165,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </main>
       </div>
       <BottomNav hasWorkspace={workspace.status !== 'none'} />
-      {/* Lifted clear of the bottom bar on a phone, or it covers the tabs. */}
-      <Toaster position="bottom-left" offset={{ bottom: 16 }} mobileOffset={{ bottom: 72 }} />
+      {/* When the workspace has no zone yet, learn it from the reader's own
+          browser once — so the schedule display stops rendering in the IST
+          fallback while the picker builds in the reader's clock. Renders
+          nothing, and never touches a zone a person chose in Settings. */}
+      {workspace.status === 'ok' ? (
+        <TimezoneAutodetect
+          workspaceId={workspace.workspace.id}
+          current={workspace.workspace.timezone}
+        />
+      ) : null}
+      <AppToaster />
     </div>
   )
 }

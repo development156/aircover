@@ -172,7 +172,23 @@ describe('POST /api/webhooks/cashfree — a correctly signed payment', () => {
     expect(workspaceId).toBe(WORKSPACE_ID)
     expect(entryType).toBe('GRANT')
     expect(amount).toBe(PLAN_CATALOG[PLAN].monthlyCredits)
-    expect(idempotencyKey).toBe(monthlyGrantKey(PLAN, PERIOD, WORKSPACE_ID))
+    // RETARGETED 2026-09-03, and the retarget is the fix it pins.
+    //
+    // This was `toBe(monthlyGrantKey(PLAN, PERIOD, WORKSPACE_ID))`, which is a
+    // key with no payment in it: a customer who bought Starter on the 3rd, ran
+    // out on the 20th and bought Starter again the same month paid twice and was
+    // granted once, because the second webhook replayed the first key and the
+    // ledger correctly refused a duplicate. Real money, no credits, and only
+    // Sentry knew.
+    //
+    // The key now carries the provider and the event, so a genuinely distinct
+    // payment grants again while a REPLAYED delivery of the same event still
+    // does not (the test below pins that half). Asserted as a shape rather than
+    // rebuilt here: the two halves that matter are that the monthly key is still
+    // its prefix, so nothing about the workspace, plan or period moved, and that
+    // the payment identifies it.
+    expect(idempotencyKey).toMatch(new RegExp(`^${monthlyGrantKey(PLAN, PERIOD, WORKSPACE_ID)}:`))
+    expect(String(idempotencyKey)).toContain(CF_PAYMENT_ID)
   })
 
   it('attributes the entry to the provider and stamps the honest mode on its meta', async () => {
@@ -443,7 +459,7 @@ describe('POST /api/webhooks/cashfree — delivery contract', () => {
   it('reports a grant that replayed instead of silently returning success', async () => {
     const { pool } = recordingPool()
     const replayingPool = {
-      query: async (text: string, values: unknown[] = []) => {
+      query: async (text: string, _values: unknown[] = []) => {
         if (text.includes('insert into billing_webhook_events')) return { rows: [{ id: 'wh_2' }] }
         if (text.includes('apply_ledger_entry')) {
           return {

@@ -1,5 +1,6 @@
 import {
   AdapterError,
+  CHANNEL_LABELS,
   CONSTRAINTS,
   type Channel,
   type FormattedContent,
@@ -166,6 +167,26 @@ function platformIdOf(leg: ZernioPlatformResult | undefined): string | null {
   return ZERNIO_ID_RE.test(id) ? null : id
 }
 
+/**
+ * The live link off a leg, or null.
+ *
+ * "Published" is decided here and nowhere else, and it means ONE thing: a string
+ * that parses as an https URL. This used to be a truthiness check on
+ * `platformPostUrl`, so `true`, an object, or a `fixture://` string would each
+ * have been stored as the permalink and the row flipped to `published` with a
+ * link nobody can open. The client's schema already refuses a non-string; this
+ * refuses the strings that are not links to anything on the internet.
+ */
+function livePermalinkOf(leg: ZernioPlatformResult | undefined): string | null {
+  const url = leg?.platformPostUrl
+  if (typeof url !== 'string' || url.length === 0) return null
+  try {
+    return new URL(url).protocol === 'https:' ? url : null
+  } catch {
+    return null
+  }
+}
+
 export function createZernioAdapter(channel: Channel, deps: ZernioAdapterDeps): PublishAdapter {
   const attempts = deps.poll?.attempts ?? DEFAULT_ATTEMPTS
   const intervalMs = deps.poll?.intervalMs ?? DEFAULT_INTERVAL_MS
@@ -173,6 +194,9 @@ export function createZernioAdapter(channel: Channel, deps: ZernioAdapterDeps): 
   const now = deps.now ?? (() => new Date())
   const platform = ZERNIO_PLATFORM_NAME[channel]
   const spec = CONSTRAINTS[channel]
+  // The name a customer reads. `channel` is the enum key and it reached the
+  // publish button verbatim as "gbp allows 1 media items".
+  const label = CHANNEL_LABELS[channel]
 
   const fail = (
     message: string,
@@ -183,6 +207,60 @@ export function createZernioAdapter(channel: Channel, deps: ZernioAdapterDeps): 
 
   const legOf = (post: ZernioPost | undefined): ZernioPlatformResult | undefined =>
     post?.platforms?.find((p) => p.platform === platform)
+
+  /**
+   * What a Zernio refusal MEANS, before it becomes an AdapterError.
+   *
+   * ── WHY THE CODE, NOT ONLY THE STATUS ────────────────────────────────────────
+   * The native adapters map 401 and 403 straight to UNAUTHORIZED and FORBIDDEN,
+   * the two codes that make the publish path raise the reconnect prompt and mark
+   * the connection expired. That is right for them: the bearer token is the
+   * customer's. It is wrong here. Zernio's bearer is SAHODA'S key, so a 401 says
+   * Sahoda cannot sign in to its own provider and reconnecting the customer's
+   * account is a remedy that cannot work. The customer's account is named by a
+   * 403 carrying `ACCOUNT_DISCONNECTED` (docs/31 §6.4, [SPEC]), and that is the
+   * one case that earns the reconnect sentence.
+   *
+   * A 409 is the content-hash window: the same words and photos to the same
+   * account inside 24 hours. Permanent, because a retry sends the same thing to
+   * the same window; distinct, because "already posted" is not "refused".
+   *
+   * `raw` carries the status and Zernio's own code, never the response body:
+   * the body is provider-controlled text and `raw` reaches a log row.
+   */
+  const fromZernio = (err: ZernioError): AdapterError => {
+    const raw = { status: err.status, zernioCode: err.code }
+    if (err.status === 409) {
+      return fail(
+        `${label} already has a post with these exact words and photos from the last 24 hours, so this one was not sent again. Change the wording or a photo to post it.`,
+        'ALREADY_POSTED',
+        'permanent',
+        // The earlier post's Zernio id rides on `raw.postId`, the shape the
+        // publish log already lifts into its handle column.
+        err.existingPostId ? { ...raw, postId: err.existingPostId } : raw,
+      )
+    }
+    if (err.code === 'ACCOUNT_DISCONNECTED') {
+      return fail(
+        `${label} is no longer connected to Sahoda. Reconnect it, then publish again.`,
+        'FORBIDDEN',
+        'permanent',
+        raw,
+      )
+    }
+    if (err.status === 401) {
+      return fail(
+        `Sahoda could not sign in to its publishing service, so nothing was sent to ${label}. This is on Sahoda's side, not your account.`,
+        'PROVIDER_UNAUTHORIZED',
+        'permanent',
+        raw,
+      )
+    }
+    if (err.status === 403) {
+      return fail(`${label} refused Sahoda permission to post this.`, err.code, 'permanent', raw)
+    }
+    return fail(err.message, err.code, err.classification, raw)
+  }
 
   /**
    * Poll until this channel's leg carries a URL, or fails, or we give up.
@@ -210,7 +288,7 @@ export function createZernioAdapter(channel: Channel, deps: ZernioAdapterDeps): 
     let rereadForId = false
     for (let i = 0; i < attempts; i += 1) {
       const leg = legOf(current)
-      if (leg?.platformPostUrl) {
+      if (livePermalinkOf(leg) !== null) {
         if (platformIdOf(leg) !== null || rereadForId) return current
         rereadForId = true
       } else if (leg?.status === 'failed') return current
@@ -232,7 +310,7 @@ export function createZernioAdapter(channel: Channel, deps: ZernioAdapterDeps): 
     async publish(req: PublishRequest): Promise<PublishSuccess> {
       if (req.content.channel !== channel) {
         throw fail(
-          `${channel} adapter received ${req.content.channel} content.`,
+          `The ${label} adapter received content written for ${CHANNEL_LABELS[req.content.channel]}.`,
           'CHANNEL_MISMATCH',
           'permanent',
         )
@@ -243,7 +321,7 @@ export function createZernioAdapter(channel: Channel, deps: ZernioAdapterDeps): 
         // The account id must have come from a workspace-scoped lookup. A malformed
         // one means the caller assembled it rather than resolving it.
         throw fail(
-          `${channel} on Zernio needs a 24-char account id.`,
+          `The ${label} account id is not in the form Sahoda expects, so nothing was sent.`,
           'INVALID_ACCOUNT_ID',
           'permanent',
         )
@@ -254,14 +332,14 @@ export function createZernioAdapter(channel: Channel, deps: ZernioAdapterDeps): 
         // Belt and braces with the Constraint Engine's MEDIA_REQUIRED. Reaching the
         // network to be told so wastes an attempt against a per-day cap.
         throw fail(
-          `${channel} needs at least one photo. There is no text-only post.`,
+          `${label} needs at least one photo. There is no text-only post there.`,
           'MEDIA_REQUIRED',
           'permanent',
         )
       }
       if (media.length > spec.maxMediaCount) {
         throw fail(
-          `${channel} allows ${spec.maxMediaCount} media items.`,
+          `${label} allows ${spec.maxMediaCount} ${spec.maxMediaCount === 1 ? 'attachment' : 'attachments'} per post.`,
           'MAX_MEDIA_COUNT',
           'permanent',
         )
@@ -338,9 +416,7 @@ export function createZernioAdapter(channel: Channel, deps: ZernioAdapterDeps): 
           requestId,
         )
       } catch (err) {
-        if (err instanceof ZernioError) {
-          throw fail(err.message, err.code, err.classification, { status: err.status })
-        }
+        if (err instanceof ZernioError) throw fromZernio(err)
         throw err
       }
 
@@ -358,13 +434,13 @@ export function createZernioAdapter(channel: Channel, deps: ZernioAdapterDeps): 
 
       const settled = await waitForUrl(post)
       const leg = legOf(settled)
-      const url = leg?.platformPostUrl ?? null
+      const url = livePermalinkOf(leg)
 
       if (!url) {
         const reason = leg?.error ?? leg?.errorMessage
         if (leg?.status === 'failed') {
           throw fail(
-            reason ? `${channel} refused this post: ${reason}` : `${channel} refused this post.`,
+            reason ? `${label} refused this post: ${reason}` : `${label} refused this post.`,
             'PLATFORM_REJECTED',
             'permanent',
             leg,
@@ -374,7 +450,7 @@ export function createZernioAdapter(channel: Channel, deps: ZernioAdapterDeps): 
         // the post may yet go live, so a retry must not assume it did not. The
         // platform post id rides on `raw` so the reconcile sweep can ask later.
         throw fail(
-          `${channel} is still processing this post. No live link yet.`,
+          `${label} is still processing this post. There is no live link yet.`,
           'STILL_PROCESSING',
           'transient',
           { postId: post._id, status: leg?.status },

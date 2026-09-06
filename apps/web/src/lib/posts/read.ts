@@ -108,6 +108,101 @@ export async function readPosts(): Promise<PostsRead> {
 }
 
 /**
+ * Cap on `readPostsInWindow`. Not `LIST_LIMIT`: a hundred is a PAGE, and a
+ * calendar window is the whole window. A thousand dated posts inside one
+ * six-week span is far past anything a workspace plans, and the cap exists so a
+ * runaway import cannot turn one render into an unbounded read.
+ */
+export const WINDOW_LIMIT = 1000
+
+/**
+ * Every post with a time inside `[fromIso, toIso)`, soonest first.
+ *
+ * ── WHY THE CALENDAR CANNOT READ THE LIST ────────────────────────────────────
+ * `readPosts` is the hundred most recently EDITED posts. That is the right shape
+ * for a list and the wrong one for a calendar: a post booked for Thursday and
+ * untouched since a hundred other edits fell off the week grid, off the mini
+ * calendar's dots and out of "Going out today", and nothing on screen said so.
+ * The list's own footnote ("Showing the 100 most recently updated") was the only
+ * warning, and it sat under a calendar it did not describe.
+ *
+ * This asks the question a calendar actually has. Same three-way answer as
+ * `readPosts`, for the same reason: an empty week and a failed read are
+ * different sentences.
+ */
+export async function readPostsInWindow(fromIso: string, toIso: string): Promise<PostsRead> {
+  // A bound that is not an instant is not a window. Refused before any read,
+  // rather than handed to Postgres as a string it would compare lexically.
+  if (Number.isNaN(Date.parse(fromIso)) || Number.isNaN(Date.parse(toIso))) {
+    return { status: 'unreadable' }
+  }
+  try {
+    const workspace = await activeWorkspaceRead()
+    if (workspace.status === 'unreadable') return { status: 'unreadable' }
+    if (workspace.status === 'none') return { status: 'no-workspace' }
+    const workspaceId = workspace.workspace.id
+
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase
+      .from('posts')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .gte('scheduled_at', fromIso)
+      .lt('scheduled_at', toIso)
+      .order('scheduled_at', { ascending: true })
+      .limit(WINDOW_LIMIT)
+
+    if (error || !data) {
+      if (error) console.error('[posts] window read failed', error.code, error.message)
+      return { status: 'unreadable' }
+    }
+    return {
+      status: 'ok',
+      posts: data.flatMap((row) => {
+        const parsed = PostSchema.safeParse(row)
+        return parsed.success ? [parsed.data] : []
+      }),
+    }
+  } catch (error) {
+    console.error('[posts] window read threw', error instanceof Error ? error.message : 'unknown')
+    return { status: 'unreadable' }
+  }
+}
+
+/**
+ * How many posts in the active workspace have no time at all.
+ *
+ * The off-grid note counts what a calendar structurally cannot draw, and the
+ * undated half of that count used to be measured on the capped list — so a
+ * workspace with 140 undated drafts read "100 posts are not on this view". A
+ * `head` count costs no rows. `null` means the question was not answered; a
+ * zero would claim every post has a date, which is the one thing this read
+ * must never say by accident.
+ */
+export async function readUndatedCount(): Promise<number | null> {
+  try {
+    const workspaceId = await activeWorkspaceId()
+    if (workspaceId === null) return null
+
+    const supabase = createServerSupabase()
+    const { count, error } = await supabase
+      .from('posts')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)
+      .is('scheduled_at', null)
+
+    if (error) {
+      console.error('[posts] undated count failed', error.code, error.message)
+      return null
+    }
+    return typeof count === 'number' ? count : null
+  } catch (error) {
+    console.error('[posts] undated count threw', error instanceof Error ? error.message : 'unknown')
+    return null
+  }
+}
+
+/**
  * The lossy view. Correct only where the caller has ALREADY decided which of the
  * three it is in — /home short-circuits on the wallet's `no-workspace` before it
  * reaches a post — and never where an empty list is about to be rendered as a
@@ -489,5 +584,73 @@ export async function listVariantStates(
     return byPost
   } catch {
     return byPost
+  }
+}
+
+/**
+ * Attached media for a page of posts, in one query.
+ *
+ * ── WHY THE LIST NEEDS THIS AT ALL ───────────────────────────────────────────
+ * The posts list has never read `post_media`, so a post with a photo and a post
+ * without one rendered identically. On the full-width rows that was a gap; on
+ * the tile grid it is a defect, because the tile is mostly the space where the
+ * photo would be and the reader is looking straight at it.
+ *
+ * ── ONE QUERY, LIKE `listVariantStates`, AND FOR THE SAME REASON ─────────────
+ * `readMedia` is per post. A page of `LIST_LIMIT` posts through that is
+ * `LIST_LIMIT` round trips on the screen people leave open. This is the same
+ * shape as the variant read beside it: one `in` over the whole page, grouped in
+ * memory, ordered so the FIRST row is the one the tile shows.
+ *
+ * A row that fails to parse is dropped rather than faked, exactly as it is in
+ * `readMedia`.
+ *
+ * ── NULL WHEN IT COULD NOT BE READ, AND THAT IS THE WHOLE POINT ─────────────
+ * The first version returned a plain `Map` and an EMPTY one on every failure —
+ * no workspace, a PostgREST error, a thrown exception — which is byte-identical
+ * to a page whose posts genuinely have no photos. The tiles then rendered as a
+ * designed photo-less screen, and a writer whose read hiccuped would attach a
+ * second copy of a photo already on the post. That is precisely the confusion
+ * `MediaPeek` was written to prevent, reintroduced one level upstream of it.
+ *
+ * It is also the shape this file already fixed once: `listPosts` returning `[]`
+ * for both empty and failed is the defect `PostsRead` exists for, and
+ * `readMedia` returns `PostMedia[] | null` for the same reason. This now matches
+ * them. `null` means the question was not answered; an empty map means it was,
+ * and the answer is none.
+ *
+ * The asymmetry with `listVariantStates` beside it is deliberate rather than an
+ * inconsistency: a variant read failing empty DEGRADES a chip to a weaker claim,
+ * while a media read failing empty makes a POSITIVE false claim about what is on
+ * the post. Failing quiet is only safe when the quiet answer is the weaker one.
+ */
+export async function listPostMedia(postIds: string[]): Promise<Map<string, PostMedia[]> | null> {
+  const byPost = new Map<string, PostMedia[]>()
+  if (postIds.length === 0) return byPost
+
+  try {
+    const workspaceId = await activeWorkspaceId()
+    if (workspaceId === null) return null
+
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase
+      .from('post_media')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .in('post_id', postIds)
+      .order('created_at', { ascending: true })
+
+    if (error || !data) return null
+
+    for (const row of data) {
+      const parsed = PostMediaSchema.safeParse(row)
+      if (!parsed.success) continue
+      const list = byPost.get(parsed.data.post_id) ?? []
+      list.push(parsed.data)
+      byPost.set(parsed.data.post_id, list)
+    }
+    return byPost
+  } catch {
+    return null
   }
 }

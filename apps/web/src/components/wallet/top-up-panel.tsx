@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Check, Coins, CreditCard, Info, Sparkles } from 'lucide-react'
+import { Check, Coins, CreditCard, Sparkles } from 'lucide-react'
 import {
   PLAN_CATALOG,
   describePlanPrice,
@@ -12,12 +12,15 @@ import {
 } from '@sahoda/shared'
 
 import { startCheckout } from '@/app/actions/wallet'
+import { CheckoutResult } from '@/components/wallet/checkout-result'
+import { RECOMMENDED_PLAN } from '@/lib/billing/recommended-plan'
 import { Card, CardLabel } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { StaggerItem } from '@/components/motion/stagger'
 import type { CheckoutState } from '@/lib/wallet/checkout-state'
 import { cn } from '@/lib/utils'
 import { creditWord } from '@/lib/credit-words'
+import { DEFAULT_ZONE } from '@/lib/time/zone'
 
 /**
  * Only priced plans are offered. `free` is in `PlanIdSchema` but there is nothing
@@ -28,33 +31,6 @@ const PAID_PLANS: readonly PlanCatalogEntry[] = Object.values(PLAN_CATALOG).filt
 )
 
 const DEFAULT_PLAN: PlanId = 'starter'
-
-/**
- * The plan Sahoda points at. Founder's call, 25 August 2026.
- *
- * ── WHY THIS IS ALLOWED WHERE "POPULAR" WAS NOT ──────────────────────────────
- * A "Popular" chip was declined twice on this panel, and the reason was never
- * that badges are tacky. It is that "popular" is a claim about OTHER CUSTOMERS
- * — how many workspaces chose this plan — and nothing in this codebase counts
- * that, so the chip would be a number we cannot produce, dressed as a fact.
- *
- * "Recommended" is a claim about US. It says Sahoda suggests this one, which is
- * true by construction the moment someone decides it, and it is checkable by
- * asking that person. Same shape of chip, completely different epistemics.
- *
- * ── AND IT IS DELIBERATELY NOT THE DEFAULT SELECTION ─────────────────────────
- * `DEFAULT_PLAN` stays `starter`. Recommending a plan and pre-selecting it are
- * different acts: the second decides what the checkout will charge if someone
- * presses the button without reading, and that was not asked for. Flip this only
- * on purpose.
- *
- * ── AND IT LIVES HERE, NOT IN PLAN_CATALOG ───────────────────────────────────
- * A `recommended` field in `packages/shared` would be the tidier home, but the
- * advisor lane is editing pricing in that exact file right now and this branch
- * already carries one unresolved conflict with them. Which plan a screen points
- * at is a presentation choice; the catalog stays the contract.
- */
-const RECOMMENDED_PLAN: PlanId = 'growth'
 
 const inr = (value: number): string => value.toLocaleString('en-IN')
 
@@ -95,7 +71,7 @@ const asOf = (iso: string): string =>
   new Intl.DateTimeFormat('en-IN', {
     day: 'numeric',
     month: 'short',
-    timeZone: 'Asia/Kolkata',
+    timeZone: DEFAULT_ZONE,
   }).format(new Date(iso))
 
 export function TopUpPanel({ currency = null, fx = null }: TopUpPanelProps) {
@@ -382,7 +358,7 @@ export function TopUpPanel({ currency = null, fx = null }: TopUpPanelProps) {
                       <span key={line} className="flex items-start gap-2.5 type-sm text-muted">
                         {/* ── THE CIRCLED TICK, AND WHY IT COSTS NO ACCENT ──────
                           The reference draws each feature's tick inside a ring:
-                          `h-6 w-6 bg-white border border-orange-500 rounded-full`
+                          `h-6 w-6 bg-white border border-orange-500 rounded-pill`
                           with an orange glyph. That exact class list is
                           unaffordable here and the arithmetic is the same one
                           this file already records for the card edge — a real
@@ -421,7 +397,7 @@ export function TopUpPanel({ currency = null, fx = null }: TopUpPanelProps) {
                             'mt-icon-nudge grid size-[18px] shrink-0 place-content-center rounded-pill bg-surface',
                             checked
                               ? 'shadow-[inset_0_0_0_1px_var(--brand-lift)]'
-                              : 'shadow-[inset_0_0_0_1px_var(--line)]',
+                              : 'surface-ring-firm',
                           )}
                         >
                           <Check
@@ -526,76 +502,5 @@ export function TopUpPanel({ currency = null, fx = null }: TopUpPanelProps) {
 
       {result !== null ? <CheckoutResult result={result} onRetry={start} /> : null}
     </Card>
-  )
-}
-
-function CheckoutResult({ result, onRetry }: { result: CheckoutState; onRetry: () => void }) {
-  if (!result.ok) {
-    return (
-      <div
-        role="alert"
-        className="space-y-2 rounded-input border border-danger-bg bg-danger-bg px-3 py-2.5 text-[13px] text-danger"
-      >
-        <p>{result.message} No payment was started and you were not charged.</p>
-        <Button type="button" variant="secondary" size="sm" onClick={onRetry}>
-          Start checkout
-        </Button>
-      </div>
-    )
-  }
-
-  if (result.simulated) {
-    // A REAL Cashfree order now exists for this session — but in the sandbox, where no money
-    // moves, and the page that would collect the payment (`/billing/checkout/{orderId}`,
-    // which hands `payment_session_id` to `cashfree-js`) is not built yet. So this is
-    // labelled and left inert: rendering it as a link, or as a completed purchase, would be
-    // a fake success. The old copy claimed "no payment rail is connected", which stopped
-    // being true the moment the fixture double was replaced.
-    return (
-      // role="status": the pending line goes silent when the transition ends, so
-      // without this a screen-reader user is never told the action finished.
-      <div
-        role="status"
-        className="space-y-2 rounded-input bg-warn-bg px-3 py-2.5 text-[13px] text-warn"
-      >
-        <p className="flex items-center gap-2 font-semibold">
-          <Info size={14} strokeWidth={2} aria-hidden />
-          {result.mode === 'sandbox'
-            ? 'Sandbox order created. No real money moves'
-            : 'Simulated checkout. No payment rail is connected'}
-        </p>
-        <p>
-          {result.mode === 'sandbox'
-            ? 'A real Cashfree order was opened in test mode. Nothing was charged and no credits were added. Credits arrive only after a completed payment is confirmed. The payment page is not reachable from the app yet.'
-            : `No payment was taken and no credits were added. This is what a ${result.mode} session returns while billing is being wired.`}
-        </p>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-mono text-[12px]">
-          <dt className="text-muted">mode</dt>
-          <dd className="break-all">{result.mode}</dd>
-          <dt className="text-muted">session</dt>
-          <dd className="break-all">{result.sessionId}</dd>
-          <dt className="text-muted">plan</dt>
-          <dd className="break-all">{result.planId}</dd>
-        </dl>
-      </div>
-    )
-  }
-
-  return (
-    <div role="status" className="space-y-2 rounded-input bg-ok-bg px-3 py-2.5 text-[13px] text-ok">
-      <p className="font-semibold">Checkout session ready</p>
-      <p>
-        Credits are added once the payment completes. Session{' '}
-        <span className="font-mono break-all">{result.sessionId}</span>.
-      </p>
-      <a
-        href={result.url}
-        rel="noopener noreferrer"
-        target="_blank"
-        className="inline-block font-semibold underline underline-offset-2"
-      >
-        Open the payment page
-      </a>
-    </div>
   )
 }

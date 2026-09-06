@@ -54,8 +54,8 @@ describe('the cost preview', () => {
     expect(screen.getByText(/Nothing has been spent on these yet/i)).toBeTruthy()
     // 3 × post_variants creation, plus the orchestration already charged.
     const creation = 3 * creditCost('post_variants')
-    expect(screen.getByText(`${creation} cr`)).toBeTruthy()
-    expect(screen.getByText(`${creation + creditCost('loop_cycle')} cr`)).toBeTruthy()
+    expect(screen.getByText(`${creation} credits`)).toBeTruthy()
+    expect(screen.getByText(`${creation + creditCost('loop_cycle')} credits`)).toBeTruthy()
   })
 
   it('puts the price in the button label, never only in a total', () => {
@@ -78,7 +78,7 @@ describe('the cost preview', () => {
     )
     // A total a person cannot decompose is a total they cannot trim, so the
     // per-line prices are present too.
-    expect(screen.getAllByText(`${creditCost('post_variants')} cr`).length).toBe(3)
+    expect(screen.getAllByText(`${creditCost('post_variants')} credits`).length).toBe(3)
   })
 
   it('sends the total IT SHOWED as the expected credits', async () => {

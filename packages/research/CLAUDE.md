@@ -5,15 +5,15 @@ The **URL door** (doc 18 §5): turn a customer's website into a voice corpus. Se
 **This package acquires and quarantines. It never calls a model.** The quarantined extraction
 is `brand_extract` in `@sahoda/mesh` — every model call in this codebase lives there.
 
-- **Firecrawl is a DIRECT vendor integration, not a mesh route.** doc 18 opens by correcting
-  exactly this: OpenRouter routes inference; Firecrawl's crawl/scrape/extract are a separate
+- **TinyFish Fetch is a DIRECT vendor integration, not a mesh route.** doc 18 opens by correcting
+  exactly this: OpenRouter routes inference; TinyFish's fetch is a separate
   service with its own key. Routing them through the mesh would make a scraping failure look
   like a model failure and bill a fixed credit price against a per-call vendor cost.
 - **Crawl several pages, not one.** One page yields the category's voice, not the company's.
   `MAX_PAGES` caps the spend; `CrawlSuccess.skipped` names what the cap dropped — a silent
   top-N reads as "we crawled your site" when it did not.
-- **Cost is `pages + 1` Firecrawl credits** (one map + one scrape per page), knowable before
-  spend. `FIRECRAWL_API_KEY` must be in `turbo.json`'s `@sahoda/web#build` allowlist or the
+- **Cost is zero vendor credits with TinyFish Fetch** (it was `pages + 1` Firecrawl credits); the day's 1,000 fetches are the budget, knowable before
+  spend. `TINYFISH_API_KEY` must be in `turbo.json`'s `@sahoda/web#build` allowlist or the
   Vercel build will not see it while every local gate stays green.
 - **Fail honestly.** Six named reasons, each its own sentence, each falling back to asking.
   `js_only` must never read as "your site is empty", and `crawler_error` (our bad key, our

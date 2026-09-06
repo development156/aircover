@@ -229,6 +229,24 @@ export interface ZernioMessage {
   createdAt?: string
   readAt?: string | null
   isDeleted?: boolean
+  /**
+   * What came attached. Absent on a message that carried none; the wire sends `[]`.
+   *
+   * `url` is a SNAPSHOT on Instagram and Facebook: a signed Meta CDN link that
+   * expires on Meta's schedule. `refreshUrl` is stamped only on a REST read and is
+   * Zernio's re-mint endpoint for that attachment; a webhook payload carries none,
+   * and the reader builds the same URL from the ids (`messageAttachmentUrl`).
+   */
+  attachments?: ZernioAttachment[]
+}
+
+/** One attachment on a message, as Zernio describes it. */
+export interface ZernioAttachment {
+  /** `image`, `video`, `file`, `sticker`, `audio`, `share`. Zernio's own vocabulary. */
+  type: string
+  url: string
+  refreshUrl?: string
+  payload?: Record<string, unknown>
 }
 
 /** What a message's `direction` means to us, including "we do not recognise it". */
@@ -375,6 +393,301 @@ const qs = (parts: Record<string, string | number | undefined>): string => {
   return out.length === 0 ? '' : `?${out.join('&')}`
 }
 
+/**
+ * Shared filter shape across every `/analytics/inbox/*` endpoint.
+ *
+ * `accountId` is a plain string, not `ScopedAccountId`: unlike the messaging
+ * surface, `profileId` alone already scopes every one of these calls to the
+ * tenant, so `accountId` here is a narrowing filter WITHIN that tenant rather
+ * than the thing that establishes the tenant. Minting a `ScopedAccountId` would
+ * imply a second scoping check these endpoints do not need or perform.
+ */
+export interface ZernioInboxAnalyticsFilter {
+  fromDate: string
+  toDate?: string
+  platform?: string
+  accountId?: string
+  source?: string
+}
+
+export interface ZernioInboxVolumeSummary {
+  received: number
+  sent: number
+  read: number
+  failed: number
+  uniqueConversations: number
+}
+
+export interface ZernioInboxVolumeDay {
+  date: string
+  sent: number
+  received: number
+  read: number
+  failed: number
+}
+
+export interface ZernioInboxVolumePlatform {
+  platform: string
+  sent: number
+  received: number
+  read: number
+  failed: number
+}
+
+export interface ZernioInboxVolume {
+  from: string
+  to: string | null
+  summary: ZernioInboxVolumeSummary
+  timeseries: ZernioInboxVolumeDay[]
+  byPlatform: ZernioInboxVolumePlatform[]
+}
+
+export interface ZernioInboxHeatmapBucket {
+  /** 1 = Monday … 7 = Sunday, per ClickHouse's `toDayOfWeek`. */
+  dow: number
+  hour: number
+  received: number
+  sent: number
+  read: number
+}
+
+export interface ZernioInboxHeatmap {
+  from: string
+  to: string | null
+  buckets: ZernioInboxHeatmapBucket[]
+}
+
+export interface ZernioInboxSourcePlatform {
+  platform: string
+  received: number
+  sent: number
+  read: number
+}
+
+export interface ZernioInboxSourceRow {
+  source: string
+  received: number
+  sent: number
+  read: number
+  byPlatform: ZernioInboxSourcePlatform[]
+}
+
+export interface ZernioInboxSourceBreakdown {
+  from: string
+  to: string | null
+  sources: ZernioInboxSourceRow[]
+}
+
+export interface ZernioInboxResponseTimeSummary {
+  sampleSize: number
+  medianSeconds: number
+  p90Seconds: number
+  p99Seconds: number
+  meanSeconds: number
+  fastestSeconds: number
+  slowestSeconds: number
+}
+
+export interface ZernioInboxResponseTimeBucket {
+  bucket: string
+  lowerSeconds: number
+  upperSeconds: number | null
+  count: number
+}
+
+export interface ZernioInboxResponseTime {
+  from: string
+  to: string | null
+  summary: ZernioInboxResponseTimeSummary | null
+  histogram: ZernioInboxResponseTimeBucket[]
+}
+
+export interface ZernioInboxTopAccount {
+  accountId: string
+  platform: string
+  /** `(disconnected)` when the live SocialAccount no longer exists. */
+  displayName: string
+  username: string
+  received: number
+  sent: number
+  total: number
+  conversations: number
+  medianResponseSeconds: number
+  /** Zero here with `repliedCount === 0` means never replied, not an instant reply. */
+  repliedCount: number
+}
+
+export interface ZernioInboxTopAccounts {
+  from: string
+  to: string | null
+  accounts: ZernioInboxTopAccount[]
+}
+
+// ── posting analytics, profile-scoped ────────────────────────────────────────
+
+/**
+ * ONE DAY OF `GET /v1/analytics/daily-metrics`.
+ *
+ * ── EVERY METRIC IS NULLABLE HERE AND IT IS NOT ON THE WIRE ──────────────────
+ * The OpenAPI schema types all eight as `integer` and the example sends all
+ * eight. They are typed `number | null` anyway, because this module's job is to
+ * report what arrived and not what was promised: a key the response omits, or
+ * sends as a string, or sends as `null`, must not reach a chart as a zero. A
+ * zero is a measurement of nothing and a null is the absence of a measurement,
+ * and once they are the same value nothing downstream can tell them apart.
+ *
+ * `postCount` and the `platforms` split are counts of rows Zernio holds, so
+ * those default to 0 and {} rather than to null: an absent day is simply not in
+ * the array.
+ */
+export interface ZernioDailyMetricValues {
+  impressions: number | null
+  reach: number | null
+  likes: number | null
+  comments: number | null
+  shares: number | null
+  saves: number | null
+  clicks: number | null
+  views: number | null
+}
+
+export interface ZernioDailyMetricsDay {
+  /** `YYYY-MM-DD`. */
+  date: string
+  postCount: number
+  /** Posts per platform on this day: `{ instagram: 2, twitter: 1 }`. */
+  platforms: Record<string, number>
+  metrics: ZernioDailyMetricValues
+}
+
+export interface ZernioDailyPlatformRow extends ZernioDailyMetricValues {
+  platform: string
+  postCount: number
+}
+
+export interface ZernioDailyMetrics {
+  dailyData: ZernioDailyMetricsDay[]
+  platformBreakdown: ZernioDailyPlatformRow[]
+}
+
+/**
+ * ── `attribution` IS NOT A PREFERENCE, IT DECIDES WHAT THE CHART MEANS ───────
+ * `publish` (Zernio's default) sums each post's LIFETIME total onto its publish
+ * date, so a column is "posts published that day, and everything they have ever
+ * earned since". `received` buckets the per-day INCREASE by the day it arrived,
+ * so a column is "engagement gained that day, on posts of any age". They are
+ * different questions with the same axis, and a screen that let the default
+ * decide would change what its y-axis means without saying so.
+ *
+ * Required here, with no default, for exactly that reason: a caller has to
+ * choose, and whatever it chooses it can then print.
+ */
+export interface ZernioDailyMetricsFilter {
+  /** ISO 8601. Inclusive. */
+  fromDate: string
+  /** ISO 8601. Inclusive. Zernio defaults to now. */
+  toDate?: string
+  /** One platform, or every platform when omitted. */
+  platform?: string
+  attribution: 'publish' | 'received'
+  /** `late` is published through Zernio, `external` is imported. */
+  source?: 'all' | 'late' | 'external'
+}
+
+/**
+ * `GET /v1/accounts/follower-stats` — follower history for EVERY connected
+ * account, per platform.
+ *
+ * ── WHY THIS EXISTS BESIDE `instagramFollowerHistory` ────────────────────────
+ * That one is account-scoped, Instagram-only, and is what the Account health
+ * panel reads. This one is profile-scoped and answers for every platform at
+ * once, which is the only way to draw one chart per channel. Two endpoints, two
+ * shapes, and they are not interchangeable: this one keys its series by
+ * Zernio's account `_id` and the other returns Meta's own metric bag.
+ *
+ * Counts are refreshed once a day on Zernio's side, so a series is at most one
+ * point per day however often it is asked. Requires the Analytics add-on: a
+ * legacy plan answers 403 `requiresAddon`, which throws and MUST NOT be read as
+ * "nothing is connected".
+ */
+export interface ZernioFollowerAccount {
+  /** Zernio's account id. The key into `stats`. */
+  id: string
+  platform: string
+  username: string | null
+  /** Nullable throughout: a figure that did not arrive is not a zero. */
+  currentFollowers: number | null
+  growth: number | null
+  growthPercentage: number | null
+  dataPoints: number
+}
+
+export interface ZernioFollowerPoint {
+  /** `YYYY-MM-DD`. */
+  date: string
+  followers: number
+}
+
+export interface ZernioFollowerStats {
+  accounts: ZernioFollowerAccount[]
+  /** Account id to its series, oldest first. Absent accounts have no entry. */
+  stats: Record<string, ZernioFollowerPoint[]>
+  granularity: string | null
+}
+
+export interface ZernioFollowerStatsFilter {
+  /** `YYYY-MM-DD`. Zernio defaults to 30 days ago. */
+  fromDate?: string
+  toDate?: string
+  granularity?: 'daily' | 'weekly' | 'monthly'
+}
+
+/**
+ * `GET /v1/analytics/posting-frequency` — cadence against engagement.
+ *
+ * One row per (platform, posts_per_week) pair, with the average engagement rate
+ * observed across the weeks that matched that frequency. `weeksCount` is the
+ * sample behind each row and is the reason it is carried rather than dropped: a
+ * rate from one week is not a finding, and a chart that plotted it beside a rate
+ * from eighteen weeks would give them the same weight.
+ *
+ * `[DOC]`, not `[LIVE]`. The shape comes from the OpenAPI spec; no workspace
+ * with a connected account was reachable from the sandbox this was written in,
+ * so nothing here has been seen on the wire. Requires the Analytics add-on.
+ */
+export interface ZernioFrequencyRow {
+  platform: string
+  postsPerWeek: number
+  /** A PERCENTAGE, 0-100, as Zernio sends it. Not a fraction. */
+  avgEngagementRate: number | null
+  avgEngagement: number | null
+  weeksCount: number
+}
+
+/**
+ * `GET /v1/analytics/content-decay` — how engagement accumulates after a post.
+ *
+ * Seven buckets from "0-6h" to "30d+", each carrying the average share of a
+ * post's FINAL engagement that had arrived by then, and the number of posts
+ * behind that average. The bucket labels are Zernio's own strings and are shown
+ * as they arrive rather than re-derived, because a label this product invented
+ * would eventually disagree with the window it names.
+ *
+ * `[DOC]`, not `[LIVE]`. Same reason as above.
+ */
+export interface ZernioDecayBucket {
+  order: number
+  label: string
+  /** A PERCENTAGE, 0-100. Null when it did not arrive. */
+  avgPctOfFinal: number | null
+  postCount: number
+}
+
+export interface ZernioPostingAnalyticsFilter {
+  platform?: string
+  source?: 'all' | 'late' | 'external'
+}
+
 export interface ZernioReads {
   // ── analytics, profile-scoped ──────────────────────────────────────────────
   /**
@@ -461,6 +774,21 @@ export interface ZernioReads {
     conversationId: string,
     opts?: MessageListOpts,
   ): Promise<ZernioMessagePage>
+  /**
+   * A media url for one attachment that works RIGHT NOW, or null.
+   *
+   * `GET /inbox/conversations/{c}/messages/{m}/attachments/{i}?accountId&format=json`.
+   * Instagram and Facebook sign DM media per request; this re-mints a stale one
+   * from Meta. Other platforms answer their stored url while it resolves and 404
+   * once it does not, which is the null arm. `messageId` is the PLATFORM message
+   * id, the one `listMessages` returns as `id`.
+   */
+  messageAttachmentUrl(
+    account: ScopedAccountId,
+    conversationId: string,
+    messageId: string,
+    index: number,
+  ): Promise<string | null>
 
   // ── comments (read only) ───────────────────────────────────────────────────
   listCommentedPosts(
@@ -478,6 +806,96 @@ export interface ZernioReads {
     profile: ScopedProfileId,
     opts?: ListOpts,
   ): Promise<ZernioPaged<ZernioReview, ZernioCursorPage>>
+
+  // ── inbox analytics, profile-scoped ─────────────────────────────────────────
+  /** Daily volume + KPI summary + per-platform split, for the analytics volume chart. */
+  inboxVolume(
+    profile: ScopedProfileId,
+    filter: ZernioInboxAnalyticsFilter,
+  ): Promise<ZernioInboxVolume>
+  /** Day-of-week × hour-of-day buckets. Sparse: zero-fill the 7×24 grid at render time. */
+  inboxHeatmap(
+    profile: ScopedProfileId,
+    filter: ZernioInboxAnalyticsFilter & {
+      action?: 'message.received' | 'message.sent' | 'message.read' | 'all'
+    },
+  ): Promise<ZernioInboxHeatmap>
+  /** Message volume by lineage source (human, workflow, sequence, broadcast, ...). */
+  inboxSourceBreakdown(
+    profile: ScopedProfileId,
+    filter: ZernioInboxAnalyticsFilter,
+  ): Promise<ZernioInboxSourceBreakdown>
+  /**
+   * Time-to-first-response. `summary` is null when `sampleSize` is 0 — no received
+   * message in the window ever got a reply, which is a different sentence from "every
+   * reply was instant" and must never render as a zero.
+   */
+  inboxResponseTime(
+    profile: ScopedProfileId,
+    filter: ZernioInboxAnalyticsFilter,
+  ): Promise<ZernioInboxResponseTime>
+  /** Leaderboard of accounts by inbox volume. */
+  inboxTopAccounts(
+    profile: ScopedProfileId,
+    filter: ZernioInboxAnalyticsFilter & { limit?: number },
+  ): Promise<ZernioInboxTopAccounts>
+
+  // ── posting analytics, profile-scoped ──────────────────────────────────────
+  /**
+   * Daily aggregated metrics and a per-platform breakdown, for /analytics.
+   *
+   * This is the ONLY source in this product for likes, comments, shares, saves,
+   * clicks and views. `post_metric_snapshots` stores impressions, reach and a
+   * single summed `engagement` and throws the parts away, which is why
+   * `headline.ts` has a card saying out loud that Sahoda cannot tell you how
+   * many people replied.
+   *
+   * `profileId` goes on the wire like every other profile-scoped read: omitted,
+   * it reads every profile on the API key, which is every tenant.
+   *
+   * ── IT CAN BE REFUSED FOR A REASON THAT IS NOT AN OUTAGE ────────────────────
+   * HTTP 402 `analytics_addon_required` on a legacy plan. That throws like any
+   * other refusal and MUST NOT be read as "nothing is connected": the accounts
+   * are connected and the plan does not carry the add-on. `lib/analytics/
+   * daily-metrics.ts` keeps the two apart.
+   */
+  dailyMetrics(
+    profile: ScopedProfileId,
+    filter: ZernioDailyMetricsFilter,
+  ): Promise<ZernioDailyMetrics>
+
+  /**
+   * Follower history for every connected account, per platform.
+   *
+   * The profile-scoped sibling of `instagramFollowerHistory`, which answers for
+   * one Instagram account and returns a different shape entirely. This is the
+   * only source that can draw a follower line per channel.
+   */
+  followerStats(
+    profile: ScopedProfileId,
+    filter?: ZernioFollowerStatsFilter,
+  ): Promise<ZernioFollowerStats>
+
+  /**
+   * Posting cadence against engagement, per platform. `[DOC]` shape.
+   *
+   * Answers "does posting four times a week do better than two?" from this
+   * workspace's own history. Never a recommendation on its own: a row backed by
+   * one week is not evidence, which is why `weeksCount` is required here.
+   */
+  postingFrequency(
+    profile: ScopedProfileId,
+    filter?: ZernioPostingAnalyticsFilter,
+  ): Promise<{ frequency: ZernioFrequencyRow[] }>
+  /**
+   * How quickly a post's engagement arrives after it goes out. `[DOC]` shape.
+   *
+   * Requires the Analytics add-on, and answers 403 `requiresAddon` without it.
+   */
+  contentDecay(
+    profile: ScopedProfileId,
+    filter?: ZernioPostingAnalyticsFilter,
+  ): Promise<{ buckets: ZernioDecayBucket[] }>
 }
 
 export function createZernioReads(deps: ZernioClientDeps): ZernioReads {
@@ -622,6 +1040,21 @@ export function createZernioReads(deps: ZernioClientDeps): ZernioReads {
       }
     },
 
+    async messageAttachmentUrl(account, conversationId, messageId, index) {
+      try {
+        const { data } = await json<{ url?: unknown }>(
+          'GET',
+          `/inbox/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/attachments/${Math.max(0, Math.trunc(index))}${qs({ accountId: account, format: 'json' })}`,
+          'messageAttachmentUrl',
+        )
+        return typeof data.url === 'string' && data.url !== '' ? data.url : null
+      } catch {
+        // A 404 here is the documented answer for "the stored url no longer
+        // resolves and this platform cannot re-mint". Not an error to report.
+        return null
+      }
+    },
+
     async listCommentedPosts(profile, opts) {
       const { data, rateLimit } = await json<{
         data?: ZernioCommentedPost[]
@@ -674,5 +1107,361 @@ export function createZernioReads(deps: ZernioClientDeps): ZernioReads {
         rateLimit,
       }
     },
+
+    async inboxVolume(profile, filter) {
+      const { data } = await json<{
+        from?: string
+        to?: string | null
+        summary?: Partial<ZernioInboxVolumeSummary>
+        timeseries?: ZernioInboxVolumeDay[]
+        byPlatform?: ZernioInboxVolumePlatform[]
+      }>(
+        'GET',
+        `/analytics/inbox/volume${qs({
+          profileId: profile,
+          fromDate: filter.fromDate,
+          toDate: filter.toDate,
+          platform: filter.platform,
+          accountId: filter.accountId,
+          source: filter.source,
+        })}`,
+        'inboxVolume',
+      )
+      return {
+        from: data.from ?? filter.fromDate,
+        to: data.to ?? null,
+        summary: {
+          received: data.summary?.received ?? 0,
+          sent: data.summary?.sent ?? 0,
+          read: data.summary?.read ?? 0,
+          failed: data.summary?.failed ?? 0,
+          uniqueConversations: data.summary?.uniqueConversations ?? 0,
+        },
+        timeseries: data.timeseries ?? [],
+        byPlatform: data.byPlatform ?? [],
+      }
+    },
+
+    async inboxHeatmap(profile, filter) {
+      const { data } = await json<{
+        from?: string
+        to?: string | null
+        buckets?: ZernioInboxHeatmapBucket[]
+      }>(
+        'GET',
+        `/analytics/inbox/heatmap${qs({
+          profileId: profile,
+          fromDate: filter.fromDate,
+          toDate: filter.toDate,
+          platform: filter.platform,
+          accountId: filter.accountId,
+          source: filter.source,
+          action: filter.action,
+        })}`,
+        'inboxHeatmap',
+      )
+      return {
+        from: data.from ?? filter.fromDate,
+        to: data.to ?? null,
+        buckets: data.buckets ?? [],
+      }
+    },
+
+    async inboxSourceBreakdown(profile, filter) {
+      const { data } = await json<{
+        from?: string
+        to?: string | null
+        sources?: ZernioInboxSourceRow[]
+      }>(
+        'GET',
+        `/analytics/inbox/source-breakdown${qs({
+          profileId: profile,
+          fromDate: filter.fromDate,
+          toDate: filter.toDate,
+          platform: filter.platform,
+          accountId: filter.accountId,
+        })}`,
+        'inboxSourceBreakdown',
+      )
+      return {
+        from: data.from ?? filter.fromDate,
+        to: data.to ?? null,
+        sources: data.sources ?? [],
+      }
+    },
+
+    async inboxResponseTime(profile, filter) {
+      const { data } = await json<{
+        from?: string
+        to?: string | null
+        summary?: ZernioInboxResponseTimeSummary
+        histogram?: Partial<ZernioInboxResponseTimeBucket>[]
+      }>(
+        'GET',
+        `/analytics/inbox/response-time${qs({
+          profileId: profile,
+          fromDate: filter.fromDate,
+          toDate: filter.toDate,
+          platform: filter.platform,
+          accountId: filter.accountId,
+        })}`,
+        'inboxResponseTime',
+      )
+      // `sampleSize: 0` is Zernio's own answer for "nobody replied to anybody in the
+      // window" — `summary` is still an object then, not absent. Normalising it to
+      // `null` here is what lets the web layer render "no paired conversations" instead
+      // of a median of 0 seconds, without every caller re-deriving the same check.
+      const summary = data.summary && data.summary.sampleSize > 0 ? data.summary : null
+      return {
+        from: data.from ?? filter.fromDate,
+        to: data.to ?? null,
+        summary,
+        histogram: (data.histogram ?? []).map((b) => ({
+          bucket: b.bucket ?? '',
+          lowerSeconds: b.lowerSeconds ?? 0,
+          upperSeconds: b.upperSeconds ?? null,
+          count: b.count ?? 0,
+        })),
+      }
+    },
+
+    async inboxTopAccounts(profile, filter) {
+      const { data } = await json<{
+        from?: string
+        to?: string | null
+        accounts?: ZernioInboxTopAccount[]
+      }>(
+        'GET',
+        `/analytics/inbox/top-accounts${qs({
+          profileId: profile,
+          fromDate: filter.fromDate,
+          toDate: filter.toDate,
+          platform: filter.platform,
+          source: filter.source,
+          limit: filter.limit,
+        })}`,
+        'inboxTopAccounts',
+      )
+      return {
+        from: data.from ?? filter.fromDate,
+        to: data.to ?? null,
+        accounts: data.accounts ?? [],
+      }
+    },
+    // ── posting analytics, profile-scoped ────────────────────────────────────
+
+    async dailyMetrics(profile, filter) {
+      const { data } = await json<{
+        dailyData?: unknown[]
+        platformBreakdown?: unknown[]
+      }>(
+        'GET',
+        `/analytics/daily-metrics${qs({
+          profileId: profile,
+          fromDate: filter.fromDate,
+          toDate: filter.toDate,
+          platform: filter.platform,
+          attribution: filter.attribution,
+          source: filter.source,
+        })}`,
+        'dailyMetrics',
+      )
+
+      return {
+        dailyData: (Array.isArray(data.dailyData) ? data.dailyData : [])
+          .map(dailyDay)
+          .filter((day): day is ZernioDailyMetricsDay => day !== null),
+        platformBreakdown: (Array.isArray(data.platformBreakdown) ? data.platformBreakdown : [])
+          .map(dailyPlatform)
+          .filter((row): row is ZernioDailyPlatformRow => row !== null),
+      }
+    },
+    async followerStats(profile, filter) {
+      const { data } = await json<{
+        accounts?: unknown[]
+        stats?: Record<string, unknown>
+        granularity?: unknown
+      }>(
+        'GET',
+        `/accounts/follower-stats${qs({
+          profileId: profile,
+          fromDate: filter?.fromDate,
+          toDate: filter?.toDate,
+          granularity: filter?.granularity,
+        })}`,
+        'followerStats',
+      )
+
+      const stats: Record<string, ZernioFollowerPoint[]> = {}
+      for (const [id, series] of Object.entries(data.stats ?? {})) {
+        if (!Array.isArray(series)) continue
+        const points: ZernioFollowerPoint[] = []
+        for (const raw of series) {
+          if (typeof raw !== 'object' || raw === null) continue
+          const row = raw as Record<string, unknown>
+          const date = typeof row.date === 'string' ? row.date.slice(0, 10) : null
+          const followers = dailyNum(row.followers)
+          // A point missing either half is DROPPED. A date with no count is not
+          // a day of zero followers, and a count with no date cannot be plotted.
+          if (date === null || !/^\d{4}-\d{2}-\d{2}$/.test(date) || followers === null) continue
+          points.push({ date, followers })
+        }
+        stats[id] = points.sort((a, b) => a.date.localeCompare(b.date))
+      }
+
+      return {
+        accounts: (Array.isArray(data.accounts) ? data.accounts : []).flatMap((raw) => {
+          if (typeof raw !== 'object' || raw === null) return []
+          const row = raw as Record<string, unknown>
+          const id = typeof row._id === 'string' ? row._id : null
+          const platform = typeof row.platform === 'string' ? row.platform : null
+          // An account with no id cannot be joined to its series, and one with
+          // no platform cannot be labelled. Neither is guessed at.
+          if (id === null || platform === null) return []
+          return [
+            {
+              id,
+              platform,
+              username: typeof row.username === 'string' ? row.username : null,
+              currentFollowers: dailyNum(row.currentFollowers),
+              growth: dailyNum(row.growth),
+              growthPercentage: dailyNum(row.growthPercentage),
+              dataPoints: dailyNum(row.dataPoints) ?? 0,
+            },
+          ]
+        }),
+        stats,
+        granularity: typeof data.granularity === 'string' ? data.granularity : null,
+      }
+    },
+    async postingFrequency(profile, filter) {
+      const { data } = await json<{ frequency?: unknown[] }>(
+        'GET',
+        `/analytics/posting-frequency${qs({
+          profileId: profile,
+          platform: filter?.platform,
+          source: filter?.source,
+        })}`,
+        'postingFrequency',
+      )
+      return {
+        frequency: (Array.isArray(data.frequency) ? data.frequency : []).flatMap((raw) => {
+          if (typeof raw !== 'object' || raw === null) return []
+          const row = raw as Record<string, unknown>
+          const platform = typeof row.platform === 'string' ? row.platform : null
+          const postsPerWeek = dailyNum(row.posts_per_week)
+          // Both halves name the row. Without either there is nothing to plot
+          // it against, and a default would be a cadence nobody observed.
+          if (platform === null || postsPerWeek === null) return []
+          return [
+            {
+              platform,
+              postsPerWeek,
+              avgEngagementRate: dailyNum(row.avg_engagement_rate),
+              avgEngagement: dailyNum(row.avg_engagement),
+              weeksCount: dailyNum(row.weeks_count) ?? 0,
+            },
+          ]
+        }),
+      }
+    },
+
+    async contentDecay(profile, filter) {
+      const { data } = await json<{ buckets?: unknown[] }>(
+        'GET',
+        `/analytics/content-decay${qs({
+          profileId: profile,
+          platform: filter?.platform,
+          source: filter?.source,
+        })}`,
+        'contentDecay',
+      )
+      return {
+        buckets: (Array.isArray(data.buckets) ? data.buckets : [])
+          .flatMap((raw) => {
+            if (typeof raw !== 'object' || raw === null) return []
+            const row = raw as Record<string, unknown>
+            const label = typeof row.bucket_label === 'string' ? row.bucket_label : null
+            const order = dailyNum(row.bucket_order)
+            // An unlabelled or unordered bucket cannot be placed on an axis
+            // whose whole meaning is the order of its buckets.
+            if (label === null || order === null) return []
+            return [
+              {
+                order,
+                label,
+                avgPctOfFinal: dailyNum(row.avg_pct_of_final),
+                postCount: dailyNum(row.post_count) ?? 0,
+              },
+            ]
+          })
+          .sort((a, b) => a.order - b.order),
+      }
+    },
+  }
+}
+
+// ── posting analytics: narrowing ─────────────────────────────────────────────
+
+/**
+ * A finite number, or NOTHING.
+ *
+ * Never a coerced zero. A metric that arrives as a string, a null or not at all
+ * is one we hold no reading for, and the difference between that and a real
+ * zero is the difference between "the platform reported none" and "we never got
+ * an answer" — two sentences this product keeps apart everywhere else.
+ */
+function dailyNum(raw: unknown): number | null {
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null
+  if (typeof raw !== 'string' || raw === '') return null
+  const parsed = Number(raw)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function dailyValues(raw: Record<string, unknown>): ZernioDailyMetricValues {
+  return {
+    impressions: dailyNum(raw.impressions),
+    reach: dailyNum(raw.reach),
+    likes: dailyNum(raw.likes),
+    comments: dailyNum(raw.comments),
+    shares: dailyNum(raw.shares),
+    saves: dailyNum(raw.saves),
+    clicks: dailyNum(raw.clicks),
+    views: dailyNum(raw.views),
+  }
+}
+
+/** A day without a readable date is DROPPED. An invented date is a wrong column. */
+function dailyDay(raw: unknown): ZernioDailyMetricsDay | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const row = raw as Record<string, unknown>
+  const date = typeof row.date === 'string' ? row.date.slice(0, 10) : null
+  if (date === null || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null
+
+  const platforms: Record<string, number> = {}
+  if (typeof row.platforms === 'object' && row.platforms !== null) {
+    for (const [platform, count] of Object.entries(row.platforms as Record<string, unknown>)) {
+      const value = dailyNum(count)
+      if (value !== null) platforms[platform] = value
+    }
+  }
+
+  const metrics =
+    typeof row.metrics === 'object' && row.metrics !== null
+      ? dailyValues(row.metrics as Record<string, unknown>)
+      : dailyValues({})
+
+  return { date, postCount: dailyNum(row.postCount) ?? 0, platforms, metrics }
+}
+
+/** A breakdown row without a platform name is DROPPED, never bucketed as "other". */
+function dailyPlatform(raw: unknown): ZernioDailyPlatformRow | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const row = raw as Record<string, unknown>
+  if (typeof row.platform !== 'string' || row.platform === '') return null
+  return {
+    platform: row.platform,
+    postCount: dailyNum(row.postCount) ?? 0,
+    ...dailyValues(row),
   }
 }

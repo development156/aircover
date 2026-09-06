@@ -4,7 +4,8 @@ import { CalendarClock, ChevronRight, FileText, Sun, Timer } from 'lucide-react'
 import { needsAPerson } from '@/lib/approvals/queue'
 import type { DisplayPost } from '@/lib/posts/display-post'
 import { formatScheduledAt } from '@/lib/posts/schedule-format'
-import { istDayKey } from '@/lib/planner/week-window'
+import { willGoOut } from '@/lib/planner/filters'
+import { dayKey } from '@/lib/time/day-key'
 import { cn } from '@/lib/utils'
 
 /**
@@ -37,9 +38,17 @@ import { cn } from '@/lib/utils'
  * The founder asked for a TODAY group. The temptation was to file the existing
  * "Needs approval" under it, and that would have been a false claim: an approval
  * has no date, so nothing about it is today-scoped. What IS today-scoped is how
- * many scheduled posts fall inside today's IST day, so that is what the tile
- * counts — keyed with `istDayKey`, the same function the week window and the
- * month grid bucket by, so this number can never disagree with the grid below.
+ * many posts that will go out fall inside today's day IN THE WORKSPACE'S ZONE,
+ * so that is what the tile counts — keyed with `dayKey`, the same function the
+ * week window and the month grid bucket by, so this number can never disagree
+ * with the grid below.
+ *
+ * ── "WILL GO OUT" MEANS THE DISPATCHER WILL SEND IT ──────────────────────────
+ * "Going out today", its "scheduled in all" note and "Next up" all read
+ * `willGoOut` (`isDispatchable` from the shared package): `approved` or
+ * `scheduled`, with a time. They used to read `scheduled_at` alone, so a dated
+ * DRAFT — every "Plan my week" output — was counted as going out, and the
+ * dispatcher never sends a draft. A figure that says "going out" has to mean it.
  *
  * ── NEXT UP IS THE NEXT FUTURE POST, OR THE SLOT SAYS SO ─────────────────────
  * Not "the first row", which is a different claim and would name a post that has
@@ -56,12 +65,18 @@ function Figure({
   label,
   note,
   href,
-  destination,
   lead = false,
 }: {
   Icon: typeof FileText
   value: string
   label: string
+  /**
+   * A SECOND fact, or nothing. Never a restatement of the number above it:
+   * "Not scheduled yet" under a draft count is the definition of a draft, and
+   * a row of four such lines is four sentences telling the reader what they
+   * already read. Only "Going out today" keeps one, because the whole-week
+   * total genuinely is a different figure.
+   */
   note?: string
   href: Href
   /** Where the tile goes, said out loud. See the sr-only span below. */
@@ -88,7 +103,9 @@ function Figure({
       </span>
       {/* `type-h2`, NOT `type-h1`. docs/37 §16: "Exactly one `type-h1` per
           view" — the page heading owns it, and four figures set at the same
-          rung would each be claiming to be the title of the screen. */}
+          rung would each be claiming to be the title of the screen. And NOT
+          `type-hero-num`: §16 allows at most one of those per view, and four
+          would be four screens' worth of headline number on one row. */}
       <span className="num type-h2 text-ink">{value}</span>
       {note !== undefined ? <span className="truncate type-meta text-muted">{note}</span> : null}
     </Link>
@@ -102,26 +119,22 @@ export function PlannerSummary({
 }: {
   posts: readonly DisplayPost[]
   now: Date
-  zone?: string | null
+  /** The workspace's zone, resolved by the page. Required: a forgotten zone is a wrong count. */
+  zone: string
 }) {
-  const scheduled = posts.filter((p) => p.intent === 'scheduled').length
-  const awaiting = posts.filter((p) => needsAPerson(p.intent)).length
+  // Only what the dispatcher will send. `willGoOut` also proves the time
+  // parses, which is what keeps `dayKey` below from throwing on a bad row.
+  const goingOut = posts.filter(willGoOut)
+  const scheduled = goingOut.length
+  const awaiting = posts.filter((p) => needsAPerson(p)).length
   const drafts = posts.filter((p) => p.intent === 'draft').length
 
-  const todayKey = istDayKey(now)
-  // The NaN guard is not defensive padding: `Intl.DateTimeFormat.format` THROWS
-  // `RangeError: Invalid time value` on an unparseable date, so one bad row in
-  // the column would take the whole screen down rather than render one tile
-  // wrong. `lib/planner/filters.ts` guards the same read for the same reason.
-  const today = posts.filter((p) => {
-    if (p.scheduled_at === null) return false
-    const at = new Date(p.scheduled_at)
-    return !Number.isNaN(at.getTime()) && istDayKey(at) === todayKey
-  }).length
+  const todayKey = dayKey(zone, now)
+  const today = goingOut.filter((p) => dayKey(zone, new Date(p.scheduled_at!)) === todayKey).length
 
   const at = now.getTime()
-  const next = posts
-    .filter((p) => p.scheduled_at !== null && new Date(p.scheduled_at).getTime() > at)
+  const next = goingOut
+    .filter((p) => new Date(p.scheduled_at!).getTime() > at)
     .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime())[0]
 
   return (
@@ -133,7 +146,6 @@ export function PlannerSummary({
         Icon={Timer}
         value={String(awaiting)}
         label="Needs approval"
-        note={awaiting > 0 ? 'Waiting on you' : 'Nothing waiting'}
         href="/approvals"
         destination="open Approvals"
         lead={awaiting > 0}
@@ -142,6 +154,10 @@ export function PlannerSummary({
         Icon={Sun}
         value={String(today)}
         label="Going out today"
+        /* The ONE note that survives, because it is a different measurement:
+           this tile counts today's day and this line counts the whole
+           plan. Removing it would leave "0" beside a week that has eleven
+           posts in it and no way to tell the two apart. */
         note={`${scheduled} scheduled in all`}
         href="/planner"
         destination="open the plan"
@@ -150,7 +166,6 @@ export function PlannerSummary({
         Icon={FileText}
         value={String(drafts)}
         label="Drafts"
-        note="Not scheduled yet"
         href="/posts"
         destination="open Posts"
       />
@@ -199,6 +214,9 @@ export function PlannerSummary({
           <span aria-hidden className="block type-h2 text-muted">
             &mdash;
           </span>
+          {/* The absence mark is a glyph, so the sentence beside it is the only
+              thing that says what is absent. It is NOT a restatement of a
+              number — there is no number — so it stays. */}
           <span className="block truncate type-meta text-muted">Nothing scheduled ahead</span>
         </div>
       )}

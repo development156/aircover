@@ -2,6 +2,7 @@
 
 import { auth } from '@clerk/nextjs/server'
 
+import { toAssetCard } from '@/lib/assets/card'
 import { readAssets } from '@/lib/assets/read'
 import type { AssetCard } from '@/lib/assets/view'
 import { reportServerError } from '@/lib/observability/report'
@@ -21,7 +22,12 @@ import { signMediaPreviews } from '@/lib/posts/media-url'
  * an upload; a failed read must not, because the photo the writer is looking for
  * may be sitting right there.
  */
-export type PickerRead = { ok: true; cards: AssetCard[] } | { ok: false }
+/**
+ * `capped` rides out with the list for the same reason it rides out of
+ * `readAssets`: the picker shows the newest two hundred and has to SAY so, or a
+ * writer scrolls to the end and concludes the photo they want was never added.
+ */
+export type PickerRead = { ok: true; cards: AssetCard[]; capped: boolean } | { ok: false }
 
 export async function listAssetsForPicker(): Promise<PickerRead> {
   try {
@@ -29,35 +35,36 @@ export async function listAssetsForPicker(): Promise<PickerRead> {
     if (!userId) return { ok: false }
 
     const read = await readAssets()
-    if (read.status === 'no-workspace') return { ok: true, cards: [] }
+    if (read.status === 'no-workspace') return { ok: true, cards: [], capped: false }
     if (read.status !== 'ok') return { ok: false }
 
-    const previews = await signMediaPreviews(read.assets.map((entry) => entry.asset))
-    const urlById = new Map(previews.map((preview) => [preview.id, preview.url]))
+    // Originals and thumbnails in ONE signing pass, keyed by id. The picker's
+    // tile draws the thumbnail; the attach still points at the original.
+    const thumbs = read.assets.flatMap((entry) =>
+      entry.thumbPath === null
+        ? []
+        : [{ id: `thumb:${entry.asset.id}`, storage_path: entry.thumbPath }],
+    )
+    const previews = await signMediaPreviews([
+      ...read.assets.map((entry) => entry.asset),
+      ...thumbs,
+    ])
+    const preview = new Map<string, string | null>()
+    const thumb = new Map<string, string | null>()
+    for (const signed of previews) {
+      if (signed.id.startsWith('thumb:')) thumb.set(signed.id.slice('thumb:'.length), signed.url)
+      else preview.set(signed.id, signed.url)
+    }
 
     return {
       ok: true,
-      cards: read.assets.map(({ asset, usage }) => ({
-        id: asset.id,
-        title: asset.title,
-        alt: asset.alt,
-        kind: asset.kind,
-        mime: asset.mime,
-        bytes: asset.bytes,
-        width: asset.width,
-        height: asset.height,
-        createdAt: asset.created_at,
-        previewUrl: urlById.get(asset.id) ?? null,
-        // NOT `[]`. The picker renders no filing, so it runs no memberships
-        // query, and an empty array here would state that every photo in the
-        // composer is filed nowhere. `null` says we did not look.
-        folderIds: null,
-        // The picker reads the LIVE library only, so nothing it returns is trashed.
-        // Stated rather than omitted: a composer that could attach a file its owner
-        // had deleted would be the whole point of the trash going wrong.
-        deletedAt: null,
-        usage,
-      })),
+      // `folderIds: null`, NOT `[]`. The picker renders no filing, so it runs
+      // no memberships query, and an empty array would state that every photo
+      // in the composer is filed nowhere. `null` says we did not look.
+      cards: read.assets.map(({ asset, usage }) =>
+        toAssetCard(asset, usage, { preview, thumb }, null),
+      ),
+      capped: read.capped,
     }
   } catch (error) {
     reportServerError(error, { action: 'listAssetsForPicker' })

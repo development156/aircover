@@ -31,9 +31,57 @@ import {
 
 const ctx: PublishJobContext = { attempt: 1, jobRunId: 'run_ration' }
 
-/** The monthly ration's window is the only one that starts on the 1st at midnight. */
-const isMonthWindow = (since: Date): boolean =>
-  since.getUTCDate() === 1 && since.getUTCHours() === 0
+/**
+/**
+ * BOTH HALVES OF THIS FIX ARE KEPT, AND THEY GUARD DIFFERENT THINGS.
+ *
+ * Two lanes found the same defect on the same morning and fixed it two ways.
+ * `wt-divas` pinned the clock; this lane replaced the discriminator. Neither
+ * subsumes the other, so the merge takes both and adds the case that only
+ * becomes testable once you have them together.
+ *
+ * ── THE DEFECT ───────────────────────────────────────────────────────────────
+ * `runPublishPost` asks `countLiveSends` TWICE on X — once for the Constraint
+ * Engine's per-day cap and once for the monthly ration — and a test that wants
+ * to fail only one of them has to tell them apart. The old discriminator was
+ * `since.getUTCDate() === 1 && since.getUTCHours() === 0`, on the reasoning
+ * that the monthly window always starts on the 1st. True, and not sufficient:
+ * the PER-DAY window is today at UTC midnight, so on the 1st of a month the two
+ * windows are the SAME INSTANT and nothing about `since` can separate them.
+ *
+ * MEASURED 2026-09-01 on an unmodified `wt-core`: the per-day read runs first,
+ * matched a month-only predicate, threw, and the suite reported
+ * `PER_DAY_CAP_UNREADABLE` where it expected `X_MONTHLY_RATION_UNREADABLE`.
+ * It passed in CI on 2026-08-31 (9 tests, 28ms) and failed the next morning
+ * with no code change in between. A test whose result depends on the calendar
+ * is a guard for thirty days out of thirty-one.
+ *
+ * ── HALF ONE: THE CLOCK IS PINNED (from wt-divas) ────────────────────────────
+ * `runPublishPost` already takes `now` (`PublishPostDeps.now`, defaulting to
+ * `new Date()`), so pinning it costs nothing and makes the WHOLE file
+ * deterministic rather than just this discriminator. That value is worth having
+ * on its own: any other date-dependent assertion added here later is safe too.
+ *
+ * ── HALF TWO: THE DISCRIMINATOR IS THE READ'S ORDINAL (this lane) ────────────
+ * A pinned clock fixes the symptom by never visiting the day the bug lives on.
+ * The ordinal is true on all thirty-one days, so it holds even if a future test
+ * un-pins the clock, or if `runPublishPost` stops honouring `deps.now`. The
+ * `asserts the order` test below is what keeps the ordinal honest: swap the two
+ * reads and it fails, rather than these silently testing the wrong one.
+ *
+ * ── AND THE CASE NEITHER LANE COULD WRITE ALONE ──────────────────────────────
+ * With the clock pinnable, `on the first of the month` below runs the whole
+ * thing AT the coincidence — the exact instant that broke it. A pinned clock
+ * alone cannot test that day; an ordinal alone cannot choose the day. Together
+ * they can.
+ */
+const NOW = new Date('2026-08-17T09:30:00.000Z')
+
+/** The instant the two windows coincide: the per-day window IS the monthly one. */
+const FIRST_OF_MONTH = new Date('2026-09-01T09:30:00.000Z')
+
+const PER_DAY_READ = 1
+const X_RATION_READ = 2
 
 const RULE_SET: RuleSet = {
   ruleSetVersion: 'regime-_floor@2026.08',
@@ -65,13 +113,23 @@ interface Spend {
  * It receives the ARGS since 2026-08-20, because `runPublishPost` now asks
  * `countLiveSends` TWICE on X — once for the Constraint Engine's per-day cap and
  * once for the monthly X ration — and a case that wants to fail only one of them
- * has to be able to tell which it is being asked. `isMonthWindow` below is the
- * discriminator: the monthly window always starts on the 1st.
+ * has to be able to tell which it is being asked. The read's ORDINAL is the
+ * discriminator: `PER_DAY_READ` is asked first, `X_RATION_READ` second. See the
+ * note above for why the window date cannot do this job.
  */
 function harness(
-  count: (args: { workspaceId: string; channel: string; since: Date }) => Promise<number>,
+  count: (args: {
+    workspaceId: string
+    channel: string
+    since: Date
+    /** 1-based: which of this post's `countLiveSends` calls this is. */
+    nth: number
+  }) => Promise<number>,
   channel: PublishPostPayload['channel'] = 'x',
+  /** The pinned instant. Overridden only by the first-of-the-month test. */
+  now: Date = NOW,
 ) {
+  let reads = 0
   const spend: Spend = {
     gateChecks: [],
     adapterCalls: 0,
@@ -106,10 +164,12 @@ function harness(
 
   const deps: PublishPostDeps = {
     mode: 'fixture',
+    now: () => now,
     gate,
     countLiveSends: async (args) => {
       spend.countedFor.push(args)
-      return count(args)
+      reads += 1
+      return count({ ...args, nth: reads })
     },
     loadVariant: async () => ({
       variantId: payloadFor(channel).variantId,
@@ -128,6 +188,10 @@ function harness(
       spend.logs.push(e)
     },
     markVariant: async (u) => {
+      spend.variantUpdates.push(u)
+    },
+    recordPublished: async (e, u) => {
+      spend.logs.push(e)
       spend.variantUpdates.push(u)
     },
   }
@@ -223,14 +287,27 @@ describe('the X monthly ration, on the publish path', () => {
       expect(asked.channel).toBe('x')
       expect(asked.since.getUTCHours()).toBe(0)
     }
-    const months = spend.countedFor.filter((a) => isMonthWindow(a.since))
-    // Exactly one MONTH window — the ration's. (On the 1st of a month the day
-    // window coincides with it, so this asserts on the count of distinct windows
-    // rather than on which slot each landed in.)
-    expect(new Set(spend.countedFor.map((a) => a.since.getTime())).size).toBe(
-      months.length === 2 ? 1 : 2,
+    // ── EACH READ BY WHAT IT ASKS, NOT BY COMPARING THE TWO ─────────────────
+    // This used to count DISTINCT windows and switch its expectation between 1
+    // and 2. That was an attempt at the same 1st-of-the-month coincidence the
+    // ordinal exists for, and it got it backwards: on the 1st the two windows
+    // ARE one instant, which is a fact about the calendar rather than a defect.
+    // Asserting what each read asks for is true on all thirty-one days.
+    const perDay = spend.countedFor[PER_DAY_READ - 1]!
+    const ration = spend.countedFor[X_RATION_READ - 1]!
+
+    // The ration's window always begins on the 1st.
+    expect(ration.since.getUTCDate()).toBe(1)
+    // The day's window is its own UTC midnight, whatever day that is.
+    expect(perDay.since.getTime()).toBe(
+      Date.UTC(
+        perDay.since.getUTCFullYear(),
+        perDay.since.getUTCMonth(),
+        perDay.since.getUTCDate(),
+      ),
     )
-    expect(months.length).toBeGreaterThanOrEqual(1)
+    // And the month can never start after the day.
+    expect(ration.since.getTime()).toBeLessThanOrEqual(perDay.since.getTime())
   })
 
   it("never charges a channel that does not bill per post against X's monthly ration", async () => {
@@ -258,6 +335,67 @@ describe('the X monthly ration, on the publish path', () => {
     )
   })
 
+  it('tells the two reads apart ON the first of the month, where the windows coincide', async () => {
+    // ── THE DAY THE OLD DISCRIMINATOR DIED ──────────────────────────────────
+    // Neither lane's fix alone could write this. Pinning the clock fixes the
+    // symptom by never visiting this day; an ordinal discriminator is calendar
+    // independent but cannot choose a day to prove it on. Together they run the
+    // whole thing AT the coincidence.
+    //
+    // On 1 September the per-day window (today at UTC midnight) IS the monthly
+    // window (the 1st at UTC midnight). A date-based discriminator answers
+    // `true` for BOTH reads, the per-day read throws first, and the assertion
+    // below sees PER_DAY_CAP_UNREADABLE instead. The ordinal does not care.
+    const { deps, spend } = harness(
+      async ({ nth }) => {
+        if (nth === X_RATION_READ) throw new Error('pool is gone')
+        return 0
+      },
+      'x',
+      FIRST_OF_MONTH,
+    )
+
+    await expect(runPublishPost(payloadFor('x'), ctx, deps)).rejects.toThrow()
+
+    // The two windows really are the same instant on this day — that is the
+    // premise, asserted rather than assumed.
+    expect(spend.countedFor).toHaveLength(2)
+    expect(spend.countedFor[PER_DAY_READ - 1]!.since.getTime()).toBe(
+      spend.countedFor[X_RATION_READ - 1]!.since.getTime(),
+    )
+
+    // And the right one was still refused.
+    expect(spend.adapterCalls).toBe(0)
+    expect(spend.logs[0]!.error).toMatchObject({
+      code: X_RATION_UNREADABLE_CODE,
+      classification: 'transient',
+    })
+  })
+
+  it('asserts the order the two reads happen in, because everything else assumes it', async () => {
+    // ── THE ASSUMPTION THE ORDINAL DISCRIMINATOR RESTS ON ────────────────────
+    // Every test in this file that wants to fail exactly one of the two reads
+    // names it by ordinal. If `runPublishPost` ever swaps them, those tests
+    // would go on passing while testing the OTHER read — the silent kind of
+    // wrong. This is the one test that would fail instead.
+    //
+    // The windows are compared as `<=` rather than by date: on the 1st of the
+    // month they are the same instant, which is the whole reason the ordinal
+    // exists.
+    const { deps, spend } = harness(async () => 0)
+
+    await runPublishPost(payloadFor('x'), ctx, deps)
+
+    expect(spend.countedFor).toHaveLength(2)
+    const perDay = spend.countedFor[PER_DAY_READ - 1]!
+    const ration = spend.countedFor[X_RATION_READ - 1]!
+
+    // The month window can never START LATER than today's midnight.
+    expect(ration.since.getTime()).toBeLessThanOrEqual(perDay.since.getTime())
+    // And the ration's window always begins on the 1st, whatever today is.
+    expect(ration.since.getUTCDate()).toBe(1)
+  })
+
   it('an UNREADABLE count refuses transiently — it neither spends nor gives up', async () => {
     // Two wrong answers are available here and both would ship silently: reading
     // the failure as "0 used" spends real money off a failed read, and reading it
@@ -266,8 +404,8 @@ describe('the X monthly ration, on the publish path', () => {
     // Only the MONTH read fails. The per-day read runs first now, so a counter that
     // threw unconditionally would be caught by the per-day guard and this file would
     // stop testing the ration's own unreadable path without saying so.
-    const { deps, spend } = harness(async ({ since }) => {
-      if (isMonthWindow(since)) throw new Error('pool is gone')
+    const { deps, spend } = harness(async ({ nth }) => {
+      if (nth === X_RATION_READ) throw new Error('pool is gone')
       return 0
     })
 

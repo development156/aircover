@@ -96,11 +96,27 @@ export function WorkspaceSwitcher({
   // its failure toast live in CreateWorkspaceButton, which /wallet's first-run
   // state renders too — one offer, one behaviour, in both places.
   if (workspaces.length === 0 || !active) {
-    return <CreateWorkspaceButton guideAnchor="topbar.workspace-create" />
+    // Compact on a phone, not hidden. MEASURED 2026-09-05 (smoke,
+    // no-truncated-labels at 390): the 167px label pushed the user menu to
+    // x=432 in a 390px viewport. The first repair hid the whole button there,
+    // and `shell-probe.spec.ts` (run 34012814133) refused it: this trigger is
+    // what tells the no-workspace state apart from every other, on every
+    // width. So the words go sr-only on a phone and the button stays.
+    return <CreateWorkspaceButton guideAnchor="topbar.workspace-create" compactOnNarrow />
   }
 
   return (
-    <div ref={containerRef} className="relative min-w-0">
+    <div
+      ref={containerRef}
+      // One workspace on a phone has nothing to switch to, and its trigger was
+      // 48px of a 35px overflow (see credit-chip.tsx for the measurement). The
+      // switcher returns the moment there is a second workspace to choose.
+      // Never hidden on a phone, even with one workspace: shell-probe.spec.ts
+      // (run 34020306051) needs the switcher to tell the bootstrapped state from
+      // the empty one, and the trigger below already compacts to its 44px badge
+      // under `narrow`, so it costs the row 44px and no words.
+      className="relative min-w-0"
+    >
       <button
         ref={triggerRef}
         type="button"
@@ -111,7 +127,7 @@ export function WorkspaceSwitcher({
         /* Collapsed to its badge on a phone by 2f9fca1, which left it 40px across —
            the height cleared the floor and the width did not. `min-w` finishes what
            that fix started; the badge itself stays 22px and centres. */
-        className="flex min-w-0 items-center gap-2 rounded-input border border-line bg-bg px-3 py-[7px] font-semibold transition-micro hover:bg-s1 max-narrow:min-h-[44px] max-narrow:min-w-[44px] max-narrow:justify-center max-narrow:px-2"
+        className="flex h-control min-w-0 items-center gap-2 rounded-input border border-line bg-bg px-3 font-semibold transition-micro hover:bg-s1 max-narrow:h-11 max-narrow:min-w-[44px] max-narrow:justify-center max-narrow:px-2"
       >
         <WorkspaceBadge name={active.name} />
         {/* ── THE NAME STEPS ASIDE ON A PHONE, IT DOES NOT SHRINK ────────────
@@ -153,11 +169,26 @@ export function WorkspaceSwitcher({
           {workspaces.map((ws) => {
             const isActive = ws.slug === active.slug
             return (
-              <form key={ws.id} action={setActiveWorkspace}>
+              /* ── SUBMIT FIRST, CLOSE AFTER ──────────────────────────────
+                 MEASURED 2026-09-06 (wt-core preview, Chromium): this button
+                 closed the menu from its own onClick. React committed that
+                 close in the microtask checkpoint the browser runs between the
+                 click listeners and the form's activation behaviour, so the
+                 form was gone before it could submit — "Form submission
+                 canceled because the form is not connected", and no workspace
+                 ever switched. The action now runs to completion first; the
+                 menu closes on the way back. `workspace-switcher.test.tsx`
+                 plays the browser's order by hand and fails on the old shape. */
+              <form
+                key={ws.id}
+                action={async (formData: FormData) => {
+                  await setActiveWorkspace(formData)
+                  closeToTrigger()
+                }}
+              >
                 <input type="hidden" name="slug" value={ws.slug} />
                 <button
                   type="submit"
-                  onClick={closeToTrigger}
                   aria-current={isActive ? 'true' : undefined}
                   className={cn(
                     'flex w-full items-center gap-2.5 rounded-input px-2.5 py-2 text-left transition-micro hover:bg-s1',

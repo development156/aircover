@@ -1,5 +1,7 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
+
 import { auth } from '@clerk/nextjs/server'
 import {
   BrandIntakeSchema,
@@ -13,8 +15,10 @@ import { pruneBlankListEntries } from '@/lib/brand/prune-blank-entries'
 import { readBrain } from '@/lib/brand/read-brain'
 import { mapSaveBrandError } from '@/lib/brand/save-brand-error'
 import { reportServerError } from '@/lib/observability/report'
+import { clearPendingBrain } from '@/lib/onboarding/pending-brain'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { getActiveWorkspace } from '@/lib/workspaces'
+import { writeBrandStartersBestEffort } from '@/lib/brand/write-starters'
 
 /**
  * The Brand Brain WRITE path, and nothing else.
@@ -99,6 +103,14 @@ export async function saveBrandMemory(
    * new intake at worst and can never destroy a stored one.
    */
   intake: BrandIntake | null = null,
+  /**
+   * `expectedVersion`: the version the caller READ, for the RPC's compare-and-
+   * set. Hand edits pass it (BR-04: two overlapping confirms used to revert each
+   * other); onboarding's Finish deliberately does not, so a rage-click replays
+   * instead of conflicting. `intakePaths`: fields seeded from setup answers,
+   * stamped `source: 'intake'` — see lib/onboarding/intake-paths.ts.
+   */
+  options: { expectedVersion?: number | null; intakePaths?: readonly string[] } = {},
 ): Promise<SaveBrandState> {
   // Hoisted so the catch can tag the tenant — see lib/observability/report.ts.
   let workspaceId: string | undefined
@@ -136,6 +148,7 @@ export async function saveBrandMemory(
       previous.status === 'ok' ? { payload: previous.active, meta: previous.meta } : null,
       payload,
       confirmPaths,
+      options.intakePaths ?? [],
     )
 
     // Carried forward when this write has nothing to say about it — see the
@@ -153,8 +166,13 @@ export async function saveBrandMemory(
         ...(nextIntake.success ? { intake: nextIntake.data } : {}),
       },
       p_source: source,
+      ...(typeof options.expectedVersion === 'number'
+        ? { p_expected_version: options.expectedVersion }
+        : {}),
     })
     if (error || !data) return { ok: false, message: mapSaveBrandError(error) }
+    // The parked build, if this save came from a reveal, is now an active row.
+    await clearPendingBrain(workspace.id)
 
     const result = ResolveBrandMemoryResultSchema.safeParse(data)
     if (!result.success) {
@@ -162,6 +180,27 @@ export async function saveBrandMemory(
     }
 
     if (nextIntake.success) await mirrorIntakeToWorkspace(supabase, workspace.id, nextIntake.data)
+
+    // BEST-EFFORT, AND NEVER ON THE CRITICAL PATH TO A REFUSAL. Writes the
+    // Studio's picture ideas for the version that was JUST produced, once.
+    // Never throws (see the file's own header) — a failure here is a fact
+    // about the Studio's starters, never about whether this Brand Brain save
+    // succeeded, so it is deliberately not inside any branch that could turn
+    // it into a refusal.
+    await writeBrandStartersBestEffort({
+      workspaceId: workspace.id,
+      brandVersion: result.data.version,
+      payload,
+      fieldMeta,
+    })
+
+    // The topbar ring lives in the app layout and reads the active brain. MEASURED
+    // 2026-09-06: after onboarding's first save, "Review Brand Brain" opened
+    // /brain at version 1 while the ring beside it still said "No brain yet"
+    // until a hard reload. The per-field actions revalidate the layout for this
+    // reason; the save that creates the brain must too.
+    revalidatePath('/', 'layout')
+    revalidatePath('/brain')
 
     return { ok: true, version: result.data.version, replayed: result.data.replayed }
   } catch (error) {

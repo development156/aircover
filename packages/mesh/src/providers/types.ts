@@ -55,6 +55,16 @@ export interface ChatRequest {
    * deprecated and redirects to it).
    */
   pdfEngine?: 'cloudflare-ai' | 'mistral-ocr' | 'native'
+  /**
+   * How long this ONE call may take before it is abandoned, in milliseconds.
+   *
+   * The runner sets it per task from `timeouts.ts`; the client falls back to
+   * `DEFAULT_CHAT_TIMEOUT_MS` when a caller left it unset. A call past the
+   * ceiling is a `ProviderCallError` with `timedOut: true`, so a stalled socket
+   * ends inside the route's wall and the credit hold is released on the same
+   * request instead of stranded by a killed function.
+   */
+  timeoutMs?: number
 }
 
 /** Raw per-call token counts; costUsd + latency are derived by the runner. */
@@ -108,6 +118,17 @@ export interface ImageRequest {
    * providers, so the caller checks rather than hoping.
    */
   references?: readonly string[]
+  /**
+   * The model the CALLER asked for, before the router has vetted it.
+   *
+   * Not necessarily the model that will be used: `planImage` checks it against
+   * `ALLOWED_IMAGE_MODELS` and falls back to the tier's default for anything
+   * else. It rides on the request so the engine can hand it to the router
+   * without a second parameter on every call site.
+   */
+  modelId?: string
+  /** Same contract as `ChatRequest.timeoutMs`; the runner sets `IMAGE_TIMEOUT_MS`. */
+  timeoutMs?: number
 }
 
 export interface ImageResponse {
@@ -155,12 +176,18 @@ export type FetchLike = (url: string, init: RequestInit) => Promise<Response>
 /**
  * A failed provider call. Carries only the provider name + HTTP status — never
  * the api key, request body, or decrypted payload — so it is safe to log.
+ *
+ * `timedOut` is true when the call was abandoned at its ceiling rather than
+ * refused or dropped by the network. Telemetry keeps the two apart because
+ * they need different people looking at them: one is a provider outage, the
+ * other is a ceiling somebody can change.
  */
 export class ProviderCallError extends Error {
   constructor(
     readonly provider: string,
     readonly status: number | null,
     message: string,
+    readonly timedOut: boolean = false,
   ) {
     super(message)
     this.name = 'ProviderCallError'

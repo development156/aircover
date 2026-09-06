@@ -62,6 +62,7 @@ function composer(channels: readonly string[] = ['x', 'linkedin']) {
   return render(
     <Composer
       post={post}
+      zone="Asia/Kolkata"
       variants={[] as PostVariant[]}
       media={[]}
       templates={{ ok: true, templates: [] } as never}

@@ -72,7 +72,8 @@
       "getOpsAdmin",
       "read",
       "soft",
-      "read"
+      "read",
+      "readInboxAnalytics"
     ]
   },
   {
@@ -84,8 +85,7 @@
       "getOpsAdmin",
       "read",
       "soft",
-      "read",
-      "readApprovalQueue"
+      "read"
     ]
   },
   {
@@ -125,6 +125,7 @@
       "read",
       "soft",
       "read",
+      "readBrain",
       "readBrain"
     ]
   },
@@ -138,6 +139,7 @@
       "read",
       "soft",
       "read",
+      "readBrain",
       "readAudiencePage"
     ]
   },
@@ -150,7 +152,8 @@
       "getOpsAdmin",
       "read",
       "soft",
-      "read"
+      "read",
+      "readBrain"
     ]
   },
   {
@@ -163,6 +166,7 @@
       "read",
       "soft",
       "read",
+      "readBrain",
       "readBrain"
     ]
   },
@@ -176,6 +180,7 @@
       "read",
       "soft",
       "read",
+      "readBrain",
       "readLibrary"
     ]
   },
@@ -190,6 +195,7 @@
       "soft",
       "read",
       "readBrain",
+      "readBrain",
       "readCitedPassages"
     ]
   },
@@ -203,6 +209,7 @@
       "read",
       "soft",
       "read",
+      "readBrain",
       "readBrain"
     ]
   },
@@ -351,6 +358,19 @@
     ]
   },
   {
+    "route": "/(app)/inbox/threads/store/[threadId]",
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "activeThemeTokens",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "accountIdsByChannel"
+    ]
+  },
+  {
     "route": "/(app)/leads",
     "awaits": [
       "decideLanding",
@@ -371,8 +391,7 @@
       "getOpsAdmin",
       "read",
       "soft",
-      "read",
-      "readLoop"
+      "read"
     ]
   },
   {
@@ -564,8 +583,7 @@
       "getOpsAdmin",
       "read",
       "soft",
-      "read",
-      "activeWorkspaceRead"
+      "read"
     ]
   },
   {
@@ -578,7 +596,7 @@
       "read",
       "soft",
       "read",
-      "activeWorkspaceRead"
+      "readPictureForViewer"
     ]
   },
   {
@@ -603,7 +621,7 @@
   },
   {
     "route": "/(onboarding)/onboarding",
-    "awaits": ["getActiveWorkspace"]
+    "awaits": ["activeWorkspaceRead"]
   },
   {
     "route": "/admin",

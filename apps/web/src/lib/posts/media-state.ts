@@ -29,7 +29,21 @@ import type { ChannelRejection } from './attach-decision'
  * person can act on the first.
  */
 export type AttachMediaState =
-  | { ok: true; media: PostMedia; warnings: ChannelRejection[] }
+  | {
+      ok: true
+      media: PostMedia
+      warnings: ChannelRejection[]
+      /**
+       * Set when the file was re-encoded into another container so every channel
+       * on this post could take it. One calm line, not a warning: nothing went
+       * wrong and nothing needs doing. Absent on the ordinary path.
+       *
+       * Optional rather than nullable so every existing construction of this
+       * state still compiles — a required field here would break each one, and a
+       * conversion that did not happen has nothing to say.
+       */
+      converted?: string
+    }
   | {
       ok: false
       message: string

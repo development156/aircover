@@ -133,51 +133,23 @@ export function NotRunningNote({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * A column of a pipeline that has no cards in it.
+ * ── TWO THINGS THAT USED TO BE HERE ──────────────────────────────────────────
+ * `InertColumn` and `InertToggle` were removed on 2026-09-04. Both were drawn
+ * for screens that have since been BUILT, and both were superseded by the real
+ * thing rather than by another placeholder:
  *
- * ── WHY IT IS NOT AN EMPTY LIST WITH A "0" HEADER ────────────────────────────
- * A kanban column's header normally carries a count, and that count is the first
- * thing a reader trusts. `New 0` on a leads board says "nobody has enquired",
- * which is a claim about the reader's business; the true claim is "nothing can
- * enquire yet, because no form is wired to this". So the column keeps its NAME —
- * the stage names are real, they are the `leads.status` CHECK constraint — and
- * carries a sentence about what lands in it instead of a number.
- */
-export function InertColumn({
-  name,
-  what,
-  children,
-}: {
-  name: string
-  /** What a card in this column would mean. One short sentence. */
-  what: string
-  children?: React.ReactNode
-}) {
-  return (
-    <section className="is-proposed flex min-h-[168px] flex-col gap-2 rounded-card p-3">
-      <h3 className="type-eyebrow text-muted">{name}</h3>
-      <p className="type-sm text-muted">{what}</p>
-      {children}
-    </section>
-  )
-}
-
-/**
- * A switch-shaped thing that cannot be flipped.
+ *   InertColumn  a kanban column with a name and no count, for /leads. Superseded
+ *                by `components/leads/board.tsx`, which carries the same argument
+ *                in its live form — a column with nothing in it says what would
+ *                land there, rather than a bare zero that would claim nobody has
+ *                enquired.
+ *   InertToggle  a picture of a switch in the off position, for /playbooks. That
+ *                page now rules the idea out in its own words: an unbuilt recipe
+ *                is "rendered as a sentence rather than a disabled switch,
+ *                because a disabled switch is a dead end in the costume of a
+ *                control."
  *
- * Deliberately NOT `<input type="checkbox" disabled>` and not `role="switch"`:
- * both announce a control, and a disabled one announces a control that exists
- * and is momentarily unavailable. Neither is true here. It is a picture of a
- * switch, drawn in the off position because "off" is what an unbuilt automation
- * actually is.
+ * They stayed exported and rendered nowhere while their two host screens
+ * graduated out of the roadmap treatment. The four exports above did not, and
+ * are mounted on /report and the four /ads screens.
  */
-export function InertToggle({ label }: { label: string }) {
-  return (
-    <span data-inert-control className="inline-flex items-center gap-2 select-none">
-      <span aria-hidden className="is-proposed block h-[18px] w-[32px] rounded-pill">
-        <span className="mt-[3px] ml-[3px] block size-[12px] rounded-full bg-surface-3" />
-      </span>
-      <span className="type-sm text-muted">{label}</span>
-    </span>
-  )
-}

@@ -57,7 +57,7 @@ describe('/brain/resolve — the paid re-resolve', () => {
 
     // A <span> with an onClick, or the accent-coloured prose this replaced,
     // carries no role and never reaches this query.
-    const control = screen.getByRole('link', { name: /re-run/i })
+    const control = screen.getByRole('link', { name: /rebuild/i })
     expect(control).toHaveAttribute('href', '/onboarding')
 
     // `inline-flex` and `h-control` come from buttonVariants and from nowhere
@@ -68,7 +68,7 @@ describe('/brain/resolve — the paid re-resolve', () => {
 
   test('does not out-rank the free path it sits beneath', async () => {
     render(await ResolvePage())
-    const control = screen.getByRole('link', { name: /re-run/i })
+    const control = screen.getByRole('link', { name: /rebuild/i })
 
     // Every free control on this view is secondary or ghost — the bulk accept
     // included, contrary to the note that used to sit in this file. A primary
@@ -80,7 +80,7 @@ describe('/brain/resolve — the paid re-resolve', () => {
 
   test('the price and the consequence reach a screen reader before the press', async () => {
     render(await ResolvePage())
-    const control = screen.getByRole('link', { name: /re-run/i })
+    const control = screen.getByRole('link', { name: /rebuild/i })
 
     const describedBy = control.getAttribute('aria-describedby')
     expect(describedBy).toBeTruthy()
@@ -89,18 +89,18 @@ describe('/brain/resolve — the paid re-resolve', () => {
 
     // The two CLAIMS, not the sentence: paid, and it overwrites confirmed work.
     // Lifting the link out of the paragraph is the edit that could drop either.
-    expect(note?.textContent).toMatch(/paid/i)
+    expect(note?.textContent).toMatch(/costs credits/i)
     expect(note?.textContent).toMatch(/confirmed/i)
   })
 
   test('the free path is still stated, and still stated first', async () => {
     render(await ResolvePage())
 
-    const note = screen.getByText(/Confirming and correcting on this page is free/i)
+    const note = screen.getByText(/Confirming and correcting here is free/i)
     expect(note).toBeInTheDocument()
-    // Order matters: the reader must meet "free" before "paid", or the button
+    // Order matters: the reader must meet "free" before the cost, or the button
     // below reads as the price of the whole screen.
     const text = note.textContent ?? ''
-    expect(text.indexOf('free')).toBeLessThan(text.search(/paid/i))
+    expect(text.indexOf('free')).toBeLessThan(text.search(/costs credits/i))
   })
 })

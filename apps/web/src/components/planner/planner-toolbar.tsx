@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Search, X } from 'lucide-react'
 
+import { Segmented, segmentedItem } from '@/components/planner/segmented'
 import { PLANNER_TABS, TAB_LABELS, type PlannerTab } from '@/lib/planner/filters'
 import { cn } from '@/lib/utils'
 
@@ -51,7 +52,20 @@ export function PlannerToolbar({
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <nav aria-label="Filter the plan" className="flex flex-wrap items-center gap-1">
+      {/* ── ONE SEGMENTED CONTROL, THE SAME ONE `ViewToggle` WEARS ────────────
+          These were four loose pills on the page ground, where the standing tab
+          was told apart by a ring the other three did not have. Two rows above,
+          `ViewToggle` draws the identical job — pick one of four — as the kit's
+          `.sl-seg`: a padded well, and the chosen item LIFTED onto `--surface`
+          rather than sunk into a darker fill. One page carrying two grammars for
+          one interaction is the drift this whole redesign is about, so the tabs
+          take the grammar that was already right.
+
+          The well is `bg-s2`, the same `--surface-2` the view control uses, and
+          the group is `rounded-md` (20px) with items at `rounded-sm` (12px) —
+          docs/37 §5's ladder rule: a nested surface's radius is the parent's
+          minus one step. */}
+      <Segmented label="Filter the plan">
         {PLANNER_TABS.map((tab) => {
           const on = tab === active
           return (
@@ -66,24 +80,28 @@ export function PlannerToolbar({
                 },
               }}
               aria-current={on ? 'page' : undefined}
-              className={cn(
-                'inline-flex items-center gap-2 rounded-full px-3 py-1.5 type-sm transition-micro',
-                'max-narrow:min-h-11',
-                on
-                  ? 'surface-ring-firm bg-surface font-[650] text-ink'
-                  : 'text-muted hover:bg-s2 hover:text-ink',
-              )}
+              className={segmentedItem(on, 'py-1.5')}
             >
               {TAB_LABELS[tab]}
               {/* A zero is still information here — it is the answer to "is there
-                  anything waiting?" — so it is shown rather than hidden. */}
-              <span className={cn('num type-meta', on ? 'text-muted' : 'text-ink-mute')}>
+                  anything waiting?" — so it is shown rather than hidden.
+
+                  On the standing tab the count sits in its own tinted chip, so
+                  the number the reader came for is the strongest thing in the
+                  control. Off the standing tab it stays a quiet numeral: four
+                  chips would be four badges and none of them a signal. */}
+              <span
+                className={cn(
+                  'num type-meta',
+                  on ? 'rounded-pill bg-brand-tint px-1.5 font-bold text-ink' : 'text-ink-mute',
+                )}
+              >
                 {counts[tab]}
               </span>
             </Link>
           )
         })}
-      </nav>
+      </Segmented>
 
       {/* A plain GET form. `method` is omitted because GET is the default and
           the whole point is that submitting produces a shareable URL. */}
@@ -93,7 +111,7 @@ export function PlannerToolbar({
         {active !== 'all' ? <input type="hidden" name="tab" value={active} /> : null}
         {dateKey !== null ? <input type="hidden" name="date" value={dateKey} /> : null}
 
-        <div className="surface-ring flex items-center gap-2 rounded-full bg-surface px-3 transition-micro focus-within:shadow-[inset_0_0_0_1.5px_var(--brand)]">
+        <div className="surface-ring flex items-center gap-2 rounded-pill bg-surface px-3 transition-micro focus-within:shadow-[inset_0_0_0_1.5px_var(--brand)]">
           <Search size={14} strokeWidth={2} aria-hidden className="shrink-0 text-ink-mute" />
           <label htmlFor="planner-search" className="sr-only">
             Search post titles
@@ -114,7 +132,7 @@ export function PlannerToolbar({
               pathname: '/planner',
               query: { ...carry, ...(active === 'all' ? {} : { tab: active }) },
             }}
-            className="inline-flex items-center gap-1 rounded-full px-2 py-1.5 type-meta text-muted transition-micro hover:bg-s2 hover:text-ink max-narrow:min-h-11"
+            className="inline-flex items-center gap-1 rounded-pill px-2 py-1.5 type-meta text-muted transition-micro hover:bg-s2 hover:text-ink max-narrow:min-h-11"
           >
             <X size={13} strokeWidth={2} aria-hidden />
             Clear

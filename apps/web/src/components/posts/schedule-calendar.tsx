@@ -5,19 +5,24 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Select } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import {
-  clockTime,
   combine,
+  dayOfMonth,
   isSameDay,
   isSameMonth,
+  longLabel,
   monthGridDays,
   monthLabel,
   shiftMonth,
+  slotLabel,
   startOfDay,
   timeSlots,
+  timeValue,
   WEEKDAY_INITIALS,
 } from '@/lib/posts/calendar-month'
 
 export interface ScheduleCalendarProps {
+  /** The zone the grid is drawn in and every pick is built in: the workspace's. */
+  zone: string
   /** The month on screen. The caller owns it so the arrows are its business. */
   anchor: Date
   onAnchorChange: (anchor: Date) => void
@@ -55,8 +60,14 @@ const SLOTS = timeSlots()
  * The DAY is what a cell tests, not the instant. Today is still selectable at
  * 11pm even though most of it has gone, because the time row below decides the
  * instant and `validateScheduleLead` has the final word on it.
+ *
+ * ── EVERY DATE HERE IS READ AND BUILT IN `zone` ──────────────────────────────
+ * Not the browser's. The cells, "today", the chosen day and the instant a pick
+ * commits all go through the workspace's zone, so the day a reader taps is the
+ * day the planner beside this control will draw the post on.
  */
 export function ScheduleCalendar({
+  zone,
   anchor,
   onAnchorChange,
   value,
@@ -64,18 +75,18 @@ export function ScheduleCalendar({
   earliest,
   now,
 }: ScheduleCalendarProps) {
-  const days = monthGridDays(anchor)
-  const earliestDay = startOfDay(earliest)
-  const chosenTime = value === null ? '09:00' : timeValue(value)
+  const days = monthGridDays(zone, anchor)
+  const earliestDay = startOfDay(zone, earliest)
+  const chosenTime = value === null ? '09:00' : timeValue(zone, value)
 
   function pickDay(day: Date) {
     const [hours, minutes] = chosenTime.split(':').map(Number)
-    onChange(combine(day, hours ?? 9, minutes ?? 0))
+    onChange(combine(zone, day, hours ?? 9, minutes ?? 0))
   }
 
   function pickTime(next: string) {
     const [hours, minutes] = next.split(':').map(Number)
-    onChange(combine(value ?? startOfDay(now), hours ?? 9, minutes ?? 0))
+    onChange(combine(zone, value ?? startOfDay(zone, now), hours ?? 9, minutes ?? 0))
   }
 
   return (
@@ -84,7 +95,7 @@ export function ScheduleCalendar({
         <button
           type="button"
           aria-label="Previous month"
-          onClick={() => onAnchorChange(shiftMonth(anchor, -1))}
+          onClick={() => onAnchorChange(shiftMonth(zone, anchor, -1))}
           className="flex size-8 items-center justify-center rounded-sm text-muted transition-micro hover:bg-s2 hover:text-ink max-narrow:size-11"
         >
           <ChevronLeft size={16} aria-hidden />
@@ -92,12 +103,12 @@ export function ScheduleCalendar({
         {/* `aria-live` so a screen reader hears the month change rather than
             being silently moved to a different set of dates. */}
         <p aria-live="polite" className="type-h3">
-          {monthLabel(anchor)}
+          {monthLabel(zone, anchor)}
         </p>
         <button
           type="button"
           aria-label="Next month"
-          onClick={() => onAnchorChange(shiftMonth(anchor, 1))}
+          onClick={() => onAnchorChange(shiftMonth(zone, anchor, 1))}
           className="flex size-8 items-center justify-center rounded-sm text-muted transition-micro hover:bg-s2 hover:text-ink max-narrow:size-11"
         >
           <ChevronRight size={16} aria-hidden />
@@ -117,10 +128,10 @@ export function ScheduleCalendar({
 
       <div role="group" aria-label="Pick a date" className="grid grid-cols-7 gap-1">
         {days.map((day) => {
-          const outside = !isSameMonth(day, anchor)
+          const outside = !isSameMonth(zone, day, anchor)
           const past = day.getTime() < earliestDay.getTime()
-          const chosen = value !== null && isSameDay(day, value)
-          const today = isSameDay(day, now)
+          const chosen = value !== null && isSameDay(zone, day, value)
+          const today = isSameDay(zone, day, now)
 
           return (
             <button
@@ -129,7 +140,7 @@ export function ScheduleCalendar({
               data-calendar-day={chosen ? 'chosen' : undefined}
               // The FULL date, so a screen reader hears "Thursday, 27 August"
               // rather than "27" repeated six times down a column.
-              aria-label={longLabel(day)}
+              aria-label={longLabel(zone, day)}
               aria-pressed={chosen}
               disabled={past}
               onClick={() => pickDay(day)}
@@ -147,7 +158,7 @@ export function ScheduleCalendar({
                 today && !chosen ? 'shadow-[inset_0_0_0_1px_var(--brand)]' : null,
               )}
             >
-              {day.getDate()}
+              {dayOfMonth(zone, day)}
             </button>
           )
         })}
@@ -176,7 +187,7 @@ export function ScheduleCalendar({
                 rather than silently snapped to the nearest slot, which would
                 change a schedule the writer already set. */}
             {SLOTS.some((slot) => slot.value === chosenTime) ? null : (
-              <option value={chosenTime}>{labelFor(chosenTime)}</option>
+              <option value={chosenTime}>{slotLabel(chosenTime)}</option>
             )}
             {SLOTS.map((slot) => (
               <option key={slot.value} value={slot.value}>
@@ -204,26 +215,4 @@ export function ScheduleCalendar({
       </div>
     </div>
   )
-}
-
-const pad = (value: number): string => String(value).padStart(2, '0')
-
-/** `HH:mm` from a Date, which is what both time controls speak. */
-function timeValue(at: Date): string {
-  return `${pad(at.getHours())}:${pad(at.getMinutes())}`
-}
-
-function labelFor(value: string): string {
-  const [hours, minutes] = value.split(':').map(Number)
-  return clockTime(new Date(2000, 0, 1, hours ?? 9, minutes ?? 0))
-}
-
-/** "Thursday, 27 August" plus the year, which a grid spanning December needs. */
-function longLabel(day: Date): string {
-  return day.toLocaleDateString('en-GB', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
 }

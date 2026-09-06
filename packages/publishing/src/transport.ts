@@ -65,12 +65,32 @@ export function routedTransport(routes: FixtureRoute[]): Transport {
   }
 }
 
-/** Production transport backed by the platform's global `fetch`. */
-export function fetchTransport(fetchImpl: typeof fetch = fetch): Transport {
+/**
+ * Node's global `fetch` has NO default timeout, so a stalled upstream hangs until
+ * the platform kills the function. On the publish path that is the one failure
+ * that leaves no record: the variant stays `publishing` for the whole lease and
+ * there is no `post_publish_logs` row for reconcile to find. `packages/billing`
+ * closed the same hole in its transport; this is the same deadline, sized for
+ * media uploads rather than a webhook round-trip.
+ */
+const DEFAULT_TIMEOUT_MS = 30_000
+
+export interface FetchTransportOptions {
+  fetchImpl?: typeof fetch
+  timeoutMs?: number
+}
+
+/** Production transport backed by the platform's global `fetch`, with a hard deadline. */
+export function fetchTransport(opts: FetchTransportOptions | typeof fetch = {}): Transport {
+  // A bare fetch is the call shape every deps.ts uses today; keep it working.
+  const { fetchImpl = fetch, timeoutMs = DEFAULT_TIMEOUT_MS } =
+    typeof opts === 'function' ? { fetchImpl: opts } : opts
+
   return async (req) => {
     const res = await fetchImpl(req.url, {
       method: req.method,
       headers: req.headers,
+      signal: AbortSignal.timeout(timeoutMs),
       // Multipart bodies (X media) are raw bytes. TS 5.7+ types those as
       // `Uint8Array<ArrayBufferLike>`, which DOM's `BodyInit` rejects because
       // ArrayBufferLike admits SharedArrayBuffer-backed views. This package

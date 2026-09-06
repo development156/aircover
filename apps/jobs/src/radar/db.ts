@@ -28,7 +28,7 @@ export interface DueSource {
 export interface BeginFetchRequest {
   sourceId: string
   mode: 'cheap' | 'render'
-  provider: 'direct' | 'zyte' | 'apify'
+  provider: 'direct' | 'tinyfish' | 'apify'
   estimateMicros: number
   costBasis: 'measured' | 'estimated' | 'free'
 }
@@ -67,8 +67,48 @@ export interface ChangeWrite {
 }
 
 export interface RadarDb {
-  /** Sources whose cadence says they are due, cheapest-to-serve first. */
+  /**
+   * Sources whose cadence says they are due, longest-unattempted first.
+   *
+   * ORDERED BY THE LAST ATTEMPT, NOT THE LAST SIGHTING. A source that never
+   * succeeds keeps `last_seen_at` NULL, and NULL sorts first, so ordering by
+   * the sighting alone handed the whole weekly batch to the same failures for
+   * ever. See `pg.ts` for the query and `pg.pglite.test.ts` for the proof.
+   */
   dueSources(limit: number): Promise<DueSource[]>
+
+  /**
+   * ONE COMPETITOR'S SOURCES, FOR A WORKSPACE THAT ACTUALLY WATCHES THEM.
+   *
+   * The manual read ("Read now" on /radar) needs a list `dueSources` cannot
+   * give it: cadence-relative is exactly what a person pressing a button is
+   * asking to bypass, and a source read an hour ago is the one they most want
+   * re-read after fixing a broken address.
+   *
+   * ⚠ THE WORKSPACE ARGUMENT IS NOT A FILTER FOR CONVENIENCE ⚠
+   * It is the tenancy boundary. This runs over a service-role pool, so a query
+   * keyed on the competitor alone would return sources for a competitor the
+   * caller does not watch as readily as one they do — and the registry is
+   * SHARED, so "a competitor id" is not a secret. The subscription join is what
+   * makes the list unaimable at somebody else's watch list even if a caller's
+   * own check is ever removed. `app.radar_workspace_spend_today` reads the same
+   * tables through the same join, for the same reason.
+   *
+   * Cadence is deliberately NOT consulted. Whether the read is affordable is
+   * still decided by the ledger and by `app.radar_begin_fetch`, both of which
+   * this path goes through unchanged.
+   */
+  sourcesForCompetitor(competitorId: string, workspaceId: string): Promise<DueSource[]>
+
+  /**
+   * Every workspace watching the competitor this source belongs to.
+   *
+   * The registry is shared: one source is fetched once however many workspaces
+   * subscribe to it, but `radar_scan` is priced per business per workspace, so
+   * the charge needs the list the fetch does not. `app.radar_begin_fetch`
+   * returns only a COUNT, which cannot be billed against.
+   */
+  subscribers(sourceId: string): Promise<string[]>
 
   beginFetch(request: BeginFetchRequest): Promise<BeginFetchResult>
   finishFetch(request: FinishFetchRequest): Promise<void>

@@ -1,6 +1,5 @@
-import { Pool } from 'pg'
-
 import { createZernioWebhookHandler } from '@/lib/zernio/webhook-handler'
+import { directTransaction } from '@/lib/zernio/pool'
 import { reportServerError } from '@/lib/observability/report'
 
 /**
@@ -26,6 +25,10 @@ import { reportServerError } from '@/lib/observability/report'
  * The receiver is a different principal and gets a different door: a direct
  * Postgres connection, exactly as the Cashfree receiver already uses for the
  * ledger. NOTHING in this lane weakens that policy or its CHECK.
+ *
+ * The pool itself moved to `@/lib/zernio/pool` when the reply path needed the same
+ * door — a second pool against the same database from the same process would spend
+ * the scarcest budget in this deployment twice.
  */
 export const dynamic = 'force-dynamic'
 /** `pg` and `node:crypto`. This cannot run on the Edge runtime. */
@@ -53,40 +56,14 @@ function handler(): Handler | null {
   if (cached) return cached
 
   const secret = process.env.ZERNIO_WEBHOOK_SECRET ?? ''
-  const databaseUrl = process.env.SUPABASE_DB_URL ?? ''
-  if (secret === '' || databaseUrl === '') return null
-
-  const pool = new Pool({ connectionString: databaseUrl, max: 4 })
+  const withTransaction = directTransaction()
+  if (secret === '' || withTransaction === null) return null
 
   cached = createZernioWebhookHandler({
     secret,
     // ONE transaction per delivery. The rollback is load-bearing: it is what makes a
     // failed projection leave no half-written event for a retry to trip over.
-    withTransaction: async (fn) => {
-      const client = await pool.connect()
-      try {
-        await client.query('begin')
-        const result = await fn({
-          // `pg` types `query` as returning QueryResult<QueryResultRow>, whose
-          // `rows` is not assignable to the caller's `R[]`. The cast is at the
-          // ADAPTER, where the shape is asserted once, rather than widening
-          // `Queryable` to `any` and losing the types at every call site.
-          query: <R>(sql: string, params?: unknown[]) =>
-            client.query(sql, params as unknown[]) as unknown as Promise<{ rows: R[] }>,
-        })
-        await client.query('commit')
-        return result
-      } catch (cause) {
-        try {
-          await client.query('rollback')
-        } catch {
-          // A rollback that itself fails must not mask the original error.
-        }
-        throw cause
-      } finally {
-        client.release()
-      }
-    },
+    withTransaction,
     // Id, type and failure kind only. Never a payload — these bodies carry customer
     // DMs and reviewer names, and this repo already records the redaction path as a
     // DoS surface that runs on the crash path.

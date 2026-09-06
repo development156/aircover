@@ -80,7 +80,7 @@ export function PublishPreview({ postId }: PublishPreviewProps) {
         </Button>
       )}
       <p className="text-[12px] text-muted">
-        A dry run over your saved variants. Nothing is posted and nothing is recorded.
+        A dry run over your saved versions. Nothing is posted and nothing is recorded.
       </p>
 
       {error !== null ? <InlineError>{error}</InlineError> : null}

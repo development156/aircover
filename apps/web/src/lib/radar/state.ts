@@ -16,6 +16,31 @@ export type AddCompetitorState =
   | { ok: false; reason: 'failed'; message: string }
 
 /**
+ * READING ONE BUSINESS NOW, on the button rather than on the weekly schedule.
+ *
+ * ── THE SUCCESS ARM CARRIES AN OUTCOME, NOT JUST A SENTENCE ─────────────────
+ * "Sahoda read them" and "Sahoda could not read them" are both true endings to
+ * a run that did not fail, and the screen draws them differently — the second
+ * one has to say that nothing was charged. Folding them into one `ok: true`
+ * with a message would leave the caller parsing prose to find out which
+ * happened, which is the defect `DraftFromChangeState` already carries a
+ * separate `insufficient` arm to avoid.
+ *
+ * `capped` is Sahoda's own daily spending limit, and `insufficient` is the
+ * customer's wallet. They read almost the same on screen and they are opposite
+ * facts: one is ours to fix and the other is theirs, so only one of them may
+ * offer a top-up.
+ */
+export type ReadNowState =
+  | {
+      ok: true
+      /** `moved` wrote a change; `could-not-read` reached nothing and charged nothing. */
+      outcome: 'moved' | 'unchanged' | 'read' | 'could-not-read'
+      message: string
+    }
+  | { ok: false; reason: 'insufficient' | 'capped' | 'not-watching' | 'failed'; message: string }
+
+/**
  * Turning one observed change into drafts.
  *
  * `insufficient` is its OWN arm carrying the two numbers, exactly as

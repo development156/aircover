@@ -30,7 +30,7 @@ describe('brainOrigin', () => {
   test('the sample line says it is not about this business, and says what to do', () => {
     const { line } = brainOrigin('system')
     expect(line).toMatch(/not answers about your business/i)
-    expect(line).toMatch(/re-run the resolve/i)
+    expect(line).toMatch(/rebuild/i)
   })
 
   /**
@@ -70,7 +70,7 @@ describe('NO_PER_FIELD_EVIDENCE', () => {
    * not that it might later.
    */
   test('states that per-field evidence does not exist', () => {
-    expect(NO_PER_FIELD_EVIDENCE).toMatch(/cannot show which sentence produced which field/i)
+    expect(NO_PER_FIELD_EVIDENCE).toMatch(/cannot show which sentence led to which field/i)
     expect(NO_PER_FIELD_EVIDENCE).toMatch(/will not invent/i)
   })
 
@@ -97,7 +97,7 @@ describe('an accepted learning is not a model fallback', () => {
     const origin = brainOrigin('system', { appliedFromLearning: true })
     expect(origin.kind).toBe('learned')
     expect(origin.isSample).toBe(false)
-    expect(origin.label).toBe('Updated by a learning you accepted')
+    expect(origin.label).toBe('Updated with a change you approved')
   })
 
   test('still says SAMPLE when nothing claims the version — the fallback is unchanged', () => {

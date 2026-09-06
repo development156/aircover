@@ -158,3 +158,206 @@ export function countCertainty(signals: readonly BrandSignal[]): {
  * images' worth of credits.
  */
 export const MAX_IMAGES_PER_GENERATION = 20
+
+/**
+ * WHY A GENERATED PICTURE DOES OR DOES NOT CARRY THE WORKSPACE'S LOGO.
+ *
+ * ── THE COLUMN ALONE CANNOT ANSWER THIS, AND THE MIGRATION SAYS SO ──────────
+ * `studio_generation_images.stamped_asset_id` is a pointer, so its NULL is a
+ * single fact — no stamped copy exists — standing in for several different
+ * situations. That migration's own step 4 spells them out and forbids the copy
+ * from conflating them, and then leaves the screen no way to tell them apart.
+ * This is that way: the reason is recorded WHEN THE STAMPING RAN, beside the
+ * pointer, in the same append-only insert.
+ *
+ * ── WHY IT IS NOT DERIVED AT READ TIME ──────────────────────────────────────
+ * Every alternative asks a question about the past by looking at the present.
+ * "The workspace has no logo" is true NOW; it says nothing about what was true
+ * when a picture was drawn last week, and a shop that uploaded a logo yesterday
+ * would have every older picture re-explained as though the logo had been there
+ * all along. Same shape as `BrandSignalSchema` above: the record stores what was
+ * actually done, because the source can change afterwards.
+ *
+ * ── FOUR VALUES, AND A FIFTH STATE THAT IS THE ABSENCE OF ONE ───────────────
+ * NULL is not in this enum and is not an error: it means stamping was never
+ * attempted, which is true of every row written before this shipped and of any
+ * deploy where the column is not yet applied. A screen that rendered that as a
+ * failure would tell somebody something went wrong with a picture that predates
+ * the feature.
+ *
+ * `failed` deliberately covers more than one internal cause — a mark that would
+ * not fit, bytes that would not encode, an upload that did not land. They are
+ * one value because they are one SENTENCE to a reader: nothing they can do
+ * changes any of them, and splitting a code a person cannot act on invents a
+ * distinction no screen can honour. `no_logo` and `logo_unreadable` are separate
+ * for the opposite reason: their remedies differ, and offering the wrong one is
+ * the impossible remedy this product forbids.
+ */
+export const StampOutcomeSchema = z.enum([
+  /** A stamped copy exists. `stamped_asset_id` names it. */
+  'stamped',
+  /** The workspace had no logo to stamp. Remedy: add one. */
+  'no_logo',
+  /** A logo file exists and Sahoda could not read it. Remedy: replace it. */
+  'logo_unreadable',
+  /** Stamping ran and did not produce a stored copy. No remedy the reader owns. */
+  'failed',
+  /**
+   * The customer turned the stamp off for this press.
+   *
+   * ── WHY THIS IS NOT NULL ────────────────────────────────────────────────
+   * A deliberate skip and a picture drawn before stamping existed are both
+   * "no stamping happened", and they are not the same sentence: one is a
+   * choice the reader made a minute ago and the other is a fact about when
+   * the product shipped. Writing NULL for a skip would have the screen tell
+   * somebody "made before Sahoda placed logos" about a picture they drew
+   * today with the toggle off, which is simply false.
+   *
+   * NULL keeps its meaning and gains nothing: never attempted, by us.
+   */
+  'skipped',
+])
+export type StampOutcome = z.infer<typeof StampOutcomeSchema>
+
+/**
+ * WHAT A CUSTOMER MAY CHOOSE ABOUT THE MARK ON ONE PRESS, AS ONE CONTRACT.
+ *
+ * ── WHY THREE FIELDS AND NOT MORE ───────────────────────────────────────────
+ * Where it sits, how big it is, and whether it happens at all. Nothing else
+ * about the mark is a customer decision: the plate colour is derived from the
+ * workspace's own Brand Skin (`stamp-generated.ts`), and the clear-space ratio
+ * and contrast floor are house rules, not a per-press preference.
+ *
+ * ── WHY `sizeStep` IS THREE NAMED VALUES AND NOT A SLIDER ───────────────────
+ * A slider invites a number nobody can judge by looking at it: "17%" means
+ * nothing until it is rendered, and by then the press has already been made.
+ * Three words a person can hold in their head — small, medium, large — beat a
+ * control that needs a preview to mean anything. `medium` is deliberately the
+ * exact share this product shipped with before any of this existed
+ * (`MARK_HEIGHT_SHARE` in `logo-placement.ts`), so choosing nothing reproduces
+ * today's picture exactly.
+ *
+ * ── DEFAULTS REPRODUCE TODAY'S BEHAVIOUR, ON PURPOSE ────────────────────────
+ * `enabled: true`, `anchor: 'bottom-right'`, `sizeStep: 'medium'` is the mark
+ * every picture has carried since stamping shipped. A request that omits
+ * `stamp` altogether, or sends `{}`, gets exactly that: an old caller, a
+ * client built before this contract existed, or a hand-made request all draw
+ * the same picture they always did.
+ *
+ * ── WHY `anchor` IS NOT SOURCED FROM `logo-placement.ts` ────────────────────
+ * That file is geometry, in `apps/web`, and this package may not depend on an
+ * app. The four values are declared here as the STUDIO's own vocabulary for a
+ * corner; `logo-placement.ts`'s own `Anchor` type carries the identical four
+ * strings for the same reason `GenerationMode` and the mesh's task names are
+ * kept as plain string literals on both sides of a package boundary — the
+ * literal values are the contract, not a shared TypeScript type.
+ */
+export const STAMP_ANCHORS = ['bottom-right', 'bottom-left', 'top-right', 'top-left'] as const
+export const StampAnchorSchema = z.enum(STAMP_ANCHORS)
+export type StampAnchor = z.infer<typeof StampAnchorSchema>
+
+/**
+ * WHY THE MARK LANDED SOMEWHERE OTHER THAN THE CORNER THE CUSTOMER ASKED FOR.
+ *
+ * The renderer measures all four corners of the finished picture and may place
+ * the mark somewhere other than the chosen corner. `apps/web`'s `corner-choice.ts`
+ * owns that decision and its `AnchorChoice.reason` carries these two words; this is
+ * the SHARED copy of that vocabulary, declared here for the same reason
+ * `STAMP_ANCHORS` is: the two literals are the contract that the database check
+ * constraint, the row read and the customer sentence all agree on, not a shared
+ * TypeScript type reaching across the `apps/web` boundary.
+ *
+ * Two words and no third, because they are two different sentences to a shop
+ * owner and the remedy for each is nothing they can do:
+ *
+ *   busy        the chosen corner had too much going on behind the mark, and a
+ *               quieter corner was used instead. A design call, not a fault.
+ *   unreadable  the mark would not have cleared contrast in the chosen corner, so
+ *               a legible corner was used. Legibility, not preference.
+ *
+ * This is NOT a `StampOutcome`: outcome says whether a mark went on at all, this
+ * says where it went once it did. A picture is `stamped` whichever corner it
+ * landed in, and NULL here (no move) is the ordinary case, not an absence of one.
+ */
+export const STAMP_ANCHOR_MOVE_REASONS = ['busy', 'unreadable'] as const
+export const StampAnchorMoveReasonSchema = z.enum(STAMP_ANCHOR_MOVE_REASONS)
+export type StampAnchorMoveReason = z.infer<typeof StampAnchorMoveReasonSchema>
+
+/**
+ * `medium` is today's fixed 14% of the canvas's shorter edge, unchanged.
+ * `small` and `large` are new. See `logo-placement.ts` for the exact shares
+ * and for why neither the width cap nor the height cap changes behaviour as a
+ * result of adding them.
+ */
+export const STAMP_SIZE_STEPS = ['small', 'medium', 'large'] as const
+export const StampSizeStepSchema = z.enum(STAMP_SIZE_STEPS)
+export type StampSizeStep = z.infer<typeof StampSizeStepSchema>
+
+/**
+ * Per-field defaults, not a top-level default on the object: `{}`, `{ enabled:
+ * false }` and a request that never mentions `stamp` at all must all validate
+ * to a complete, sensible options record rather than only the last of the
+ * three.
+ */
+export const StampOptionsSchema = z.object({
+  /** Whether a stamped copy is produced at all. Off never changes what is charged. */
+  enabled: z.boolean().default(true),
+  anchor: StampAnchorSchema.default('bottom-right'),
+  sizeStep: StampSizeStepSchema.default('medium'),
+})
+export type StampOptions = z.infer<typeof StampOptionsSchema>
+
+/** Exactly today's behaviour, as a value: on, bottom-right, medium (14%). */
+export const DEFAULT_STAMP_OPTIONS: StampOptions = StampOptionsSchema.parse({})
+
+/**
+ * A FEW WORDS DESCRIBING WHAT THE PICTURE SHOULD NOT SHOW.
+ *
+ * ── WHY THIS IS PROMPT-LEVEL, AND WHY THE COMMENT MATTERS MORE THAN THE CODE ─
+ * MEASURED against `packages/mesh/src/providers/openrouter.ts`: the images
+ * request body carries exactly `model`, `prompt`, `size` and
+ * `input_references`. There is no negative-prompt field. So this text is
+ * appended to the SENTENCE Sahoda sends, not passed to a switch the model is
+ * obliged to honour. A diffusion model follows an exclusion imperfectly, and
+ * every caller reading this value must say what it is asking for, never what
+ * it is guaranteeing.
+ *
+ * ── WHY IT NEVER TOUCHES `wanted` ────────────────────────────────────────────
+ * The clause is appended to the prompt actually SENT to the model
+ * (`studio_generations.prompt_sent`); the words the customer typed
+ * (`prompt_given`) are never rewritten by it, the same separation brand
+ * conditioning already keeps.
+ *
+ * ── THE BOUND IS A COST CONTROL, NOT A STYLE RULE ────────────────────────────
+ * `wanted` alone can already reach 1,000 characters (`ImageGenerateInputSchema`
+ * in `mesh/tasks.ts`), which is the hard ceiling the assembled prompt must
+ * clear. A short bound here leaves room for the exclusion clause without the
+ * caller having to reason about the exact character budget left over from a
+ * long description; the caller still decides, deliberately, what to do when
+ * the two together would still be too long — see `IMAGE_PROMPT_MAX_CHARS`.
+ */
+export const LEAVE_OUT_MAX_CHARS = 120
+export const LeaveOutSchema = z.string().trim().min(1).max(LEAVE_OUT_MAX_CHARS)
+export type LeaveOut = z.infer<typeof LeaveOutSchema>
+
+/**
+ * HOW CLOSELY A PICTURE SHOULD FOLLOW THE REFERENCE IMAGES IT WAS GIVEN.
+ *
+ * Same honesty rule as `LeaveOutSchema` above and the same measured fact: the
+ * provider has no strength field, so this is a sentence appended to the
+ * prompt, never a dial the model is bound to obey.
+ *
+ * ── MEANINGLESS WITHOUT A REFERENCE, AND THAT IS THE CALLER'S JOB TO ENFORCE ─
+ * This schema does not know whether any reference was picked; a caller with
+ * zero references must not pass anything other than the default, and the
+ * screen that offers this choice must show it as unavailable rather than
+ * rendering a live control that silently does nothing.
+ *
+ * `balanced` is the default and adds NOTHING to the prompt: it is already
+ * what every mode's own direction already asks for, so a request that never
+ * mentions this field draws exactly the picture it always has.
+ */
+export const REFERENCE_FOLLOW_STEPS = ['loose', 'balanced', 'close'] as const
+export const ReferenceFollowSchema = z.enum(REFERENCE_FOLLOW_STEPS).default('balanced')
+export type ReferenceFollow = z.infer<typeof ReferenceFollowSchema>
+export const DEFAULT_REFERENCE_FOLLOW: ReferenceFollow = ReferenceFollowSchema.parse(undefined)

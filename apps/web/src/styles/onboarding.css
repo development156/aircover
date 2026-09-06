@@ -563,13 +563,16 @@
 
 /* ================================================================ inputs
 
-    Underline inputs, not boxes. A boxed field on a warm editorial page
-    reads as a form; a rule under a large sentence reads as a place to
-    write. The rule thickens and turns orange on focus, which is the only
-    state change needed.                                              */
+    BOXES, NOT UNDERLINES — and this paragraph used to say the opposite.
+    It described the original design, where a field was a rule under a large
+    sentence, and it survived the 2026-08-29 ruling that replaced that with a
+    filled, ringed box. A comment that contradicts the code below it is worse
+    than no comment: the next person builds from the wrong one.
+
+    A field is an object: paper fill, 1.5px hairline border, rounded. On focus
+    the border turns orange. That is the whole state change.              */
 
 .field {
-  position: relative;
   margin-bottom: 22px;
 }
 
@@ -580,8 +583,10 @@
     rather than boxes waiting for an answer. Two of the four things that screen
     asks for were invisible as questions.
 
-    The fill and the ring are what make it an object. The travelling underline
-    below stays: it was never the problem, it just had nothing to travel along.  */
+    The fill and the ring are what make it an object. That ruling also KEPT the
+    travelling underline, reasoning it had merely "had nothing to travel along".
+    The 2026-09-05 ruling removed it: once the box existed, the line was a second
+    orange mark inside a field that had already turned orange.                  */
 .inp {
   width: 100%;
   font-size: var(--onb-fs-input);
@@ -609,27 +614,24 @@
   outline: none;
 }
 
-/*  The travelling underline. A second rule scales in from the left on
-    focus so the line is *drawn* rather than recoloured — the difference
-    between a field that responds and one that just changes.        */
-.field::after {
-  content: '';
-  position: absolute;
-  /*  Inset to the box. Flush with 0 it drew straight across the rounded corners
-      of the field this rule now sits under.                                    */
-  left: 10px;
-  right: 10px;
-  bottom: 1.5px;
-  height: 1.5px;
-  background: var(--onb-orange);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform var(--onb-d-el) var(--onb-ease);
-}
+/*  THE TRAVELLING UNDERLINE IS GONE.
+    Founder's ruling, 2026-09-05, against a screenshot of step 01: a second
+    orange line sat inside the focused box, a finger's width under the text,
+    on every field in the flow.
 
-.field:focus-within::after {
-  transform: scaleX(1);
-}
+    It is a leftover of the design this file opens by describing, where the
+    input WAS a rule and the line was the whole control. The 2026-08-29 ruling
+    turned the input into a box with its own orange focus border and kept the
+    line, reasoning it "just had nothing to travel along". It had something to
+    travel along and the result was two orange lines saying one thing.
+
+    The focus state is not weakened by removing it: `.inp:focus` and
+    `.ta:focus` still carry the border to `--onb-orange`, which is the change
+    a person actually reads.
+
+    `.field`'s `position: relative` went with it. MEASURED: it existed only to
+    anchor this pseudo-element — no rule in this stylesheet and no element in
+    the five step files that use `.field` is absolutely positioned inside one.  */
 
 .ta {
   width: 100%;
@@ -1309,260 +1311,6 @@
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
-}
-
-/* ── brand colour field ─────────────────────────────────────────────────────
-   Replaced `.sw*`, which was a dot with an invisible `<input type="color">`
-   stretched over it. See `color-field.tsx` for why the native control stopped
-   being the whole interface. Zero raw hex here, as everywhere in this file. */
-.cf {
-  position: relative;
-}
-
-.cf__dot {
-  width: 46px;
-  height: 46px;
-  border-radius: 12px;
-  box-shadow: inset 0 0 0 1px var(--onb-hairline);
-  cursor: pointer;
-  display: block;
-  transition:
-    transform var(--onb-d-fast) var(--onb-ease),
-    border-radius var(--onb-d-fast) var(--onb-ease);
-}
-
-.cf:hover .cf__dot,
-.cf__dot:focus-visible {
-  transform: scale(1.07);
-  border-radius: 14px;
-}
-
-.cf__l {
-  font-size: var(--onb-fs-micro);
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--onb-muted);
-  margin-top: 7px;
-}
-
-.cf__v {
-  font-size: 12px;
-  color: var(--onb-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-/* The popover.
-   ── IT OPENS TO THE RIGHT, AND IT USED TO OPEN DOWNWARD ────────────────────
-   Below the swatch it ran straight into the Continue and Back buttons, which
-   sit at the bottom of every step and are FIXED to the viewport under 960px.
-   The founder photographed it half-covered by them.
-   Opening beside the swatch clears that row entirely without moving a single
-   button — the swatches sit in the left column and the space to their right is
-   empty on this screen. Nudged slightly ABOVE the swatch's centre (-56%, not
-   -50%) so the tall grid leans away from the action row rather than toward it.
-   Under 960px there is no room to the right and the button row is fixed, so it
-   flips ABOVE the swatch instead — the one direction nothing occupies. */
-.cpick {
-  position: absolute;
-  z-index: 40;
-  left: calc(100% + 14px);
-  top: 50%;
-  /* `transform`, while the entry animation drives `translate`. Two separate
-     properties on purpose: the keyframe used to animate `transform` and its
-     `to { transform: none }` would have wiped this centring the moment the
-     animation finished. */
-  transform: translateY(-56%);
-  width: min(320px, calc(100vw - 40px));
-  padding: 12px;
-  border-radius: var(--r-lg);
-  background: var(--onb-paper);
-  box-shadow:
-    inset 0 0 0 1px var(--onb-hairline),
-    var(--sh-pop);
-  display: flex;
-  flex-direction: column;
-  gap: 11px;
-  animation: cpick-in var(--onb-d-fast) var(--onb-ease) both;
-}
-
-@keyframes cpick-in {
-  from {
-    opacity: 0;
-    translate: -4px 0;
-  }
-  to {
-    opacity: 1;
-    translate: 0 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .cpick {
-    animation: none;
-  }
-}
-
-.cpick__grid {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.cpick__row {
-  display: grid;
-  grid-template-columns: repeat(11, 1fr);
-  gap: 5px;
-}
-
-/* The neutrals row is seven wide against eleven, so it spans rather than
-   leaving four empty cells the eye reads as missing colours. */
-.cpick__row:first-child {
-  grid-template-columns: repeat(7, 1fr);
-}
-
-.cpick__sw {
-  aspect-ratio: 1;
-  border-radius: 6px;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  /* LITERAL white, and the dark variant literal black, because the ground here
-     is a colour the CUSTOMER chose and not a themed surface. A token would flip
-     with the theme and put a dark tick on a dark swatch in one of them. Same
-     argument docs/26 §1.6 makes for platform brand marks; `white` is already
-     used as a keyword three rules above this one. */
-  color: white;
-  box-shadow: inset 0 0 0 1px var(--onb-hairline);
-  transition: transform var(--onb-d-fast) var(--onb-ease);
-}
-
-.cpick__sw:hover,
-.cpick__sw:focus-visible {
-  transform: scale(1.14);
-}
-
-.cpick__sw.on {
-  box-shadow:
-    inset 0 0 0 1px var(--onb-hairline),
-    0 0 0 2px var(--onb-ink);
-}
-
-/* A white tick on a pale swatch is an invisible selection. `isLight` decides. */
-.cpick__tick--dark {
-  color: black;
-}
-
-.cpick__foot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.cpick__prev {
-  width: 28px;
-  height: 28px;
-  flex: none;
-  border-radius: 999px;
-  box-shadow: inset 0 0 0 1px var(--onb-hairline);
-}
-
-.cpick__hexwrap {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  height: 34px;
-  padding: 0 10px;
-  border-radius: var(--r-sm);
-  background: var(--onb-ink-04);
-  box-shadow: inset 0 0 0 1px var(--onb-hairline);
-}
-
-/* ── ONE FOCUS RING, NOT TWO ─────────────────────────────────────────────────
-   `#stage :focus-visible` at the top of this file paints a 2px orange outline
-   offset 3px on everything focusable in the flow. Around this input that landed
-   OUTSIDE the wrapper's own ring, so focusing the hex field drew two orange
-   rectangles, one inside the other. Reported as an "ugly orange box".
-
-   `outline: none` on `.cpick__hex` did not stop it and could not: that selector
-   is 0,1,0 and the global is 1,1,0, so the global always won. The suppression
-   below is id-qualified for exactly that reason.
-
-   The outline is removed and NOT simply hidden: the wrapper ring below is the
-   replacement, raised to the same 2px the rest of the flow uses, so a keyboard
-   user still sees precisely where focus is. */
-#stage .cpick__hex:focus-visible {
-  outline: none;
-}
-
-.cpick__hexwrap:focus-within {
-  box-shadow: inset 0 0 0 2px var(--onb-orange);
-}
-
-/* Same global, different damage: on a swatch the 3px offset throws the ring
-   over its neighbours in a grid whose gap is 5px, so keyboard focus reads as
-   three selected cells. Pulled tight to the swatch it lands on. */
-#stage .cpick__sw:focus-visible {
-  outline-offset: 0;
-}
-
-.cpick__hash {
-  font-size: 13px;
-  color: var(--onb-muted);
-}
-
-.cpick__hex {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  background: none;
-  color: var(--onb-ink);
-  font-size: 13px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  /* No `outline: none` here. It sat on this rule and did nothing — the global
-     `#stage :focus-visible` outranks it — and a line that reads as if it
-     handles focus while the ring it was meant to remove is still on screen is
-     worse than no line. The suppression that works is id-qualified, above. */
-}
-
-.cpick__tool {
-  width: 34px;
-  height: 34px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  border-radius: var(--r-sm);
-  color: var(--onb-muted);
-  cursor: pointer;
-  box-shadow: inset 0 0 0 1px var(--onb-hairline);
-  transition: color var(--onb-d-fast) var(--onb-ease);
-}
-
-.cpick__tool:hover {
-  color: var(--onb-ink);
-}
-
-/* The escape hatch, deliberately quiet: it opens the operating system dialog. */
-.cpick__native {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 12px;
-  color: var(--onb-muted);
-  cursor: pointer;
-}
-
-.cpick__native input {
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: 0;
-  border-radius: 5px;
-  background: none;
-  cursor: pointer;
 }
 
 .filelist {
@@ -2309,18 +2057,6 @@
     padding-bottom: 8px;
   }
 
-  /* No room to the right of the swatch at this width, and the button row below
-     is FIXED to the viewport — so the popover flips above, the one direction
-     with nothing in it. Left-aligned to the pane rather than to its swatch: the
-     third swatch is far enough across that anchoring to it would push a 320px
-     panel off the right edge. */
-  .cpick {
-    left: 0;
-    top: auto;
-    bottom: calc(100% + 12px);
-    transform: none;
-  }
-
   /* Pinned bottom CTA with blur backdrop in dark and light themes */
   .cta-row,
   #rail {
@@ -2337,19 +2073,44 @@
     gap: 10px;
   }
 
+  /* Q-08: MEASURED 63px at 390px was 38px tall on Build my Brand Brain,
+     Continue and Back, and 28px on Save & exit — all under the product's
+     44px phone touch floor (docs/workflow/01_CONTEXT.md). `min-height`
+     rather than `height`: the used height is clamped to whichever of the
+     two is larger, so this raises the floor without touching the value a
+     wider phone or the desktop rule reads. */
   .cta-row .btn {
     flex: 1;
     justify-content: center;
-    height: 38px;
+    min-height: 44px;
     border-radius: var(--r-sm, 6px);
     font-size: 13px;
   }
-  .cta-row .enterkey {
+  /* The "Press Enter" hint has no meaning on a phone. The SAME element carries
+     the price on the last step ("Uses 50 credits" / "Free the first time"),
+     and hiding that below 960px hid the cost on the one screen that spends it
+     — MEASURED 2026-09-07 at 936 and 390. Costs are shown before any spend
+     (CLAUDE.md), so only the keyboard hint goes. */
+  .cta-row .enterkey:not(.enterkey--cost) {
     display: none;
+  }
+  .cta-row .enterkey--cost {
+    flex: 1 0 100%;
+    text-align: center;
   }
   .cta-row .btn--ghost {
     flex: 0 0 auto;
-    height: 38px;
+    min-height: 44px;
+  }
+
+  /* Same floor, same reasoning, for the two phone controls the CTA row does
+     not own: the header's "Save & exit" (measured 98×28) and every chip this
+     stylesheet draws — the business-type picks on step 02 and the
+     Website/Instagram/Google Business Profile competitor-kind picks on the
+     rivals step (measured 39px tall), both built from the one `.chip` rule. */
+  .nav__exit,
+  .chip {
+    min-height: 44px;
   }
 
   .more__grid {

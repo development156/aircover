@@ -31,7 +31,7 @@ import { normalizeSlot } from '@/lib/planner/slots'
 import type { PlanWeekState } from '@/lib/planner/state'
 import { chargeFailureState, FAILURE_REASON } from '@/lib/posts/charge-failure'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
+import { workspaceForWrite } from '@/lib/workspaces'
 
 /** Goals are model input — cap what one click can stuff into a paid prompt. */
 const GOALS_MAX_CHARS = 500
@@ -105,8 +105,14 @@ export async function planMyWeek(goals: unknown, channels: unknown): Promise<Pla
     const requested = toChannelSet(parsedInput.data.channels)
     // A plain array for the mesh call — `PlanWeekInputSchema` types it mutable, and
     // `ChannelSet` is readonly. The copy is still the distinct list; the spread only
-    // drops the brand at the package seam.
-    const taskInput = { goals: parsedInput.data.goals, channels: [...requested] }
+    // drops the brand at the package seam. `nowIso` rides along: parsing it above
+    // and then building the task input without it is exactly what shipped a
+    // model with no notion of today (plan-week.test.ts pins it).
+    const taskInput = {
+      goals: parsedInput.data.goals,
+      channels: [...requested],
+      nowIso: parsedInput.data.nowIso,
+    }
 
     // SERVER-DERIVED ledger key, fresh per invocation — a stable ref would
     // replay a spent HOLD+DEBIT. See lib/planner/object-ref.ts.
@@ -129,6 +135,7 @@ export async function planMyWeek(goals: unknown, channels: unknown): Promise<Pla
     let delivered = false
     let created = 0
     let clamped = 0
+    let postIds: string[] = []
 
     const credits = await getWithCredits()(
       { workspaceId: workspace.id, action, objectRef },
@@ -192,6 +199,7 @@ export async function planMyWeek(goals: unknown, channels: unknown): Promise<Pla
         }
 
         created = data.length
+        postIds = data.map((row) => String(row.id))
         // Last statement before the return: from here on the wrapper owns the
         // outcome, and any failure it reports may still have debited.
         delivered = true
@@ -228,6 +236,7 @@ export async function planMyWeek(goals: unknown, channels: unknown): Promise<Pla
       ok: true,
       created,
       clamped,
+      postIds,
       balanceAfter: credits.data.balanceAfter,
       creditsCharged: creditCost(action),
     }

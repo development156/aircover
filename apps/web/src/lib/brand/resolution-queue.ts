@@ -79,6 +79,9 @@ function entry(field: BrainField, payload: BrandMemoryPayload, provenance: Prove
 }
 
 function byRank(a: QueueEntry, b: QueueEntry): number {
+  // What the person told Sahoda comes before anything Sahoda made up.
+  const intake = Number(b.state === 'intake') - Number(a.state === 'intake')
+  if (intake !== 0) return intake
   const kind = KIND_RANK[a.field.metaKind] - KIND_RANK[b.field.metaKind]
   if (kind !== 0) return kind
   return (PRIORITY.get(a.field.path) ?? 0) - (PRIORITY.get(b.field.path) ?? 0)
@@ -105,20 +108,27 @@ export function settledFields(payload: BrandMemoryPayload, provenance: Provenanc
 }
 
 export interface QueueTally {
+  /** Seeded from setup answers; the wording is Sahoda's, the substance theirs. */
+  fromIntake: number
   /** Guesses on fields the contract says are only the owner's to answer. */
   unearned: number
   /** Guesses on fields where a proposal is what the field is FOR. */
   proposed: number
-  /** Every field still a guess. */
+  /** Every registered field still unconfirmed, intake ones included. */
   total: number
+  /** Unconfirmed fields that are Sahoda's own: `total` minus `fromIntake`. */
+  guesses: number
   /** Every registered field. The denominator the ring uses. */
   registered: number
 }
 
 export function queueTally(queue: readonly QueueEntry[]): QueueTally {
+  const guesses = queue.filter((item) => item.state !== 'intake')
   return {
-    unearned: queue.filter((item) => item.field.metaKind === 'asked').length,
-    proposed: queue.filter((item) => item.field.metaKind === 'negotiated').length,
+    fromIntake: queue.length - guesses.length,
+    guesses: guesses.length,
+    unearned: guesses.filter((item) => item.field.metaKind === 'asked').length,
+    proposed: guesses.filter((item) => item.field.metaKind === 'negotiated').length,
     total: queue.length,
     registered: BRAIN_FIELDS.length,
   }
@@ -151,15 +161,27 @@ export const ENTITLEMENT: Record<BrainFieldMetaKind, Entitlement> = {
   asked: {
     label: 'Only you know this',
     heading: 'Only you know these',
-    line: 'Sahoda is not entitled to answer these. It filled them in so the Brain would work at all, and its guesses here are worth less than yours on any day.',
+    line: 'Only you can answer these. Sahoda filled them in so it could start. Your answer is always better than its guess.',
   },
   negotiated: {
-    label: 'Sahoda proposed this',
-    heading: 'Sahoda proposed these',
-    line: 'These are the fields Sahoda is meant to draft: you have the instinct, it has the craft. Keep each one, or say it differently.',
+    label: 'Sahoda wrote this',
+    heading: 'Sahoda wrote these for you',
+    line: 'These are the things Sahoda is good at writing: how you sound, how formal you are, which phrases are yours. Keep each one, or change it.',
   },
 }
 
 export function entitlementOf(field: BrainField): Entitlement {
   return ENTITLEMENT[field.metaKind]
+}
+
+/** The group for fields seeded from setup answers. Not an entitlement: the person IS entitled. */
+export const INTAKE_GROUP: Entitlement = {
+  label: 'From your answer',
+  heading: 'Check Sahoda kept your meaning',
+  line: 'You told Sahoda these when you set up. Sahoda wrote them in its own words. If the words are right, confirm them. If not, correct them.',
+}
+
+/** The heading, sentence and marker for a row: intake rows are grouped by state, the rest by kind. */
+export function groupOf(entry: QueueEntry): Entitlement {
+  return entry.state === 'intake' ? INTAKE_GROUP : ENTITLEMENT[entry.field.metaKind]
 }

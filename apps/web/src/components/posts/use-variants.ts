@@ -342,9 +342,20 @@ export function useVariants(
       commit((current) => {
         const next = { ...current }
         for (const item of items) {
+          const channel = current[item.channel]
+          // Fill the keyword field from the ones the model wrote FOR this
+          // channel, so a generated version arrives ready rather than leaving the
+          // writer to retype them. Only when the model returned some: an empty
+          // list must not wipe keywords a person typed by hand (e.g. GBP, which
+          // the model is told to leave bare). Preserves the bracket preference.
+          const extras =
+            item.hashtags && item.hashtags.length > 0
+              ? { ...channel.extras, hashtags: item.hashtags }
+              : channel.extras
           next[item.channel] = {
-            ...current[item.channel],
+            ...channel,
             body: item.body,
+            extras,
             dirty: true,
             error: null,
             // A generated variant is written FOR this channel. It is the clearest

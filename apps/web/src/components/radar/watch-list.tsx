@@ -1,8 +1,17 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { ArrowRight, AtSign, Building2, MapPin, ShieldCheck, Target, Trash2 } from 'lucide-react'
-import { addCompetitor, removeCompetitor } from '@/app/actions/radar'
+import {
+  ArrowRight,
+  AtSign,
+  Building2,
+  MapPin,
+  RefreshCw,
+  ShieldCheck,
+  Target,
+  Trash2,
+} from 'lucide-react'
+import { addCompetitor, readCompetitorNow, removeCompetitor } from '@/app/actions/radar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -151,17 +160,49 @@ export function WatchForm() {
  * The businesses already on the list. Its own component and its own error, so a
  * refused removal is reported next to the rows rather than under the add form.
  */
-export function WatchRows({ competitors }: { competitors: readonly Competitor[] }) {
+export function WatchRows({
+  competitors,
+  readCost,
+}: {
+  competitors: readonly Competitor[]
+  /** What one "Read now" costs, as a sentence: "1 credit". Shown before the spend. */
+  readCost: string
+}) {
   const [error, setError] = useState<string | null>(null)
+  const [status, setStatus] = useState<string | null>(null)
+  // WHICH row is busy, not whether any row is. Two buttons per row and a
+  // single boolean would grey the whole list for one read.
+  const [busy, setBusy] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+
+  /**
+   * "Read now": the weekly pass, for this one business, now. The result is a
+   * sentence on both arms, and the failure arm keeps the wallet honest: a
+   * refused read says nothing was charged, because `readCompetitorNow` charges
+   * only after a page came back.
+   */
+  function readNow(id: string) {
+    setError(null)
+    setStatus(null)
+    setBusy(id)
+    startTransition(async () => {
+      const result = await readCompetitorNow(id)
+      setBusy(null)
+      if (result.ok) setStatus(result.message)
+      else setError(result.message)
+    })
+  }
 
   function drop(id: string) {
     setError(null)
+    setStatus(null)
+    setBusy(id)
     startTransition(async () => {
       // The result is READ. Discarding it left a refused delete looking like a
       // successful one: the row stayed on screen, nothing was said, and the
       // obvious next move for the reader is to press it again.
       const result = await removeCompetitor(id)
+      setBusy(null)
       if (!result.ok) setError(result.message)
     })
   }
@@ -175,6 +216,9 @@ export function WatchRows({ competitors }: { competitors: readonly Competitor[] 
       className="flex flex-col gap-2"
     >
       {error ? <InlineError>{error}</InlineError> : null}
+      <p role="status" aria-live="polite" className="type-meta text-muted empty:hidden">
+        {status}
+      </p>
       <ul className="grid gap-2 wide:grid-cols-2">
         {competitors.map((competitor) => {
           const Icon = KIND_ICON[competitor.kind]
@@ -208,6 +252,20 @@ export function WatchRows({ competitors }: { competitors: readonly Competitor[] 
                   )}
                 </span>
               </span>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => readNow(competitor.id)}
+                loading={pending && busy === competitor.id}
+                disabled={pending}
+                title={`Read ${competitor.name} now for ${readCost}`}
+              >
+                <RefreshCw size={14} aria-hidden />
+                <span className="sr-only">
+                  Read {competitor.name} now, {readCost}
+                </span>
+                <span aria-hidden>Read now</span>
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"

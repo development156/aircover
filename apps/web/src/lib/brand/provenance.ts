@@ -1,4 +1,4 @@
-import type { BrandFieldMetaMap, BrandMemoryPayload } from '@sahoda/shared'
+import { SOURCE_INTAKE, type BrandFieldMetaMap, type BrandMemoryPayload } from '@sahoda/shared'
 
 import { BRAIN_FIELDS } from './fields'
 import { leavesEqual, readLeaf } from './leaf'
@@ -7,10 +7,12 @@ import { leavesEqual, readLeaf } from './leaf'
  * How a field got its value.
  *
  * `confirmed` — a person agreed to it. `guessed` — the model produced it and
- * nobody has said otherwise yet. There is no third state: a field either has a
- * human behind it or it does not.
+ * nobody has said otherwise yet. `intake` — the person answered this at setup
+ * and the model put it in its own words: theirs in substance, unconfirmed in
+ * wording. It counts as unconfirmed everywhere a number is shown, and it is
+ * shown apart from guesses everywhere a label is.
  */
-export type FieldState = 'confirmed' | 'guessed'
+export type FieldState = 'confirmed' | 'guessed' | 'intake'
 
 export type Provenance = ReadonlyMap<string, FieldState>
 
@@ -42,7 +44,14 @@ export function provenanceOf(meta: BrandFieldMetaMap | undefined): Provenance {
 
   for (const field of BRAIN_FIELDS) {
     const entry = meta[field.path]
-    state.set(field.path, entry?.confirmed === true ? 'confirmed' : 'guessed')
+    state.set(
+      field.path,
+      entry?.confirmed === true
+        ? 'confirmed'
+        : entry?.source === SOURCE_INTAKE
+          ? 'intake'
+          : 'guessed',
+    )
   }
 
   return state

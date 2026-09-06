@@ -57,6 +57,26 @@ export const TASK_TIER: Record<MeshTaskName, ModelTier> = {
    * ACCEPTED COST: economy's OpenAI fallback is gpt-4o-mini rather than gpt-4o.
    * That path fires only when OpenRouter is unreachable, and brand_guidelines
    * is the one task with a demo-fallback safety net underneath it.
+   *
+   * ── IT DID NOT TAKE EFFECT FOR THREE WEEKS, AND NOW IT HAS ──────────────────
+   * MEASURED 2026-09-03: the bake-off's conclusion was written HERE, and this
+   * table is read by nothing at runtime. `MeshTaskDef.tier` is the source (this
+   * file's own header says so), and `tasks/brand-guidelines.ts` said `standard`
+   * from the day it was created — `git log -L48,48` on it showed one commit, the
+   * creating one. So brand_guidelines ran on sonnet-5 the whole time and the 5.7x
+   * saving was never taken.
+   *
+   * APPLIED 2026-09-04, founder's decision. The task definition now says
+   * `economy` and this table says the same, and `agrees with every task
+   * definition` below asserts the two per task — it caught this very change when
+   * only one side had moved, which is the drift that hid the problem in the first
+   * place.
+   *
+   * THE CAVEAT REMAINS UNDISCHARGED, so it stays written down rather than being
+   * quietly dropped now that the decision went the other way: haiku returned
+   * signal_lock 'strong' on all three runs where sonnet said 'moderate', and a
+   * model that always says strong would make that field worthless. Re-measure on
+   * a THIN intake.
    */
   brand_guidelines: 'economy',
   // Standard, not economy: this one reads adversarial customer-supplied text and
@@ -106,6 +126,69 @@ export const IMAGE_ROUTES: Partial<Record<ModelTier, string>> = {
   premium: 'openai/gpt-image-1',
 }
 
+/**
+ * EVERY IMAGE MODEL THIS PRODUCT WILL ADDRESS.
+ *
+ * ── WHY AN ALLOW-LIST AND NOT JUST A DEFAULT ────────────────────────────────
+ * The Studio lets a person choose which model draws their picture, so a model id
+ * now arrives from a REQUEST. Passing that string through to the provider would
+ * let anybody bill this account against any model on OpenRouter, including ones
+ * far dearer than anything we price, and would put an unpriced id in the
+ * `model_id` column as though we had chosen it.
+ *
+ * So the id is checked against this list and a stranger is refused. The list is
+ * the contract: adding a model here is the deliberate act, and everything else
+ * (the picker, the price, the rules) reads from it.
+ *
+ * ── PAGE-VERIFIED IS NOT GENERATION-VERIFIED ────────────────────────────────
+ * The three ids added on 2026-08-31 had their FIGURES read off each model's own
+ * OpenRouter page and compared against docs/43 §3. That is a check on the price
+ * and reference bounds, NOT a check that the model draws: every press against
+ * them has returned HTTP_400 from `/api/v1/images` (production `ai_provider_logs`,
+ * 2 and 4 September, zero successes). The allow-list is a SPENDING boundary, so
+ * they stay on it — an id off the list would fall back to the tier default and
+ * spend silently against the wrong model. Whether a listed id actually draws is
+ * the picker's `routed` flag in `apps/web/src/lib/studio/models.ts`, not this
+ * list.
+ *
+ *   google/gemini-2.5-flash-image     the one id MEASURED drawing (6 ok rows, 2026-08-30)
+ *   google/gemini-3-pro-image         page: $2/M in, $120/M image out, 14 references
+ *   openai/gpt-image-1                page: $5/M text in, $40/M out, 10 per request, 16 references
+ *   bytedance-seed/seedream-5-0-lite  page: $0.035 flat per image, 4 per request, 14 references
+ */
+export const ALLOWED_IMAGE_MODELS: readonly string[] = [
+  'google/gemini-2.5-flash-image',
+  'google/gemini-3-pro-image',
+  'openai/gpt-image-1',
+  'bytedance-seed/seedream-5-0-lite',
+]
+
+/** True only for an id this product has deliberately priced and listed. */
+export function isAllowedImageModel(id: string): boolean {
+  return ALLOWED_IMAGE_MODELS.includes(id)
+}
+
 export function imageModelForTier(tier: ModelTier): string | undefined {
   return IMAGE_ROUTES[tier]
+}
+
+/**
+ * The model an image call will actually use.
+ *
+ * ── THE REQUESTED ID IS VETTED, NEVER PASSED THROUGH ────────────────────────
+ * A model id now arrives from a request, because the Studio lets somebody
+ * choose one. Handing that string to the provider would let any caller bill
+ * this account against any model on OpenRouter, including ones far dearer than
+ * anything this product prices. An id that is not on the list is IGNORED and
+ * the tier's own model is used, because the screen has already refused it with
+ * a sentence and this layer's job is to make the wrong thing impossible rather
+ * than to explain it twice.
+ *
+ * Lives here, exported and pure, rather than inside `createMesh`: a closure
+ * nobody can call is a boundary nobody can prove.
+ */
+export function chooseImageModel(tier: ModelTier, requested?: string): string | undefined {
+  return requested !== undefined && isAllowedImageModel(requested)
+    ? requested
+    : imageModelForTier(tier)
 }

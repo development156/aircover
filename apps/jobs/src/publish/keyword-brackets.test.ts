@@ -86,6 +86,7 @@ function capturingDeps(variant: PublishVariant): {
       adapterFor: () => adapter,
       writeLog: async () => {},
       markVariant: async () => {},
+      recordPublished: async () => {},
       // 0 so the per-day cap cannot fire and this file keeps testing the one
       // thing it is about. The caps have their own coverage.
       countLiveSends: async () => 0,

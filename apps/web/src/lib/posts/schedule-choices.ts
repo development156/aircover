@@ -5,6 +5,8 @@ import {
   SWEEP_INTERVAL_MINUTES,
   SWEEP_RUNTIME_ALLOWANCE_SECONDS,
 } from '@/lib/posts/delivery-window'
+import { addDaysInZone } from '@/lib/time/day-key'
+import { instantAtWallClock, partsInZone, zoneLabel } from '@/lib/time/zone'
 
 /**
  * NAMED TIMES, SO SCHEDULING A POST DOES NOT REQUIRE KNOWING WHAT A DATE INPUT IS.
@@ -41,9 +43,18 @@ import {
  * wants 4:45 pm on the 3rd has to be able to say so. The native input becomes
  * the implementation detail `docs/34` §1 recommended it become, rather than the
  * whole interface.
+ *
+ * ── AND THE CLOCK IS THE WORKSPACE'S ─────────────────────────────────────────
+ * "Tomorrow morning" used to be built with `setHours` on the reader's own
+ * device, while every screen that read the result back formatted it in the
+ * workspace's zone. MEASURED: a customer in Dubai picks it, the composer
+ * confirms 9:00 am, and the posts list calls the same post 10:30 am IST. Every
+ * function here now takes the zone the planner draws in and builds the instant
+ * a reader in THAT zone means, through `instantAtWallClock`, which owns the two
+ * transition-day cases. Founder's ruling, 2026-09-06.
  */
 
-/** Local wall-clock hour a named part of the day means. Printed, never implied. */
+/** Wall-clock hour, in the workspace's zone, a named part of the day means. Printed, never implied. */
 const MORNING_HOUR = 9
 const EVENING_HOUR = 18
 
@@ -58,11 +69,9 @@ export interface ScheduleChoice {
   when: Date
 }
 
-function atLocalHour(base: Date, dayOffset: number, hour: number): Date {
-  const d = new Date(base)
-  d.setDate(d.getDate() + dayOffset)
-  d.setHours(hour, 0, 0, 0)
-  return d
+function atZoneHour(zone: string, base: Date, dayOffset: number, hour: number): Date {
+  const p = partsInZone(zone, addDaysInZone(zone, base, dayOffset))
+  return instantAtWallClock(zone, { year: p.year, month: p.month, day: p.day, hour, minute: 0 })
 }
 
 function inAnHour(now: Date): Date {
@@ -87,19 +96,31 @@ function inAnHour(now: Date): Date {
  * honest. Returning a padded list would put a button on the screen that cannot
  * be pressed.
  */
-export function scheduleChoices(channels: readonly Channel[], now: Date): ScheduleChoice[] {
+export function scheduleChoices(
+  zone: string,
+  channels: readonly Channel[],
+  now: Date,
+): ScheduleChoice[] {
   if (Number.isNaN(now.getTime())) return []
   const floor = earliestScheduleAt(channels, now)
   if (Number.isNaN(floor.getTime())) return []
-  return keepScheduleable(candidateChoices(now), floor)
+  return keepScheduleable(candidateChoices(zone, now), floor)
 }
 
 /** The three, before the floor is applied. Exported for the guard, not for callers. */
-export function candidateChoices(now: Date): ScheduleChoice[] {
+export function candidateChoices(zone: string, now: Date): ScheduleChoice[] {
   return [
     { id: 'hour', label: 'In an hour', when: inAnHour(now) },
-    { id: 'tomorrow-morning', label: 'Tomorrow morning', when: atLocalHour(now, 1, MORNING_HOUR) },
-    { id: 'tomorrow-evening', label: 'Tomorrow evening', when: atLocalHour(now, 1, EVENING_HOUR) },
+    {
+      id: 'tomorrow-morning',
+      label: 'Tomorrow morning',
+      when: atZoneHour(zone, now, 1, MORNING_HOUR),
+    },
+    {
+      id: 'tomorrow-evening',
+      label: 'Tomorrow evening',
+      when: atZoneHour(zone, now, 1, EVENING_HOUR),
+    },
   ]
 }
 
@@ -142,18 +163,37 @@ export const DELIVERY_WINDOW_MINUTES = Math.ceil(
   SWEEP_INTERVAL_MINUTES + SWEEP_RUNTIME_ALLOWANCE_SECONDS / 60,
 )
 
-const timeOnly = new Intl.DateTimeFormat('en-IN', { hour: 'numeric', minute: '2-digit' })
-const dayAndTime = new Intl.DateTimeFormat('en-IN', {
-  weekday: 'short',
-  day: 'numeric',
-  month: 'short',
-  hour: 'numeric',
-  minute: '2-digit',
-})
+/** One formatter per zone and shape; the zone is a per-workspace fact, not a constant. */
+const CACHE = new Map<string, Intl.DateTimeFormat>()
 
-/** "Mon 24 Aug, 9:00 am" — the exact instant a named choice means. */
-export function formatChoiceTime(when: Date): string {
-  return dayAndTime.format(when)
+function formatter(zone: string, shape: 'time' | 'day-time'): Intl.DateTimeFormat {
+  const key = `${zone}|${shape}`
+  let f = CACHE.get(key)
+  if (!f) {
+    f = new Intl.DateTimeFormat(
+      'en-IN',
+      shape === 'time'
+        ? { timeZone: zone, hour: 'numeric', minute: '2-digit' }
+        : {
+            timeZone: zone,
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short',
+            hour: 'numeric',
+            minute: '2-digit',
+          },
+    )
+    CACHE.set(key, f)
+  }
+  return f
+}
+
+/**
+ * "Mon 24 Aug, 9:00 am IST" — the exact instant a named choice means, with the
+ * zone said once, because the whole defect was a time with no zone beside it.
+ */
+export function formatChoiceTime(zone: string, when: Date): string {
+  return `${formatter(zone, 'day-time').format(when)} ${zoneLabel(zone, when)}`
 }
 
 /**
@@ -177,7 +217,8 @@ export function formatChoiceTime(when: Date): string {
  * `scheduleFieldNote` already says so — a delivery range there would be a
  * promise about a rail that is not running.
  */
-export function deliveryRangeNote(when: Date): string {
+export function deliveryRangeNote(zone: string, when: Date): string {
   const end = new Date(when.getTime() + DELIVERY_WINDOW_MINUTES * 60_000)
-  return `Goes out between ${timeOnly.format(when)} and ${timeOnly.format(end)} — Sahoda checks every ${SWEEP_INTERVAL_MINUTES} minutes, so it is not to the second.`
+  const time = formatter(zone, 'time')
+  return `Goes out between ${time.format(when)} and ${time.format(end)} ${zoneLabel(zone, when)}. Sahoda checks every ${SWEEP_INTERVAL_MINUTES} minutes, so it is not to the second.`
 }

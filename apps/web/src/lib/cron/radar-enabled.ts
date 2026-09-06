@@ -31,13 +31,16 @@ import 'server-only'
  * it without a redeploy — which is the thing worth being able to do in a hurry
  * when the spend is the risk rather than the writes.
  *
- * ── EXACT-MATCH, AND ONLY FOR THE OFF DIRECTION ─────────────────────────────
- * Only the literal string `off` disables it, matching `metrics-enabled.ts`. A
- * typo therefore leaves the pass running. That is the right direction here for
- * the same reason it is there — a missed weekly scan cannot be collected later,
- * because the page has already changed — and the opposite of the right answer
- * for a publishing flag.
+ * ── REVERSED 2026-09-06: FAIL-CLOSED, LIKE EVERY OTHER SWEEP ─────────────────
+ * The ruling above stood while the pass was cheap and empty. The audit of
+ * 2026-09-06 (IL-06) found the opposite: a weekly pass that ran on every
+ * environment, bought Instagram reads for every workspace on every preview
+ * that had the keys, and had produced zero changes in production because
+ * APIFY_TOKEN was never set there. A pass nobody armed was spending and
+ * nobody was reading. Only the literal string `on` now runs it, matching
+ * apps/jobs/CLAUDE.md, and "Read now" on /radar is the door for a workspace
+ * that wants a reading before Monday.
  */
 export function radarScanEnabled(): boolean {
-  return process.env.SAHODA_RADAR_SCAN_MODE !== 'off'
+  return process.env.SAHODA_RADAR_SCAN_MODE === 'on'
 }

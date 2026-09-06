@@ -7,7 +7,12 @@ import * as Sentry from '@sentry/nextjs'
 import { NotYet, Unreadable } from '@/components/design-system/absence-row'
 import { getWorkspaceRole } from '@/lib/workspace-role'
 import { readBalance, type BalanceRead } from '@/lib/wallet/read'
-import { getActiveWorkspaceSlug, listWorkspaces, resolveActiveWorkspace } from '@/lib/workspaces'
+import {
+  currentUserId,
+  getActiveWorkspaceSlug,
+  listWorkspaces,
+  resolveActiveWorkspace,
+} from '@/lib/workspaces'
 
 /**
  * The rail's docked bottom block (reference `.side__foot`).
@@ -113,7 +118,10 @@ function CreditsFootRow() {
       <span className="text-[12px] text-muted">Credits left</span>
       <Link
         href="/wallet"
-        className="rounded-sm text-[12px] font-semibold text-accent transition-micro hover:underline"
+        // Ink with an underline, not accent: #ff6600 on the rail ground is
+        // 2.94:1 (tokens.css), and rail-collapse.spec.ts measured exactly that
+        // here (run 34020306051). The underline is the link signal now.
+        className="rounded-sm text-[12px] font-semibold text-ink underline decoration-line underline-offset-2 transition-micro hover:decoration-ink"
       >
         Usage
       </Link>
@@ -122,7 +130,7 @@ function CreditsFootRow() {
 }
 
 export async function RailFoot() {
-  const [user, workspacesRead, activeSlug, balance] = await Promise.all([
+  const [user, workspacesRead, activeSlug, balance, userId] = await Promise.all([
     soft('clerk_user', currentUser, null),
     /**
      * Read with its failure VISIBLE, not swallowed.
@@ -144,11 +152,12 @@ export async function RailFoot() {
     })(),
     soft('active_workspace_slug', getActiveWorkspaceSlug, null as string | null),
     soft<BalanceRead>('available_credits', readBalance, { status: 'unreadable' }),
+    soft('current_user', currentUserId, null as string | null),
   ])
   const workspaces = workspacesRead.value
 
   const credits = creditsText(balance)
-  const active = resolveActiveWorkspace(workspaces, activeSlug)
+  const active = resolveActiveWorkspace(workspaces, activeSlug, userId)
   /**
    * True only when we positively know there is no workspace: the read SUCCEEDED
    * and returned nothing. A failed read stays `Unreadable`, which is the honest
@@ -196,7 +205,11 @@ export async function RailFoot() {
       >
         <span
           aria-hidden
-          className="grid size-[26px] flex-none place-items-center rounded-full bg-brand-wash text-[11px] font-bold text-accent"
+          // `text-ink`, not `text-accent`: MEASURED run 34012814133, the
+          // collapsed rail in dark read these initials at 2.75:1 against the
+          // wash, the faintest label in the shell. The wash is a 6% tint of the
+          // rail, so ink on it clears 4.5:1 in both themes; accent on it does not.
+          className="grid size-[26px] flex-none place-items-center rounded-pill bg-brand-wash text-[11px] font-bold text-ink"
         >
           {initials(name)}
         </span>
@@ -246,7 +259,7 @@ export function RailFootSkeleton() {
         <CreditsFootRow />
       </div>
       <div className="flex items-center gap-2 px-3 py-2.5 rail-min:justify-center rail-min:px-0">
-        <span aria-hidden className="size-[26px] flex-none rounded-full bg-s2" />
+        <span aria-hidden className="size-[26px] flex-none rounded-pill bg-s2" />
         <span className="min-w-0 flex-1 rail-min:hidden">
           <SkeletonBar className="h-[13px] w-24" />
           <SkeletonBar className="mt-1 h-[11px] w-16" />

@@ -40,7 +40,7 @@ describe('the spend total tells the two zeroes apart', () => {
   it('a read that threw shows the unreadable mark, never 0', () => {
     render(<SpendCard spend={{ ...base, status: 'unreadable' }} />)
     expect(screen.queryByText('0')).toBeNull()
-    expect(screen.getByText(/credits spent in the last 30 days could not be read/i)).toBeTruthy()
+    expect(screen.getByText(/credits used in the last 30 days could not be read/i)).toBeTruthy()
   })
 
   it('says it is empty exactly once', () => {
@@ -98,6 +98,14 @@ describe('what the card must not stop saying', () => {
     expect(screen.queryByText(/Showing from/i)).toBeNull()
   })
 
+  it('an empty window reserves no chart height', () => {
+    // MEASURED 2026-09-06: the reserved 168px rendered as a 150–200px void
+    // under "0 credits" at every width, the largest empty object on /home.
+    render(<SpendCard spend={base} />)
+    const sparse = screen.getByTestId('chart-sparse')
+    expect(sparse.className).not.toMatch(/h-\[168px\]/)
+  })
+
   it('a window that was read and had no spend is never the no-data state', () => {
     // Days that were READ and genuinely had no spend must not be reported as
     // "we have nothing". The chart draws thirty stubs; the sentence must not
@@ -111,7 +119,7 @@ describe('what the card must not stop saying', () => {
     // The floor's real job was stopping a reader inferring a trend from one
     // spike. That claim is kept in words; the chart is not withheld to make it.
     render(<SpendCard spend={{ ...base, status: 'ok', days: days([0, 0, 0, 0, 6]), total: 6 }} />)
-    expect(screen.getByText(/not enough to read as a trend/i)).toBeTruthy()
+    expect(screen.getByText(/no trend yet/i)).toBeTruthy()
     expect(screen.queryByTestId('chart-sparse')).toBeNull()
   })
 })

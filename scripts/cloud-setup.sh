@@ -100,13 +100,22 @@ for v in "${ENV_OPTIONAL[@]}"; do
 done
 
 # ── Fixed values that are not secrets ────────────────────────────────────────
-# SAHODA_E2E_ACK_TARGET is a GUARD, not a knob: Playwright refuses at module
-# scope without it. It exists because this suite wrote to the production
-# database on every gate run for months and minted 12,196 Clerk users.
+# SAHODA_E2E_ACK_TARGET IS NO LONGER WRITTEN, and the reason is the sentence
+# that used to sit here: the guard "exists because this suite wrote to the
+# production database on every gate run for months and minted 12,196 Clerk
+# users" -- and then the next line handed every sandbox a standing
+# acknowledgement of that same database, so the guard was defeated by the script
+# that provisions it. `SAHODA_E2E_ACK_TARGET=1` was rejected as "satisfiable by
+# anyone who wanted the error to go away"; a default is satisfiable by nobody
+# typing anything at all, which is worse.
+#
+# As of 2026-09-04 production cannot be acknowledged at any price
+# (`lib/testing/e2e-target.ts`), so the value would be inert as well as wrong.
+# An operator running the suite against a guarded ref types it for that run.
+#
 # E2E_PORT must be explicit, or turbo's strict env stripping drops it and every
 # sandbox lands on the same default port.
 : "${SUPABASE_PROJECT_REF:=rloztdhzfliyvpvxsgjl}"
-: "${SAHODA_E2E_ACK_TARGET:=rloztdhzfliyvpvxsgjl}"
 : "${E2E_PORT:=3100}"
 
 say "2 · Writing the three .env files"
@@ -120,7 +129,6 @@ write_env() {
     _x=$(val "$v"); [ -n "$_x" ] && printf '%s=%s\n' "$v" "$_x" >> "$target"
   done
   printf 'SUPABASE_PROJECT_REF=%s\n'  "$SUPABASE_PROJECT_REF"  >> "$target"
-  printf 'SAHODA_E2E_ACK_TARGET=%s\n' "$SAHODA_E2E_ACK_TARGET" >> "$target"
   printf 'E2E_PORT=%s\n'              "$E2E_PORT"              >> "$target"
   ok "$target  ($(wc -l < "$target") vars)"
 }
@@ -141,8 +149,9 @@ else
   bad "SAHODA_LANE_OWNER not set."
   echo "         Two things break, and the second one is not obvious:"
   echo "           1. handoffs are filed under a branch id nobody can read"
-  echo "           2. .githooks/pre-push keys on THIS value, so a karunesh"
-  echo "              lane with it unset can push to wt-core and wt-web."
+  echo "           2. .githooks/pre-push keys on THIS value, and only the"
+  echo "              value 'divas' may write wt-core. Unset reads as a lane,"
+  echo "              so unset is refused wt-core and wt-web, not waved through."
   echo "              The block is off. It does not announce itself."
   echo "         Set it in this environment's variables:"
   echo "           girija | jiban | divas | karunesh"
@@ -270,10 +279,16 @@ if command -v pnpm >/dev/null 2>&1; then
 fi
 
 # ── THE REPO'S GIT GUARDS ────────────────────────────────────────────────────
-# `.githooks/pre-commit` refuses a commit that stages `ops/state/qa.pending.json`,
-# which every gate run rewrites. Pointed at here rather than left to each person
-# to remember, because the rule was broken twice in three commits by `git add -A`
-# on 2026-08-25 — once immediately after being fixed for the same reason.
+# `.githooks/pre-commit` refuses a commit that stages `ops/state/qa.pending.json`.
+# Pointed at here rather than left to each person to remember, because the rule
+# was broken twice in three commits by `git add -A` on 2026-08-25, once
+# immediately after being fixed for the same reason.
+#
+# Since 2026-08-31 the ops scripts no longer rewrite that file at all: a gate run
+# records its QA rows in `ops/state/.pending.local.json`, which is gitignored, and
+# the sync drains them there. So the hook now guards against a person staging it,
+# not against a tool churning it every few minutes. See the block above
+# `PENDING_OVERLAY_FILE` in scripts/lib/ops-state.mjs.
 #
 # `.githooks/pre-push` refuses a push to wt-core, wt-web or main from the lane
 # owned by `karunesh`, which may read every branch and write only to its own.

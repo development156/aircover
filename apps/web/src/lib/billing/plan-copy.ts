@@ -9,6 +9,7 @@ import {
   type TaxTreatment,
 } from '@sahoda/shared'
 import { creditWord } from '@/lib/credit-words'
+import { DEFAULT_ZONE } from '@/lib/time/zone'
 
 /**
  * Every sentence and every formatted number the plan screen renders.
@@ -48,7 +49,7 @@ export function onDate(iso: string): string {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
-    timeZone: 'Asia/Kolkata',
+    timeZone: DEFAULT_ZONE,
   }).format(new Date(iso))
 }
 

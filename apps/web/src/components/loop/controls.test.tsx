@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 vi.mock('@/app/actions/loop-dial', () => ({
   setLoopSettings: vi.fn(async () => ({ ok: true })),
@@ -141,6 +142,26 @@ describe('LoopControls — what the run facts may claim', () => {
     expect(screen.getByText(/Spent this cycle/)).toBeTruthy()
   })
 
+  it('draws NO bar for a budget of ZERO, which is a choice and not a scale', () => {
+    // ── A REAL STORED VALUE THAT IS NOT A PROPORTION ────────────────────────
+    // The gate was `budgetCredits !== null`, so a budget of 0 rendered a bar
+    // with `aria-valuemax=0` under `aria-valuenow=85` and the sentence "Used 85
+    // of 0 credits" — while the fill drew EMPTY, because `share` divides by the
+    // budget. Every part of that is wrong in a different way, and `CreditsCard`
+    // beside it already guarded `budget > 0`.
+    render(
+      <LoopControls
+        {...BASE}
+        run={{ spentCredits: 85, budgetCredits: 0, startedAt: null, duration: null }}
+      />,
+    )
+    expect(screen.queryByRole('progressbar')).toBeNull()
+    expect(screen.queryByText(/of 0 credits/)).toBeNull()
+    // The spend still has to be reported. Removing the bar must not remove the fact.
+    expect(screen.getByText(/Spent this cycle/)).toBeTruthy()
+    expect(screen.getByText('85')).toBeTruthy()
+  })
+
   it('keeps an overspent bar inside its track while the figures still say so', () => {
     const { container } = render(
       <LoopControls
@@ -160,5 +181,46 @@ describe('LoopControls — what the run facts may claim', () => {
     expect(screen.queryByRole('progressbar')).toBeNull()
     expect(screen.queryByText(/Spent this cycle/)).toBeNull()
     expect(screen.queryByText(/This cycle/)).toBeNull()
+  })
+})
+
+describe('LoopControls — the budget field saves on blur, so blur must know what it is saving', () => {
+  /**
+   * `Number('')` is 0. Clearing the field to retype it and tabbing away wrote a
+   * budget of zero, silently, and a reload showed "0" (MEASURED 2026-09-06).
+   */
+  it('writes nothing for an emptied field and puts the saved figure back', async () => {
+    const { setLoopSettings } = await import('@/app/actions/loop-dial')
+    render(<LoopControls {...BASE} />)
+    const input = screen.getByLabelText('Weekly budget in credits') as HTMLInputElement
+
+    await userEvent.clear(input)
+    await userEvent.tab()
+
+    expect(setLoopSettings).not.toHaveBeenCalled()
+    expect(input.value).toBe('150')
+  })
+
+  it('writes nothing when the figure did not change', async () => {
+    const { setLoopSettings } = await import('@/app/actions/loop-dial')
+    render(<LoopControls {...BASE} />)
+
+    await userEvent.click(screen.getByLabelText('Weekly budget in credits'))
+    await userEvent.tab()
+
+    expect(setLoopSettings).not.toHaveBeenCalled()
+  })
+
+  it('saves a changed figure and says so', async () => {
+    const { setLoopSettings } = await import('@/app/actions/loop-dial')
+    render(<LoopControls {...BASE} />)
+    const input = screen.getByLabelText('Weekly budget in credits')
+
+    await userEvent.clear(input)
+    await userEvent.type(input, '120')
+    await userEvent.tab()
+
+    await waitFor(() => expect(setLoopSettings).toHaveBeenCalledWith({ weeklyBudgetCredits: 120 }))
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Saved.'))
   })
 })

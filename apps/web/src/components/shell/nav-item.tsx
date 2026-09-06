@@ -105,6 +105,9 @@ export function NavItem({
   return (
     <Link
       href={href}
+      // Hover and focus still prefetch; only the on-sight fan-out is off.
+      // See shell-prefetch.test.ts for the twenty renders this stops.
+      prefetch={false}
       data-guide={guide}
       aria-current={active ? 'page' : undefined}
       /**
@@ -140,12 +143,15 @@ export function NavItem({
         // The active surface is an ALPHA wash (--t50 = orange at 6%), so it
         // composites correctly on white AND on the dark shell — which is why
         // this no longer needs the `dark:bg-s2` override the solid v3 tint did.
-        // Orange on the dark-composited wash measures ~6.7:1.
-        active && 'bg-brand-wash font-semibold text-accent',
+        // INK on it, not accent: tokens.css's own table puts #ff6600 on the
+        // light wash at 2.75:1, and `rail-collapse.spec.ts` measured exactly
+        // that on the active row (run 34017127220). The wash, the weight and
+        // the 2px bar below carry the state; the words stay readable.
+        active && 'bg-brand-wash font-semibold text-ink',
         // The 2px rail. Structure, not decoration: it is the one active signal
         // that survives greyscale, so the state does not rest on hue alone.
         active &&
-          'before:absolute before:top-2 before:bottom-2 before:-left-[9px] before:w-[2px] before:rounded-full before:bg-brand before:content-[""]',
+          'before:absolute before:top-2 before:bottom-2 before:-left-[9px] before:w-[2px] before:rounded-pill before:bg-brand before:content-[""]',
         active && 'rail-min:before:hidden',
       )}
     >
@@ -169,7 +175,7 @@ export function NavItem({
       {count !== undefined && count > 0 ? (
         <>
           {/* Expanded: the number, pushed to the trailing edge. */}
-          <span className="ml-auto grid h-[18px] min-w-[18px] flex-none place-items-center rounded-full bg-brand px-[5px] text-[11px] font-bold text-primary-foreground tabular-nums rail-min:hidden">
+          <span className="ml-auto grid h-[18px] min-w-[18px] flex-none place-items-center rounded-pill bg-brand px-[5px] text-[11px] font-bold text-primary-foreground tabular-nums rail-min:hidden">
             {count}
           </span>
           {/* Collapsed: a dot. The count has nowhere to go in a 64px rail, but
@@ -177,7 +183,7 @@ export function NavItem({
               for. The accessible name below carries the number either way. */}
           <span
             aria-hidden
-            className="absolute top-[7px] right-[13px] hidden size-[7px] rounded-full bg-brand ring-2 ring-surface rail-min:block"
+            className="absolute top-[7px] right-[13px] hidden size-[7px] rounded-pill bg-brand ring-2 ring-surface rail-min:block"
           />
           <span className="sr-only">{count} waiting</span>
         </>

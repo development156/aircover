@@ -73,7 +73,7 @@ export function QaTransfer() {
           type="button"
           onClick={download}
           disabled={busy}
-          className="rounded-pill bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-micro hover:bg-primary-strong hover:text-white disabled:pointer-events-none disabled:opacity-45"
+          className="rounded-pill bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-micro hover:bg-primary-strong hover:text-primary-strong-foreground disabled:pointer-events-none disabled:opacity-45"
         >
           {busy ? 'Working…' : 'Export JSON'}
         </button>

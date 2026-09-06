@@ -7,7 +7,7 @@ import {
 } from '@sahoda/shared'
 import type { ChatRequest, ChatResponse, Provider } from '../providers/types'
 import { createMeshRunner } from '../engine'
-import { brandGuidelinesTask } from './brand-guidelines'
+import { BRAND_GUIDELINES_SYSTEM, brandGuidelinesTask } from './brand-guidelines'
 
 const input = ResolveInputSchema.parse({ source: { name: 'Chai & Chapters' } })
 
@@ -39,9 +39,13 @@ function runnerFor(provider: Provider) {
 }
 
 describe('brandGuidelinesTask', () => {
-  it('is the standard-tier brand_guidelines task with an explicit token budget', () => {
+  it('is the economy-tier brand_guidelines task with an explicit token budget', () => {
+    // ECONOMY since 2026-09-04, applying a bake-off measured 2026-08-12 that had
+    // been written into `TASK_TIER` and never into the definition that routes the
+    // call. The tier lives in TWO places and `routing.test.ts` asserts they agree,
+    // so this line and that table move together or the suite says so.
     expect(brandGuidelinesTask.def.name).toBe('brand_guidelines')
-    expect(brandGuidelinesTask.def.tier).toBe('standard')
+    expect(brandGuidelinesTask.def.tier).toBe('economy')
     expect(brandGuidelinesTask.def.maxTokens).toBeGreaterThan(0)
   })
 
@@ -85,5 +89,22 @@ describe('brandGuidelinesTask', () => {
       expect(result.data).toEqual(DEMO_FALLBACK_PAYLOAD)
       expect(result.fallback).toBe(true)
     }
+  })
+})
+
+/**
+ * The "note" lands on /brain as prose the owner reads. MEASURED 2026-09-06 on the
+ * preview: "Almost all intake fields (persona, pain, fear, values, hook, voice)
+ * were left blank … the founder fills in more detail" — a note about the JSON to
+ * the engineer, on a screen for a shop owner. The prompt now says who the reader
+ * is and which words may not appear; this pins that instruction.
+ */
+describe('the note is written for the owner', () => {
+  it('tells the model who reads the note and bans the jargon that leaked', () => {
+    const system = BRAND_GUIDELINES_SYSTEM
+    expect(system).toMatch(/business owner/i)
+    expect(system).toMatch(/plain, simple English/i)
+    for (const banned of ['intake', 'persona', 'archetype', 'hook', 'founder'])
+      expect(system).toMatch(new RegExp(`never use the words[^.]*\\b${banned}\\b`, 'i'))
   })
 })

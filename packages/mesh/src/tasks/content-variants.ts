@@ -3,7 +3,7 @@ import { ChannelSchema, ContentVariantsOutputSchema, CONSTRAINTS } from '@sahoda
 import type { Channel, ContentVariantsOutput, MeshContext, MeshTaskDef } from '@sahoda/shared'
 import type { ChatMessage } from '../providers/types'
 import type { MeshTaskSpec } from '../engine'
-import { PROSE_RULES } from '../prose-rules'
+import { PROSE_RULES, VOICE_INTEGRITY } from '../prose-rules'
 import { SEARCH_SURFACE_RULE, SEO_RULES } from '../seo-rules'
 
 /** 2048: measured 925 x 1.4 (token-budget.ts). 1024 left 10% headroom. */
@@ -29,32 +29,78 @@ export type ContentVariantsInput = z.infer<typeof ContentVariantsInputSchema>
  * CONTENT right: a keyword is a phrase a customer would type into a search box,
  * which is a different thing from a hashtag and is usually more than one word.
  */
-const KEYWORD_RULE = `KEYWORDS, NOT HASHTAGS. The "hashtags" field holds SEARCH KEYWORDS. \
-Never write a "#". Write the plain words somebody would type into a search box, and prefer \
-a real phrase over a single word: "chai in pune" beats "chai". Sahoda wraps each one as \
-[keyword] when it publishes, so do not add brackets yourself. Two to six per channel.`
+const KEYWORD_RULE = `KEYWORDS, NOT HASHTAGS. Fill each channel's "hashtags" field with SEARCH \
+KEYWORDS. Never write a "#". Write the plain words somebody would type into a search box, and \
+prefer a real phrase over a single word: "chai in pune" beats "chai". Sahoda wraps each one as \
+[keyword] when it publishes, so do not add brackets yourself. Give 2 to 5 for EVERY channel \
+except Google Business Profile, which takes none because Google indexes the body itself.`
 
 const SYSTEM = `You adapt one canonical social post into native per-channel variants for Sahoda.
 Output ONLY a JSON object matching:
 { "variants": [ { "channel": <one of the requested channels>, "body": string,
-  "extras": { "hashtags"?: string[], "gbpCta"?: string } } ] }
+  "extras": { "hashtags": string[], "gbpCta"?: string } } ] }
 Rules: exactly one variant per requested channel; stay within each channel's character
 limit; follow each platform's norms for links and (GBP) call-to-action; keep
 the core message and the brand voice. No markdown, no commentary.
+Every variant MUST carry "extras.hashtags" with 2 to 5 search keywords, EXCEPT Google
+Business Profile, which sets it to []. A non-GBP variant with an empty or missing
+"hashtags" is incomplete: fill it before you answer.
 ${KEYWORD_RULE}
 ${SEO_RULES}
 ${SEARCH_SURFACE_RULE}
-${PROSE_RULES}`
+${PROSE_RULES}
+${VOICE_INTEGRITY}`
 
 export { KEYWORD_RULE }
 
-/** One-line limit brief per channel, sourced from the shared Constraint Engine (one source of truth). */
+/**
+ * ── PER-PLATFORM VOICE, NOT JUST PER-PLATFORM LIMITS ─────────────────────────
+ * `channelBrief` told the model how LONG a post could be and nothing about how it
+ * should READ, so every channel came back in one register — the canonical post,
+ * trimmed. A shop owner opening the X variant beside the LinkedIn one saw two
+ * lengths of a single voice, not two posts that belong on two different
+ * platforms. This is the "follow each platform's norms" the old prompt gestured
+ * at and never named.
+ *
+ * One line each, guidance not law: the body still carries the brand voice and the
+ * core message; this shapes HOW it lands. No em-dashes (PROSE_RULES still holds).
+ * Emoji are native to a social caption and are NOT the interface emoji ban
+ * (docs/22 §4), so Instagram is told they belong — stripping them there is a
+ * regression, not a fix.
+ */
+const CHANNEL_STYLE: Record<Channel, string> = {
+  x: 'punchy and short. Lead with the single most interesting thing, cut every warm-up word, one idea per post.',
+  instagram:
+    'warm and visual, written to sit under a photo. A friendly opening line, emoji where they feel natural, and let the keywords do the discovery.',
+  linkedin:
+    'professional and specific. A clear first line that states the value, then room to explain it plainly. No breathless hype.',
+  facebook:
+    'conversational and neighbourly, the way you would tell a regular. A hook or a question fits, and a link is fine.',
+  gbp: 'factual and local, the way a good listing reads. Say what is on offer and end on a clear next step. Google indexes the words, so no keyword list.',
+  telegram:
+    'direct and plain, a short broadcast to people who already follow you. Say the thing, add a link if there is one.',
+}
+
+/**
+ * Per-channel brief: the numeric limits from the shared Constraint Engine (one
+ * source of truth) on the first line, then the voice that channel is written in.
+ */
 function channelBrief(channel: Channel): string {
   const spec = CONSTRAINTS[channel]
   const parts = [`max ${spec.maxChars} chars`, `links ${spec.linkPolicy}`]
-  if (spec.maxHashtags !== undefined) parts.push(`≤${spec.maxHashtags} keywords`)
-  if (spec.gbp) parts.push(`CTA one of: ${spec.gbp.ctaTypes.join('/')}`)
-  return `- ${channel}: ${parts.join('; ')}`
+  // The keyword ask goes in the per-channel brief, not only in the system rule:
+  // MEASURED on the preview, keywords came back only for the one channel whose
+  // brief mentioned them (Instagram, which carries a `maxHashtags`). GBP takes
+  // none; every other channel gets 2 to 5, capped where the platform caps them.
+  if (spec.gbp) {
+    parts.push(`CTA one of: ${spec.gbp.ctaTypes.join('/')}`)
+    parts.push('no keywords')
+  } else if (spec.maxHashtags !== undefined) {
+    parts.push(`2-5 keywords (max ${spec.maxHashtags})`)
+  } else {
+    parts.push('2-5 keywords')
+  }
+  return `- ${channel}: ${parts.join('; ')}\n    voice: ${CHANNEL_STYLE[channel]}`
 }
 
 const def: MeshTaskDef<ContentVariantsInput, ContentVariantsOutput> = {

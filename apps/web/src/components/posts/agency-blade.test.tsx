@@ -72,12 +72,24 @@ describe('the blade marks Sahoda authorship, post-level only', () => {
 
   test('the planner row follows the same rule', () => {
     const { unmount } = render(
-      <PlannerRow post={post({ origin: 'plan_week' })} now={NOW} variantStates={[]} />,
+      <PlannerRow
+        zone="Asia/Kolkata"
+        post={post({ origin: 'plan_week' })}
+        now={NOW}
+        variantStates={[]}
+      />,
     )
     expect(blades()).toHaveLength(1)
     unmount()
 
-    render(<PlannerRow post={post({ origin: 'manual' })} now={NOW} variantStates={[]} />)
+    render(
+      <PlannerRow
+        zone="Asia/Kolkata"
+        post={post({ origin: 'manual' })}
+        now={NOW}
+        variantStates={[]}
+      />,
+    )
     expect(blades()).toHaveLength(0)
   })
 
@@ -119,6 +131,7 @@ describe('post-level surfaces pass the publish EVIDENCE through to the chip', ()
   test('PlannerRow hands its variant rows to the chip', () => {
     render(
       <PlannerRow
+        zone="Asia/Kolkata"
         post={post({ status: 'approved' })}
         now={NOW}
         variantStates={[variantRow({ simulated: true, permalink: null, platformPostId: null })]}
@@ -135,7 +148,14 @@ describe('post-level surfaces pass the publish EVIDENCE through to the chip', ()
     expect(screen.getByTestId('status-chip').className).not.toContain('is-real')
     unmount()
 
-    render(<PlannerRow post={post({ status: 'published' })} now={NOW} variantStates={[]} />)
+    render(
+      <PlannerRow
+        zone="Asia/Kolkata"
+        post={post({ status: 'published' })}
+        now={NOW}
+        variantStates={[]}
+      />,
+    )
     expect(screen.getByTestId('status-chip').className).not.toContain('is-real')
   })
 })

@@ -2,9 +2,14 @@ import 'server-only'
 
 import type { ZernioConversation } from '@sahoda/publishing'
 
+import { createServerSupabase } from '@/lib/supabase/server'
+import { activeWorkspaceRead } from '@/lib/workspaces'
+
+import type { InboxListRow } from './list-row'
+import { zernioPlatform } from './platform-spelling'
 import { countAccounts, readConversations } from './read'
 import type { StoreDecision } from './store-decision'
-import { readStoredThreads } from './store-read'
+import { readStoredThreads, threadsNeedingReply } from './store-read'
 
 /**
  * The conversations list, assembled the way the founder chose on 2026-08-21:
@@ -44,23 +49,73 @@ export interface ConversationsView {
    *
    * Mapped from the store rather than the component being rewritten: the component's
    * filtering, channel chips and empty line are all tested and none of that changes
-   * — only where the rows come from. `accountId` is the one field the store cannot
-   * supply (a thread is keyed by conversation, not by account) and it is left EMPTY
-   * rather than filled with the thread id. The list does not read it, and a plausible
-   * wrong value is worse than an obviously absent one.
+   * — only where the rows come from.
+   *
+   * ── `accountId` IS READ, AND IT IS RESOLVED ──────────────────────────────────
+   * The first version of this file left it `''` under a note saying the list does
+   * not read it. The list does: `ConversationRow` builds every link with
+   * `threadHref({ accountId, conversationId })`, and an empty account yields
+   * `/inbox/threads//<id>`, which no route matches. Every stored row was a 404.
+   *
+   * `inbox_threads` has no account column, so the id is resolved the way the live
+   * read resolves a platform-shaped question (`accountForWorkspace` in
+   * `lib/zernio/scope.ts`): through this workspace's Zernio-backed connections for
+   * the thread's channel, first connected wins. Where a live row knows the same
+   * thread, its id is the fallback. Only when neither can say is it left EMPTY,
+   * because a plausible wrong value is worse than an obviously absent one.
    */
-  rows: ZernioConversation[]
+  rows: InboxListRow[]
   decision: StoreDecision
   /** How many rows came from the live read rather than the store. */
   historyRows: number
 }
 
-/** Zernio's platform vocabulary, restored for the row the list renders. */
-const PLATFORM: Readonly<Record<string, string>> = {
-  x: 'twitter',
-  gbp: 'googlebusiness',
-  instagram: 'instagram',
-  linkedin: 'linkedin',
+/**
+ * Which Zernio account a thread on each channel belongs to, for this workspace.
+ *
+ * The same row `countAccounts` counts: active, and carrying a `profileId`, because
+ * only a Zernio-backed connection can be addressed by a thread URL at all
+ * (`accountByIdForWorkspace` checks the profile before minting an id). Ordered by
+ * `created_at` so that with two accounts on one platform the answer is a stated
+ * rule, first connected, rather than whichever row Postgres returned.
+ *
+ * Returns an EMPTY map on any failure. That is not "no accounts": it is "could
+ * not resolve", and the caller's fallback chain treats it that way. Nothing here
+ * is allowed to throw, because the page must render what the store holds even
+ * when this lookup cannot be made.
+ */
+export async function accountIdsByChannel(): Promise<ReadonlyMap<string, string>> {
+  try {
+    const read = await activeWorkspaceRead()
+    if (read.status !== 'ok') return new Map()
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase
+      .from('connections')
+      .select('platform, external_account')
+      .eq('workspace_id', read.workspace.id)
+      .eq('status', 'active')
+      .not('external_account->>profileId', 'is', null)
+      .order('created_at', { ascending: true })
+    if (error) {
+      console.error('[inbox] account lookup for stored threads failed', error.message)
+      return new Map()
+    }
+    const byChannel = new Map<string, string>()
+    for (const row of data ?? []) {
+      const platform = row.platform as string
+      const account = row.external_account as { id?: unknown } | null
+      const id = typeof account?.id === 'string' ? account.id : null
+      if (id === null || byChannel.has(platform)) continue
+      byChannel.set(platform, id)
+    }
+    return byChannel
+  } catch (error) {
+    console.error(
+      '[inbox] account lookup for stored threads threw',
+      error instanceof Error ? error.message : '?',
+    )
+    return new Map()
+  }
 }
 
 /**
@@ -120,10 +175,25 @@ export async function readConversationsList(): Promise<ConversationsView> {
     historyRows,
   })
 
-  const stored: ZernioConversation[] = view.rows.map((r) => ({
+  // Looked up only when there is a stored row to resolve: an empty store costs
+  // no query, and the supplement-only page stays exactly as fast as it was.
+  const accountByChannel = view.rows.length > 0 ? await accountIdsByChannel() : new Map()
+  const liveById = new Map((history ?? []).map((r) => [r.id, r]))
+
+  // Asked once for the whole page rather than per row, and only when there are
+  // stored rows to ask about.
+  const awaitingReply =
+    view.rows.length > 0 ? await threadsNeedingReply(view.rows.map((r) => r.id)) : new Set<string>()
+
+  const stored: InboxListRow[] = view.rows.map((r) => ({
     id: r.platformThreadId,
-    platform: PLATFORM[r.channel] ?? r.channel,
-    accountId: '',
+    platform: zernioPlatform(r.channel),
+    accountId: accountByChannel.get(r.channel) ?? liveById.get(r.platformThreadId)?.accountId ?? '',
+    // OUR row id, carried so the row has a destination even with no account to
+    // address. Without it an account-less stored row rendered as a paragraph
+    // explaining why the message it was displaying could not be opened.
+    storedThreadId: r.id,
+    needsReply: awaitingReply.has(r.id),
     participantName: r.authorName ?? undefined,
     accountUsername: r.authorHandle ?? undefined,
     lastMessage: r.preview ?? undefined,
@@ -137,5 +207,28 @@ export async function readConversationsList(): Promise<ConversationsView> {
   const seen = new Set(stored.map((r) => r.id))
   const older = (history ?? []).filter((r) => !seen.has(r.id))
 
-  return { rows: [...stored, ...older], decision: view.decision, historyRows }
+  return { rows: byNewest([...stored, ...older]), decision: view.decision, historyRows }
+}
+
+/**
+ * Newest first, across BOTH halves of the merge.
+ *
+ * The list used to be every stored row followed by every live one, which is the
+ * order the two reads happened in and not an order anybody asked for: a DM that
+ * arrived this morning sat below a six-month-old conversation because one came from
+ * the store and the other from Zernio. The two halves describe one inbox and the
+ * only ordering a reader expects of an inbox is time.
+ *
+ * A row with NO timestamp sorts last rather than first. It is the absence of a
+ * measurement, and putting it at the top would be reading "we do not know when"
+ * as "just now" — the same fabrication as a zero standing in for a failed count.
+ * Ties keep their existing order (`sort` is stable), so the store still wins the
+ * collision it already won above.
+ */
+function byNewest(rows: InboxListRow[]): InboxListRow[] {
+  const at = (row: InboxListRow): number => {
+    const parsed = row.updatedTime ? Date.parse(row.updatedTime) : Number.NaN
+    return Number.isNaN(parsed) ? Number.NEGATIVE_INFINITY : parsed
+  }
+  return [...rows].sort((a, b) => at(b) - at(a))
 }

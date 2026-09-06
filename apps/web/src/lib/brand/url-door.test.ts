@@ -4,7 +4,7 @@ import {
   type ExtractedField,
   type ExtractedFieldWire,
 } from '@sahoda/shared'
-import type { CrawlOutcome, FirecrawlClient } from '@sahoda/research'
+import type { CrawlOutcome, PageSource } from '@sahoda/research'
 import { describe, expect, test } from 'vitest'
 
 import {
@@ -18,7 +18,7 @@ import {
 const PDF = 'data:application/pdf;base64,JVBERi0xLjcK'
 
 const ctx = { workspaceId: 'ws', traceId: 't' }
-const noClient = {} as FirecrawlClient
+const noClient = {} as PageSource
 
 function extractor(result: BrandExtractOutput | null): ExtractRunner {
   return { run: async () => (result ? { ok: true, data: result } : { ok: false }) }
@@ -71,7 +71,7 @@ describe('openUrlDoor', () => {
     expect(out.fields[0]!.confirmed).toBe(false)
     expect(out.fields[0]!.source_url).toBe('https://x.in/about')
     expect(out.pagesSkipped).toEqual(['https://x.in/blog'])
-    expect(out.firecrawlCredits).toBe(2)
+    expect(out.vendorCredits).toBe(2)
   })
 
   test('passes each crawl failure through unchanged — one reason, one sentence', async () => {
@@ -96,7 +96,7 @@ describe('openUrlDoor', () => {
     expect(out.reason).toBe('js_only')
     expect(out.message).toMatch(/javascript/i)
     // Credits already spent are still reported — the cost happened.
-    expect(out.firecrawlCredits).toBe(1)
+    expect(out.vendorCredits).toBe(1)
   })
 
   test('a readable site with an unusable extraction asks, and never invents', async () => {

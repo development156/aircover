@@ -69,10 +69,30 @@ export function PublishStateProvider({ initial, children }: PublishStateProvider
   const [snapshot, setSnapshot] = useState<PublishSnapshot>(initial)
   const [phase, setPhase] = useState<LivePhase>('idle')
 
+  // ── THE SERVER RE-RENDERS, AND THE SNAPSHOT HAS TO FOLLOW ──────────────────
+  // A server action revalidates the page and the RSC tree arrives with a NEW
+  // `initial`. `useState(initial)` reads its argument once, so this provider
+  // kept the snapshot it was born with: MEASURED 2026-09-06 on /planner, after
+  // "Confirm schedule" the row's date and note updated from the new server
+  // tree while the chip beside them read "Draft" for 8 s and more, until a
+  // reload. `readAt` is the server's own stamp on the snapshot, so a changed
+  // `readAt` is a fresher read, and the state is adjusted during render (the
+  // React pattern for deriving state from a changed prop) rather than one
+  // paint late in an effect. A snapshot the poll has ALREADY moved past is
+  // left alone: a refresh that raced a poll must not turn the chip back.
+  const [seenReadAt, setSeenReadAt] = useState(initial.readAt)
+  if (initial.readAt !== seenReadAt) {
+    setSeenReadAt(initial.readAt)
+    if (Date.parse(initial.readAt) >= Date.parse(snapshot.readAt)) setSnapshot(initial)
+  }
+
   // The ids are fixed for the life of the page: they come from the server render,
   // and a post appearing or disappearing is a navigation, not a poll result.
-  // Frozen in a ref so the effect below does not re-arm on every render.
-  const postIds = useMemo(() => initial.posts.map((post) => post.postId), [initial])
+  // Keyed on the JOINED ids, not on `initial`: every server re-render is a new
+  // `initial` object, and an array derived from it was a new identity each
+  // time, which re-armed the effect below and restarted its watch clock.
+  const idKey = initial.posts.map((post) => post.postId).join(',')
+  const postIds = useMemo(() => (idKey === '' ? [] : idKey.split(',')), [idKey])
 
   const snapshotRef = useRef(snapshot)
   snapshotRef.current = snapshot

@@ -9,6 +9,9 @@ import { PlanPicker } from '@/components/billing/plan-picker'
 import { SettingCard, SettingRow } from '@/components/settings/setting-row'
 import { buttonVariants } from '@/components/ui/button'
 import { readBillingProfile, readInvoices, readSubscription } from '@/lib/billing/read'
+import { StoragePanel } from '@/components/settings/storage-panel'
+import { readStorageUsage } from '@/lib/storage/usage'
+import { getActiveWorkspace } from '@/lib/workspaces'
 import { readBalance, type BalanceRead } from '@/lib/wallet/read'
 
 export const metadata = { title: 'Plan & credits' }
@@ -49,11 +52,14 @@ export const metadata = { title: 'Plan & credits' }
  * unless it has something to say.
  */
 export default async function SettingsPlanPage() {
-  const [subscription, invoices, profile, balance] = await Promise.all([
+  const [subscription, invoices, profile, balance, storage] = await Promise.all([
     readSubscription(),
     readInvoices(),
     readBillingProfile(),
     readBalance(),
+    // Alongside the other reads, never after them: `read-waterfall.test.ts` counts
+    // sequential server reads per route and refuses a new one.
+    getActiveWorkspace().then((workspace) => readStorageUsage(workspace?.id ?? null)),
   ])
 
   if (subscription.status === 'no-workspace') {
@@ -83,6 +89,12 @@ export default async function SettingsPlanPage() {
       <CurrentPlan subscription={subscription.data} policy={policy} />
 
       <PlanPicker subscription={subscription.data} />
+
+      {/* Storage sits with the plan, not with workspace identity: an allowance is
+          an entitlement, the same category as credits and seats. Above Invoices
+          because this page runs "what is true now" before "what already
+          happened". */}
+      <StoragePanel usage={storage} />
 
       {/* ONE GRAMMAR. This was a bare `type-h2` above a table that brings its
           own bordered container, beside a Billing details card with a second

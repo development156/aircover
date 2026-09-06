@@ -325,7 +325,34 @@ describe('resolveWebhookEvent — the order_tags fallback', () => {
 })
 
 describe('fetchOrder', () => {
-  it('returns the order status and tags', async () => {
+  it('returns the order status, tags and the SDK session the bridge page needs', async () => {
+    // The bridge page (`/billing/checkout/{orderId}`) re-reads the order on every request and
+    // hands `payment_session_id` to the Cashfree JS SDK. Dropping it here is the defect that
+    // left the payment step unbuildable: the page had an order and nothing to pay with.
+    const p = build([
+      {
+        match: { method: 'GET', urlIncludes: '/pg/orders/' },
+        response: {
+          status: 200,
+          body: {
+            order_id: 'o1',
+            order_status: 'ACTIVE',
+            order_tags: TAGS,
+            payment_session_id: 'session_abc123',
+          },
+        },
+      },
+    ])
+
+    expect(await p.fetchOrder('o1')).toEqual({
+      orderId: 'o1',
+      status: 'ACTIVE',
+      tags: TAGS,
+      paymentSessionId: 'session_abc123',
+    })
+  })
+
+  it('reports a null session rather than inventing one when the provider omits it', async () => {
     const p = build([
       {
         match: { method: 'GET', urlIncludes: '/pg/orders/' },
@@ -333,7 +360,12 @@ describe('fetchOrder', () => {
       },
     ])
 
-    expect(await p.fetchOrder('o1')).toEqual({ orderId: 'o1', status: 'PAID', tags: TAGS })
+    expect(await p.fetchOrder('o1')).toEqual({
+      orderId: 'o1',
+      status: 'PAID',
+      tags: TAGS,
+      paymentSessionId: null,
+    })
   })
 
   it('throws a classified error on a 404', async () => {

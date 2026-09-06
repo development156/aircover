@@ -166,6 +166,18 @@ function price(action: string): number {
 }
 
 /**
+ * NOT WIRED YET, AND DELIBERATELY NOT DELETED.
+ *
+ * `price()` reads `pricing.config.json` and throws on a missing key, so the
+ * ALLOWED table below could name its credit figures by ACTION rather than as
+ * literals that drift the moment a price changes. Nothing calls it today.
+ * Rewiring the table is a real change to what this spec asserts, and the smoke
+ * leg has no working environment here to watch it fail in, so it is recorded
+ * rather than done half way.
+ */
+void price
+
+/**
  * route → every number that may legitimately appear in `#main`.
  *
  * Ordinals are listed explicitly rather than as a range, so adding an eighth
@@ -202,7 +214,10 @@ const ALLOWED: ReadonlyArray<readonly [string, readonly number[]]> = [
   // Each allows NOTHING: these five quote no price, so any digit on them is one
   // they invented. `/studio` used to sit here allowing `price('carousel')`; it
   // was built on 2026-08-28 and no longer quotes a figure at all.
-  ['/ads', []],
+  // `/ads` carries the gates ladder (components/ads/gates-ladder.tsx): three
+  // steps labelled "Step 1" to "Step 3". Ordinals of Sahoda's own process, not
+  // a claim about the reader's business. MEASURED run 34012814133.
+  ['/ads', [1, 2, 3]],
   ['/ads/creative', []],
   ['/ads/targeting', []],
   ['/ads/budget', []],

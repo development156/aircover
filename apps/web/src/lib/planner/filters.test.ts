@@ -15,6 +15,9 @@ import {
   upcoming,
 } from './filters'
 
+const IST = 'Asia/Kolkata'
+const NY = 'America/New_York'
+
 /** A DisplayPost is only reachable through `forDisplay`, so build the shape directly. */
 function post(over: Partial<DisplayPost> & { id: string }): DisplayPost {
   return {
@@ -51,7 +54,7 @@ describe('the tab a URL asks for', () => {
 })
 
 describe('the date a URL asks for', () => {
-  it('a well-formed IST day key is honoured', () => {
+  it('a well-formed day key is honoured', () => {
     expect(parseDate('2026-08-28')).toBe('2026-08-28')
   })
 
@@ -118,33 +121,56 @@ describe('the three narrowings together', () => {
   ]
 
   it('no filter keeps every row', () => {
-    expect(applyFilter(rows, { tab: 'all', query: '', dateKey: null })).toHaveLength(3)
+    expect(applyFilter(rows, { tab: 'all', query: '', dateKey: null }, IST)).toHaveLength(3)
   })
 
-  it('a picked date keeps only that IST day', () => {
-    const kept = applyFilter(rows, { tab: 'all', query: '', dateKey: '2026-08-28' })
+  it('a picked date keeps only that day, on the workspace’s calendar', () => {
+    const kept = applyFilter(rows, { tab: 'all', query: '', dateKey: '2026-08-28' }, IST)
     expect(kept.map((p) => p.id)).toEqual(['a'])
   })
 
+  it('reads the picked day in the workspace’s zone, so the same key narrows differently', () => {
+    // The audit's instant: 2026-09-02T20:00-04:00 is 2 September in New York
+    // and 3 September in Kolkata. A New York workspace picking "2 September"
+    // must see this post; a Kolkata workspace picking the same key must not.
+    const late = [
+      post({
+        id: 'ny',
+        intent: 'scheduled' as PostStatus,
+        scheduled_at: '2026-09-02T20:00:00-04:00',
+      }),
+    ]
+    const key = { tab: 'all' as const, query: '', dateKey: '2026-09-02' }
+    expect(applyFilter(late, key, NY).map((p) => p.id)).toEqual(['ny'])
+    expect(applyFilter(late, key, IST)).toEqual([])
+    expect(applyFilter(late, { ...key, dateKey: '2026-09-03' }, IST).map((p) => p.id)).toEqual([
+      'ny',
+    ])
+  })
+
   it('an undated post is never kept by a date filter — it has no day to be on', () => {
-    const kept = applyFilter(rows, { tab: 'all', query: '', dateKey: '2026-08-30' })
+    const kept = applyFilter(rows, { tab: 'all', query: '', dateKey: '2026-08-30' }, IST)
     expect(kept.map((p) => p.id)).toEqual(['c'])
   })
 
   it('search is case-insensitive and matches the title', () => {
-    const kept = applyFilter(rows, { tab: 'all', query: 'CHAI', dateKey: null })
+    const kept = applyFilter(rows, { tab: 'all', query: 'CHAI', dateKey: null }, IST)
     expect(kept.map((p) => p.id)).toEqual(['a'])
   })
 
   it('a post with no title is not matched by a search, and does not throw', () => {
-    const kept = applyFilter([post({ id: 'z' })], { tab: 'all', query: 'chai', dateKey: null })
+    const kept = applyFilter([post({ id: 'z' })], { tab: 'all', query: 'chai', dateKey: null }, IST)
     expect(kept).toEqual([])
   })
 
   it('the narrowings compose rather than replacing one another', () => {
-    const kept = applyFilter(rows, { tab: 'scheduled', query: 'monsoon', dateKey: '2026-08-30' })
+    const kept = applyFilter(
+      rows,
+      { tab: 'scheduled', query: 'monsoon', dateKey: '2026-08-30' },
+      IST,
+    )
     expect(kept.map((p) => p.id)).toEqual(['c'])
-    expect(applyFilter(rows, { tab: 'drafts', query: 'monsoon', dateKey: null })).toEqual([])
+    expect(applyFilter(rows, { tab: 'drafts', query: 'monsoon', dateKey: null }, IST)).toEqual([])
   })
 })
 
@@ -166,7 +192,7 @@ describe('a tab count must equal the number of rows under that tab', () => {
   ]
 
   const countsFor = (query: string, dateKey: string | null) => {
-    const beforeTab = applyFilter(rows, { tab: 'all', query, dateKey })
+    const beforeTab = applyFilter(rows, { tab: 'all', query, dateKey }, IST)
     return Object.fromEntries(
       PLANNER_TABS.map((tab) => [tab, beforeTab.filter((p) => matchesTab(p, tab)).length]),
     ) as Record<PlannerTab, number>
@@ -174,14 +200,14 @@ describe('a tab count must equal the number of rows under that tab', () => {
 
   it.each(PLANNER_TABS)('with no search, the %s count matches its own list', (tab) => {
     expect(countsFor('', null)[tab]).toBe(
-      applyFilter(rows, { tab, query: '', dateKey: null }).length,
+      applyFilter(rows, { tab, query: '', dateKey: null }, IST).length,
     )
   })
 
   it.each(PLANNER_TABS)('with a search, the %s count still matches its own list', (tab) => {
     const query = 'chai'
     expect(countsFor(query, null)[tab]).toBe(
-      applyFilter(rows, { tab, query, dateKey: null }).length,
+      applyFilter(rows, { tab, query, dateKey: null }, IST).length,
     )
   })
 
@@ -207,10 +233,32 @@ describe('upcoming', () => {
     post({ id: 'past', intent: 'scheduled' as PostStatus, scheduled_at: '2026-08-27T09:00:00Z' }),
     post({ id: 'soon', intent: 'scheduled' as PostStatus, scheduled_at: '2026-08-28T18:00:00Z' }),
     post({ id: 'undated', intent: 'draft' as PostStatus }),
+    // Every "Plan my week" output: a draft with a time. Nothing sends it.
+    post({
+      id: 'dated-draft',
+      intent: 'draft' as PostStatus,
+      scheduled_at: '2026-08-28T15:00:00Z',
+    }),
+    post({
+      id: 'approved',
+      intent: 'approved' as PostStatus,
+      scheduled_at: '2026-08-29T09:00:00Z',
+    }),
   ]
 
   it('is soonest first', () => {
-    expect(upcoming(rows, now, 5).map((p) => p.id)).toEqual(['soon', 'later'])
+    expect(upcoming(rows, now, 5).map((p) => p.id)).toEqual(['soon', 'approved', 'later'])
+  })
+
+  it('excludes a dated DRAFT — the dispatcher only sends approved or scheduled posts', () => {
+    // `isDispatchable` in @sahoda/shared is the one definition of "waiting to
+    // go out". A draft with a time is a plan, and listing it under "Upcoming"
+    // told the reader it would be sent.
+    expect(upcoming(rows, now, 5).map((p) => p.id)).not.toContain('dated-draft')
+  })
+
+  it('includes an APPROVED post with a time — that is what the app writes when it schedules', () => {
+    expect(upcoming(rows, now, 5).map((p) => p.id)).toContain('approved')
   })
 
   it('excludes the past — an upcoming list holding this morning is not upcoming', () => {

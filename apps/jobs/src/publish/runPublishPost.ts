@@ -57,6 +57,18 @@ export class GateUnavailableError extends Error {
 /** Auth-class failures the user can only fix by reconnecting the account. */
 const RECONNECT_CODES = new Set(['UNAUTHORIZED', 'FORBIDDEN'])
 
+/**
+ * Whose sentence a failure `message` is. REQUIRED at every `fail` call, never
+ * defaulted: an optional flag that silently reads as "safe to show" is the
+ * exact shape that put a provider's HTML error body on a shop owner's screen.
+ *
+ *  · `customer`: Sahoda composed it for the reader, and it says something a
+ *    code-mapped sentence could not (a figure, a date, a count).
+ *  · `operator`: it was thrown, or it names a lowercase channel key or a row id.
+ *    It belongs in `post_publish_logs.error.message` and nowhere else.
+ */
+type MessageAudience = 'customer' | 'operator'
+
 export type { PublishMode } from './mode'
 
 /** The post_variants row being published, plus its attachments. */
@@ -157,6 +169,14 @@ export interface PublishLogEntry {
   error: PublishLogError | null
   jobRunId: string
   publishedAt: string | null
+  /**
+   * The adapter's de-duplication key for this send, `publishIdempotencyKey(postId,
+   * channel, scheduledAt)`, on EVERY row. A partial unique index on
+   * `post_publish_logs (idempotency_key) where status = 'succeeded'` is what turns
+   * the platform's ~5-minute courtesy into a permanent database fact: the same send
+   * cannot be recorded as succeeded twice.
+   */
+  idempotencyKey: string
 }
 
 export interface PublishLogError {
@@ -296,6 +316,16 @@ export interface PublishPostDeps {
   hostMedia?(channel: Channel, media: PublishRequestMedia[]): Promise<MediaRef[]>
   writeLog(entry: PublishLogEntry): Promise<void>
   markVariant(update: VariantUpdate): Promise<void>
+  /**
+   * The succeeded log row and the `published` mark, as ONE transaction (F-33).
+   *
+   * REQUIRED, for the reason `gate` and `countLiveSends` are: an optional
+   * `recordPublished?` that fell back to `writeLog` + `markVariant` would be the
+   * exact two-statement window this exists to close, reopened silently in
+   * whichever call site forgot it. Every deps-constructing site fails to compile
+   * until it supplies one.
+   */
+  recordPublished(entry: PublishLogEntry, update: VariantUpdate): Promise<void>
   /** Flip connections.status so the UI can raise a reconnect CTA. */
   markConnection?(connectionId: string, status: 'expired'): Promise<void>
   now?(): Date
@@ -321,6 +351,20 @@ export type PublishOutcome =
       code: string
       message: string
       reconnectRequired: boolean
+      /**
+       * Whether `message` was written by Sahoda for the person who pressed Publish.
+       *
+       * True for a sentence this file or the Constraint Engine composed, figures
+       * and all: "allows 280 characters; this has 312", "held until tomorrow".
+       * False for anything that was THROWN, by an adapter or the database driver,
+       * because that text can carry a provider's response body verbatim. A false
+       * message still goes to the log row, where an operator reads it; the route
+       * maps its CODE to copy and never forwards the words.
+       *
+       * Decided here, at the source, because the route cannot tell the two apart
+       * by code alone: MEDIA_REQUIRED comes from the engine and from the adapter.
+       */
+      customerReadable: boolean
     }
 
 /**
@@ -349,6 +393,7 @@ export async function runPublishPost(
   const fail = async (
     code: string,
     message: string,
+    audience: MessageAudience,
     connectionId: string | null,
     gate?: GateErrorDetail,
   ): Promise<PublishOutcome> => {
@@ -367,22 +412,33 @@ export async function runPublishPost(
     })
     const reconnectRequired = RECONNECT_CODES.has(code)
     if (reconnectRequired && connectionId) await deps.markConnection?.(connectionId, 'expired')
-    return { status: 'failed', classification: 'permanent', code, message, reconnectRequired }
+    return {
+      status: 'failed',
+      classification: 'permanent',
+      code,
+      message,
+      reconnectRequired,
+      customerReadable: audience === 'customer',
+    }
   }
 
   if (!spec.publishable) {
+    // Names the channel by its lowercase key, so it is a log line and not copy.
     return fail(
       'CHANNEL_NOT_PUBLISHABLE',
       `${payload.channel} cannot be published in this release.`,
+      'operator',
       null,
     )
   }
 
   const variant = await deps.loadVariant(payload)
   if (!variant) {
+    // A key and a row id: written for whoever reads the log, not for the writer.
     return fail(
       'VARIANT_NOT_FOUND',
       `No ${payload.channel} variant for post ${payload.postId}.`,
+      'operator',
       null,
     )
   }
@@ -427,7 +483,11 @@ export async function runPublishPost(
   const standing = isThread ? violations.filter((v) => v.code !== 'MAX_CHARS') : violations
   if (standing.length > 0) {
     const first = standing[0]!
-    return fail(first.code, first.message, null)
+    // The engine's own sentence carries the figures ("allows 280 characters;
+    // this has 312"), and a sentence mapped from the code would be vaguer than
+    // the truth it replaced. It leads with the channel KEY, which the render
+    // edge rewrites into the label (`presentViolation`); the figures stay.
+    return fail(first.code, first.message, 'customer', null)
   }
 
   // ── THE POST IS NOT WHAT IT SAYS IT IS ──────────────────────────────────────
@@ -455,7 +515,9 @@ export async function runPublishPost(
   // writer's to fix, and the message says what they wrote versus what is attached.
   const formatRefusal = refuseFormat(spec, variant.format, variant.media.length)
   if (formatRefusal) {
-    return fail(formatRefusal.code, formatRefusal.message, null)
+    // Sahoda's own words about the writer's choice, some carrying the measured
+    // aspect ratio. Same leading-key shape as the engine's, repaired the same way.
+    return fail(formatRefusal.code, formatRefusal.message, 'customer', null)
   }
 
   // ── WHAT ACTUALLY GOES OUT, COMPUTED ONCE ───────────────────────────────────
@@ -485,7 +547,8 @@ export async function runPublishPost(
     // producing four. `planThread` derives it from the text both sides hold.
     const planned = planThread(spec, publishedText)
     if (!planned.ok) {
-      return fail(planned.refusal.code, planned.refusal.message, null)
+      // Counts characters and posts; nothing thrown, nothing keyed.
+      return fail(planned.refusal.code, planned.refusal.message, 'customer', null)
     }
     thread = planned.plan
   }
@@ -536,7 +599,7 @@ export async function runPublishPost(
       // tomorrow would succeed: `transient` tells the runner to retry, and every
       // retry inside today burns an attempt on a verdict that cannot change. The
       // message says when it can be sent instead.
-      return fail(PER_DAY_CAP_EXHAUSTED_CODE, perDayCapRefusalMessage(perDay), null)
+      return fail(PER_DAY_CAP_EXHAUSTED_CODE, perDayCapRefusalMessage(perDay), 'customer', null)
     }
   }
 
@@ -591,7 +654,7 @@ export async function runPublishPost(
     if (!ration.allowed) {
       // PERMANENT: no retry inside this month makes the allowance reappear, and a
       // transient classification would have the runner burn its attempts on it.
-      return fail(X_RATION_EXHAUSTED_CODE, xRationRefusalMessage(ration), null)
+      return fail(X_RATION_EXHAUSTED_CODE, xRationRefusalMessage(ration), 'customer', null)
     }
   }
 
@@ -660,7 +723,11 @@ export async function runPublishPost(
     // works, and `classifyCandidate` never re-dispatches it (PENDING_STATES is
     // `pending|scheduled`), so the cron cannot loop on it either.
     const code = verdict.decision === 'block' ? GATE_BLOCKED_CODE : GATE_HELD_CODE
-    return fail(code, gateMessage(verdict), null, gateDetail(verdict))
+    // `operator`, and deliberately: `gateMessage` is the thin log line, and the
+    // refusal a person reads is built in apps/web from `gate` (the rule, the
+    // tier, the rewrite). A hold's `holdReason` can also be the checker's own
+    // words, which is one more reason not to forward it.
+    return fail(code, gateMessage(verdict), 'operator', null, gateDetail(verdict))
   }
 
   let connection: ResolvedConnection
@@ -689,7 +756,11 @@ export async function runPublishPost(
     // (20260801000004, 20260801000005), so they are matched exactly rather than
     // sniffed for. Anything else keeps the old code, because an error this file
     // does not recognise is not one it may re-label.
-    return fail(preflightCodeOf(e) ?? 'CONNECTION_UNAVAILABLE', messageOf(e), null)
+    //
+    // Thrown text, so `operator`: the driver prefixes the raised code with its
+    // own "error:" and the vault's failures name internals. The CODE is what
+    // the route turns into a sentence.
+    return fail(preflightCodeOf(e) ?? 'CONNECTION_UNAVAILABLE', messageOf(e), 'operator', null)
   }
 
   try {
@@ -742,22 +813,26 @@ export async function runPublishPost(
 
     // The adapter's own mode is authoritative: a fixture result is recorded as a fixture
     // even when this run believed it was live (CLAUDE.md honesty rule).
-    await deps.writeLog(
+    //
+    // ONE call, ONE transaction. The log row and the variant mark used to be two
+    // statements, and a process killed between them left a live post behind a
+    // variant that was still claimable once its lease ran out (F-33).
+    await deps.recordPublished(
       logRow(payload, ctx, result.mode, 'succeeded', {
         connectionId: connection.connectionId,
         platformPostId: result.platformPostId,
         permalink: result.permalink,
         publishedAt: result.publishedAt,
       }),
+      {
+        workspaceId: payload.workspaceId,
+        variantId: payload.variantId,
+        publishStatus: 'published',
+        platformPostId: result.platformPostId,
+        permalink: result.permalink,
+        lastError: null,
+      },
     )
-    await deps.markVariant({
-      workspaceId: payload.workspaceId,
-      variantId: payload.variantId,
-      publishStatus: 'published',
-      platformPostId: result.platformPostId,
-      permalink: result.permalink,
-      lastError: null,
-    })
     return {
       status: 'succeeded',
       mode: result.mode,
@@ -807,8 +882,12 @@ export async function runPublishPost(
       status: 'failed',
       classification: 'permanent',
       code,
+      // The adapter's thrown text, which for Zernio is built from the provider's
+      // response body ("createPost: HTTP 500 <html>…"). It is in the log row
+      // above for an operator; it is marked here so no screen ever prints it.
       message: error.message,
       reconnectRequired,
+      customerReadable: false,
     }
   }
 
@@ -845,6 +924,10 @@ export async function runPublishPost(
       error: extra.error ?? null,
       jobRunId: c.jobRunId,
       publishedAt: status === 'succeeded' ? (extra.publishedAt ?? now().toISOString()) : null,
+      // The same key the adapter was handed, from the same three facts. Built here
+      // and not read back off the request so a failed row that never reached the
+      // adapter still carries it.
+      idempotencyKey: publishIdempotencyKey(p.postId, p.channel, p.scheduledAt),
     }
   }
 }

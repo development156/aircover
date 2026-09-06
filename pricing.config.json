@@ -8,6 +8,7 @@
   },
   "actions": {
     "caption_rewrite": 1,
+    "studio_prompt_refine": 1,
     "inbox_reply": 1,
     "post_variants": 3,
     "twin_preflight": 4,

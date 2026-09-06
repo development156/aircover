@@ -5,10 +5,15 @@ import { useRouter } from 'next/navigation'
 import { Upload } from 'lucide-react'
 
 import type { ChannelRejection } from '@/lib/posts/attach-decision'
+import type { UploadAssetState } from '@/lib/assets/state'
 
 import { uploadAsset } from '@/app/actions/assets'
 import { UPLOADABLE_MIME_TYPES } from '@/lib/assets/kind'
-import { MEDIA_UPLOAD_CAP_BYTES } from '@/lib/posts/media-constants'
+import {
+  MEDIA_UPLOAD_CAP_BYTES,
+  MEDIA_UPLOAD_TOO_LARGE,
+  uploadTransportRefusal,
+} from '@/lib/posts/media-constants'
 import { ChannelObjections } from '@/components/posts/channel-objections'
 import { cn } from '@/lib/utils'
 
@@ -30,6 +35,16 @@ import { cn } from '@/lib/utils'
  *
  * `accept` is a hint, never a check: `File.type` is whatever the browser was
  * told to say. The server sniffs the bytes and decides.
+ *
+ * ── THE ONE CHECK THAT DOES RUN HERE, AND WHY ────────────────────────────────
+ * Size. Not because the client's word is trusted (the server checks again) but
+ * because a file over the cap never REACHES the server check: Vercel answers
+ * 413 at the edge, the awaited action throws, and the whole screen fell to the
+ * error boundary. MEASURED 2026-09-06 with a 5.7 MB PNG. So the size is read
+ * here first, the refusal is the server's own sentence, and every call to the
+ * action is wrapped, so a transport failure is one refused row rather than a
+ * crashed route. Files added before the failure are still added, and the
+ * library still refreshes to show them.
  */
 const CAP_MB = Math.floor(MEDIA_UPLOAD_CAP_BYTES / 1_000_000)
 
@@ -64,9 +79,20 @@ export function AssetUpload({ label = 'Add photos' }: { label?: string }) {
       let unusable: ChannelRejection[] = []
 
       for (const file of files) {
+        const name = file.name || 'that file'
+        if (file.size > MEDIA_UPLOAD_CAP_BYTES) {
+          refused.push({ name, message: MEDIA_UPLOAD_TOO_LARGE })
+          continue
+        }
         const formData = new FormData()
         formData.append('file', file)
-        const state = await uploadAsset(formData)
+        let state: UploadAssetState
+        try {
+          state = await uploadAsset(formData)
+        } catch {
+          refused.push({ name, message: uploadTransportRefusal(name) })
+          continue
+        }
         if (state.ok) {
           added += 1
           // The LAST file's objections, not a merged set: the sentence below
@@ -74,7 +100,7 @@ export function AssetUpload({ label = 'Add photos' }: { label?: string }) {
           // attribute one photo's problem to another.
           if (state.unusable.length > 0) unusable = state.unusable
         } else {
-          refused.push({ name: file.name || 'that file', message: state.message })
+          refused.push({ name, message: state.message })
         }
       }
 
@@ -151,9 +177,11 @@ export function AssetUpload({ label = 'Add photos' }: { label?: string }) {
 
       {!pending && outcome !== null && outcome.refused.length > 0 ? (
         <ul role="alert" className="space-y-1.5">
-          {outcome.refused.map((entry) => (
+          {outcome.refused.map((entry, index) => (
             <li
-              key={entry.name}
+              // Two photos from one phone can share a name; the index keeps
+              // both refusals on screen.
+              key={`${index}-${entry.name}`}
               className="rounded-input border border-danger-bg bg-danger-bg px-3 py-2.5 text-[13px] text-danger"
             >
               <span className="font-semibold">{entry.name}</span>: {entry.message}

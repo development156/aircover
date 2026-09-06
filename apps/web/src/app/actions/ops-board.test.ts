@@ -76,7 +76,13 @@ describe('the database decides, and a refusal is reported as one', () => {
 
     const result = await run()
 
-    expect(result.ok).toBe(false)
+    // RETARGETED: a bare `.ok` check passes identically whether the RPC's
+    // 42501 was correctly translated to NOT_PERMITTED, or `run()` threw and
+    // an unrelated catch produced WRITE_FAILED instead — both are `ok: false`.
+    // Assert the specific sentence a `42501` maps to, and that a refused
+    // write never triggers the board re-read.
+    expect(result).toEqual({ ok: false, message: NOT_PERMITTED })
+    expect(state.revalidated).toEqual([])
   })
 
   it('re-reads the board only after a write that actually landed', async () => {

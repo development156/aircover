@@ -11,6 +11,7 @@ import { valueBoxClass } from './certainty-mark'
  * their own, and a joined string silently merges two rules into one.
  */
 export function FieldValue({
+  lit = false,
   field,
   value,
   state,
@@ -18,11 +19,19 @@ export function FieldValue({
   field: BrainField
   value: BrainLeaf
   state: FieldState
+  /** The dash just turned solid under this value: one soft ring, --dur-slow. */
+  lit?: boolean
 }) {
   const empty = Array.isArray(value) ? value.length === 0 : value.trim().length === 0
 
   return (
-    <div className={cn('rounded-input px-3 py-2 text-[13.5px]', valueBoxClass(state))}>
+    <div
+      className={cn(
+        'rounded-input px-3 py-2 text-[13.5px]',
+        valueBoxClass(state),
+        lit && 'value-lit',
+      )}
+    >
       {empty ? (
         // Blank is a real answer to show: the model left it out, and it is the
         // one case where "guess" would overstate what is actually there.

@@ -53,7 +53,9 @@ describe('SpendTrend — what it may not claim', () => {
     // ONE run: a zero is measured, so it does not break the line.
     expect(strokes).toHaveLength(1)
     // Three points in the path, the middle one at the baseline.
-    expect(strokes[0]!.getAttribute('d')).toMatch(/^M0 .*L300 158.*L600 /)
+    // A monotone curve passes THROUGH every reading; the zero at day 4 is a
+    // segment end at (300, 158), and the path starts at 0 and ends at 600.
+    expect(strokes[0]!.getAttribute('d')).toMatch(/^M0\.0 .*,300\.0 158\.0.*,600\.0 /)
   })
 
   it('scales height from zero, not from the window minimum', () => {
@@ -69,11 +71,46 @@ describe('SpendTrend — what it may not claim', () => {
     expect(Math.max(...ys) - Math.min(...ys)).toBeLessThan(12)
   })
 
+  it('draws the average rule inside the plot, never above the highest point', () => {
+    // ── THE RULE USED ITS OWN GEOMETRY ──────────────────────────────────────
+    // `top` was `(1 - heightFraction(average)) * 100`, which ignores PAD_TOP and
+    // PAD_BOTTOM, while the line path and the hover dot both go through `py`.
+    // MEASURED with the panel's constants (H 160, pad 8/2): the correct
+    // expression is `98.75 - 93.75f` and that one is `100 - 100f`.
+    //
+    // 40/41/42 is the dataset that shows it: the rule landed at 2.38% while the
+    // plotted 42 sat at 5.00%, so "Avg 41" was drawn ABOVE the highest reading
+    // on the chart. Asserted against the PATH rather than against a number, so
+    // the guard survives a change to the padding.
+    const { container } = render(<SpendTrend points={days([40, 41, 42])} unit="credits" />)
+
+    // The READINGS, not the control points: a monotone cubic's control
+    // handles can sit outside the data's y-range while the curve itself does
+    // not, so the plotted points are read off segment ends (`,x y` after each
+    // C) and the move-to.
+    const d = container.querySelector('path[stroke="var(--brand)"]')!.getAttribute('d')!
+    const ys = [
+      ...[...d.matchAll(/^M[\d.]+ ([\d.]+)/g)].map((m) => Number(m[1])),
+      ...[...d.matchAll(/,[\d.]+ ([\d.]+)(?=C|$)/g)].map((m) => Number(m[1])),
+    ]
+    const highestPointY = Math.min(...ys)
+    const lowestPointY = Math.max(...ys)
+
+    const rule = container.querySelector('[data-avg-rule]') as HTMLElement
+    // `top` is a percentage of the panel; the path is in viewBox units of H.
+    const ruleY = (parseFloat(rule.style.top) / 100) * 160
+
+    // Larger y is further down. The average of 40/41/42 is between them, so the
+    // rule must sit between the highest and lowest plotted points.
+    expect(ruleY).toBeGreaterThan(highestPointY)
+    expect(ruleY).toBeLessThan(lowestPointY)
+  })
+
   it('averages the days it read, not the days it did not', () => {
     // Two measured days, 10 and 30, and two unread. The average is 20. Dividing
     // by four would print 10 and understate what was actually spent per day.
     render(<SpendTrend points={days([10, null, 30, null])} unit="credits" />)
-    expect(screen.getByText('Avg').parentElement).toHaveTextContent('Avg 20')
+    expect(screen.getByText('Average').parentElement).toHaveTextContent('Average 20')
   })
 
   it('draws no average rule over a window with nothing in it', () => {
@@ -98,13 +135,13 @@ describe('SpendTrend — what the founder asked for', () => {
     const { container } = render(<SpendTrend points={days([10, 30, 20])} unit="credits" />)
 
     const stroke = container.querySelector('path[stroke="var(--brand)"]')!
-    expect(stroke.getAttribute('stroke-width')).toBe('1.5')
+    expect(stroke.getAttribute('stroke-width')).toBe('2')
     // Non-scaling, or the stroke smears with the horizontal stretch and stops
     // being thin at a wide viewport — which is the whole brief.
     expect(stroke.getAttribute('vector-effect')).toBe('non-scaling-stroke')
 
     const stops = [...container.querySelectorAll('stop')]
-    expect(stops[0]!.getAttribute('stop-opacity')).toBe('0.10')
+    expect(stops[0]!.getAttribute('stop-opacity')).toBe('0.22')
     expect(stops[1]!.getAttribute('stop-opacity')).toBe('0')
   })
 
@@ -127,7 +164,7 @@ describe('SpendTrend — what the founder asked for', () => {
   it('keeps the peak sentence the card already gave', () => {
     // `Bars` printed this. The brief replaces the drawing, not the information.
     render(<SpendTrend points={days([10, 30, 20])} unit="credits" />)
-    expect(screen.getByText(/Highest:/)).toHaveTextContent('Highest: 30 credits on 2 Aug')
+    expect(screen.getByText(/Most used:/)).toHaveTextContent('Most used: 30 credits on 2 Aug')
   })
 
   it('prints a readable axis instead of thirty crushed dates', () => {

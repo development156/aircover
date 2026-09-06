@@ -119,6 +119,26 @@ export function KeywordField({
     setRaw(settled(published))
   }
 
+  /**
+   * ── THE STORED LIST CAN CHANGE FROM OUTSIDE THE BOX ────────────────────────
+   * `raw` is seeded once at mount and then owned by the writer, which is right
+   * for typing. But generation ("Adapt for N channels") writes keywords straight
+   * into `extras.hashtags`, and MEASURED live the body updated while this box
+   * stayed empty: the prop changed and `raw` never heard about it. Same
+   * derived-state-during-render shape as the bracket sync above.
+   *
+   * Guarded so it never resets the caret on the writer's OWN edit: a keystroke
+   * flows raw → onChange → parent → back as `hashtags`, so the incoming list
+   * already equals what the box holds. Adopt only when it DIFFERS — an external
+   * write like generation, or a restored draft.
+   */
+  const storedKey = JSON.stringify(normalizeKeywords(hashtags))
+  const [syncedStored, setSyncedStored] = useState(storedKey)
+  if (storedKey !== syncedStored) {
+    setSyncedStored(storedKey)
+    if (storedKey !== JSON.stringify(tags)) setRaw(settled(normalizeKeywords(hashtags, brackets)))
+  }
+
   // Google Business posts are local business updates. `formatForPlatform`
   // deliberately drops the tail for gbp, so a box here would collect text that is
   // thrown away before it reaches Google — a dead end with extra steps.

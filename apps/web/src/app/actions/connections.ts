@@ -5,7 +5,7 @@ import { auth } from '@clerk/nextjs/server'
 
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
+import { workspaceForWrite } from '@/lib/workspaces'
 import { zernioClient } from '@/lib/zernio/server'
 
 export type DisconnectState = { ok: true } | { ok: false; message: string }

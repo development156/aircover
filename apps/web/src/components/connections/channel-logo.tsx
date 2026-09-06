@@ -1,4 +1,3 @@
-import Image from 'next/image'
 import { CircleSlash } from 'lucide-react'
 
 import {
@@ -107,13 +106,24 @@ export function ChannelLogo({
   }
 
   return (
-    <Image
+    /**
+     * A plain <img>, on purpose. These are tiny static marks under /public and
+     * next/image cannot optimise them further; what it DID do was ship its
+     * 13 kB client runtime to every route that draws a channel mark, which put
+     * /analytics over its js-budget the day the platform table arrived
+     * (MEASURED 2026-09-06: chunk 2798 was next/image, and this was its only
+     * importer on that route).
+     */
+    // eslint-disable-next-line @next/next/no-img-element -- static mark, no optimisation to gain
+    <img
       src={src}
       alt=""
       aria-hidden
       data-channel={channel}
       width={size}
       height={size}
+      loading="lazy"
+      decoding="async"
       className={cn('block shrink-0 object-contain', className)}
       style={{ width: size, height: size }}
     />

@@ -106,6 +106,26 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   },
   { table: 'asset_folders', readability: 'readable', describes: 'the folders you made' },
   {
+    /**
+     * ── THE WRITER ARRIVED, SO THIS SENTENCE WENT BACK TO THE PLAIN ONE ─────
+     * This entry used to carry a long note explaining that the table was
+     * readable, exported and EMPTY for every customer, because nothing wrote
+     * it: `logo-bytes.ts` recomputed a logo's measurements on every generation
+     * and kept none of them. Its last line said that if a writer ever arrived,
+     * the sentence goes back to the plain one. It arrived on 2026-09-06
+     * (`lib/brand/logo-facts-cache.ts`), so it has.
+     *
+     * The old note is worth remembering for its reasoning rather than its
+     * conclusion: an entry reading "what Sahoda measured about each logo you
+     * uploaded" above an empty list told a reader we measured nothing, which
+     * was the opposite of true. A description has to match what the export
+     * will actually contain, and that changed when the code did.
+     */
+    table: 'asset_logo_facts',
+    readability: 'readable',
+    describes: 'what Sahoda measured about each logo you uploaded, so it can place it well',
+  },
+  {
     table: 'asset_smart_folders',
     readability: 'readable',
     describes: 'the saved searches you named',
@@ -125,6 +145,11 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
     describes: 'who your invoices are made out to',
   },
   { table: 'brand_memory', readability: 'readable', describes: 'your Brand Brain' },
+  {
+    table: 'brand_starters',
+    readability: 'readable',
+    describes: 'the picture ideas Sahoda wrote for you from your Brand Brain',
+  },
   { table: 'campaign_posts', readability: 'readable', describes: 'posts inside campaigns' },
   { table: 'campaigns', readability: 'readable', describes: 'your campaigns' },
   { table: 'connections', readability: 'readable', describes: 'your linked accounts' },
@@ -199,6 +224,16 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   },
   { table: 'playbook_runs', readability: 'readable', describes: 'every playbook run' },
   { table: 'playbooks', readability: 'readable', describes: 'your playbooks' },
+  {
+    table: 'post_approvals',
+    readability: 'readable',
+    describes: 'who sent each post for review, who cleared it, who sent it back and why',
+  },
+  {
+    table: 'post_comments',
+    readability: 'readable',
+    describes: 'the notes people left on posts while they were being written',
+  },
   { table: 'post_media', readability: 'readable', describes: 'pictures attached to posts' },
   {
     table: 'post_metric_snapshots',

@@ -1,198 +1,574 @@
+import type { Route } from 'next'
+
 import { PageTitle } from '@/components/page-title'
-import { PerformanceStrip } from '@/components/analytics/performance-strip'
-import { BestPerforming } from '@/components/analytics/best-performing'
-import { PerformanceOverTime } from '@/components/analytics/performance-over-time'
 import { AccountPanel } from '@/components/analytics/account-panel'
-import { ChannelTable } from '@/components/analytics/channel-table'
-import { PostTable } from '@/components/analytics/post-table'
 import { ReadinessLine } from '@/components/analytics/readiness-line'
-import { WhatPublished } from '@/components/analytics/what-published'
-import { coverageFor } from '@/lib/analytics/compare'
-import { ANALYTICS_METRIC_CALLS, readAnalyticsPage } from '@/lib/analytics/page-data'
+import { ChannelCards } from '@/components/analytics/channel-cards'
+import { MetricOverTime, type MetricLegendEntry } from '@/components/analytics/metric-over-time'
+import { PostRows } from '@/components/analytics/post-rows'
+import { ReportExample } from '@/components/analytics/report-example'
+import { TimingHeatmap } from '@/components/analytics/timing-heatmap'
+import { ViewControls } from '@/components/analytics/view-controls'
+import type { Headline } from '@/lib/analytics/headline'
+import { HeadlineStrip } from '@/components/analytics/headline-strip'
+import { KpiStrip } from '@/components/analytics/kpi-strip'
+import { PostsOverTime, PostsPerPlatform } from '@/components/analytics/posts-per-platform'
+import { PlatformTable } from '@/components/analytics/platform-table'
+import {
+  ContentFormats,
+  EngagementAccumulation,
+  FollowerEvolution,
+  PostingCadence,
+} from '@/components/analytics/posting-shape'
+import { readPostingInsights } from '@/lib/analytics/posting-insights'
+import { platformRows } from '@/lib/analytics/platform-breakdown'
+import { postsPerChannel, postsPerWeek } from '@/lib/analytics/distribution'
+import { analyticsKpis, followersFromAccount } from '@/lib/analytics/kpi'
+import { ACCOUNT_READ_TTL_MINUTES } from '@/lib/analytics/account-insights'
 import { analyticsReadiness } from '@/lib/analytics/readiness'
+import { readAnalyticsPage } from '@/lib/analytics/page-data'
+import {
+  DEFAULT_DIRECTION,
+  DEFAULT_SORT,
+  isSortKey,
+  type SortDirection,
+} from '@/lib/analytics/rows'
 import { readMetricSeries } from '@/lib/analytics/series'
+import {
+  LIVE_METRIC_LABELS,
+  dailyPoints,
+  dailyTotals,
+  readDailyMetrics,
+  type LiveMetric,
+} from '@/lib/analytics/daily-metrics'
+import { METRIC_LABELS } from '@/lib/analytics/compare'
+import { sumAt } from '@/lib/analytics/kpi'
+import {
+  METRIC_KEYS,
+  hrefFor,
+  isStoredMetric,
+  metricHref,
+  resolveMetric,
+  resolveView,
+  windowLabel,
+  type AnalyticsMetric,
+} from '@/lib/analytics/view-params'
+import { readWindow } from '@/lib/analytics/window-data'
+import { measureLine } from '@/lib/analytics/measure-line'
+import { nothingYetCard } from '@/lib/analytics/nothing-yet'
+import { MeasureNow } from '@/components/analytics/measure-now'
+import { formatScheduledAt } from '@/lib/posts/schedule-format'
+import { InboxAnalytics } from '@/components/analytics/inbox/inbox-analytics'
+import { resolveInboxView } from '@/lib/analytics/inbox-view-params'
+import Link from 'next/link'
 
 export const metadata = { title: 'Analytics' }
 
 /**
- * Analytics — per-post performance, per-account insights, and the comparison.
+ * ANALYTICS — THE EVIDENCE, NOT THE STORY.
  *
- * ── WHAT THIS PAGE IS ALLOWED TO SAY ─────────────────────────────────────────
- * Every rule the post cards already followed, and one more that only appears once
- * numbers are put next to each other. The card rules: a zero is never rendered for a
- * measurement that did not happen; `lastUpdated` is a POLL stamp and proves a sync
- * ran, not that anything was measured; a payload of zeroes inside a platform's
- * reporting window is pending, not measured; and a channel whose window we do not
- * know can never earn a zero at all.
+ * ── THE DIVISION THIS PAGE EXISTS ON ─────────────────────────────────────────
+ * `/report` is the narrative: what happened, what Sahoda decided, one thing to
+ * do. This page is where somebody checks the working. It must never try to be
+ * the story, and it must never leave a bare number for the reader to interpret
+ * either — so every figure here carries what it is a number OF, and a comparison
+ * against this workspace's own history.
  *
- * The new one: an ABSENT number must not become a zero by being aggregated or
- * ordered. A total that skipped two pending posts is a subtotal wearing a total's
- * clothes, and a pending post sorted to the bottom of a ranking has been called the
- * worst performer without a zero ever being drawn. `lib/analytics/compare.ts` owns
- * that refusal; this page only renders its verdicts.
+ * That is the whole reason it is two pages. A screen that both concludes and
+ * evidences ends up doing neither: the conclusion gets buried in tables and the
+ * tables get bent into supporting the conclusion.
  *
- * Three independent sections. The account read and the post read fail separately, so
- * a broken Instagram connection costs the account card and nothing else.
+ * ── WHAT USED TO BE HERE, AND WHY IT WENT ────────────────────────────────────
+ * A stack of weekly report cards, each opening with a verdict sentence. It was
+ * the right idea on the wrong page — `/report` already tells that story, and two
+ * screens narrating the same week is exactly how they come to disagree. The
+ * arithmetic behind it stayed and became the shared foundation: `timing.ts` is
+ * the one selector both pages read for the best slot, so the grid below and the
+ * scheduling sentence on the report cannot contradict each other.
+ *
+ * ── EVERY NUMBER ON THIS PAGE IS READ AT ONE AGE ─────────────────────────────
+ * Stored values are running lifetime totals, so a post published on the 1st has
+ * thirty days of accumulating on one published on the 30th. Comparing them raw
+ * measures how long ago something went out and reports it as how well it did.
+ * `readWindow` picks one age and every section uses it, which is also what makes
+ * the sections add up against each other.
  */
-export default async function AnalyticsPage() {
+export default async function AnalyticsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    tab?: string
+    range?: string
+    from?: string
+    to?: string
+    channel?: string
+    metric?: string
+    sort?: string
+    dir?: string
+    page?: string
+    window?: string
+    platform?: string
+    account?: string
+  }>
+}) {
+  const params = await searchParams
+  const view = resolveView(params)
   /**
-   * A FOURTH independent read, for the same reason the other three are independent:
-   * the history lives in its own table and, until the founder applies migration
-   * 20260819000100, that table does not exist. A read that cannot happen must cost
-   * this one card and nothing else on the page.
+   * Which of the nine metrics the big chart draws, from the URL.
    *
-   * ── AND BECAUSE IT IS INDEPENDENT, IT IS NOT AWAITED SECOND ────────────────
-   * The note above already said this read depends on nothing, and the code then
-   * waited for `readAnalyticsPage()` to come back before starting it — one extra
-   * round trip to ap-south-1 for a page that had already stated it did not need
-   * one. MEASURED 2026-08-23: a PostgREST call from this server has a p50 of
-   * 105ms, so that is roughly a tenth of a second on every visit to /analytics.
+   * Three of them this database keeps (`post_metric_snapshots`). The other six
+   * exist nowhere in it and are read live from the platforms; `daily-metrics.ts`
+   * carries the argument, and the chart prints which source it is drawing so the
+   * two are never mistaken for each other.
    */
-  const [{ rows, posts, account, hasPublished }, series] = await Promise.all([
-    readAnalyticsPage(),
-    readMetricSeries('reach'),
-  ])
+  const metric = resolveMetric(params.metric)
 
   /**
-   * ── SIX APOLOGIES, OR ONE ANSWER ─────────────────────────────────────────
+   * ── THE TAB IS RESOLVED BEFORE ANY READ ───────────────────────────────────
+   * `tab=inbox` renders an entirely different body, so nothing on the posting
+   * side may be awaited first: the read-waterfall ratchet counts every await
+   * on this route, and a posting read the inbox tab never uses would grow it
+   * for a body that never renders.
+   */
+  if (params.tab === 'inbox') {
+    const inboxView = resolveInboxView(params)
+    return (
+      <div className="space-y-grid">
+        <TabHeader active="inbox" />
+        <InboxAnalytics view={inboxView} />
+      </div>
+    )
+  }
+
+  /**
+   * ── FOUR INDEPENDENT READS ───────────────────────────────────────────────
+   * None of them depends on another, so none of them waits for another. A
+   * hiccup in any one costs its own section and nothing else: every read below
+   * returns its own absence rather than rejecting.
+   */
+  const [window, { account, hasPublished }, series, measured, daily, posting] = await Promise.all([
+    readWindow(view),
+    readAnalyticsPage(),
+    // The stored history for whichever stored metric was asked for. A live
+    // metric leaves this on reach, which costs nothing extra: the read happens
+    // either way and the legend needs its total.
+    readMetricSeries(isStoredMetric(metric) ? metric : 'reach'),
+    measureLine(),
+    // Always, whatever metric is selected: the legend prints every metric's
+    // total beside its name, and six of the nine can only come from here.
+    readDailyMetrics(view),
+    /**
+     * Followers per channel, posting cadence and engagement arrival. ONE await
+     * for three endpoints: they share a workspace and a profile, so they
+     * resolve the scope once and then go out together, and the route gains one
+     * name rather than three (`read-waterfall.test.ts`).
+     */
+    readPostingInsights(view),
+  ])
+
+  const sort = isSortKey(params.sort) ? params.sort : DEFAULT_SORT
+  const direction: SortDirection = params.dir === 'asc' ? 'asc' : DEFAULT_DIRECTION
+  const page = Number(params.page) || 1
+
+  const label = windowLabel(view)
+  const ready = window.kind === 'ready' ? window : null
+
+  /**
+   * ── ONE REASON, COMPUTED ONCE, FOR THE WHOLE SCREEN ───────────────────────
+   * docs/40 §3.4 ruling 1. This mechanism existed, was fully tested, and was
+   * DISCONNECTED by the 2026-08-29 rebuild: the collapse survived only as a
+   * whole-page early return gated on `!hasPublished`, so a workspace one step
+   * further along — posts out, nothing connected, where a beta account sits
+   * after its first hour — got the same apology from five sections at once,
+   * each diagnosing the page's single shared cause on its own.
    *
-   * The note this replaces described five containers each arguing correctly for
-   * its own existence and never against its four neighbours, and it fixed them
-   * with a gate: `not-connected && !hasPublished && posts.length === 0`.
-   *
-   * THE GATE WAS AIMED ONE STATE TOO EARLY. `posts.length === 0` was added
-   * because a two-part gate turned `analytics-history.spec.ts` red, and the note
-   * argued that the state MEASURED as broken was "a workspace with NOTHING".
-   * MEASURED again on 2026-08-23 one step along — four posts, two channels
-   * published, nothing connected, which is where a beta account sits after its
-   * first hour — the screen says "nothing" SIX times in six treatments across
-   * 1237px at 1440 and 1652px at 390, and renders no number at all. The gate
-   * closed the state nobody stays in and left open the state everybody does.
-   *
-   * ── AND THE GATE IS STILL NOT WIDENED ────────────────────────────────────
-   * Widening it is the obvious repair and it is the wrong one twice over.
-   * `analytics-history.spec.ts` asserts the performance-over-time card is
-   * present and says "has started keeping a history" on exactly that workspace;
-   * widening the gate would delete the card and turn the spec red, and a guard
-   * is never loosened to accommodate the change that broke it. It would also be
-   * wrong on its own terms — a reader who cannot see that this product measures
-   * reach AT ALL is worse off than one looking at an empty reach slot
-   * (docs/37 §15: a container is structure).
-   *
-   * So the containers stay and the DIAGNOSIS moves. `analyticsReadiness` decides
-   * the cause once, from the page's own data; `ReadinessLine` states it once, at
-   * the top, with the one remedy attached; and every section below falls back to
-   * its slot-level absence mark instead of re-deriving the same sentence.
-   * Six statements become one, the card the spec depends on keeps its words, and
-   * the gate is untouched.
+   * `measuredRows` is the only thing that proves measurement: rows carrying a
+   * real number right now, not rows that exist.
    */
   const readiness = analyticsReadiness({
     account,
     hasPublished,
-    // Impressions is the column the tables order on, so it is the one whose
-    // presence decides whether this page has anything to show.
-    measuredRows: coverageFor(rows, 'impressions').counted,
+    measuredRows: ready ? ready.rows.filter((row) => row.reachAtAge !== null).length : 0,
   })
-  const reasonStated = readiness.kind !== 'measuring'
 
   /**
-   * Nothing to structure. No posts, no publish, no account — so every container
-   * below would be an empty frame around the one sentence the line already says,
-   * and the line says it alone.
-   *
-   * This is the SAME component and the same words as the populated case, which
-   * is the point: docs/27 §1's finding was six treatments of one fact, and
-   * keeping a separate page-level `EmptyState` here would have left two. It also
-   * retires the `Sahoda: Sahoda:` duplication that shipped in that block's `tip`
-   * — `EmptyState` prefixes the string, and the caller passed one already
-   * carrying the prefix.
+   * When the account figures were asked for. A reading is reused for
+   * `ACCOUNT_READ_TTL_MINUTES` per server instance, so the panel below may be
+   * showing numbers older than this render; the line under it says how old.
+   * `null` when there is no reading to date, in which case the panel's own
+   * state sentence is the whole story.
    */
-  const nothingToStructure = account.kind === 'not-connected' && !hasPublished && posts.length === 0
+  const accountReadAt =
+    account.kind === 'ready' && account.readAt
+      ? formatScheduledAt(account.readAt, window.kind === 'ready' ? window.timezone : null)
+      : null
+  const channels = ready ? [...new Set(ready.rows.map((row) => row.channel))].sort() : []
+
+  /**
+   * The four headline numbers, and the two this product cannot measure.
+   *
+   * Built here rather than in the strip so the absence of a figure is a decision
+   * with a reason attached, visible beside the reason it is absent, rather than
+   * a branch inside a component that renders whatever it is handed.
+   */
+  const headlines: Headline[] = [
+    {
+      id: 'reached',
+      label: 'People reached',
+      meaning: 'How many people saw your posts, counted once per post they saw.',
+      value: null,
+      absence: 'not-measured',
+      caveat:
+        'Reach is reported for each post separately, and this product cannot add those up into a figure for a period without counting the same person twice.',
+      change: { kind: 'no-previous' },
+    },
+    {
+      id: 'replied',
+      label: 'People who replied',
+      meaning: 'How many people wrote back to you under a post.',
+      value: null,
+      absence: 'not-measured',
+      caveat:
+        'Sahoda records likes, comments, shares and saves as one figure and does not keep them apart, so it cannot tell you how many people replied.',
+      change: { kind: 'no-previous' },
+    },
+    {
+      id: 'enquiries',
+      label: 'Enquiries',
+      meaning: 'People who got in touch through your site or your inbox.',
+      value: null,
+      absence: 'not-measured',
+      caveat:
+        'Enquiries are recorded, but nothing links one to the post that brought it, so this figure would not be about your posting.',
+      change: { kind: 'no-previous' },
+    },
+  ]
+
+  /**
+   * ── THE FIGURES THIS PRODUCT CAN ACTUALLY REPORT ──────────────────────────
+   * The strip above is the record of what it cannot: unique reach, replies,
+   * attributed enquiries. This one is engagement rate, reach summed post by
+   * post, followers, the count of posts and the best of them. Each is compared
+   * against the window before it, read at the SAME age (`buildWindowRows`).
+   *
+   * `Posts published` MOVED here from the strip above rather than being copied.
+   * One count, one card: two cards carrying the same number under two labels is
+   * how they come to disagree.
+   */
+  const kpis = ready
+    ? analyticsKpis({
+        rows: ready.rows,
+        previousRows: ready.previousRows,
+        postsPublished: ready.postsPublished,
+        postsPublishedPrevious: ready.postsPublishedPrevious,
+        weeksOfHistory: ready.weeksOfHistory,
+        followers: followersFromAccount(account),
+      })
+    : []
+
+  if (window.kind === 'no-workspace') {
+    return (
+      <div className="space-y-grid">
+        <Header label={label} timezone={null} view={view} channels={[]} measured={measured} />
+        <ReportExample
+          headline="There is no workspace here yet to measure"
+          detail="Sahoda measures a workspace. This account does not have one yet, so there is nothing for these numbers to be about."
+          action={null}
+        />
+      </div>
+    )
+  }
+
+  if (window.kind === 'unreadable') {
+    return (
+      <div className="space-y-grid">
+        <Header label={label} timezone={null} view={view} channels={[]} measured={measured} />
+        <ReportExample
+          headline="Sahoda could not read your numbers just now"
+          detail="The request went out and came back without an answer, so this is not a reading of your posts. Nothing is wrong with them. Refresh to try again."
+          action={null}
+        />
+      </div>
+    )
+  }
+
+  /**
+   * Nothing has ever published, so every section below would be a frame around
+   * the same sentence. ONE card, and then the page itself drawn from a made-up
+   * business so a reader can see the shape of what they are about to get.
+   */
+  if (!hasPublished && window.rows.length === 0 && window.postsPublished === 0) {
+    return (
+      <div className="space-y-grid">
+        <Header
+          label={label}
+          timezone={window.timezone}
+          view={view}
+          channels={[]}
+          measured={measured}
+        />
+        <ReportExample {...nothingYetCard(account.kind)} />
+      </div>
+    )
+  }
+
+  /**
+   * ── HOW MUCH WENT OUT, AND WHERE ──────────────────────────────────────────
+   * Derived from rows already read, so neither chart costs a round trip. Both
+   * count DISTINCT posts, the same rule the strip above uses, so a reader who
+   * adds up the weekly columns gets the number on the "Posts this period" card.
+   */
+  /**
+   * ── THE LEGEND IS THE SWITCH, SO IT NEEDS EVERY METRIC'S TOTAL ────────────
+   * Each total comes from the source that metric is drawn from, never from the
+   * other one: the three stored metrics are summed off the window's own rows,
+   * so the legend agrees with the KPI strip above it, and the six live ones are
+   * summed off Zernio's days. A total assembled from the wrong source would be
+   * a number the chart under it could not reproduce.
+   */
+  /**
+   * Every metric, every platform. Derived from the SAME live read the chart
+   * legend uses, so the table and the chart can never disagree about a total.
+   */
+  const breakdown = daily.kind === 'ready' ? platformRows(daily.platforms) : []
+  const live = daily.kind === 'ready' ? dailyTotals(daily.days) : null
+  const metricLabel = (key: AnalyticsMetric): string =>
+    isStoredMetric(key) ? METRIC_LABELS[key] : LIVE_METRIC_LABELS[key as LiveMetric]
+  const legend: MetricLegendEntry[] = METRIC_KEYS.map((key) => ({
+    metric: key,
+    label: metricLabel(key),
+    total: isStoredMetric(key)
+      ? sumAt(
+          window.rows,
+          key === 'reach'
+            ? 'reachAtAge'
+            : key === 'impressions'
+              ? 'impressionsAtAge'
+              : 'engagementAtAge',
+        ).total
+      : (live?.[key as LiveMetric].total ?? null),
+    href: metricHref(view, key),
+  }))
+
+  const perChannel = postsPerChannel(window.rows)
+  const perWeek = postsPerWeek(window.rows, view, window.timezone)
+
+  const rowHref = (change: { sort?: string; dir?: string; page?: string }): Route => {
+    const base = hrefFor(view, {})
+    const query = new URLSearchParams(base.includes('?') ? base.slice(base.indexOf('?') + 1) : '')
+    const next = { sort, dir: direction, page: String(page), ...change }
+    if (next.sort !== DEFAULT_SORT) query.set('sort', next.sort)
+    else query.delete('sort')
+    if (next.dir !== DEFAULT_DIRECTION) query.set('dir', next.dir)
+    else query.delete('dir')
+    if (next.page !== '1') query.set('page', next.page)
+    else query.delete('page')
+    const text = query.toString()
+    return (text ? `/analytics?${text}` : '/analytics') as Route
+  }
 
   return (
     <div className="space-y-grid">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <PageTitle>Analytics</PageTitle>
-        {/* ── THE CORNER STRING IS GONE ────────────────────────────────────
-            It read "2 published posts · 2 channels" in 12px muted type. Both
-            figures now lead the page as stat cards at `type-hero-num`, and
-            docs/37 §16 is explicit: a page that says the same thing in more
-            than one place says it once, at the top. Keeping it would have been
-            the same figure in the two most different sizes on the screen. */}
-      </div>
+      <Header
+        label={label}
+        timezone={window.timezone}
+        view={view}
+        channels={channels}
+        measured={measured}
+      />
 
-      {/* The reference opens this page with a KPI strip (1150x103) and the app
-          had none in ANY state. It is NOT gated on `hasPublished`, and that is
-          the point: these are ACCOUNT insights — reach, views, accounts engaged,
-          interactions — which Instagram reports for the account itself and which
-          do not require this workspace to have published anything. Hiding them
-          behind a post count would withhold numbers that already exist.
-
-          The tables below stay gated, because those genuinely are per-post rows
-          and there is nothing to tabulate until a post goes out. */}
+      {/* Renders NOTHING once anything on the page has a number. Every section
+          below defers to it rather than re-diagnosing. */}
       <ReadinessLine readiness={readiness} />
 
-      {nothingToStructure ? null : (
-        <>
-          {/* ── THREE NUMBERS THIS PAGE CAN ALWAYS PROVE ─────────────────
-              MEASURED before this landed: a workspace with two posts on two
-              channels saw six containers and NOT ONE NUMBER, while the two real
-              figures it held rendered as a 12px muted string in the page's
-              top-right corner. Every container below waits on a platform; these
-              three are counts of rows this product owns, so they are full the
-              moment anything publishes. See the component. */}
-          {hasPublished ? <WhatPublished posts={posts} rows={rows} /> : null}
+      {kpis.length > 0 ? (
+        <section aria-labelledby="kpis" className="space-y-2">
+          <h2 id="kpis" className="sr-only">
+            The numbers for {label}
+          </h2>
+          <KpiStrip kpis={kpis} windowLabel={label} />
+          {/* WHEN these figures were asked for, in the same sentence the button
+              in the header uses. One string, so the two cannot disagree. */}
+          <p className="type-meta text-muted">{measured}</p>
+        </section>
+      ) : null}
 
-          <PerformanceStrip analytics={account} reasonStated={reasonStated} detailsLink={false} />
+      <HeadlineStrip headlines={headlines} windowLabel={label} />
 
-          <AccountPanel analytics={account} reasonStated={reasonStated} />
+      <div className="grid grid-cols-2 gap-grid max-wide:grid-cols-1">
+        <PostsPerPlatform counts={perChannel} />
+        <PostsOverTime weeks={perWeek} />
+      </div>
 
-          {/* The reference's two remaining containers, side by side beneath the
-          account panel. Best performing is WIRED — rankBy already refuses to rank
-          an unmeasured row. Performance over time is wired too now, and draws
-          nothing until there is a history to draw: before the migration it renders
-          the same container it always did. See the component for the five things
-          it refuses to plot. */}
-          <div className="grid grid-cols-[minmax(0,1fr)_340px] items-start gap-grid max-wide:grid-cols-1">
-            <PerformanceOverTime series={series} />
-            <BestPerforming rows={rows} reasonStated={reasonStated} />
-          </div>
+      <MetricOverTime
+        legendBasis={`Totals for ${label.toLowerCase()}. Impressions, reach and engagement are summed from your own posts in the period; the rest are what your connected accounts reported. The chart's own dates are printed under it.`}
+        metric={metric}
+        label={metricLabel(metric)}
+        legend={legend}
+        stored={isStoredMetric(metric) ? series : undefined}
+        live={
+          isStoredMetric(metric)
+            ? undefined
+            : {
+                read: daily,
+                points: daily.kind === 'ready' ? dailyPoints(daily.days, metric as LiveMetric) : [],
+              }
+        }
+      />
 
-          {/* The tables are the one place a NUMBER can appear, so they are the
-              last thing gated and the first thing that would be wrong to hide.
-              Nothing to tabulate until a post goes out. */}
-          {hasPublished ? (
-            <>
-              <ChannelTable rows={rows} />
-              <PostTable rows={rows} />
-              {/* The cap is STATED, not silently applied. Rows past it come back
-                  `not-loaded`, and they are already counted in every denominator
-                  on this page — but a reader who sees "18 of 30 reported"
-                  deserves to know that some of the twelve were never asked
-                  rather than assuming all twelve are still pending. */}
-              {rows.length > ANALYTICS_METRIC_CALLS ? (
-                <p className="type-meta text-muted">
-                  Metrics are read for the first {ANALYTICS_METRIC_CALLS} published channels on this
-                  page. The rest are listed as not loaded. Open a post to read its own.
-                </p>
-              ) : null}
-            </>
-          ) : null}
-          {/* ── WHERE THE SEVENTH STATEMENT USED TO BE ─────────────────────
-              A page-level `EmptyState` — 44px orange marker tile, bold heading,
-              centred prose, `Create post` — rendered here whenever nothing had
-              published. docs/27 §1 called it the hierarchy inversion, and the
-              2026-08-20 pass fixed the half of that which was fixable in place
-              by giving it an action, so that loudest and most useful were the
-              same object.
+      {/* ── WHAT YOUR WEEK LOOKS LIKE ───────────────────────────────────────
+          The most actionable view on the page, and the one the CMO Report's
+          timing sentence is derived from. Both read `bestSlotSentence` off the
+          same selector, so the grid here and the sentence there cannot say
+          different things about the same business.
 
-              It is gone rather than restyled, because on the frames docs/40 §3.1
-              measured it was not the only thing saying this: `ReadinessLine` now
-              opens the page with "Nothing published yet" and the same remedy,
-              and a second copy 1100px lower is the repetition this whole lane is
-              about. The claim did not move. The second rendering of it did. */}
-        </>
-      )}
+          It deliberately ignores the date filter above it: a best slot is a
+          claim about the business, and one that moved whenever somebody changed
+          a date range would not be a pattern. The line under the grid says so. */}
+      <section aria-labelledby="timing" className="surface-ring rounded-card bg-surface p-5">
+        <h2 id="timing" className="type-h3 text-ink">
+          What your week looks like
+        </h2>
+        <p className="mt-1 max-w-[62ch] type-meta text-muted">
+          Average reach by the day and the part of day a post went out, across everything you have
+          published rather than only this period.
+        </p>
+        <div className="mt-4">
+          <TimingHeatmap timing={window.timing} timezone={window.timezone} />
+        </div>
+      </section>
+
+      <PostRows
+        rows={window.rows}
+        sort={sort}
+        direction={direction}
+        page={page}
+        hrefFor={rowHref}
+        ageDays={window.ageDays}
+        timezone={window.timezone}
+      />
+
+      {/* ── EVERY METRIC AS ITSELF ────────────────────────────────────────
+          The one place likes, comments, shares and saves are not folded into a
+          single `engagement` figure, because this is the only source that
+          keeps them apart. */}
+      <PlatformTable read={daily} rows={breakdown} windowLabel={label} />
+
+      {/* ── THE SHAPE OF THE POSTING ITSELF ───────────────────────────────
+          What went out and what came back, rather than how much. The format
+          card is the only one here read from our own database; the other
+          three come from the platforms and each states its own absence. */}
+      <div className="grid grid-cols-2 gap-grid max-wide:grid-cols-1">
+        <ContentFormats breakdown={window.formats} />
+        <PostingCadence section={posting.frequency} />
+      </div>
+
+      <FollowerEvolution section={posting.followers} />
+
+      <EngagementAccumulation section={posting.decay} />
+
+      <ChannelCards rows={window.rows} ageDays={window.ageDays} />
+
+      {/* ── ACCOUNT HEALTH, LAST AND ON PURPOSE ──────────────────────────────
+          The follower COUNT now also appears in the KPI strip at the top, by
+          the founder's brief of 2026-09-06, which asks this page to match what
+          Zernio's own analytics screen puts in front of a reader. This section
+          keeps the HISTORY: the daily line, the gains and the losses. It is
+          still last on purpose. A follower count is the number every other tool
+          leads with and the one figure here that does not describe whether the
+          work is working; the card at the top says as much in its own caveat
+          ("a count of right now, not of this period") rather than letting
+          proximity to reach make it read as performance. */}
+      <section aria-labelledby="account-health" className="space-y-3">
+        <h2 id="account-health" className="type-h3 text-ink">
+          Account health
+        </h2>
+        {/* Pinned to `false` by the rebuild, which is how the collapse was
+            lost: the card then re-stated the cause and re-offered the link the
+            line above already carries. */}
+        <AccountPanel analytics={account} reasonStated={readiness.kind !== 'measuring'} />
+        {accountReadAt ? (
+          <p className="type-meta text-muted tabular-nums">
+            Read from Instagram at {accountReadAt}. Sahoda asks again once a reading is{' '}
+            {ACCOUNT_READ_TTL_MINUTES} minutes old.
+          </p>
+        ) : null}
+      </section>
     </div>
+  )
+}
+
+/**
+ * The header, and the one place the clock is named.
+ *
+ * Every date and every "Tuesday morning" on this page is in the workspace's own
+ * zone, and a page that makes wall-clock claims without saying whose clock is
+ * making a claim it cannot support for a reader in another country.
+ */
+function Header({
+  label,
+  timezone,
+  view,
+  channels,
+  measured,
+}: {
+  label: string
+  timezone: string | null
+  view: ReturnType<typeof resolveView>
+  channels: readonly import('@sahoda/shared').Channel[]
+  /** When Sahoda last asked the platforms, as a sentence. */
+  measured: string
+}) {
+  return (
+    <div className="space-y-3">
+      <TabHeader active="posting" />
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+        <div className="min-w-0">
+          <PageTitle>Analytics</PageTitle>
+          <p className="mt-1 type-sm text-muted">
+            The numbers behind your CMO report.
+            {timezone ? ` Dates and times are shown in ${timezone}.` : ''}
+          </p>
+          <p className="sr-only">Showing {label}.</p>
+        </div>
+        <div className="flex flex-col items-end gap-2">
+          <ViewControls view={view} channels={channels} />
+          <MeasureNow lastLine={measured} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * "Posting analytics" | "Inbox analytics", driven by `?tab=inbox`.
+ *
+ * A plain `<Link>`, not client state: the tab IS the URL, same reasoning as
+ * `ViewControls` and `InboxFilters`. Switching costs zero new client JS.
+ */
+function TabHeader({ active }: { active: 'posting' | 'inbox' }) {
+  const tabClass = (current: boolean) =>
+    `rounded-sm px-3 py-1.5 type-meta font-[550] transition-micro ${
+      current ? 'surface-ring bg-tint-50 text-accent dark:bg-s2' : 'text-muted hover:text-ink'
+    }`
+  return (
+    <nav aria-label="Analytics view" className="flex flex-wrap items-center gap-2">
+      <Link
+        href="/analytics"
+        aria-current={active === 'posting' ? 'page' : undefined}
+        className={tabClass(active === 'posting')}
+        data-guide="analytics-tab-posting"
+      >
+        Posting analytics
+      </Link>
+      <Link
+        href={'/analytics?tab=inbox' as Route}
+        aria-current={active === 'inbox' ? 'page' : undefined}
+        className={tabClass(active === 'inbox')}
+        data-guide="analytics-tab-inbox"
+      >
+        Inbox analytics
+      </Link>
+    </nav>
   )
 }

@@ -69,9 +69,9 @@ export default async function BrainPage() {
         <EmptyState
           icon={BrainCircuit}
           title="Sahoda doesn't know your brand yet"
-          body="The Brand Brain is what Sahoda writes your captions, your weekly plan and your website from. Give Sahoda a spark and it will resolve a first draft you can correct."
+          body="The Brand Brain is what Sahoda writes your captions, your weekly plan and your website from. Tell Sahoda a little about your business and it will write a first draft you can correct."
           action={<OnboardingLink>Set up your Brand Brain</OnboardingLink>}
-          tip="You approve and correct what it resolves. You never start from a blank form."
+          tip="You check and correct what it writes. You never start from a blank form."
         />
 
         <section className="surface-ring rounded-card bg-surface" aria-labelledby="brain-will-hold">
@@ -136,7 +136,11 @@ export default async function BrainPage() {
         {/* The single most useful thing to do next. It was the second half of
             BrainHeader; here it becomes the aside's lead, which is where the
             reference puts its own "suggested improvement". */}
-        <BrainHeader provenance={brain.provenance} version={brain.version} />
+        <BrainHeader
+          provenance={brain.provenance}
+          version={brain.version}
+          recordsAuthorship={brain.meta !== undefined}
+        />
         <DerivedCard alignment={brain.active.alignment} provenance={brain.provenance} />
       </aside>
     </div>

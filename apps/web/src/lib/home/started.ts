@@ -76,7 +76,7 @@ export interface StartStep {
   label: string
   /** What this step turns on, stated as the thing the reader gets. */
   gets: string
-  href: '/brain' | '/connections' | '/posts/new'
+  href: '/onboarding' | '/connections' | '/posts/new'
 }
 
 /**
@@ -98,20 +98,25 @@ export function startSteps(): StartStep[] {
   return [
     {
       id: 'brain',
-      label: 'Teach Sahoda your brand',
-      gets: 'Everything it writes comes from this.',
-      href: '/brain',
+      label: 'Teach Sahoda about your business',
+      gets: 'Everything Sahoda writes starts from this.',
+      // /onboarding, not /brain. This list only renders for a workspace with
+      // no brain, and /brain for that workspace is a page that says so and
+      // offers one more button to /onboarding. MEASURED 2026-09-06 on the
+      // wt-core preview: the lead door was two hops, while the topbar's ring
+      // for the same state was already one.
+      href: '/onboarding',
     },
     {
       id: 'connect',
-      label: 'Connect a channel',
-      gets: 'Lets a post actually go out, and starts reach and followers.',
+      label: 'Connect a social account',
+      gets: 'Lets a post really go out, and starts counting reach and followers.',
       href: '/connections',
     },
     {
       id: 'write',
       label: 'Write your first post',
-      gets: 'Appears in your week and in the approvals queue.',
+      gets: 'Shows up in your week and in your list of things to check.',
       href: '/posts/new',
     },
   ]

@@ -42,7 +42,7 @@ describe('the re-resolve control', () => {
     // onClick, or the accent-coloured prose this replaced, has no role and
     // fails here. Matched by an accessible name containing the verb, so the
     // copy can change without the guard going stale.
-    const control = screen.getByRole('link', { name: /re-run/i })
+    const control = screen.getByRole('link', { name: /rebuild/i })
     expect(control).toHaveAttribute('href', '/onboarding')
 
     // It LOOKS like a button, which is the entire request. `inline-flex` and
@@ -54,7 +54,7 @@ describe('the re-resolve control', () => {
 
   test('is not the panel primary — a re-resolve destroys confirmed work', () => {
     render(<BrainHeader provenance={NOTHING_CONFIRMED} version={16} />)
-    const control = screen.getByRole('link', { name: /re-run/i })
+    const control = screen.getByRole('link', { name: /rebuild/i })
 
     // The secondary recipe, asserted by the token that separates it from
     // primary. `bg-primary` here would mean the paid, destructive path had been
@@ -65,7 +65,7 @@ describe('the re-resolve control', () => {
 
   test('the price and the consequence reach a screen reader before the press', () => {
     render(<BrainHeader provenance={NOTHING_CONFIRMED} version={16} />)
-    const control = screen.getByRole('link', { name: /re-run/i })
+    const control = screen.getByRole('link', { name: /rebuild/i })
 
     const describedBy = control.getAttribute('aria-describedby')
     expect(describedBy).toBeTruthy()
@@ -75,7 +75,7 @@ describe('the re-resolve control', () => {
     // The two CLAIMS, not the sentence: that it is paid, and that it overwrites
     // fields the person already confirmed. Extracting the link from the
     // paragraph is exactly the edit that could have dropped either.
-    expect(note?.textContent).toMatch(/paid/i)
+    expect(note?.textContent).toMatch(/costs credits/i)
     expect(note?.textContent).toMatch(/confirmed/i)
   })
 
@@ -83,7 +83,7 @@ describe('the re-resolve control', () => {
     // The panel has two shapes and the control sits below both. A guard pinned
     // to one branch would prove half of what its name claims.
     render(<BrainHeader provenance={ALL_CONFIRMED} version={16} />)
-    const control = screen.getByRole('link', { name: /re-run/i })
+    const control = screen.getByRole('link', { name: /rebuild/i })
     expect(control).toHaveAttribute('href', '/onboarding')
     // The clothes too, not just the href. `href` alone survived the mutation
     // that put the control back inside the paragraph, which made this the one

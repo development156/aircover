@@ -32,6 +32,11 @@ export type PlanActionState = { ok: true; message: string } | { ok: false; messa
  * `simulated` is an explicit discriminant rather than something inferred from a missing URL,
  * for the reason `CheckoutState` gives: a caller must not be able to render a sandbox session
  * as a completed purchase by forgetting a check.
+ *
+ * `reused` is a second, independent discriminant: true when `startPlanUpgrade` found an
+ * order already open for this exact workspace/plan/billing-period and handed back that one
+ * instead of opening a second — the guard against a double submit creating two Cashfree
+ * orders. False on every freshly created order, never inferred.
  */
 export type UpgradeCheckoutState =
   | {
@@ -42,6 +47,7 @@ export type UpgradeCheckoutState =
       planId: PlanId
       /** What the customer WOULD have paid. Shown so the sandbox state is still informative. */
       amountDuePaise: number
+      reused: boolean
     }
-  | { ok: true; simulated: false; mode: 'live'; sessionId: string; url: string }
+  | { ok: true; simulated: false; mode: 'live'; sessionId: string; url: string; reused: boolean }
   | { ok: false; message: string }

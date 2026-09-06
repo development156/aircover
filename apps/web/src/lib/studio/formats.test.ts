@@ -5,6 +5,7 @@ import { CONSTRAINTS, STUDIO_PRESETS } from '@sahoda/shared'
 import {
   GENERATABLE_MAX,
   GENERATABLE_MIN,
+  aspectRatioLabel,
   canGenerate,
   channelPermits,
   formatById,
@@ -139,6 +140,48 @@ describe('canGenerate', () => {
 
   test('accepts the bounds themselves, because they are inclusive', () => {
     expect(canGenerate({ width: GENERATABLE_MIN, height: GENERATABLE_MAX })).toBe(true)
+  })
+})
+
+describe('aspectRatioLabel', () => {
+  /**
+   * REDUCED, NOT RETYPED. 1080x1920 is 9:16, and the wrong version of this
+   * function returns "1080:1920" — technically a ratio, unreadable as one.
+   *
+   * MUTATION: return `${format.width}:${format.height}` unreduced and this
+   * goes red on the story case.
+   */
+  test('reduces a clean shape to its smallest whole numbers', () => {
+    expect(aspectRatioLabel({ width: 1080, height: 1080 })).toBe('1:1')
+    expect(aspectRatioLabel({ width: 1080, height: 1920 })).toBe('9:16')
+    expect(aspectRatioLabel({ width: 1600, height: 900 })).toBe('16:9')
+    expect(aspectRatioLabel({ width: 1200, height: 900 })).toBe('4:3')
+    expect(aspectRatioLabel({ width: 1080, height: 1350 })).toBe('4:5')
+  })
+
+  /**
+   * NEVER ROUNDED TO LOOK TIDY. 1200x628 (the link card) reduces to 300:157,
+   * which nobody would recognise as a shape. This proves the function shows
+   * the pixel dimensions instead of inventing a clean-looking ratio the
+   * format is not.
+   *
+   * MUTATION: raise `CLEAN_CEILING` so 300:157 passes through and this goes
+   * red, asserting a ratio nobody could read at a glance.
+   */
+  test('shows pixel dimensions instead of a ratio that would not reduce cleanly', () => {
+    expect(aspectRatioLabel({ width: 1200, height: 628 })).toBe('1200 × 628px')
+  })
+
+  /**
+   * Every size the Studio actually offers reduces to SOMETHING: this only
+   * proves the function never throws or returns an empty string across the
+   * real catalogue, not that every one of them is a clean ratio (the link
+   * card above already proves one of them is not).
+   */
+  test('every offered format gets a label', () => {
+    for (const format of generatableFormats()) {
+      expect(aspectRatioLabel(format).length, format.id).toBeGreaterThan(0)
+    }
   })
 })
 

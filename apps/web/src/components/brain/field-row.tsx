@@ -4,6 +4,9 @@ import { useState, useTransition } from 'react'
 import { Check, Pencil } from 'lucide-react'
 
 import { confirmBrainField } from '@/app/actions/brand-field'
+import { blankReason } from '@/lib/brand/blank'
+
+import { useJustChanged } from './use-just-changed'
 import { Button } from '@/components/ui/button'
 import type { BrainField } from '@/lib/brand/fields'
 import { leavesEqual, type BrainLeaf } from '@/lib/brand/leaf'
@@ -12,6 +15,8 @@ import type { FieldState } from '@/lib/brand/provenance'
 import { CertaintyMark } from './certainty-mark'
 import { FieldEditor } from './field-editor'
 import { FieldValue } from './field-value'
+
+const UNREACHABLE = 'Could not reach Sahoda. Check your connection and try again. Nothing changed.'
 
 export interface FieldRowProps {
   field: BrainField
@@ -68,29 +73,52 @@ export function FieldRow({ field, value, state }: FieldRowProps) {
    * stale: it is seeded when the row mounts, and a regenerate landing since then
    * would make this press confirm a value the field no longer holds.
    */
+  /**
+   * A transport failure is a SENTENCE here, never a throw.
+   *
+   * MEASURED 2026-09-06 on the wt-core preview, network set to Offline, one
+   * "Confirm · free" pressed: the rejection escaped `startTransition`, React
+   * unmounted the route into the error boundary, and the whole tab — every
+   * open editor and ticked checkbox — was replaced by "Something broke on our
+   * side, not yours". The failure was the person's own connection.
+   */
   function confirmInPlace() {
     setError(null)
     startSaving(async () => {
-      const result = await confirmBrainField(field.path, value)
-      if (!result.ok) setError(result.message)
+      try {
+        const result = await confirmBrainField(field.path, value, { asSeen: true })
+        if (!result.ok) setError(result.message)
+      } catch {
+        setError(UNREACHABLE)
+      }
     })
   }
 
   function save() {
     setError(null)
     startSaving(async () => {
-      const result = await confirmBrainField(field.path, draft)
-      if (!result.ok) {
-        setError(result.message)
-        return
+      try {
+        const result = await confirmBrainField(field.path, draft)
+        if (!result.ok) {
+          setError(result.message)
+          return
+        }
+        // Left open on failure so the typing survives; closed on success, where
+        // the revalidated server render is now the truth.
+        setEditing(false)
+      } catch {
+        setError(UNREACHABLE)
       }
-      // Left open on failure so the typing survives; closed on success, where the
-      // revalidated server render is now the truth.
-      setEditing(false)
     })
   }
 
+  // The server re-renders this row with the new state after a write; the change
+  // in the PROP is the beat the chip pops on. First render never pops.
+  const justConfirmed = useJustChanged(state) && state === 'confirmed'
+
   const unchanged = leavesEqual(draft, value)
+  // Refused BEFORE the press, in the same words the server would refuse it in.
+  const blank = blankReason(field, draft)
   // Unchanged text on an already-confirmed field is the one press that genuinely
   // records nothing — the server short-circuits it rather than burning a version.
   const alreadyConfirmed = state === 'confirmed'
@@ -99,7 +127,7 @@ export function FieldRow({ field, value, state }: FieldRowProps) {
     <div data-guide={`brain.field.${field.path}`} className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[13px] font-semibold text-ink">{field.label}</span>
-        <CertaintyMark state={state} />
+        <CertaintyMark state={state} justChanged={justConfirmed} />
         {!editing ? (
           <div className="ml-auto flex items-center gap-1">
             {/* Only while it is still a guess. On a confirmed field this would
@@ -138,7 +166,13 @@ export function FieldRow({ field, value, state }: FieldRowProps) {
 
       {editing ? (
         <div className="flex flex-col gap-2">
-          <FieldEditor field={field} draft={draft} onDraftChange={setDraft} disabled={pending} />
+          <FieldEditor
+            field={field}
+            draft={draft}
+            onDraftChange={setDraft}
+            disabled={pending}
+            autoFocus
+          />
           {/* The question is shown while editing rather than at rest: at rest it
               would be noise beside an answer that already exists, and here it is
               the thing the user is actually answering. */}
@@ -162,24 +196,31 @@ export function FieldRow({ field, value, state }: FieldRowProps) {
                 and the fastest path to a confirmed brain. Leaving the button
                 disabled would have kept the whole point of that change
                 unreachable from the one screen that offers it. */}
-            <Button type="button" size="sm" loading={pending} onClick={save}>
+            <Button
+              type="button"
+              size="sm"
+              loading={pending}
+              disabled={blank !== null}
+              onClick={save}
+            >
               {unchanged && !alreadyConfirmed ? 'Confirm · free' : 'Save · free'}
             </Button>
             <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={cancel}>
               Cancel
             </Button>
-            {unchanged && !pending ? (
+            {blank ? <span className="type-sm text-muted">{blank}</span> : null}
+            {unchanged && !pending && !blank ? (
               <span className="text-[12.5px] text-muted">
                 {alreadyConfirmed
                   ? 'Already confirmed. Edit the text to change it.'
-                  : 'Saves this wording as yours, exactly as written.'}
+                  : 'Saves these words as yours, exactly as written.'}
               </span>
             ) : null}
           </div>
         </div>
       ) : (
         <>
-          <FieldValue field={field} value={value} state={state} />
+          <FieldValue field={field} value={value} state={state} lit={justConfirmed} />
           {/* The editor renders its own error. This one belongs to the inline
               confirm, which has no editor open to put it in — without this the
               press would fail silently and the mark would simply not change. */}

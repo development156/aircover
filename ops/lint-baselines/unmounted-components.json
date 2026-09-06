@@ -1,0 +1,11 @@
+{
+  "unmounted": [
+    "apps/web/src/components/analytics/channel-table.tsx::ChannelTable",
+    "apps/web/src/components/analytics/post-table.tsx::PostTable",
+    "apps/web/src/components/analytics/week-card.tsx::WeekCard",
+    "apps/web/src/components/connections/kind-glyph.tsx::DRAWN_KINDS",
+    "apps/web/src/components/onboarding/stage/drop-zone.tsx::DropZone",
+    "apps/web/src/components/planner/week-grid.tsx::WeekGrid",
+    "apps/web/src/components/shell/theme-script.tsx::THEME_SCRIPT_SOURCE"
+  ]
+}

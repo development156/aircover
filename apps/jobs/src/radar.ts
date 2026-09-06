@@ -1,5 +1,7 @@
+import { createWithCredits } from '@sahoda/billing'
+
 import { createRadarPgDb } from './radar/pg'
-import { runRadarPass, type RadarPassOptions, type RadarPassReport } from './radar/run'
+import { runRadarPass, type RadarPassOptions } from './radar/run'
 import { getRuntime } from './runtime'
 
 /**
@@ -28,7 +30,9 @@ import { getRuntime } from './runtime'
  * reintroduce it by accident, because there is no argument here that would.
  */
 
-export type { RadarPassReport } from './radar/run'
+import type { RadarPassReport } from './radar/run'
+
+export type { RadarPassReport }
 
 export interface RadarPassDepsOptions {
   /**
@@ -38,8 +42,9 @@ export interface RadarPassDepsOptions {
    * ready, which after an outage is potentially every source at once.
    *
    * Sources past the wall are reported in `refused` rather than dropped, and the
-   * next pass takes them first — NULL `last_seen_at` sorts ahead of every real
-   * timestamp, so the ones that waited longest go first.
+   * next pass takes them first: the order is by the last ATTEMPT, so the ones
+   * that waited longest go first and a source that keeps failing rotates to the
+   * back rather than holding the batch for ever.
    */
   batch?: number
 }
@@ -54,9 +59,15 @@ export interface RadarPassDepsOptions {
  * nothing and reports honestly, rather than throwing at boot.
  */
 export function radarPassDeps(options: RadarPassDepsOptions = {}): RadarPassOptions {
-  const { env, pool } = getRuntime()
+  const { env, pool, ledger } = getRuntime()
   return {
     db: createRadarPgDb(pool),
+    // THE CHARGE /radar PRINTS. "One scan per business per week, at 5 credits
+    // each" was, until this line, a price nobody was debited: the pass tracked
+    // Sahoda's provider cash in `radar_fetch_log` and reached no ledger at all.
+    // The runtime's ledger port is the same one every sweep settles through, so
+    // a Radar scan appears in the wallet beside everything else.
+    withCredits: createWithCredits(ledger),
     // The PROVIDER transport only: Apify and Zyte, whose URLs this repository
     // writes. NOT the competitor's page — see the header.
     fetch: globalThis.fetch as never,
@@ -64,9 +75,31 @@ export function radarPassDeps(options: RadarPassDepsOptions = {}): RadarPassOpti
     // explicitly-undefined one stay the same thing under
     // `exactOptionalPropertyTypes`.
     ...(env.apifyToken ? { apifyToken: env.apifyToken } : {}),
-    ...(env.zyteApiKey ? { zyteApiKey: env.zyteApiKey } : {}),
+    ...(env.tinyfishApiKey ? { tinyfishApiKey: env.tinyfishApiKey } : {}),
     ...(options.batch === undefined ? {} : { batch: options.batch }),
   }
+}
+
+/**
+ * READ ONE COMPETITOR NOW, FOR ONE WORKSPACE.
+ *
+ * The "Read now" button on /radar, and the automatic first read a new watch
+ * gets the moment it is added. Same runner, same ladder, same spending gate as
+ * the weekly cron — the ONLY difference is which sources are looked at and who
+ * pays, and both of those live in `only` (see `RadarPassOptions`).
+ *
+ * A separate runner would have been the wrong shape twice over: it would have
+ * been a second place for the cap, the ledger and the SSRF-guarded transport to
+ * be got right, and the two would have drifted the first time one was fixed.
+ *
+ * `batch` is not passed because `only` does not use it: `sourcesForCompetitor`
+ * already caps at one competitor's handful of addresses.
+ */
+export async function readCompetitorNow(input: {
+  competitorId: string
+  workspaceId: string
+}): Promise<RadarPassReport> {
+  return runRadarPass({ ...radarPassDeps(), only: input })
 }
 
 export { runRadarPass }

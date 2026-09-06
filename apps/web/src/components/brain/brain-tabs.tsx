@@ -25,7 +25,7 @@ const TABS: ReadonlyArray<{ href: Route; label: string }> = [
    * brain every field is a guess, so this is the tab with all the work in it,
    * and a route with no nav entry is a dead end by the product's own rule.
    */
-  { href: '/brain/resolve', label: 'Resolve' },
+  { href: '/brain/resolve', label: 'Check guesses' },
   // Two tabs the app HAS data for, and which the flat grid used to bury:
   // five sections sat in one undifferentiated list.
   { href: '/brain/identity', label: 'Identity' },

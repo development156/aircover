@@ -482,7 +482,7 @@ describe('assetObjectPath — the LIBRARY sibling', () => {
     ['workspaceId', { workspaceId: '../../etc', assetId: ASSET }],
     ['assetId', { workspaceId: WORKSPACE, assetId: '../../etc' }],
     ['workspaceId', { workspaceId: `${WORKSPACE}\n${WORKSPACE}`, assetId: ASSET }],
-  ])('refuses a %s that is not a canonical uuid', (field, ids) => {
+  ])('refuses a %s that is not a canonical uuid', (_field, ids) => {
     expect(() => assetObjectPath({ ...ids, mime: 'image/png' } as never)).toThrow(MediaPathError)
   })
 

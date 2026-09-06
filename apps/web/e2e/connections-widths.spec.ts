@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { expect, test } from './fixtures/seeded-user'
 import { bootstrapWorkspace } from './fixtures/compose'
 
@@ -47,8 +50,42 @@ const TILE = '[data-channel][data-connected]'
 
 /** Every channel in the catalogue gets a tile, built or not. Zero tiles is the
  *  other way this page renders (no workspace, or a failed read), and a suite
- *  that loops over zero tiles is green for the wrong reason. */
-const TILES = 8
+ *  that loops over zero tiles is green for the wrong reason.
+ *
+ *  Read from the catalogue, not retyped: this was `8` while the catalogue held
+ *  12, and the first CI smoke run to reach this spec (2026-09-05, run
+ *  33985674352) failed on "expected 8, received 12" at every width — a guard
+ *  refusing the product for growing. Zero is still refused below, because a
+ *  derived count of 0 would make the loop green for the wrong reason. */
+const TILES = catalogueSize()
+
+/**
+ * Counted from the SOURCE FILES, not imported from them. The import was tried
+ * first (run 34008428577, 2026-09-06): `catalogue.ts` pulls `@sahoda/shared`,
+ * which imports `pricing.config.json` as an ES module, and Playwright's loader
+ * refuses that without an import attribute — so the whole suite failed to load
+ * and ran zero tests. Two text scans of the two literals this page is built
+ * from are the cheaper dependency: every `id: '…'` inside `export const
+ * CATALOGUE`, minus every id inside `HIDDEN_FROM_OFFER` in `offer.ts` (the
+ * page withholds those three from the offer). MEASURED 15 − 3 = 12, the count
+ * the page renders. An entry written on one line would be missed by the scan,
+ * and the zero guard below is what makes such a miss visible.
+ */
+function catalogueSize(): number {
+  const here = dirname(fileURLToPath(import.meta.url))
+  const read = (rel: string) => readFileSync(join(here, rel), 'utf8')
+  const catalogue = read('../src/lib/connections/catalogue.ts')
+  const start = catalogue.indexOf('export const CATALOGUE')
+  const end = catalogue.indexOf('\n]', start)
+  const ids = [...catalogue.slice(start, end).matchAll(/^\s+id: '([a-z_]+)',$/gm)].map((m) => m[1]!)
+  const offer = read('../src/lib/connections/offer.ts')
+  const hiddenStart = offer.indexOf('HIDDEN_FROM_OFFER')
+  const hiddenEnd = offer.indexOf('])', hiddenStart)
+  const hidden = new Set(
+    [...offer.slice(hiddenStart, hiddenEnd).matchAll(/'([a-z_]+)'/g)].map((m) => m[1]!),
+  )
+  return ids.filter((id) => !hidden.has(id)).length
+}
 
 /**
  * What counts as a defect, evaluated in the page. Kept as a string — an arrow
@@ -173,6 +210,7 @@ test.describe('connections names survive every width @smoke', () => {
 
       // The guard that makes everything after it mean something. It also covers
       // the failed-read branch, which is the other zero-tile render.
+      expect(TILES, 'the catalogue is empty, so this guard could not fail').toBeGreaterThan(0)
       await expect(
         page.locator(`#main ${TILE}`),
         `width ${width}: every channel in the catalogue has a tile`,

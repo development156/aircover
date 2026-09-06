@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { countWords, crawlSite, selectPages } from './crawl-site'
-import { FirecrawlError, type FirecrawlClient, type ScrapedPage } from './firecrawl'
+import type { PageSource, ScrapedPage } from './types'
+import { PageSourceError } from './vendor-error'
 
 const HOME = 'https://chaiandchapters.in/'
 
@@ -14,7 +15,7 @@ function client(opts: {
   pages?: Record<string, ScrapedPage>
   mapThrows?: unknown
   scrapeThrows?: unknown
-}): { client: FirecrawlClient; scraped: string[] } {
+}): { client: PageSource; scraped: string[] } {
   const scraped: string[] = []
   return {
     scraped,
@@ -33,15 +34,6 @@ function client(opts: {
     },
   }
 }
-
-const PROSE =
-  'A two-room bookshop off a Buxi Bazaar side street where Odia poetry sits at eye level. ' +
-  'The reading room upstairs is never rushed and a seat costs nothing. Our readers are ' +
-  'Ravenshaw students and school teachers who grew up on Odia poetry and now mostly buy ' +
-  'English fiction, because Odia titles are hard to find in the city and the online sellers ' +
-  'do not stock them at all. Book club meets Saturday at five upstairs; bring your copy or ' +
-  'borrow ours. Pakhala from May, same seat, cooler lunch. We only recommend what we have ' +
-  'read, and Odia writing gets the front shelf every single week of the year here.'
 
 describe('countWords', () => {
   it('counts prose and ignores markdown syntax, links and images', () => {
@@ -211,7 +203,7 @@ describe('crawlSite — fails honestly (doc 18 §5)', () => {
   })
 
   it('crawler_error: OUR failure is never reported as a fact about their website', async () => {
-    const refusal = new FirecrawlError(402, '/scrape')
+    const refusal = new PageSourceError(402, 'tinyfish', '/fetch')
     const { client: c } = client({ mapThrows: refusal, scrapeThrows: refusal })
 
     const out = await crawlSite(HOME, { client: c })
@@ -224,7 +216,7 @@ describe('crawlSite — fails honestly (doc 18 §5)', () => {
   })
 
   it('every failure falls back to asking, and none invents a voice', async () => {
-    const cases: Array<[string, FirecrawlClient]> = [
+    const cases: Array<[string, PageSource]> = [
       ['', client({}).client],
       ['nonsense', client({}).client],
       [HOME, client({ pages: { [HOME]: page(HOME, '', 404) } }).client],

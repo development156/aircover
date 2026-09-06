@@ -1,6 +1,7 @@
 import { expect, test } from './fixtures/seeded-user'
 import { useTheme, type Theme } from './helpers/ux-shot'
 import type { Page } from '@playwright/test'
+import { dismissPlanOffer } from './fixtures/compose'
 
 /**
  * THE RAIL COLLAPSES, IT OPENS COLLAPSED, AND NOTHING LOSES ITS NAME EITHER WAY.
@@ -170,22 +171,24 @@ function withRatios(readings: LabelReading[]): LabelReading[] {
  * expectation from the thing it is testing passes under any mutation of it. If
  * a section leaves the rail, this fails by name and somebody decides.
  */
+// `Remix`, `Sites` and `Playbooks` are NOT here: the founder's ruling of
+// 2026-08-25 removed all three from `lib/nav/sections.ts` (built, not "soon",
+// simply absent from the rail; `reachable.test.ts` says how each is reached).
+// This list still named them and the collapsed check failed on "Remix" for
+// three attempts (run 34012814133), pinning a menu the product no longer has.
 const RAIL_LABELS = [
   'Home',
   'Brand Brain',
   'Posts',
   'Campaigns',
   'Assets',
-  'Remix',
   'Planner',
   'Approvals',
-  'Sites',
   'Inbox',
   'Leads',
   'Analytics',
   'CMO Report',
   'The Loop',
-  'Playbooks',
 ] as const
 
 async function bootstrap(page: Page): Promise<void> {
@@ -247,6 +250,7 @@ test.describe('the rail collapses @smoke', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await bootstrap(page)
     await page.goto('/home', { waitUntil: 'domcontentloaded' })
+    await dismissPlanOffer(page)
     await page.waitForTimeout(600)
 
     // ── 1 · IT OPENS COLLAPSED, and the assertion is on the rendered width.
@@ -326,6 +330,7 @@ test.describe('the rail collapses @smoke', () => {
       await useTheme(page, theme)
       for (const state of ['collapsed', 'expanded'] as const) {
         await page.goto('/home', { waitUntil: 'domcontentloaded' })
+        await dismissPlanOffer(page)
         await page.waitForTimeout(500)
         const isExpanded = await page.getByTestId('rail-toggle').getAttribute('aria-expanded')
         if ((isExpanded === 'true') !== (state === 'expanded')) {

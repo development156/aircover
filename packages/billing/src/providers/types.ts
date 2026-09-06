@@ -94,6 +94,28 @@ export interface CheckoutSession {
 }
 
 /**
+ * A provider-side order read back by `GET /orders/{id}`: what the checkout bridge page and
+ * the webhook fallback both act on.
+ */
+export interface ProviderOrder {
+  orderId: string
+  /**
+   * The provider's own order status, verbatim. Cashfree's vocabulary is ACTIVE (payable),
+   * PAID, EXPIRED, TERMINATED and TERMINATION_REQUESTED; `null` when the response carried
+   * none. Deliberately not narrowed to a union: a status this package has not seen must
+   * reach the screen as "unknown", never be coerced into one it recognises.
+   */
+  status: string | null
+  tags: Record<string, string> | null
+  /**
+   * The SDK session token the bridge page hands to the Cashfree JS SDK. `null` when the
+   * provider omits it, which it does once an order is no longer payable. Without this field
+   * the bridge had an order and nothing to pay with.
+   */
+  paymentSessionId: string | null
+}
+
+/**
  * A provider webhook normalized to what billing acts on. `raw` is retained verbatim so
  * the (deferred) billing_webhook_events row can store the original payload.
  */

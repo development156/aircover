@@ -8,6 +8,9 @@ import {
 } from './from-collector'
 import { UNWIRED, type RadarStore } from './port'
 import { createServerSupabase } from '@/lib/supabase/server'
+import { reportServerError } from '@/lib/observability/report'
+import { toScanAttempts } from './attempts-map'
+import type { ScanAttempt } from './types'
 
 import type { Competitor, CompetitorKind, RadarChange, RadarDay, RadarSnapshot } from './types'
 
@@ -205,16 +208,67 @@ async function readChanges(
 }
 
 /**
+ * WHAT RADAR TRIED, from `radar_fetch_log`, through `@sahoda/jobs/radar-log`.
+ *
+ * The log is service-role only (no RLS policy admits a member), so it is read
+ * over the jobs pool, with the workspace id as the JOIN so the query cannot be
+ * aimed at another tenant. The import is dynamic so that a page render never
+ * loads `pg` unless it gets this far.
+ *
+ * A read that fails is an EMPTY list, reported, never a thrown feed: the
+ * changes are still true, and "we cannot say what was tried" is the shape the
+ * screen already draws for an empty day. The preview environments have no
+ * `SUPABASE_DB_URL` at all, and they must still render the feed.
+ */
+async function readAttempts(workspaceId: string, timezone: string | null): Promise<ScanAttempt[]> {
+  try {
+    const { radarAttemptsForWorkspace } = await import('@sahoda/jobs/radar-log')
+    return toScanAttempts(await radarAttemptsForWorkspace(workspaceId), timezone)
+  } catch (cause) {
+    reportServerError(cause, { action: 'radar.readAttempts', workspaceId })
+    return []
+  }
+}
+
+/** The workspace's clock, so an attempt lands on the day the reader lived through. */
+async function workspaceTimezone(
+  supabase: Awaited<ReturnType<typeof createServerSupabase>>,
+  workspaceId: string,
+): Promise<string | null> {
+  const { data } = await supabase
+    .from('workspaces')
+    .select('timezone')
+    .eq('id', workspaceId)
+    .maybeSingle()
+  const tz = (data as { timezone?: string | null } | null)?.timezone
+  return typeof tz === 'string' && tz.length > 0 ? tz : null
+}
+
+/** Days from the change feed, with the attempts folded in; a day may hold only attempts. */
+function withAttempts(days: readonly RadarDay[], attempts: readonly ScanAttempt[]): RadarDay[] {
+  if (attempts.length === 0) return [...days]
+  const byDate = new Map<string, RadarDay>(days.map((d) => [d.date, { ...d, attempts: [] }]))
+  for (const attempt of attempts) {
+    const held = byDate.get(attempt.attemptedOn)
+    if (held) byDate.set(attempt.attemptedOn, { ...held, attempts: [...held.attempts, attempt] })
+    else
+      byDate.set(attempt.attemptedOn, {
+        date: attempt.attemptedOn,
+        changes: [],
+        attempts: [attempt],
+      })
+  }
+  return [...byDate.values()].sort((a, b) => (a.date < b.date ? 1 : -1))
+}
+
+/**
  * Changes into days, newest first.
  *
- * `attempts` is EMPTY on every day, and that is a real gap rather than an
- * oversight. The screen models a scan that was tried and failed — "we asked and
- * the answer did not come back" — and the collector records those in
- * `radar_fetch_log`, a table this binding does not read. So the feed can say what
- * moved and cannot yet say which competitor it failed to reach on a given day.
- * An empty list is the honest shape for that: `ScanAttempt` has a `not_attempted`
- * outcome, and inventing one per competitor per day would be asserting scans that
- * may never have run.
+ * `attempts` was EMPTY on every day until 2026-09-06 (audit IL-06): the
+ * collector wrote failures to `radar_fetch_log` and nothing read them, so a
+ * competitor whose page had refused every scan for a week looked exactly like
+ * one whose page had not changed. `readAttempts` above now supplies them and
+ * `withAttempts` folds them in; this function only buckets the changes.
  */
 function groupByDay(changes: readonly RadarChange[]): RadarDay[] {
   const byDate = new Map<string, RadarChange[]>()
@@ -225,7 +279,7 @@ function groupByDay(changes: readonly RadarChange[]): RadarDay[] {
   }
   return [...byDate.entries()]
     .sort((a, b) => (a[0] < b[0] ? 1 : -1))
-    .map(([date, list]) => ({ date, changes: list, attempts: [] }))
+    .map(([date, list]) => ({ date, changes: list, attempts: [] as ScanAttempt[] }))
 }
 
 /**
@@ -357,7 +411,10 @@ export function supabaseRadarStore(): RadarStore {
         return { collector: 'watch-list-only', competitors, days: [] }
       }
 
-      const feed = await readChanges(supabase, competitors)
+      const [feed, attempts] = await Promise.all([
+        readChanges(supabase, competitors),
+        readAttempts(workspaceId, await workspaceTimezone(supabase, workspaceId)),
+      ])
       // A FAILED READ IS NOT AN EMPTY FEED. `watch-list-only` is the honest
       // answer — "Radar cannot tell you either way" — and it is the sentence the
       // screen already has for exactly this. Returning `reading` with no days
@@ -365,7 +422,7 @@ export function supabaseRadarStore(): RadarStore {
       // never make by accident.
       if (feed === null) return { collector: 'watch-list-only', competitors, days: [] }
 
-      return { collector: 'reading', competitors, days: feed }
+      return { collector: 'reading', competitors, days: withAttempts(feed, attempts) }
     },
 
     /**

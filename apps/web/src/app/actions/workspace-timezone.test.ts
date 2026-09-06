@@ -17,7 +17,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const maybeSingle = vi.fn()
 const select = vi.fn(() => ({ maybeSingle }))
-const eq = vi.fn(() => ({ select }))
+// `autoDetectWorkspaceTimezone` adds `.is('timezone', null)` to the chain so the
+// write only lands when no zone is set; `setWorkspaceTimezone` does not. Both
+// shapes resolve through the same `select`/`maybeSingle`.
+const is = vi.fn(() => ({ select }))
+const eq = vi.fn(() => ({ select, is }))
 const update = vi.fn(() => ({ eq }))
 const from = vi.fn(() => ({ update }))
 
@@ -29,8 +33,19 @@ vi.mock('@/lib/supabase/server', () => ({ createServerSupabase: () => ({ from })
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('next/headers', () => ({ cookies: vi.fn() }))
 vi.mock('next/navigation', () => ({ redirect: vi.fn() }))
+// The role gate. A viewer may read the workspace but not change its settings;
+// null means the role could not be established, which denies too.
+const { getWorkspaceRole } = vi.hoisted(() => ({
+  getWorkspaceRole: vi.fn(async (): Promise<string | null> => 'owner'),
+}))
+vi.mock('@/lib/workspace-role', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/workspace-role')>()
+  return { ...actual, getWorkspaceRole }
+})
 
-import { setWorkspaceTimezone } from './workspace'
+import { revalidatePath } from 'next/cache'
+
+import { autoDetectWorkspaceTimezone, setWorkspaceTimezone } from './workspace'
 
 const WS = '11111111-1111-4111-8111-111111111111'
 
@@ -47,6 +62,31 @@ describe('setWorkspaceTimezone', () => {
 
     expect(result).toEqual({ ok: true, timezone: 'Europe/London' })
     expect(update).toHaveBeenCalledWith({ timezone: 'Europe/London' })
+  })
+
+  it('refreshes every screen the settings copy says the zone reaches, not only /settings', async () => {
+    vi.mocked(revalidatePath).mockClear()
+    await setWorkspaceTimezone(WS, 'Europe/London')
+
+    const paths = vi.mocked(revalidatePath).mock.calls.map((c) => c[0])
+    expect(paths).toEqual(expect.arrayContaining(['/settings', '/posts', '/planner', '/home']))
+  })
+
+  it('REFUSES a viewer before any write is issued, and says so', async () => {
+    getWorkspaceRole.mockResolvedValueOnce('viewer')
+    const result = await setWorkspaceTimezone(WS, 'Europe/London')
+
+    expect(result).toEqual({ ok: false, message: expect.stringMatching(/owner|editor/i) })
+    expect(update).not.toHaveBeenCalled()
+  })
+
+  it('REFUSES when the role cannot be established, with a different sentence', async () => {
+    getWorkspaceRole.mockResolvedValueOnce(null)
+    const result = await setWorkspaceTimezone(WS, 'Europe/London')
+
+    expect(result.ok).toBe(false)
+    expect(result).toEqual({ ok: false, message: expect.stringMatching(/could not confirm/i) })
+    expect(update).not.toHaveBeenCalled()
   })
 
   it('REFUSES a plausible typo, and writes nothing at all', async () => {
@@ -106,5 +146,66 @@ describe('setWorkspaceTimezone', () => {
 
     expect(result).toEqual({ ok: false, message: 'That workspace could not be found.' })
     expect(from).not.toHaveBeenCalled()
+  })
+})
+
+describe('autoDetectWorkspaceTimezone — the browser learns it, once, only when unset', () => {
+  beforeEach(() => {
+    from.mockClear()
+    update.mockClear()
+    eq.mockClear()
+    is.mockClear()
+    maybeSingle.mockReset()
+    maybeSingle.mockResolvedValue({ data: { timezone: 'Asia/Dubai' }, error: null })
+  })
+
+  it('stores a detected zone, conditioned on the column being null', async () => {
+    const result = await autoDetectWorkspaceTimezone(WS, 'Asia/Dubai')
+
+    expect(result).toEqual({ ok: true, timezone: 'Asia/Dubai' })
+    expect(update).toHaveBeenCalledWith({ timezone: 'Asia/Dubai' })
+    // The "only if unset" is a condition of the write, not a read-then-write:
+    // two tabs racing cannot both set it.
+    expect(is).toHaveBeenCalledWith('timezone', null)
+  })
+
+  it('is a silent no-op when a zone is already set — never claims a write', async () => {
+    // The `IS NULL` filter matched no row because a zone exists. PostgREST
+    // reports null data with no error. This must NOT be reported as having
+    // stored anything, and must never move the zone a person chose.
+    maybeSingle.mockResolvedValue({ data: null, error: null })
+
+    const result = await autoDetectWorkspaceTimezone(WS, 'Asia/Dubai')
+
+    expect(result).toEqual({ ok: true, timezone: null })
+  })
+
+  it('refuses an unresolvable zone before it touches the database', async () => {
+    const result = await autoDetectWorkspaceTimezone(WS, 'Asia/Kolkatta')
+
+    expect(result.ok).toBe(false)
+    expect(from).not.toHaveBeenCalled()
+  })
+
+  it('refuses an offset — a fact about one instant, not a place', async () => {
+    const result = await autoDetectWorkspaceTimezone(WS, '+05:30')
+
+    expect(result.ok).toBe(false)
+    expect(from).not.toHaveBeenCalled()
+  })
+
+  it('refuses an id that is not a workspace id, before the database', async () => {
+    const result = await autoDetectWorkspaceTimezone('not-a-uuid', 'Asia/Dubai')
+
+    expect(result.ok).toBe(false)
+    expect(from).not.toHaveBeenCalled()
+  })
+
+  it('reports failure when the database itself errored', async () => {
+    maybeSingle.mockResolvedValue({ data: null, error: { message: 'connection lost' } })
+
+    const result = await autoDetectWorkspaceTimezone(WS, 'Asia/Dubai')
+
+    expect(result).toEqual({ ok: false, message: 'Could not save the time zone.' })
   })
 })

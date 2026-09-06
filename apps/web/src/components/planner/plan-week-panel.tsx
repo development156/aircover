@@ -3,10 +3,12 @@
 import Link from 'next/link'
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { CalendarRange, Share2, Sparkles, Target } from 'lucide-react'
+import { ArrowRight, ImageIcon, Share2, Sparkles, Target } from 'lucide-react'
 import { creditCost, toChannelSet, type ChannelSet } from '@sahoda/shared'
 
 import { planMyWeek } from '@/app/actions/plan-week'
+import { WarmBand } from '@/components/planner/warm-band'
+import { WeekIllustrator } from '@/components/planner/week-illustrator'
 import { ChannelPicker } from '@/components/posts/channel-picker'
 import { InlineError } from '@/components/posts/inline-error'
 import { PendingLines } from '@/components/posts/pending-lines'
@@ -14,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { CostLabel } from '@/components/ui/cost-label'
 import { creditWord } from '@/lib/credit-words'
+import { defaultModelId, imageActionFor } from '@/lib/studio/models'
 
 const PENDING = [
   'Reading your Brand Brain…',
@@ -32,8 +35,15 @@ const DEFAULT_CHANNELS: ChannelSet = toChannelSet(['x', 'gbp'])
  */
 const GOALS_MAX = 500
 
+/**
+ * How many drafts one plan makes, and so how many pictures the box below asks
+ * for. The action inserts what the model returns, which has been five on every
+ * run; the button says "up to" because the exact count is the model's.
+ */
+const DRAFTS_PER_PLAN = 5
+
 type Outcome =
-  | { kind: 'planned'; clamped: number }
+  | { kind: 'planned'; clamped: number; postIds: string[]; withImages: boolean }
   | { kind: 'insufficient'; required: number; available: number }
   | { kind: 'failed'; message: string }
 
@@ -48,7 +58,14 @@ export function PlanWeekPanel() {
   const [outcome, setOutcome] = useState<Outcome | null>(null)
   const [pending, startTransition] = useTransition()
 
+  const [withImages, setWithImages] = useState(false)
+
   const cost = creditCost('loop_cycle')
+  // The everyday model's own price, read through the same map the Studio
+  // charges by, never a literal. Null cannot happen for the routed default.
+  const imageAction = imageActionFor(defaultModelId())
+  const imageCost = imageAction === null ? 0 : creditCost(imageAction)
+  const totalCost = withImages ? cost + imageCost * DRAFTS_PER_PLAN : cost
 
   function run() {
     if (channels.length === 0) return
@@ -66,7 +83,12 @@ export function PlanWeekPanel() {
             <span className="tabular-nums">{result.balanceAfter}</span> left
           </span>,
         )
-        setOutcome({ kind: 'planned', clamped: result.clamped })
+        setOutcome({
+          kind: 'planned',
+          clamped: result.clamped,
+          postIds: result.postIds ?? [],
+          withImages,
+        })
         return
       }
 
@@ -95,177 +117,276 @@ export function PlanWeekPanel() {
          together. Pick one." The previous `border border-line` plus
          `shadow-card` also broke §6's other rule — "a resting card gets no
          shadow" — so both are gone. */
-      className="surface-ring-firm rounded-card bg-brand-wash p-5 narrow:p-6"
+      className="surface-ring-firm overflow-hidden rounded-card bg-surface"
     >
-      {/* ── THE ANCHOR ────────────────────────────────────────────────────────
-          The mark and the title are one object: a 40px tinted square, then the
-          title at `type-h2`, then the promise at `type-sm` in --ink-mute. That
-          20/13 pair is a real step; the 15/13 it replaced was half a rung and
-          read as two lines of the same thing, which is how the heading got lost
-          inside its own card.
+      {/* ── THE BAND. THE ONE LOUD OBJECT ON THIS ROUTE ───────────────────────
+          The founder asked for a wide gradient card with the sparkle, the
+          heading, one line of promise and a large pill button — "the obvious
+          next action". This is it, and the reason it can exist is that the hero
+          at the top of the page gave up the weight to pay for it: docs/37 §2.3
+          measures /planner as the loudest screen in the product and §16 names
+          "a 1032px orange band holding two words" as the cause. Two loud bands
+          is not a hierarchy. One is.
 
-          `type-h2` is 20px and the page title above it is `type-h1` at 24px, so
-          this leads its CARD without outranking its PAGE. Going to `type-display`
-          would have made the panel shout over /planner's own title. */}
-      <div className="flex items-start gap-3">
-        {/* dark: tint-50 stays warm-light while --acc flips to Orange300 → s2 surface */}
-        <span className="grid size-10 shrink-0 place-items-center rounded-sm bg-tint-50 text-accent dark:bg-s2">
-          <CalendarRange size={20} strokeWidth={1.8} aria-hidden />
-        </span>
-        <div className="space-y-1">
-          <h2 className="type-h2 text-ink">Plan my week</h2>
-          <p className="type-sm text-muted">
-            Five drafts, grounded in your Brand Brain, placed across the coming week.
-          </p>
+          THE GRADIENT IS ORANGE INTO NOTHING, NOT ORANGE INTO PINK. The brief
+          asks for "orange to peach to soft pink" and this palette holds exactly
+          one chromatic colour for chrome: #ff6600. There is no peach token and
+          no pink token; the only pink in the file is `--channel-instagram`,
+          whose own comment says it "never leaks into buttons, text or
+          surfaces". So the sweep runs `--t100` (orange at 16%) through `--t50`
+          (6%) to transparent, left to right — which reads as orange fading to
+          peach on the warm ground, and stops there. A third colour would mean
+          inventing a token, and a brand gaining a second hue is a decision for
+          the founder, not for a page.
+
+          The stops are `var()` in an inline style rather than Tailwind's
+          `from-`/`via-`/`to-`: those utilities emit `--tw-gradient-*` custom
+          properties, and this file must also carry `--brand-wash` as a base
+          layer under the sweep so the band never renders transparent while the
+          gradient paints. One declaration is easier to read than four classes
+          that have to agree. Raw hex is banned here and none is used. */}
+      <div className="relative isolate overflow-hidden bg-brand-wash">
+        <WarmBand />
+        <div className="relative flex flex-wrap items-center gap-4 p-5 narrow:p-6">
+          <span
+            aria-hidden
+            /* dark: tint-50 stays warm-light while --acc flips to Orange300 → s2 surface */
+            className="grid size-10 shrink-0 place-items-center rounded-sm bg-tint-50 text-accent dark:bg-s2"
+          >
+            <Sparkles size={20} strokeWidth={1.8} />
+          </span>
+
+          <div className="min-w-0 flex-1">
+            {/* `type-h2` is 20px and the page title above is `type-h1` at 24px,
+                so this leads its CARD without outranking its PAGE. */}
+            <h2 className="type-h2 text-ink">Plan my week</h2>
+            {/* The brief's own line, and it is a better sentence than the one it
+                replaces: "Five drafts, grounded in your Brand Brain, placed
+                across the coming week" describes our mechanism, this describes
+                the reader's outcome. It stays exact — five is still five, and
+                the count is stated one line down where the goal is set. */}
+            <p className="mt-0.5 type-sm text-muted">Turn drafts into a ready-to-publish week.</p>
+          </div>
+
+          {
+            /* ── THE PRIMARY. THE ONE SOLID BRAND FILL ON THIS SCREEN ───────
+               `rounded-pill` and `shadow-brand` are the brief's "rounded pill,
+               soft glow". `shadow-brand` already exists — `0 8px 24px` of the
+               brand at 24% — and was reserved by comment for the credits hero;
+               this is the second place in the product that has earned it.
+
+               NOT a gradient fill. There is one orange in this palette, and
+               `--brand-deep` is BLACK in light mode (it is the hover token), so
+               "brand to brand-deep" would paint orange into black. A gradient
+               button needs a second orange that does not exist yet.
+
+               The hover stays canon and goes BLACK, which is the rule every
+               other primary in the product follows. */
+            <Button
+              size="lg"
+              onClick={run}
+              loading={pending}
+              disabled={channels.length === 0 || pending}
+              className="w-full rounded-pill px-5 shadow-brand transition-micro hover:shadow-none narrow:w-auto"
+            >
+              {/* `Sparkles` lives on the band now, so the button carries the
+                  direction instead. docs/37 §18 bans emoji in Sahoda's own
+                  interface — the brief's "✨" and "→" are both lucide glyphs
+                  here, which inherit the button's colour in both themes. */}
+              <CostLabel
+                action={withImages ? 'Plan my week with pictures' : 'Plan my week'}
+                cost={totalCost}
+              />
+              <ArrowRight size={15} aria-hidden />
+            </Button>
+          }
         </div>
       </div>
 
-      {/* ── 1 · THE GOAL ──────────────────────────────────────────────────────
+      {/* ── EVERYTHING BELOW THE BAND IS THE CONTROLS, AND NONE WAS REMOVED ───
+          The brief redraws this panel as a bar with one button, and taken
+          literally that deletes the goals field and the channel picker. The
+          channel picker decides which platforms get written and therefore what
+          the reader is charged for; dropping it would silently plan against a
+          default the reader never chose. The same brief says "preserve the
+          existing functionality" and "do not invent unnecessary features", so
+          the resolution is a shape, not a deletion: the band IS the action and
+          the controls sit under it, quieter, on plain surface. Goals are
+          optional and channels have a seeded default, so the one-click path the
+          brief asks for is real — it just has not thrown anything away. */}
+      <div className="p-5 narrow:p-6">
+        {/* ── 1 · THE GOAL ──────────────────────────────────────────────────────
           Three groups, each opened by a hairline rule and a `type-h3` heading:
           goal, then channels, then the action. The card was one undifferentiated
           `space-y-3` stack before, which is why it read as a settings form. */}
-      <div className="mt-5 border-t border-line pt-5">
-        <p className="type-eyebrow text-ink-mute">Step 1</p>
-        {/* A plain <label>, not the `Label` primitive. `Label` hard-codes a 12px
+        <div>
+          <p className="type-eyebrow text-ink-mute">Step 1</p>
+          {/* A plain <label>, not the `Label` primitive. `Label` hard-codes a 12px
             form-label step, and layering `type-h3` over it would leave two font
             declarations racing on CSS order rather than on intent.
 
             "(optional)" stays INSIDE the label. Moved out to a sibling it still
             LOOKS the same and the accessible name silently drops it, so a screen
             reader would hear a required-sounding field. */}
-        <label
-          htmlFor="plan-week-goals"
-          className="mt-1 flex flex-wrap items-center gap-x-2 type-h3 text-ink"
-        >
-          <Target size={15} strokeWidth={2} className="text-accent" aria-hidden />
-          Goals for the week <span className="type-sm text-muted">(optional)</span>
-        </label>
+          <label
+            htmlFor="plan-week-goals"
+            className="mt-1 flex flex-wrap items-center gap-x-2 type-h3 text-ink"
+          >
+            <Target size={15} strokeWidth={2} className="text-accent" aria-hidden />
+            Goals for the week <span className="type-sm text-muted">(optional)</span>
+          </label>
 
-        <Textarea
-          id="plan-week-goals"
-          value={goals}
-          onChange={(event) => setGoals(event.target.value)}
-          disabled={pending}
-          rows={5}
-          maxLength={GOALS_MAX}
-          placeholder="e.g. promote the monsoon menu, bring more people in at the weekend"
-          // Padding and height only, plus a focus ring one tint step firmer than
-          // the primitive's. The RESTING ring, the radius and the placeholder
-          // colour are deliberately NOT overridden: every other field in the
-          // product wears them, and a planning canvas that disagrees with the
-          // composer is drift rather than polish. The placeholder in particular
-          // stays --ink-mute; the reference art has it lighter, and lighter is a
-          // legibility regression on the phone this product is built for.
-          className="mt-2 px-4 py-3 focus:shadow-[inset_0_0_0_1.5px_var(--brand),0_0_0_3px_var(--t100)]"
-        />
+          <Textarea
+            id="plan-week-goals"
+            value={goals}
+            onChange={(event) => setGoals(event.target.value)}
+            disabled={pending}
+            rows={5}
+            maxLength={GOALS_MAX}
+            placeholder="e.g. promote the monsoon menu, bring more people in at the weekend"
+            // Padding and height only, plus a focus ring one tint step firmer than
+            // the primitive's. The RESTING ring, the radius and the placeholder
+            // colour are deliberately NOT overridden: every other field in the
+            // product wears them, and a planning canvas that disagrees with the
+            // composer is drift rather than polish. The placeholder in particular
+            // stays --ink-mute; the reference art has it lighter, and lighter is a
+            // legibility regression on the phone this product is built for.
+            className="mt-2 px-4 py-3 focus:shadow-[inset_0_0_0_1.5px_var(--brand),0_0_0_3px_var(--t100)]"
+          />
 
-        {/* The ceiling was already enforced and invisible. This reports the two
+          {/* The ceiling was already enforced and invisible. This reports the two
             numbers the field itself produced; neither is estimated. */}
-        <p className="mt-1.5 text-right type-meta text-muted">
-          <span className="tabular-nums">{goals.length}</span> /{' '}
-          <span className="tabular-nums">{GOALS_MAX}</span> characters
-        </p>
-      </div>
-
-      {/* ── 2 · THE CHANNELS ──────────────────────────────────────────────── */}
-      <div className="mt-5 border-t border-line pt-5">
-        <p className="type-eyebrow text-ink-mute">Step 2</p>
-        <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <h3 className="flex items-center gap-2 type-h3 text-ink">
-            <Share2 size={15} strokeWidth={2} className="text-accent" aria-hidden />
-            Channels
-          </h3>
-          <p className="type-sm text-muted">Choose the channels you want to plan for.</p>
+          <p className="mt-1.5 text-right type-meta text-muted">
+            <span className="tabular-nums">{goals.length}</span> /{' '}
+            <span className="tabular-nums">{GOALS_MAX}</span> characters
+          </p>
         </div>
-        {/* `hideLabel` because the heading above already says it. The picker's
+
+        {/* ── 2 · THE CHANNELS ──────────────────────────────────────────────── */}
+        <div className="mt-5 border-t border-line pt-5">
+          <p className="type-eyebrow text-ink-mute">Step 2</p>
+          <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h3 className="flex items-center gap-2 type-h3 text-ink">
+              <Share2 size={15} strokeWidth={2} className="text-accent" aria-hidden />
+              Channels
+            </h3>
+            <p className="type-sm text-muted">Choose the channels you want to plan for.</p>
+          </div>
+          {/* `hideLabel` because the heading above already says it. The picker's
             own 12px `Label` under a `type-h3` heading would be the same word
             twice at two sizes. */}
-        <div className="mt-3">
-          <ChannelPicker selected={channels} onChange={setChannels} disabled={pending} hideLabel />
+          <div className="mt-3">
+            <ChannelPicker
+              selected={channels}
+              onChange={setChannels}
+              disabled={pending}
+              hideLabel
+            />
+          </div>
         </div>
-      </div>
 
-      {/* ── 3 · THE ACTION ────────────────────────────────────────────────── */}
-      <div className="mt-5 border-t border-line pt-5">
-        {pending ? (
-          <PendingLines lines={PENDING} />
-        ) : (
-          <div className="flex flex-col gap-3 narrow:flex-row narrow:items-center narrow:gap-4">
-            {/* ── NOT A 1100px ORANGE BAR ──────────────────────────────────
-                `w-full` unconditionally made the loudest object in this lane: on
-                the baseline capture /planner measured 3.5-4.3% saturated pixels,
-                the worst of any route here and above the 2.883% docs/37 §2.3
-                recorded for it, and this single bar is most of that.
+        {/* ── 3 · THE PICTURES ──────────────────────────────────────────────── */}
+        <div className="mt-5 border-t border-line pt-5">
+          <p className="type-eyebrow text-ink-mute">Step 3</p>
+          <label className="mt-1 flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={withImages}
+              onChange={(event) => setWithImages(event.target.checked)}
+              disabled={pending}
+              className="mt-1 size-4 shrink-0 accent-[var(--brand)]"
+            />
+            <span className="min-w-0">
+              <span className="flex items-center gap-2 type-h3 text-ink">
+                <ImageIcon size={15} strokeWidth={2} className="text-accent" aria-hidden />
+                Also make a picture for each post
+              </span>
+              {/* The price is a product of two figures the reader can check: the
+                  everyday model's price from the Studio, and the number of
+                  drafts a plan makes. "Up to" because the count is the model's. */}
+              <span className="mt-0.5 block type-sm text-muted">
+                Sahoda picks the shape for each post&apos;s channels, draws it on brand and attaches
+                it to the draft. Up to <span className="tabular-nums">{DRAFTS_PER_PLAN}</span>{' '}
+                pictures at <span className="tabular-nums">{imageCost}</span>{' '}
+                {creditWord(imageCost)} each, charged one by one as they arrive. A picture that
+                fails is not charged.
+              </span>
+            </span>
+          </label>
+        </div>
 
-                Full width is RIGHT on a phone, a primary under the thumb, and
-                wrong at 1440 where it is a band. `narrow:w-auto` is the pair
-                `plan-picker.tsx` already uses. Deliberately NOT `sm:w-auto`:
-                docs/37 §13 records `top-up-panel.tsx` shipping exactly that,
-                where the class is spelled correctly, type-checks, reads right in
-                review and is never emitted, so the money screen's primary
-                rendered as a ~1000px bar.
+        <div className="mt-5 border-t border-line pt-5">
+          {pending ? (
+            /* The button in the band shows the spinner; these four lines say what
+             is happening while it spins, and the last of them is the charge
+             promise. A spinner alone on a 20-credit action is not enough. */
+            <PendingLines lines={PENDING} />
+          ) : (
+            /* Says where the output LANDS, which nothing else on this card does.
+             Deliberately not "nothing publishes until you approve": auto-publish
+             exists on this route and that sentence would be false wherever it is
+             switched on. Editing and rescheduling are true in every
+             configuration.
 
-                `size="lg"` is the kit's own 40px step, not a new size. It costs
-                roughly 1,900px² more accent than the 38px default at 1440,
-                which is 0.015% of the frame, and it buys the one thing on this
-                card that is supposed to be pressed. The hover is unchanged and
-                stays canon: the primary goes BLACK, never to a darker orange. */}
-            <Button
-              size="lg"
-              onClick={run}
-              disabled={channels.length === 0}
-              className="w-full px-5 shadow-[0_2px_10px_-4px_var(--t300)] transition-micro hover:shadow-none narrow:w-auto"
-            >
-              {/* `Sparkles`, not the ✨ the brief asked for. docs/37 §18 bans
-                  emoji in Sahoda's own interface — the carve-out is for generated
-                  social captions, which this is not. The lucide glyph carries the
-                  same "this is the AI action" reading and inherits the button's
-                  own colour in both themes, which an emoji cannot. */}
-              <Sparkles size={15} aria-hidden />
-              <CostLabel action="Plan my week" cost={cost} />
-            </Button>
-            {/* Says where the output LANDS, which nothing else on this card
-                does. Deliberately not "nothing publishes until you approve":
-                auto-publish exists on this route and that sentence would be
-                false wherever it is switched on. Editing and rescheduling are
-                true in every configuration.
-
-                Capped at 46ch. Uncapped it set one 940px line at 1440 and the
-                action row read as a paragraph with a button stuck to it, which
-                is the opposite of what the row is for. MEASURED off the frame. */}
+             Capped at 46ch. Uncapped it set one 940px line at 1440. */
             <p className="type-meta max-w-[46ch] text-muted">
               Sahoda saves the drafts to your planner, where you can edit or reschedule each one.
             </p>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
 
-      {outcome?.kind === 'planned' && outcome.clamped > 0 ? (
-        <p className="mt-4 rounded-input bg-s2 px-3 py-2.5 type-sm text-muted">
-          <span className="tabular-nums">{outcome.clamped}</span>
-          {outcome.clamped === 1 ? ' suggested time was' : ' suggested times were'} unusable and
-          moved to sensible future slots.
-        </p>
-      ) : null}
+        {outcome?.kind === 'planned' && outcome.withImages && outcome.postIds.length > 0 ? (
+          <WeekIllustrator
+            key={outcome.postIds.join(',')}
+            postIds={outcome.postIds}
+            costPerPicture={imageCost}
+            onDone={(summary) => {
+              if (summary.made === 0) return
+              toast.success(
+                <span>
+                  <span className="tabular-nums">{summary.made}</span>{' '}
+                  {summary.made === 1 ? 'picture' : 'pictures'} attached ·{' '}
+                  <span className="tabular-nums">{summary.charged}</span>{' '}
+                  {creditWord(summary.charged)} used
+                  {summary.balanceAfter !== null ? (
+                    <>
+                      {' '}
+                      · <span className="tabular-nums">{summary.balanceAfter}</span> left
+                    </>
+                  ) : null}
+                </span>,
+              )
+            }}
+          />
+        ) : null}
 
-      {outcome?.kind === 'insufficient' ? (
-        <InlineError className="mt-4">
-          Planning needs <span className="tabular-nums">{outcome.required}</span>{' '}
-          {creditWord(outcome.required)} and you have{' '}
-          <span className="tabular-nums">{outcome.available}</span>. Nothing was planned and you
-          were not charged.{' '}
-          <Link href="/wallet" className="font-semibold underline underline-offset-2">
-            Top up your wallet
-          </Link>
-        </InlineError>
-      ) : null}
+        {outcome?.kind === 'planned' && outcome.clamped > 0 ? (
+          <p className="mt-4 rounded-input bg-s2 px-3 py-2.5 type-sm text-muted">
+            <span className="tabular-nums">{outcome.clamped}</span>
+            {outcome.clamped === 1 ? ' suggested time was' : ' suggested times were'} unusable and
+            moved to sensible future slots.
+          </p>
+        ) : null}
 
-      {/* The charge statement has exactly ONE owner: the action that produced the
+        {outcome?.kind === 'insufficient' ? (
+          <InlineError className="mt-4">
+            Planning needs <span className="tabular-nums">{outcome.required}</span>{' '}
+            {creditWord(outcome.required)} and you have{' '}
+            <span className="tabular-nums">{outcome.available}</span>. Nothing was planned and you
+            were not charged.{' '}
+            <Link href="/wallet" className="font-semibold underline underline-offset-2">
+              Top up your wallet
+            </Link>
+          </InlineError>
+        ) : null}
+
+        {/* The charge statement has exactly ONE owner: the action that produced the
           message. It alone knows whether the hold was released — rendered
           verbatim for that reason. */}
-      {outcome?.kind === 'failed' ? (
-        <InlineError className="mt-4">{outcome.message}</InlineError>
-      ) : null}
+        {outcome?.kind === 'failed' ? (
+          <InlineError className="mt-4">{outcome.message}</InlineError>
+        ) : null}
+      </div>
     </section>
   )
 }

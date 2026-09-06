@@ -161,25 +161,18 @@ export async function killLoop(alsoPause = true): Promise<KillState> {
     // Release each hold through `app.apply_ledger_entry`, which is the only
     // write path to the ledger. A RELEASE keyed on the hold it settles is
     // idempotent, so a second press cannot refund twice.
-    const { databaseUrl } = loadBillingEnv()
-    const ledger = createPgLedgerPort({ connectionString: databaseUrl })
-    let released = 0
-    for (const hold of out.outstanding_holds) {
-      try {
-        await ledger.apply({
-          workspaceId: workspaceId as string,
-          entryType: 'RELEASE',
-          amount: hold.amount,
-          idempotencyKey: `loop-kill:release:${hold.entry_id}`,
-          settlesEntryId: hold.entry_id,
-        })
-        released += 1
-      } catch (cause) {
-        // Reported, never swallowed silently, and never fatal: the expired-hold
-        // sweep is the backstop and the cancellation already committed.
-        reportServerError(cause, { action: 'killLoop.release', workspaceId })
-      }
-    }
+    //
+    // ── THE STOP HAS ALREADY HAPPENED BY THIS LINE ────────────────────────────
+    // The RPC committed: cycles cancelled, posts unscheduled, Loop paused. What
+    // follows is a refund, and a refund that cannot run must not be reported as
+    // a stop that did not. On the wt-core preview, with no SUPABASE_DB_URL in
+    // the environment, `loadBillingEnv()` threw here on a workspace with ZERO
+    // holds, and the person read "Could not stop the Loop. Try again." over a
+    // Loop that a reload showed stopped (MEASURED 2026-09-06). So the pool is
+    // opened only when there is a hold to release, every failure in here is
+    // reported and counted rather than thrown, and the pool is closed after:
+    // the previous version leaked one per press.
+    const released = await releaseHolds(workspaceId, out.outstanding_holds)
 
     revalidateBalance()
     revalidatePath('/loop')
@@ -257,4 +250,41 @@ export async function resolveLearning(
     reportServerError(error, { action: 'resolveLearning', workspaceId })
     return { ok: false, message: 'Could not save that. Try again.' }
   }
+}
+
+/**
+ * Refund every hold the kill switch found. Never throws: the count of what was
+ * released is the answer, and the expired-hold sweep is the backstop for the
+ * rest. The ledger pool is opened only when there is something to release.
+ */
+async function releaseHolds(
+  workspaceId: string,
+  holds: ReadonlyArray<{ entry_id: string; amount: number }>,
+): Promise<number> {
+  if (holds.length === 0) return 0
+  let ledger: ReturnType<typeof createPgLedgerPort> | null = null
+  let released = 0
+  try {
+    const { databaseUrl } = loadBillingEnv()
+    ledger = createPgLedgerPort({ connectionString: databaseUrl })
+    for (const hold of holds) {
+      try {
+        await ledger.apply({
+          workspaceId,
+          entryType: 'RELEASE',
+          amount: hold.amount,
+          idempotencyKey: `loop-kill:release:${hold.entry_id}`,
+          settlesEntryId: hold.entry_id,
+        })
+        released += 1
+      } catch (cause) {
+        reportServerError(cause, { action: 'killLoop.release', workspaceId })
+      }
+    }
+  } catch (cause) {
+    reportServerError(cause, { action: 'killLoop.releasePort', workspaceId })
+  } finally {
+    await ledger?.close().catch(() => undefined)
+  }
+  return released
 }

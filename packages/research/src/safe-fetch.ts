@@ -4,7 +4,7 @@ import { ipLiteral, isPrivateAddress } from './ip'
 import { pinnedFetch } from './pinned-fetch'
 
 /**
- * Tier 1 fetches a FOUNDER-SUPPLIED URL from our own server. Firecrawl did not
+ * Tier 1 fetches a FOUNDER-SUPPLIED URL from our own server. A vendor fetch did not
  * have this problem: the request left their infrastructure, not ours. A direct
  * fetch does, and it is the classic SSRF shape — `http://169.254.169.254/`
  * reads the cloud metadata endpoint, `http://localhost:5432` probes our own

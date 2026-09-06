@@ -1,7 +1,7 @@
 import { writeFileSync } from 'node:fs'
 import { describe, it } from 'vitest'
 import {
-  createFirecrawlClient,
+  createTinyFishSource,
   crawlSite,
   loadResearchEnv,
   quarantineCorpus,
@@ -54,7 +54,7 @@ describe.runIf(LIVE)('arm D — the URL door on a real site', () => {
     if (!name) throw new Error('ARM_D_NAME is required — the control needs the same name as arm D')
 
     const env = loadResearchEnv()
-    const client = createFirecrawlClient({ apiKey: env.firecrawlKey, baseUrl: env.firecrawlUrl })
+    const client = createTinyFishSource({ apiKey: env.tinyfishKey, baseUrl: env.tinyfishFetchUrl })
     const mesh = createMesh()
     const ctxFor = (label: string): MeshContext => ({
       workspaceId: WORKSPACE_ID,
@@ -72,7 +72,7 @@ describe.runIf(LIVE)('arm D — the URL door on a real site', () => {
           pages: crawl.pages.map((p) => ({ url: p.url, words: p.words })),
           skipped: crawl.skipped,
           wordsFound: crawl.wordsFound,
-          firecrawlCredits: crawl.creditsUsed,
+          vendorCredits: crawl.creditsUsed,
         }
       : crawl
 

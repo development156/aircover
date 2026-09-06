@@ -69,6 +69,36 @@ describe('contentVariantsTask', () => {
     expect(user).toContain('gbp')
   })
 
+  it('gives each requested channel its own voice, not just a length', () => {
+    // The gap this closes: the brief carried char limits and nothing about how a
+    // post should READ, so every channel came back as the canonical post trimmed.
+    const user = contentVariantsTask.buildMessages(input, ctx).at(-1)!.content
+    expect(user).toContain('voice:')
+    expect(user).toMatch(/x:[\s\S]*punchy and short/) // X is not LinkedIn
+    expect(user).toMatch(/gbp:[\s\S]*no keyword list/) // GBP is indexed, takes no keywords
+  })
+
+  it('asks for keywords on every channel except GBP, in the brief the model reads', () => {
+    // MEASURED on the preview: keywords came back only for the channel whose
+    // BRIEF mentioned them. The system rule alone was not enough, so the ask is
+    // in each channel's own line now — 2 to 5 for X, none for GBP.
+    const user = contentVariantsTask.buildMessages(input, ctx).at(-1)!.content
+    expect(user).toMatch(/x:[\s\S]*2-5 keywords/)
+    expect(user).toMatch(/gbp:[\s\S]*no keywords/)
+  })
+
+  it('makes the keyword field mandatory in the output contract, not optional', () => {
+    // MEASURED live on the preview at 54a84120: bodies adapted per channel but
+    // every keyword field came back empty. The shape showed `"hashtags"?` and
+    // the economy model reads the `?` as "skip it". The ask is now a MUST, and
+    // the shown shape drops the `?`, so keywords come back for X and LinkedIn.
+    const system = contentVariantsTask
+      .buildMessages(input, ctx)
+      .find((m) => m.role === 'system')!.content
+    expect(system).toMatch(/MUST carry "extras\.hashtags"/)
+    expect(system).not.toContain('"hashtags"?')
+  })
+
   it('resolves a valid model response into per-channel variants', async () => {
     const result = await runnerFor(fixedProvider([validOut])).run(contentVariantsTask, input, ctx)
     expect(result.ok).toBe(true)

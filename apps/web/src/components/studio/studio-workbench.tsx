@@ -1,581 +1,242 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import dynamic from 'next/dynamic'
-import { Download, Maximize2, Pencil, Sparkles } from 'lucide-react'
-import type { GenerationMode } from '@sahoda/shared'
+import type { Route } from 'next'
 
-import { queueGeneration } from '@/app/actions/studio'
-// Lazy: a canvas editor is a large chunk that most visits never open, and the
-// Studio's first paint is where a person is deciding whether to spend.
-const DrawModal = dynamic(() =>
-  import('@/components/studio/draw-modal').then((mod) => mod.DrawModal),
-)
+import type { BrandSignal } from '@sahoda/shared'
 
-import { PictureActions } from '@/components/studio/picture-actions'
-import { PictureViewer } from '@/components/studio/picture-viewer'
-import { ReferenceUpload } from '@/components/studio/reference-upload'
-import { Button } from '@/components/ui/button'
-import { CostLabel } from '@/components/ui/cost-label'
-import { Textarea } from '@/components/ui/textarea'
+import { Composer } from '@/components/studio/composer'
 import type { CanvasPicture } from '@/lib/studio/canvas'
 import type { StudioFormat } from '@/lib/studio/formats'
-import {
-  MAX_TRIES_PER_PRESS,
-  describeModeBlock,
-  promptHintFor,
-  readyModes,
-  ruleFor,
-} from '@/lib/studio/modes'
-import type { LibraryPicture } from '@/lib/studio/read'
-import { PROMPT_STARTERS } from '@/lib/studio/prompt'
-import { describeInsufficient, describePartial } from '@/lib/studio/refusal-copy'
-import { savePicture } from '@/lib/studio/save-picture'
+import type { LibraryRead } from '@/lib/studio/read'
+import type { StudioStarters } from '@/lib/studio/starter-ladder'
 
 /**
- * THE WORKBENCH: CONTROLS ON THE LEFT, THE PICTURE ON THE RIGHT.
+ * THE WALL. THE PLACE A NEW PICTURE IS JUDGED AGAINST EVERY OTHER ONE.
  *
- * ── WHY THE CANVAS IS HALF THE SCREEN ───────────────────────────────────────
- * Judging a picture is the work. A thumbnail in a list is enough to know a
- * generation finished and not enough to decide whether to keep it, so the newest
- * result gets real space and everything else is a control beside it.
+ * ── APPROVED REDESIGN, NOT A TIDY-UP ────────────────────────────────────────
+ * `Wall.dc.html` is the spec. The old screen spent about 1,000px of vertical
+ * space on ONE picture ("the canvas") while every other one this workspace
+ * had made sat as small thumbnails at the very bottom. That section is gone
+ * — deleted, not hidden — and a customer's own pictures now run the full
+ * width of the page, which is what a grid of pictures wants and a single
+ * inline result never gave it.
  *
- * ── THE CANVAS IS NEVER EMPTY, IT IS ALWAYS SAYING SOMETHING ────────────────
- * Before the first press it explains what will appear there. While a generation
- * runs it says so. After a refusal it carries the refusal. An empty rectangle
- * would read as something that failed to load.
+ * ── THE COMPOSER IS EXTRACTED, NOT REBUILT ──────────────────────────────────
+ * Every control this screen used to own directly — the prompt, the price,
+ * the model/mode/format/count/logo pickers, the refiner, the reference
+ * picker, "Will send," "Not built yet" — now lives in `composer.tsx`, built
+ * so a second screen (the viewer, `/studio/<id>`, a later pass) can mount the
+ * exact same bar prefilled from an existing picture. This file only decides
+ * WHERE that bar sits (floating, sticky, over the wall) and what fills the
+ * page beneath it.
  *
- * ── EVERY RULE IS ASKED OF `modes.ts`, NEVER RE-IMPLEMENTED HERE ────────────
- * Whether a mode may run, how many references it takes, and the sentence when it
- * may not, all come from one module the server action asks as well. A screen
- * that offered a mode the action refuses would waste a press; one that hid a
- * mode the action allows would cost a feature.
+ * ── STICKY, WITH ITS OWN GROUND ──────────────────────────────────────────
+ * `sticky top-topbar` pins the bar just under the app's own topbar as the
+ * page scrolls, and `bg-canvas` gives it a real ground so the wall's tiles
+ * pass BEHIND its edge rather than showing through it — the artboard's own
+ * point: looking for something to compare a new picture against should never
+ * scroll the controls away.
+ *
+ * ── THREE STEPS OF VERTICAL RHYTHM, NOWHERE ELSE ─────────────────────────
+ * Every vertical gap and stack padding on this screen is one of three
+ * token-backed steps: `gap-2`/`py-2` (8px, `--space-2`, a tight pairing —
+ * a message beside its own status line), `gap-3`/`py-3` (12px, `--space-3`,
+ * a component's own internal rows — the sticky bar's own stack, the wall
+ * section's own rows), or `gap-grid`/`py-grid` (20px, `--spacing-grid`, one
+ * major region to the next). That third step is deliberately the SAME
+ * `--spacing-grid` this page's own `page.tsx` already uses for
+ * `space-y-grid` between the title and this component — this root used to
+ * run its own top-level stack at `gap-6` (24px) instead, a second "major
+ * section" number a few pixels from the first, which is the exact defect
+ * this rule exists to close. Icon-to-label micro gaps (`gap-1.5`,
+ * `--spacing-icon-gap`) and the count stepper's own `gap-0.5` are a
+ * different, smaller-scale typographic relationship (docs/26 §2) and are
+ * not part of this ladder.
+ *
+ * ── A RIGHT GUTTER FOR WHATEVER FLOATS ────────────────────────────────────
+ * This app has no fixed or floating control positioned over `/studio`
+ * today — checked, not assumed, since the finding this note answers named
+ * one clipping the chip row's trailing "N more" (`composer-chips.tsx`) and
+ * no such control exists in this tree to reproduce it against. What does
+ * carry a real margin: every element on this screen, including the
+ * composer bar and the wall grid, stays inside `--content-pad` and never
+ * runs to the viewport's own edge, so the row `composer-chips.tsx` ends
+ * with (`grow` spacer, "N more", then `extraControls`) already has page
+ * padding as its gutter rather than nothing. If a future floating control
+ * is added back, it must reserve its own width rather than lean on this.
  */
+
+/** Which shape of work the filter row is narrowed to. */
+type WorkFilter = 'all' | 'square' | 'story' | 'wide' | 'logo'
+
+const FILTERS: readonly { value: WorkFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'square', label: 'Square post' },
+  { value: 'story', label: 'Story' },
+  { value: 'wide', label: 'Wide' },
+  { value: 'logo', label: 'With logo' },
+]
+
+/**
+ * Which filter a picture belongs to, from its own shape and logo outcome,
+ * never from the currently-chosen format — that is a fact about the NEXT
+ * press, not about a picture already made.
+ */
+function categoryOf(picture: CanvasPicture): WorkFilter[] {
+  const out: WorkFilter[] = []
+  if (picture.stampOutcome === 'stamped') out.push('logo')
+  if (picture.width === null || picture.height === null) return out
+  const ratio = picture.width / picture.height
+  if (ratio >= 0.94 && ratio <= 1.06) out.push('square')
+  else if (ratio < 0.94) out.push('story')
+  else out.push('wide')
+  return out
+}
+
 export function StudioWorkbench({
   formats,
-  cost,
   library,
   pictures,
+  signals,
+  starters,
 }: {
   formats: StudioFormat[]
-  cost: number
-  /** Pictures already in this workspace, offered as things to match. */
-  library: LibraryPicture[]
-  /** What this workspace has already made, newest first, for the canvas. */
+  library: LibraryRead
+  /** What this workspace has already made, newest first, for the wall. */
   pictures: CanvasPicture[]
+  signals: BrandSignal[] | null
+  /** The starter ladder's already-resolved answer. See `composer.tsx`'s own prop. */
+  starters?: StudioStarters
 }) {
-  const router = useRouter()
-  const [wanted, setWanted] = useState('')
-  const [mode, setMode] = useState<GenerationMode>('on_brand')
-  const [formatId, setFormatId] = useState(formats[0]?.id ?? '')
-  const [picked, setPicked] = useState<string[]>([])
-  const [count, setCount] = useState(1)
-  const [note, setNote] = useState<string | null>(null)
-  const [short, setShort] = useState(false)
-  const [made, setMade] = useState(false)
-  const [activeId, setActiveId] = useState<string | null>(null)
-  const [viewing, setViewing] = useState<CanvasPicture | null>(null)
-  const [drawing, setDrawing] = useState<CanvasPicture | null>(null)
-  const [busy, start] = useTransition()
-
+  const [filter, setFilter] = useState<WorkFilter>('all')
   /**
-   * Position zero unless somebody has clicked back through the strip. The reader
-   * already sorted newest first, so after a generation the refreshed data puts
-   * the picture that was just paid for at zero and the canvas shows it with no
-   * effect, no id to track, and no chance of showing yesterday's.
+   * Mirrored from the composer, which is the only thing that knows a press is
+   * in flight. Used only for the first-run message below: once a picture
+   * exists, the wall itself is the "something is happening" surface and this
+   * screen no longer needs to say so a second way.
    */
-  const active = pictures.find((one) => one.imageId === activeId) ?? pictures[0] ?? null
+  const [busy, setBusy] = useState(false)
 
-  const rule = ruleFor(mode)
-  const chosen = formats.find((f) => f.id === formatId) ?? null
-  // Asked, never re-derived. See this file's header.
-  const blocked = describeModeBlock({ mode, references: picked.length })
-  const ready = wanted.trim().length >= 3 && chosen !== null && blocked === null
-
-  /**
-   * ── A PRESS THAT CHANGES NOTHING MUST SAY WHY ─────────────────────────────
-   * This silently dropped the click once the mode's reference limit was reached:
-   * the tile did not select, nothing moved, and nothing was said. A control that
-   * ignores a press without explaining is exactly the dead end this product
-   * forbids, and it is worse than a refusal because the person cannot tell
-   * whether they missed the target or the app is broken.
-   *
-   * The sentence comes from `modes.ts`, the same one the server action would
-   * refuse with, so the screen never invents its own wording for a rule it does
-   * not own.
-   */
-  function toggleReference(assetId: string) {
-    setNote(null)
-    if (picked.includes(assetId)) {
-      setPicked((current) => current.filter((id) => id !== assetId))
-      return
-    }
-    // ── PICKING A PICTURE IN A MODE THAT IGNORES ONE ────────────────────────
-    // Explore uses no reference by definition, so a person who picks one has
-    // said something the mode cannot honour. Moving them to the mode that DOES
-    // is what they meant; refusing the press would be technically correct and
-    // useless. It says so, because a mode that changed itself silently would be
-    // the screen overruling a choice they made.
-    if (rule.maxReferences === 0) {
-      setMode('match')
-      setPicked([assetId])
-      setNote('Explore ignores a picture, so Sahoda moved you to Match a picture.')
-      return
-    }
-
-    if (picked.length >= rule.maxReferences) {
-      setNote(describeModeBlock({ mode, references: picked.length + 1 }))
-      return
-    }
-    setPicked((current) => [...current, assetId])
-  }
-
-  function chooseMode(next: GenerationMode) {
-    setNote(null)
-    setMode(next)
-    // Explore is unconditioned by definition, so keeping references selected
-    // would leave a contradiction on screen that the person did not create.
-    if (ruleFor(next).maxReferences === 0) setPicked([])
-  }
-
-  /**
-   * ── LOADS THE REQUEST BACK, AND DOES NOT SPEND ────────────────────────────
-   * The fastest useful action after a picture you almost like is the same
-   * request with one word changed, and that used to mean retyping the sentence
-   * and re-picking every reference. It fills the controls and stops: firing
-   * immediately would spend credits on a press that reads as "show me what I
-   * asked for", and the whole point is to change something first.
-   *
-   * A format since retired is dropped rather than selected, because a select
-   * holding a value that is not one of its options silently shows the first one
-   * and the person is charged for a size they did not choose.
-   */
-  function reuse(picture: CanvasPicture) {
-    setNote(null)
-    setWanted(picture.prompt)
-    setMode(picture.mode)
-    setPicked(picture.referenceAssetIds.slice(0, ruleFor(picture.mode).maxReferences))
-    if (picture.formatId !== null && formats.some((one) => one.id === picture.formatId)) {
-      setFormatId(picture.formatId)
-    }
-  }
-
-  function generate() {
-    setNote(null)
-    setShort(false)
-    start(async () => {
-      const result = await queueGeneration({
-        mode,
-        wanted,
-        formatId,
-        referenceAssetIds: picked,
-        count,
-      })
-      if (result.ok) {
-        setMade(true)
-        // Silent when everything asked for arrived. A partial result is neither
-        // a success nor a failure and gets its own sentence, which names both
-        // numbers and says what happened to the money.
-        setNote(describePartial({ made: result.made, asked: result.asked }))
-        // Back to position zero, so the refreshed data shows the NEW picture
-        // rather than whichever older one was being looked at when it started.
-        setActiveId(null)
-        // The picture itself arrives with the refreshed server data, which also
-        // carries its signed link. Holding bytes in state here would put a
-        // megabyte in the browser that the next navigation throws away.
-        router.refresh()
-        return
-      }
-      setShort(result.insufficient)
-      setNote(
-        result.insufficient
-          ? describeInsufficient({ required: result.required, available: result.available })
-          : result.message,
-      )
-    })
-  }
+  const shownPictures =
+    filter === 'all' ? pictures : pictures.filter((one) => categoryOf(one).includes(filter))
 
   return (
-    <div
-      className="grid gap-4 wide:grid-cols-[minmax(0,420px)_minmax(0,1fr)] max-wide:grid-cols-1"
-      data-guide="studio-workbench"
-    >
-      <section aria-labelledby="studio-make" className="flex flex-col gap-3">
-        <div>
-          <h2 id="studio-make" className="type-h2">
-            Make a picture
-          </h2>
-          <p className="type-body mt-1 max-w-[54ch] text-muted">
-            Say what you want to see. Sahoda adds your colours and the way your business sounds, so
-            you do not have to describe them every time.
-          </p>
-        </div>
+    <div className="flex w-full flex-col gap-grid" data-guide="studio-workbench">
+      <section
+        aria-labelledby="studio-make"
+        className="sticky top-topbar z-[2] -mx-page flex flex-col gap-3 bg-canvas px-page pt-3 pb-grid max-narrow:-mx-page-mobile max-narrow:px-page-mobile"
+      >
+        <h2 id="studio-make" className="sr-only">
+          Make a picture
+        </h2>
+        <Composer
+          formats={formats}
+          library={library}
+          signals={signals}
+          starters={starters}
+          onBusyChange={setBusy}
+        />
+      </section>
 
-        <label className="flex flex-col gap-1">
-          <span className="type-sm text-muted">What should the picture show?</span>
-          <Textarea
-            value={wanted}
-            autoGrow
-            rows={3}
-            maxLength={1000}
-            placeholder={promptHintFor(mode)}
-            onChange={(event) => setWanted(event.target.value)}
-            data-guide="studio-prompt"
-          />
-        </label>
-
-        {/* ── SOMETHING TO TRY ────────────────────────────────────────────────
-            A box nobody knows what to put in stays empty. These FILL the box
-            rather than generating, so nothing is spent by trying one and the
-            words can be edited first. Hidden once there is something to edit,
-            because then they are only in the way. */}
-        {wanted.trim() === '' ? (
-          <div className="flex flex-col gap-1" data-guide="studio-starters">
-            <span className="type-sm text-muted">Not sure what to write? Try one of these.</span>
-            <ul className="flex flex-wrap gap-2">
-              {PROMPT_STARTERS.map((starter) => (
-                <li key={starter}>
-                  <button
-                    type="button"
-                    onClick={() => setWanted(starter)}
-                    className="surface-ring rounded-card bg-s2 px-2 py-1 text-left type-sm text-muted transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                  >
-                    {starter}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-
-        <fieldset className="flex flex-col gap-2">
-          <legend className="type-sm text-muted">How should Sahoda approach it?</legend>
-          <div className="grid gap-2 narrow:grid-cols-3 max-narrow:grid-cols-1">
-            {readyModes().map((option) => (
-              <button
-                key={option.mode}
-                type="button"
-                onClick={() => chooseMode(option.mode)}
-                aria-pressed={mode === option.mode}
-                className={`surface-ring rounded-card px-3 py-2 text-left transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-                  mode === option.mode ? 'bg-primary text-primary-foreground' : 'bg-s2 text-muted'
-                }`}
-              >
-                <span className="block type-sm font-[550]">{option.label}</span>
-                <span className="block type-sm">{option.what}</span>
-              </button>
-            ))}
-          </div>
-        </fieldset>
-
-        {/* ── WHAT TO MATCH ──────────────────────────────────────────────────
-            Shown in EVERY mode, including the one that ignores references.
-            This used to be hidden for Explore, on the reasoning that offering a
-            picker would invite a choice the mode then ignores. That reasoning
-            stopped being true the moment picking one MOVED you to the mode that
-            uses it: the choice is now honoured rather than ignored, and hiding
-            the control only hides the shortest route to what a person meant. */}
-        <fieldset className="flex flex-col gap-2" data-guide="studio-references">
-          <legend className="type-sm text-muted">
-            {rule.maxReferences === 0
-              ? 'Picking a picture here moves you to Match a picture.'
-              : rule.minReferences > 0
-                ? 'Which picture should Sahoda match?'
-                : 'Anything Sahoda should match? (optional)'}
-          </legend>
-
-          <ReferenceUpload
-            disabled={picked.length >= rule.maxReferences}
-            onAdded={(assetId) => {
-              setNote(null)
-              // Selected at once. Somebody who adds a picture to match wants
-              // to match it, and it appears in the grid below on the refresh
-              // already chosen.
-              setPicked((current) =>
-                current.includes(assetId) || current.length >= rule.maxReferences
-                  ? current
-                  : [...current, assetId],
-              )
-              router.refresh()
-            }}
-          />
-
-          {library.length === 0 ? (
-            <p className="surface-ring rounded-card bg-s2 px-3 py-2 type-sm text-muted">
-              You have no pictures yet. Add one from this device, or make one below, and it appears
-              here to match.
+      {pictures.length === 0 ? (
+        /*
+         * ── LEFT-RANGED, LIKE EVERYTHING ELSE ON THIS SCREEN ────────────────
+         * This used to be `items-center`, the one block on the wall not
+         * aligned to the screen's own left edge. Nothing about "nothing made
+         * yet" needs centring — it reads as a left-aligned line exactly like
+         * the sentence that replaces it once a picture exists
+         * ("Every picture is saved to your library…").
+         */
+        <div className="flex flex-col items-start gap-2 py-grid" data-guide="studio-empty">
+          {busy ? (
+            <p role="status" className="type-sm text-muted" data-guide="studio-empty-busy">
+              Sahoda is generating your first image now. It usually takes a few seconds, and you can
+              leave this screen without losing it.
             </p>
           ) : (
-            <ul className="grid grid-cols-4 gap-2">
-              {library.map((picture) => {
-                // The POSITION, not a yes. `signReferences` sends them in pick
-                // order and the first weighs most, so an order-free tick hides
-                // something the model acts on.
-                const at = picked.indexOf(picture.assetId)
-                const on = at !== -1
+            <p className="type-sm text-muted">
+              Nothing made yet. Use an idea from the box above, or write your own, then press
+              Generate Image.
+            </p>
+          )}
+        </div>
+      ) : (
+        <section aria-labelledby="studio-wall-heading" className="flex flex-col gap-3">
+          <h2 id="studio-wall-heading" className="sr-only">
+            Your pictures
+          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-baseline gap-3">
+              <span className="type-eyebrow text-muted">What you have made</span>
+              <span className="type-sm text-muted">Open one to see how it was made</span>
+            </div>
+            <div className="flex flex-wrap gap-2" data-guide="studio-filter">
+              {FILTERS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setFilter(option.value)}
+                  aria-pressed={filter === option.value}
+                  className={`rounded-pill px-3.5 py-1.5 type-sm font-[550] transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                    filter === option.value
+                      ? 'bg-ink text-canvas'
+                      : 'surface-ring text-muted hover:text-ink'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {shownPictures.length === 0 ? (
+            <p className="type-sm text-muted">Nothing matches this filter yet.</p>
+          ) : (
+            <ul
+              className="grid grid-cols-3 gap-3 narrow:grid-cols-4 wide:grid-cols-6"
+              data-guide="studio-strip"
+            >
+              {shownPictures.map((picture) => {
+                const meta = [picture.formatId, picture.madeAgo].filter(Boolean).join(' · ')
                 return (
-                  <li key={picture.assetId}>
-                    <button
-                      type="button"
-                      onClick={() => toggleReference(picture.assetId)}
-                      aria-pressed={on}
-                      aria-label={
-                        on
-                          ? `${picture.title ?? 'A picture in your library'}, picked ${at + 1} of ${picked.length}`
-                          : (picture.title ?? 'A picture in your library')
-                      }
-                      className={`surface-ring relative block w-full overflow-hidden rounded-card transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-                        on ? 'ring-2 ring-accent' : ''
-                      }`}
+                  <li key={picture.imageId} className="flex flex-col gap-2">
+                    {/*
+                     * ── A LINK, NOT A CLICK HANDLER ──────────────────────────
+                     * `/studio/<id>` does not exist yet: a later pass builds
+                     * the viewer there. A real `<Link>` to a route that 404s
+                     * for one commit is a known, honest gap; a click handler
+                     * here would be a second thing that pass would have to
+                     * unpick rather than simply route past.
+                     */}
+                    <Link
+                      href={`/studio/${picture.imageId}` as Route}
+                      aria-label={picture.prompt}
+                      className="surface-ring relative block aspect-square w-full overflow-hidden rounded-card transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                     >
-                      {picture.url === null ? (
-                        <span className="flex aspect-square items-center justify-center bg-s2 type-sm text-muted">
-                          no preview
-                        </span>
-                      ) : (
-                        // eslint-disable-next-line @next/next/no-img-element -- a
-                        // short-lived signed URL from a private bucket cannot be
-                        // optimised without proxying the credential.
-                        <img
-                          src={picture.url}
-                          alt={picture.title ?? 'A picture in your library'}
-                          className="aspect-square w-full object-cover object-top"
-                        />
-                      )}
-                      {on ? (
-                        <span className="absolute right-1 top-1 flex size-[18px] items-center justify-center rounded-full bg-primary type-sm text-primary-foreground">
-                          <span className="num">{at + 1}</span>
-                        </span>
-                      ) : null}
-                    </button>
+                      {/* eslint-disable-next-line @next/next/no-img-element -- a
+                          short-lived signed URL from a private bucket cannot be
+                          optimised by next/image without proxying the credential. */}
+                      <img
+                        src={picture.stampedUrl ?? picture.url}
+                        alt=""
+                        className="size-full object-cover object-top"
+                      />
+                    </Link>
+                    {meta === '' ? null : <span className="num type-sm text-muted">{meta}</span>}
                   </li>
                 )
               })}
             </ul>
           )}
-        </fieldset>
 
-        {/* ── HOW MANY TRIES ──────────────────────────────────────────────────
-            Four separate calls, not a matching set: the routed model draws one
-            picture per call, so these will differ from each other. That is what
-            "show me some options" means and is why the label says options. */}
-        <fieldset className="flex flex-col gap-2">
-          <legend className="type-sm text-muted">How many options?</legend>
-          <div className="flex flex-wrap gap-2" data-guide="studio-count">
-            {Array.from({ length: MAX_TRIES_PER_PRESS }, (unused, i) => i + 1).map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setCount(n)}
-                aria-pressed={count === n}
-                className={`surface-ring rounded-card px-3 py-1 type-sm transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-                  count === n ? 'bg-primary text-primary-foreground' : 'bg-s2 text-muted'
-                }`}
-              >
-                <span className="num">{n}</span>
-              </button>
-            ))}
-          </div>
-          {count === 1 ? null : (
-            <span className="type-sm text-muted">
-              <span className="num">{count}</span> different pictures from the same description, so
-              you can pick. They will not match each other.
-            </span>
-          )}
-        </fieldset>
-
-        <label className="flex flex-col gap-1">
-          <span className="type-sm text-muted">What size?</span>
-          <select
-            value={formatId}
-            onChange={(event) => setFormatId(event.target.value)}
-            className="surface-ring h-input w-fit rounded-sm bg-surface px-2 type-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            data-guide="studio-format"
-          >
-            {formats.map((format) => (
-              <option key={format.id} value={format.id}>
-                {format.label}
-              </option>
-            ))}
-          </select>
-          {chosen === null ? null : (
-            <span className="type-sm text-muted">
-              <span className="num">{chosen.width}</span> by{' '}
-              <span className="num">{chosen.height}</span> pixels, for{' '}
-              <span className="num">{chosen.channels.length}</span> of your channels.
-            </span>
-          )}
-        </label>
-
-        {blocked === null ? null : (
-          <p role="status" className="surface-ring rounded-card bg-s2 px-3 py-2 type-sm text-muted">
-            {blocked}
+          <p className="type-sm text-muted">
+            Every picture is saved to your library the moment it is made, so nothing is lost if you
+            leave.
           </p>
-        )}
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={generate} loading={busy} disabled={!ready} data-guide="studio-generate">
-            Make this picture
-          </Button>
-          {/* The TOTAL, not the unit price. Somebody who chose four and was
-              shown the price of one has not been told what this press costs. */}
-          <CostLabel
-            action={count === 1 ? 'Make a picture' : `Make ${count} pictures`}
-            cost={cost * count}
-          />
-        </div>
-
-        {note === null ? null : (
-          <p role="alert" className="type-sm text-ink">
-            {note}{' '}
-            {/* A shortfall is the one refusal with a remedy, so it is the one
-                that gets a way out. */}
-            {short ? (
-              <Link
-                href="/wallet"
-                className="font-[600] underline underline-offset-2 transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
-                Top up your wallet
-              </Link>
-            ) : null}
-          </p>
-        )}
-      </section>
-
-      {/* ── THE CANVAS ──────────────────────────────────────────────────────── */}
-      <section aria-labelledby="studio-canvas" className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 id="studio-canvas" className="type-h2">
-            The canvas
-          </h2>
-          {active === null ? null : (
-            <PictureActions
-              picture={active}
-              onOpen={() => setViewing(active)}
-              onReuse={() => reuse(active)}
-              onDraw={() => setDrawing(active)}
-            />
-          )}
-        </div>
-
-        <div
-          className="surface-ring relative flex items-center justify-center overflow-hidden rounded-card bg-s2"
-          style={{
-            aspectRatio: chosen === null ? '1 / 1' : `${chosen.width} / ${chosen.height}`,
-          }}
-          data-guide="studio-canvas"
-        >
-          {/* ── THE PICTURE, WHEN THERE IS ONE ──────────────────────────────
-              Shown UNDER the drawing message rather than replaced by it, so a
-              second press does not blank the picture somebody is still looking
-              at. Nothing is lost while the next one is being made. */}
-          {active === null ? null : (
-            <button
-              type="button"
-              onClick={() => setViewing(active)}
-              aria-label={`Open "${active.prompt}" large`}
-              className="absolute inset-0 block focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element -- a
-                  short-lived signed URL from a private bucket cannot be
-                  optimised by next/image without proxying the credential. */}
-              <img
-                src={active.url}
-                alt={active.prompt}
-                width={active.width ?? undefined}
-                height={active.height ?? undefined}
-                className={`size-full object-contain transition-micro ${busy ? 'opacity-40' : ''}`}
-              />
-            </button>
-          )}
-
-          {busy || active === null ? (
-            <p className="pointer-events-none relative max-w-[38ch] px-6 text-center type-sm text-muted">
-              {busy ? (
-                'Sahoda is drawing this now. It usually takes a few seconds, and you can leave this screen without losing it.'
-              ) : made ? (
-                'Made. It is saved to your library, and it appears here in a moment.'
-              ) : (
-                <>
-                  <Sparkles className="mx-auto mb-2 size-[18px]" aria-hidden />
-                  Your picture appears here, at the size you picked, so you can judge it before you
-                  use it.
-                </>
-              )}
-            </p>
-          ) : null}
-        </div>
-
-        {/* ── THE STRIP ───────────────────────────────────────────────────────
-            Every picture this workspace has made that can actually be drawn,
-            newest first. Judging one against the last one is the work, and it
-            cannot be done by scrolling to a grid and back. */}
-        {pictures.length === 0 ? null : (
-          <ul className="flex gap-2 overflow-x-auto pb-1" data-guide="studio-strip">
-            {pictures.map((picture) => {
-              const on = picture.imageId === (active?.imageId ?? null)
-              return (
-                <li key={picture.imageId} className="shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setActiveId(picture.imageId)}
-                    aria-pressed={on}
-                    aria-label={picture.prompt}
-                    className={`surface-ring block size-[64px] overflow-hidden rounded-card transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-                      on ? 'ring-2 ring-accent' : ''
-                    }`}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element -- as above. */}
-                    <img
-                      src={picture.url}
-                      // Empty on purpose: the BUTTON is already labelled with the
-                      // prompt, and a screen reader announcing it twice makes a
-                      // strip of twelve read as twenty-four things.
-                      alt=""
-                      // Top-anchored: a square crop of a portrait photograph cuts
-                      // a face off at the chin, and this product's pictures are
-                      // food, shopfronts and people.
-                      className="size-full object-cover object-top"
-                    />
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-
-        <p className="type-sm text-muted">
-          Every picture is saved to your library the moment it is made, so nothing is lost if you
-          leave.
-        </p>
-      </section>
-
-      <PictureViewer picture={viewing} onClose={() => setViewing(null)} />
-
-      <DrawModal
-        open={drawing !== null}
-        onClose={() => setDrawing(null)}
-        picture={
-          drawing === null || drawing.width === null || drawing.height === null
-            ? null
-            : {
-                url: drawing.url,
-                width: drawing.width,
-                height: drawing.height,
-                prompt: drawing.prompt,
-              }
-        }
-        onSaved={(assetId) => {
-          setNote(null)
-          // Straight into the mode that uses it, with it already picked. A
-          // marked picture left unselected is a press that led nowhere.
-          setMode('edit')
-          setPicked([assetId])
-          router.refresh()
-        }}
-      />
+        </section>
+      )}
     </div>
   )
 }

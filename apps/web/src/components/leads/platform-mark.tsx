@@ -70,7 +70,7 @@ export function PlatformMark({ platform }: PlatformMarkProps) {
        * it — chrome, not separation. Anything that must read as a distinct
        * object carries its own edge (apps/web/CLAUDE.md).
        */
-      className="surface-ring inline-flex size-6 shrink-0 select-none items-center justify-center rounded-full bg-s2 type-sm font-[550] text-muted"
+      className="surface-ring inline-flex size-6 shrink-0 select-none items-center justify-center rounded-pill bg-s2 type-sm font-[550] text-muted"
       title={label}
     >
       {/*

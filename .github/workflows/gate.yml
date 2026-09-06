@@ -95,7 +95,13 @@ on:
 # is. On a pull request `ref_name` would be `<n>/merge`, but `head_ref` is
 # non-empty there and wins, so the pair resolves to one string from both events.
 concurrency:
-  group: gate-${{ github.head_ref || github.ref_name }}
+  # A DISPATCHED run gets its own group. MEASURED 2026-09-05, runs 33976216474
+  # and 33984273950: two smoke dispatches were cancelled within seconds by the
+  # push and pull_request runs that a teammate's push to the same branch
+  # started, because all three shared `gate-<branch>`. The suffix is empty for
+  # push and pull_request, so those two still collapse into one exactly as
+  # before; a dispatch is keyed by its own run id and nothing cancels it.
+  group: gate-${{ github.head_ref || github.ref_name }}${{ github.event_name == 'workflow_dispatch' && format('-dispatch-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
 permissions:
@@ -176,10 +182,26 @@ jobs:
   # away, and a ref cannot be typed without naming the destination. The input is
   # not defaulted, so nobody can run this by clicking through.
   smoke:
-    name: Playwright @smoke (writes to the named database)
+    name: Playwright @smoke ${{ matrix.shard }}/3 (writes to the named database)
     if: github.event_name == 'workflow_dispatch' && inputs.ack_target != ''
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # THREE SHARDS, because one runner cannot finish. MEASURED 2026-09-06: two
+    # healthy runs (33985674352, 34009643341) each used the whole 60-minute
+    # limit on a 2-vCPU runner and were cancelled before the last specs ran, so
+    # no run has ever produced a total. Locally the same 118 tests take 16
+    # minutes. Playwright's own `--shard` splits the files deterministically;
+    # each shard builds the app itself, which costs two minutes and keeps the
+    # shards independent.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    # 60, not 45. MEASURED 2026-09-05, run 33965242498: the first run that ever
+    # reached the suite was killed by the 45-minute limit with no verdict and no
+    # output flushed, on a dev server compiling every route on first request.
+    # The build step below removes that cost; the extra fifteen minutes are so
+    # a slow runner reports a result rather than a cancellation.
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4
@@ -217,46 +239,172 @@ jobs:
       # prints only whether each name is set, never a value: `vars` are not
       # masked in logs, so echoing one would publish it.
       - name: Refuse without the keys the suite needs
+        # ── ALL SIX, BECAUSE THREE WAS THE SAME DEFECT ONE LAYER DOWN ──────────
+        # This step checked THREE names while the run step below forwards SIX.
+        # `scripts/cloud-setup.sh`'s ENV_REQUIRED names two of the missing three
+        # as needed for the app to boot at all. So somebody who added exactly the
+        # three this guard asked for CLEARED IT and then died inside the suite
+        # with the opaque failure the guard exists to prevent -- a guard that
+        # certifies a configuration it never checked, which is worse than no
+        # guard, because it tells you the environment is ready.
+        #
+        # The six are the six `test:smoke` declares in turbo.json. Turborepo 2.x
+        # defaults to `envMode: "strict"` and strips anything undeclared, so a
+        # name checked here but not declared there would be checked and then
+        # thrown away. `SUPABASE_JWT_SECRET` is deliberately NOT among them: it
+        # is in ENV_REQUIRED because that script provisions `packages/db`'s live
+        # proofs, and nothing apps/web runs in this job reads it.
+        #
+        # `scripts/lib/ci-gate-coverage.test.mjs` now asserts that this list, the
+        # run step's list and turbo.json's list are the same set, so the drift
+        # that caused this cannot come back quietly.
+        #
+        # ── IT SAYS WHICH TAB, BECAUSE "ADD THEM" WAS NOT ENOUGH ───────────────
+        # MEASURED twice, 2026-08-29 run 981 and 2026-08-30 run 1061: the founder
+        # added all three and the job still refused with the identical message,
+        # naming the identical three. "Repository secrets are not configured" is
+        # true and useless, because the page it points at has THREE tabs that all
+        # store a name and a value:
+        #
+        #   Secrets   -> Repository secrets   `secrets.X`   what this job reads
+        #   Secrets   -> Dependabot           invisible to Actions entirely
+        #   Variables -> Repository variables `vars.X`      a different namespace
+        #
+        # and Settings -> Environments is a fourth place, invisible unless the
+        # job declares `environment:`, which this one deliberately does not.
+        #
+        # So the guard LOOKS in the other places before it complains. It prints
+        # only whether each name is set, never a value: `vars` are not masked in
+        # logs, so echoing one would publish it.
         env:
-          CLERK_PUBLISHABLE: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET: ${{ secrets.CLERK_SECRET_KEY }}
-          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          VAR_CLERK_PUBLISHABLE: ${{ vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          VAR_CLERK_SECRET: ${{ vars.CLERK_SECRET_KEY }}
-          VAR_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          SECRET_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          SECRET_CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          # ── THE FOUR SUPABASE VALUES COME FROM E2E_-PREFIXED SECRETS ───────────
+          # MEASURED 2026-09-05, run 33961015055: the founder added all six
+          # secrets, this guard passed for the first time ever, and the suite
+          # refused in 9 seconds with `decision refused-production`. The six
+          # unprefixed names ARE production: metrics-nightly, radar-nightly and
+          # audience-nightly read the same `secrets.SUPABASE_DB_URL` to write
+          # real customers' metrics. `e2e-target.ts` refuses production outright
+          # and names staging (`yoxmzwkxweasfaahhvpj`) as the only target. So
+          # this job reads its own four, forwards them under the names the app
+          # expects, and the nightly jobs keep theirs. The Clerk pair is shared
+          # on purpose: there is one development instance and the suite mints
+          # `+clerk_test` users on it.
+          SECRET_NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          SECRET_NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+          SECRET_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
+          SECRET_SUPABASE_DB_URL: ${{ secrets.E2E_SUPABASE_DB_URL }}
+          VAR_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          VAR_CLERK_SECRET_KEY: ${{ vars.CLERK_SECRET_KEY }}
+          VAR_NEXT_PUBLIC_SUPABASE_URL: ${{ vars.E2E_SUPABASE_URL }}
+          VAR_NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.E2E_SUPABASE_ANON_KEY }}
+          VAR_SUPABASE_SERVICE_ROLE_KEY: ${{ vars.E2E_SUPABASE_SERVICE_ROLE_KEY }}
+          VAR_SUPABASE_DB_URL: ${{ vars.E2E_SUPABASE_DB_URL }}
         run: |
+          # One list, walked twice, so the "is it missing" half and the "is it in
+          # the wrong tab" half cannot disagree the way the old six hand-written
+          # lines could.
+          # Each line is ENV_NAME=SECRET_NAME: the name the app reads, and the
+          # repository secret it is read FROM. They differ for the four Supabase
+          # values (see the env block above), and the message below names the
+          # SECRET, because that is the name a person has to type into Settings.
+          NEEDED="NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+          CLERK_SECRET_KEY=CLERK_SECRET_KEY
+          NEXT_PUBLIC_SUPABASE_URL=E2E_SUPABASE_URL
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=E2E_SUPABASE_ANON_KEY
+          SUPABASE_SERVICE_ROLE_KEY=E2E_SUPABASE_SERVICE_ROLE_KEY
+          SUPABASE_DB_URL=E2E_SUPABASE_DB_URL"
+
           missing=""
-          [ -z "$CLERK_PUBLISHABLE" ] && missing="$missing NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
-          [ -z "$CLERK_SECRET" ] && missing="$missing CLERK_SECRET_KEY"
-          [ -z "$SUPABASE_URL" ] && missing="$missing NEXT_PUBLIC_SUPABASE_URL"
+          found_as_vars=""
+          for pair in $NEEDED; do
+            name="${pair%%=*}"
+            secret="${pair##*=}"
+            secret_ref="SECRET_$name"
+            var_ref="VAR_$name"
+            if [ -z "${!secret_ref}" ]; then
+              missing="$missing $secret"
+              # Presence only, never the value.
+              if [ -n "${!var_ref}" ]; then
+                found_as_vars="$found_as_vars $secret"
+              fi
+            fi
+          done
+
+          # SHAPE, not just presence, for the two values with an obvious wrong
+          # shape. MEASURED 2026-09-05, run 33968304482: E2E_SUPABASE_URL had
+          # been re-saved with a value that was not an https address, so every
+          # Supabase read in the app and in the fixtures threw "Invalid
+          # supabaseUrl" and the suite ran an hour waiting for buttons that
+          # could never render. A prefix test echoes nothing.
+          case "$SECRET_NEXT_PUBLIC_SUPABASE_URL" in
+            ""|https://*) ;;
+            *) echo "::error::E2E_SUPABASE_URL is set but is not an https:// address. It must be the staging project URL from Supabase -> Settings -> API -> Project URL, not a connection string."; exit 1 ;;
+          esac
+          case "$SECRET_SUPABASE_DB_URL" in
+            ""|postgres://*|postgresql://*) ;;
+            *) echo "::error::E2E_SUPABASE_DB_URL is set but is not a postgres:// connection string. It must be the staging session pooler string from Supabase -> Settings -> Database."; exit 1 ;;
+          esac
 
           if [ -n "$missing" ]; then
-            # Where they ARE, if anywhere. Presence only — never the value.
-            found_as_vars=""
-            [ -n "$VAR_CLERK_PUBLISHABLE" ] && found_as_vars="$found_as_vars NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
-            [ -n "$VAR_CLERK_SECRET" ] && found_as_vars="$found_as_vars CLERK_SECRET_KEY"
-            [ -n "$VAR_SUPABASE_URL" ] && found_as_vars="$found_as_vars NEXT_PUBLIC_SUPABASE_URL"
-
             echo "::error::Not readable as repository secrets:$missing"
             if [ -n "$found_as_vars" ]; then
               echo "::error::FOUND UNDER THE VARIABLES TAB INSTEAD:$found_as_vars"
               echo "A variable is a different namespace from a secret, is not masked in logs,"
               echo "and this job reads secrets. Delete them from Variables and re-add them under"
-              echo "Settings → Secrets and variables → Actions → Secrets → Repository secrets."
+              echo "Settings -> Secrets and variables -> Actions -> Secrets -> Repository secrets."
             else
-              echo "Add them under Settings → Secrets and variables → Actions, on the SECRETS tab,"
+              echo "Add them under Settings -> Secrets and variables -> Actions, on the SECRETS tab,"
               echo "as REPOSITORY secrets. Three other places store a name and a value and none of"
               echo "them reaches this job: the Variables tab, the Dependabot tab, and"
-              echo "Settings → Environments (this job declares no environment, by design)."
+              echo "Settings -> Environments (this job declares no environment, by design)."
             fi
+            echo "All six are needed: the suite signs in through Clerk and the app it drives"
+            echo "reads Supabase with the anon key, the service role key and the pooler URL."
+            echo "The four E2E_SUPABASE_* values belong to STAGING (yoxmzwkxweasfaahhvpj):"
+            echo "the suite refuses production, and the unprefixed names are production."
             exit 1
           fi
+
+      # ── AND A DATABASE URL THAT CAN SIGN IN, BEFORE THE HOUR IS SPENT ───────
+      # The guard above checks the shape of E2E_SUPABASE_DB_URL. MEASURED
+      # 2026-09-06: with the right shape and the wrong password, staging's pooler
+      # logged 104 "password authentication failed" across three runs, every
+      # page that reads the ledger rendered "This screen didn't load", and the
+      # suite reported it as /playbooks missing its heading, three attempts each.
+      # scripts/smoke-db-probe.mjs signs in once, in seconds, names the fix, and
+      # refuses a pooler string whose project is not the acknowledged target.
+      - name: Refuse a database URL that cannot sign in
+        env:
+          SUPABASE_DB_URL: ${{ secrets.E2E_SUPABASE_DB_URL }}
+          SAHODA_E2E_ACK_TARGET: ${{ inputs.ack_target }}
+        run: node scripts/smoke-db-probe.mjs
 
       - name: Install Chromium
         run: pnpm --filter @sahoda/web exec playwright install --with-deps chromium
 
+      # ── A PRODUCTION BUILD, NEVER THE DEV SERVER ────────────────────────────
+      # docs/workflow/05_TRAPS.md: "Never run `pnpm dev` for a measurement or a
+      # suite." MEASURED 2026-09-05, run 33965242498: on the dev server every
+      # spec timed out at 60s, three attempts each, for 45 minutes, and the job
+      # was cancelled with nothing to show. `playwright.config.ts` starts
+      # whatever `E2E_SERVER_CMD` names; a built app answers /sign-in in under a
+      # second, so the webServer's own five-minute ceiling is never near.
+      - name: Build the app
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_DB_URL: ${{ secrets.E2E_SUPABASE_DB_URL }}
+        run: pnpm --filter @sahoda/web exec next build
+
       - name: Run the smoke suite
         env:
+          # The built app from the step above, on the port the config defaults to.
+          E2E_SERVER_CMD: pnpm exec next start -p 3100
           # The acknowledgement, typed by a person at dispatch time. Declared on
           # the `test:smoke` task in turbo.json — Turborepo 2.x defaults to
           # `envMode: "strict"` and strips anything undeclared, so an
@@ -264,18 +412,31 @@ jobs:
           SAHODA_E2E_ACK_TARGET: ${{ inputs.ack_target }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: pnpm turbo run test:smoke --concurrency=1
+          # Staging, under the names the app reads. See the guard step above.
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_DB_URL: ${{ secrets.E2E_SUPABASE_DB_URL }}
+        run: pnpm turbo run test:smoke --concurrency=1 -- --shard=${{ matrix.shard }}/3
+
+      # A skipped @smoke test with the service key present is a guard that did
+      # not run. Eleven specs skip on `adminClient() === null`, which is right on
+      # a laptop and wrong here; Playwright exits 0 over them (docs/51 Q-17).
+      # `always()` so the count is printed even when the suite itself failed.
+      - name: Refuse skipped smoke tests
+        if: always()
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/smoke-skips.mjs apps/web/playwright-report/results.json
 
       # The traces are the only thing worth having from a failed browser run, and
-      # they are the first thing lost when a runner is torn down.
+      # they are the first thing lost when a runner is torn down. `always()`, not
+      # `failure()`: a CANCELLED job (the 45-minute kill above) is neither, and
+      # that run left nothing at all to read.
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: |
             apps/web/playwright-report
             apps/web/test-results

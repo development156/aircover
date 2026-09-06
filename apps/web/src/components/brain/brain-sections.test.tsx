@@ -1,0 +1,45 @@
+import { render, screen } from '@testing-library/react'
+import { describe, expect, test, vi } from 'vitest'
+
+import { CREATE_WORKSPACE_LABEL } from '@/components/workspace/create-workspace-button'
+
+import { BrainSections } from './brain-sections'
+
+/**
+ * The no-workspace branch of every field tab.
+ *
+ * It read "There is nothing to show until the Brand Brain has been resolved
+ * once." with no control under it. A person with no workspace cannot resolve
+ * anything: the resolve needs a workspace to live in, so the sentence named a
+ * remedy that could not work — the defect `no-impossible-remedy.spec.ts` exists
+ * to catch, on a branch it does not visit. /brain's own page and the console
+ * both offer the same remedy for the same status; this is the third rendering
+ * of it and the only one that did not.
+ *
+ * It now renders the SHARED `CreateWorkspaceButton`, so it is asserted through
+ * `CREATE_WORKSPACE_LABEL` rather than a literal. This branch used to carry a
+ * hand-written form whose label read "Create a workspace" while every other
+ * screen's button read "Create workspace" — a wording that was already drifting
+ * when it was three separate controls. Naming the constant is what stops the
+ * fourth copy.
+ */
+vi.mock('@/lib/brand/read-brain', () => ({
+  readBrain: async () => ({ status: 'no-workspace' }),
+}))
+// Bound and handed to a <form action>; the mock only needs to be bindable.
+vi.mock('@/app/actions/workspace', () => ({ createWorkspace: vi.fn() }))
+
+describe('BrainSections with no workspace', () => {
+  // The button is code-split (see brain-sections.tsx: it carries `sonner` and
+  // would otherwise sit on every field tab's first load), so it resolves after
+  // a tick rather than synchronously — `findByRole` awaits it. That the remedy
+  // still arrives is the whole point of the split: it must not change behaviour.
+  test('offers the one remedy that can work, and does not ask for a resolve', async () => {
+    render(await BrainSections({ only: ['brand_persona'] }))
+
+    expect(
+      await screen.findByRole('button', { name: new RegExp(CREATE_WORKSPACE_LABEL, 'i') }),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/resolved once/i)).not.toBeInTheDocument()
+  })
+})

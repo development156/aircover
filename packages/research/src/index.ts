@@ -1,15 +1,17 @@
-// @sahoda/research — the URL door (doc 18 §5). Firecrawl is a DIRECT vendor
-// integration with its own key, not a mesh route: OpenRouter routes inference,
-// and routing a scrape through it would make a crawl failure look like a model
-// failure. Server-side only.
+// @sahoda/research — the URL door (doc 18 §5). TinyFish Fetch is a DIRECT
+// vendor integration with its own key, not a mesh route: OpenRouter routes
+// inference, and routing a fetch through it would make a crawl failure look
+// like a model failure. Server-side only.
 //
 // This package acquires and quarantines. It never calls a model — the
 // quarantined extraction is `brand_extract` in @sahoda/mesh, which is where
 // every model call in this codebase lives.
 export const RESEARCH_PACKAGE = '@sahoda/research' as const
 
-export { createFirecrawlClient, FirecrawlError } from './firecrawl'
-export type { FirecrawlClient, FirecrawlOptions, FetchLike } from './firecrawl'
+// Tier 3 — TinyFish Fetch: free, rendered, residential; behind a flag.
+export { createTinyFishSource, TINYFISH_SOURCE_NAME } from './tinyfish'
+export type { TinyFishOptions, FetchLike } from './tinyfish'
+export { PageSourceError, isVendorRefusal } from './vendor-error'
 
 export { crawlSite, selectPages, countWords, MAX_PER_FAMILY } from './crawl-site'
 export { shingles, similarity, isNearDuplicate, NEAR_DUPLICATE_THRESHOLD } from './similarity'
@@ -38,7 +40,7 @@ export {
 } from './reader-source'
 export type { ReaderSourceOptions } from './reader-source'
 
-// The ladder. Tier 3 (Firecrawl) is behind a flag, default off.
+// The ladder. Tier 3 (TinyFish Fetch) is behind a flag, default off.
 export { openSite } from './tiers'
 export type { OpenSiteOptions, OpenSiteResult, TierAttempt, TierFlags } from './tiers'
 
@@ -68,7 +70,7 @@ export type {
   CrawlFailureReason,
 } from './types'
 
-export { loadResearchEnv, assertServerOnly, DEFAULT_FIRECRAWL_URL } from './env'
+export { loadResearchEnv, assertServerOnly, DEFAULT_TINYFISH_FETCH_URL } from './env'
 export type { ResearchEnv } from './env'
 
 // ── The knowledge library's ingestion half ───────────────────────────────────

@@ -7,7 +7,8 @@
     ".": "./src/index.ts",
     "./sweeps": "./src/sweeps.ts",
     "./publish": "./src/publish.ts",
-    "./radar": "./src/radar.ts"
+    "./radar": "./src/radar.ts",
+    "./radar-log": "./src/radar-log.ts"
   },
   "types": "./src/index.ts",
   "scripts": {

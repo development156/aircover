@@ -2,6 +2,7 @@ import { BrandMemoryPayloadSchema } from '@sahoda/shared'
 import type { BrandMemoryPayload } from '@sahoda/shared'
 import type { ChatMessage, FetchLike } from './providers/types'
 import { assertServerOnly } from './config'
+import { CONTEXT_FETCH_TIMEOUT_MS } from './timeouts'
 
 /** The active Brand Brain rendered as a cache-controlled prefix, plus its version (the cache key). */
 export interface BrandContext {
@@ -27,8 +28,45 @@ export class BrandContextError extends Error {
  * IN this brand, not restate it. Marked `cache: true` so the provider caches these
  * stable prefix tokens (the block only changes on a Brain version bump).
  */
-export function buildBrandMessage(payload: BrandMemoryPayload): ChatMessage {
-  const { voice, brand_persona, customer_persona, hook, taboo } = payload
+/** The slice of `field_meta` the prefix reads. Loosely typed: it is a bag the RPC does not validate. */
+export type BrandFieldMetaLike = Record<
+  string,
+  { confirmed?: unknown; source?: unknown } | null | undefined
+>
+
+/**
+ * BR-15. The prefix used to carry every field with the same weight, so
+ * "Sahoda writes from your answers, not its guesses" described the storage and
+ * not the prompt. With `meta`, the model is told which lines the owner stood
+ * behind, which were the owner's own answers reworded, and that the rest is
+ * Sahoda's draft — and that a confirmed line wins a conflict.
+ */
+function provenanceLines(meta: BrandFieldMetaLike | undefined): string[] {
+  if (!meta) return []
+  const entries = Object.entries(meta).filter(([, m]) => m && typeof m === 'object')
+  const confirmed = entries.filter(([, m]) => m!.confirmed === true).map(([k]) => k)
+  const intake = entries
+    .filter(([, m]) => m!.confirmed !== true && m!.source === 'intake')
+    .map(([k]) => k)
+  if (confirmed.length === 0 && intake.length === 0) {
+    return [
+      "Provenance: none of the above is owner-confirmed yet; treat every line as Sahoda's draft.",
+    ]
+  }
+  return [
+    confirmed.length
+      ? `Confirmed by the owner (fixed, wins any conflict): ${confirmed.join(', ')}.`
+      : '',
+    intake.length ? `The owner\'s own words, reworded by Sahoda: ${intake.join(', ')}.` : '',
+    "Everything else is Sahoda's draft: write inside it, but defer to the confirmed lines.",
+  ].filter(Boolean)
+}
+
+export function buildBrandMessage(
+  payload: BrandMemoryPayload,
+  meta?: BrandFieldMetaLike,
+): ChatMessage {
+  const { voice, brand_persona, customer_persona, hook, taboo, alignment } = payload
   const lines = [
     'BRAND BRAIN — write every line grounded in this brand; do not restate it back.',
     `Voice: ${voice.descriptor} (${voice.formality_label}).`,
@@ -38,6 +76,10 @@ export function buildBrandMessage(payload: BrandMemoryPayload): ChatMessage {
     `Customer: ${customer_persona.one_liner} Pain: ${customer_persona.primary_pain_point}. Fear: ${customer_persona.primary_fear}. Wants to feel: ${customer_persona.desired_identity}.`,
     `Hook: ${hook.core_promise} (emotion: ${hook.primary_emotion}).`,
     taboo.red_lines.length ? `Red lines (never cross): ${taboo.red_lines.join('; ')}.` : '',
+    // The Loop writes an accepted learning here (brand_memory alignment.note).
+    // Without this line it landed in a field no prompt read.
+    alignment?.note ? `What is working now: ${alignment.note}` : '',
+    ...provenanceLines(meta),
   ].filter(Boolean)
   return { role: 'system', content: lines.join('\n'), cache: true }
 }
@@ -47,6 +89,8 @@ export interface PostgrestBrandContextOptions {
   /** Service-role key — server-only; never logged, never returned to a client. */
   serviceKey: string
   fetchImpl?: FetchLike
+  /** Ceiling on the read, in ms. Defaults to CONTEXT_FETCH_TIMEOUT_MS. */
+  timeoutMs?: number
 }
 
 interface BrandRow {
@@ -83,6 +127,9 @@ export function createPostgrestBrandContext(
           authorization: `Bearer ${opts.serviceKey}`,
           accept: 'application/json',
         },
+        // A grounding read is best-effort and a person is waiting on it. Past
+        // the ceiling the runner proceeds without this block.
+        signal: AbortSignal.timeout(opts.timeoutMs ?? CONTEXT_FETCH_TIMEOUT_MS),
       })
       if (!res.ok) throw new BrandContextError(res.status)
 
@@ -95,7 +142,13 @@ export function createPostgrestBrandContext(
       if (!message) {
         const parsed = BrandMemoryPayloadSchema.safeParse(row.payload)
         if (!parsed.success) return null
-        message = buildBrandMessage(parsed.data)
+        // Read BEFORE the parse strips it: the payload schema has no field_meta key.
+        const raw = row.payload as { field_meta?: unknown } | null
+        const meta =
+          raw && typeof raw.field_meta === 'object' && raw.field_meta !== null
+            ? (raw.field_meta as BrandFieldMetaLike)
+            : undefined
+        message = buildBrandMessage(parsed.data, meta)
         cache.set(key, message)
       }
       return { version: row.version, message }

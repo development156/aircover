@@ -43,10 +43,10 @@ export function SahodaRail({ drafted, planCost }: SahodaRailProps) {
        by side, under two headings both beginning "This week". The one on the
        calendar is the one that belongs there. This card's own rows already open
        the posts they name, and its empty state carries `Plan my week`. */
-    <HomeSection id="home-sahoda" title="This week, from Sahoda">
+    <HomeSection id="home-sahoda" title="What Sahoda made this week">
       {drafted.length === 0 ? (
         <div className="space-y-3">
-          <p className="type-sm text-muted">Sahoda hasn&rsquo;t drafted anything this week.</p>
+          <p className="type-sm text-muted">Sahoda has not written anything this week.</p>
           {/* Wears the Button's clothes via `buttonVariants` rather than
               re-typing them: a hand-rolled copy is how this one ended up a
               40px pill after the control shapes moved to 34px / 6px.

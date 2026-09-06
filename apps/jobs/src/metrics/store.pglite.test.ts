@@ -255,6 +255,59 @@ describe('the metric store (real Postgres, in-process)', () => {
       expect(targets[0]?.publishedAt).toBeNull()
     })
 
+    /**
+     * ── ONE WORKSPACE, BECAUSE A PERSON PRESSED A BUTTON ───────────────────
+     * "Measure now" on /analytics runs this same pass for the caller's own
+     * workspace. Unscoped, their click spends the whole batch on the fleet and
+     * can come back having measured none of their posts at all.
+     *
+     * Executed rather than asserted through a mock: a mock that checks
+     * `createMetricStore` was handed a workspace id proves the argument
+     * arrived, and says nothing about whether the SQL uses it.
+     */
+    it('asks only about the workspace it was given', async () => {
+      const otherPost = '44444444-4444-4444-8444-444444444444'
+      await db.query(`insert into posts (id, workspace_id) values ($1, $2)`, [otherPost, OTHER_WS])
+      await db.query(`insert into zernio_profiles (workspace_id, profile_id) values ($1, $2)`, [
+        OTHER_WS,
+        'b'.repeat(24),
+      ])
+      await addVariant()
+      await addVariant({ workspace_id: OTHER_WS, post_id: otherPost })
+
+      expect(await store.listTargets()).toHaveLength(2)
+
+      const scoped = createMetricStore({ pool: poolOver(db), workspaceId: OTHER_WS })
+      const targets = await scoped.listTargets()
+      expect(targets).toHaveLength(1)
+      expect(targets[0]?.workspaceId).toBe(OTHER_WS)
+    })
+
+    /**
+     * The scope has to hold on BOTH forms of the query. `listTargets` orders by
+     * least-recently-measured and falls back to `published_at` when the history
+     * table is absent — which is the state this environment is in until the
+     * migration is applied. A filter applied to one form only would leak the
+     * whole fleet into one person's click on exactly the path production takes.
+     */
+    it('asks only about that workspace on the no-history fallback too', async () => {
+      const otherPost = '55555555-5555-4555-8555-555555555555'
+      await db.query(`insert into posts (id, workspace_id) values ($1, $2)`, [otherPost, OTHER_WS])
+      await db.query(`insert into zernio_profiles (workspace_id, profile_id) values ($1, $2)`, [
+        OTHER_WS,
+        'b'.repeat(24),
+      ])
+      await addVariant()
+      await addVariant({ workspace_id: OTHER_WS, post_id: otherPost })
+      // `beforeEach` drops post_metric_snapshots, so the fair ordering raises
+      // 42P01 and the fallback is the path actually taken here.
+      const scoped = createMetricStore({ pool: poolOver(db), workspaceId: WS })
+
+      const targets = await scoped.listTargets()
+      expect(targets).toHaveLength(1)
+      expect(targets[0]?.workspaceId).toBe(WS)
+    })
+
     it('bounds one pass, because each target is a request', async () => {
       for (let i = 0; i < 5; i += 1) {
         await addVariant({ channel: `ch${i}`, platform_post_id: `id${i}` })

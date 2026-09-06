@@ -1,10 +1,12 @@
 import 'server-only'
 import type { DispatchSweepReport, HoldSweepReport } from '@sahoda/jobs/sweeps'
 import type { ReconcileReport } from '@sahoda/jobs/publish'
+import type { LoopSweepReport } from '@/lib/loop/sweep'
 
 /** What went wrong, named but never described — the detail goes to the log, not the wire. */
 interface SweepError {
-  error: 'dispatch-sweep-failed' | 'hold-sweep-failed' | 'reconcile-sweep-failed'
+  error:
+    'dispatch-sweep-failed' | 'hold-sweep-failed' | 'reconcile-sweep-failed' | 'loop-sweep-failed'
 }
 
 /** The dispatch report minus `decisions`, which carries post and workspace ids. */
@@ -36,6 +38,8 @@ export interface CronSweepBody {
   holds: HoldSweepReport | SweepError
   /** The polling stand-in for webhooks. Counters only, same as the others. */
   reconcile: ReconcileReport | SweepError
+  /** The stale-Loop-cycle reaper. Counts only ({scanned, expired}); it carries no ids. */
+  loop: LoopSweepReport | SweepError
 }
 
 export interface CronSweepOutcome {
@@ -47,6 +51,7 @@ export interface CronSweepRunners {
   runDispatch(): Promise<DispatchSweepReport>
   runHolds(): Promise<HoldSweepReport>
   runReconcile(): Promise<ReconcileReport>
+  runLoop(): Promise<LoopSweepReport>
   /**
    * Required, not optional. An optional field here would be omitted by exactly the
    * caller that most needs it — the one that never thought about which rail it is on.
@@ -56,16 +61,17 @@ export interface CronSweepRunners {
   onError?(scope: SweepScope, error: unknown): void
 }
 
-type SweepScope = 'dispatch' | 'holds' | 'reconcile'
+type SweepScope = 'dispatch' | 'holds' | 'reconcile' | 'loop'
 
 const ERROR_FOR: Record<SweepScope, SweepError['error']> = {
   dispatch: 'dispatch-sweep-failed',
   holds: 'hold-sweep-failed',
   reconcile: 'reconcile-sweep-failed',
+  loop: 'loop-sweep-failed',
 }
 
 /**
- * One cron tick: run both scheduled sweeps and describe what happened in counters.
+ * One cron tick: run the three scheduled sweeps and describe what happened in counters.
  *
  * Two rules shape the response. First, the sweeps are independent — a dispatcher failure
  * must not stop the hold reaper, because stranded credits are the user's money and the
@@ -74,18 +80,31 @@ const ERROR_FOR: Record<SweepScope, SweepError['error']> = {
  * (`dispatch-sweep-failed`) rather than described, since a database error message can
  * carry a connection string, a host or a query.
  *
+ * ── THE ORDER IS LOAD-BEARING ────────────────────────────────────────────────
+ * Reconcile runs FIRST. It used to run last, "because it is the only one that can
+ * wait", and that ordering was the second half of a double post: an Instagram publish
+ * the platform ACCEPTED but had not finished (STILL_PROCESSING) hands its claim back as
+ * `scheduled`, and a tick that dispatched before reconciling re-sent it ~5m40s after the
+ * first — on or past the ~5-minute idempotency window doc 13 §5 puts on Zernio's request
+ * id. The classifier now holds such a variant, and this order makes sure the pass that
+ * can END that hold has run before the dispatcher looks at the row. Reconcile is a
+ * bounded batch of Zernio reads (RECONCILE_BATCH per queue); dispatch is the one that
+ * can spend ~200s publishing, so it goes last, and the hold reaper — fifty guarded
+ * updates — sits ahead of it rather than behind a wall-clock it cannot influence.
+ *
  * A failed sweep answers 500 so a broken tick shows up as an error in the cron dashboard
  * instead of a green run that quietly did nothing. Vercel does not retry a failed
- * invocation; the next tick is the retry, and both sweeps re-read their candidates.
+ * invocation; the next tick is the retry, and every sweep re-reads its candidates.
  */
 export async function runCronSweeps(runners: CronSweepRunners): Promise<CronSweepOutcome> {
-  const dispatch = await attempt('dispatch', runners.runDispatch, runners.onError)
-  const holds = await attempt('holds', runners.runHolds, runners.onError)
-  // Last on purpose: it is the only one that can wait. A tick that runs out of
-  // wall-clock should lose the reconciliation pass, not the publishing.
   const reconcile = await attempt('reconcile', runners.runReconcile, runners.onError)
+  const holds = await attempt('holds', runners.runHolds, runners.onError)
+  // Independent of the others, exactly like the hold reaper: a stranded Loop week is a
+  // slot nobody can reuse, and a dispatcher or reconcile failure must not stop it.
+  const loop = await attempt('loop', runners.runLoop, runners.onError)
+  const dispatch = await attempt('dispatch', runners.runDispatch, runners.onError)
 
-  const ok = !isError(dispatch) && !isError(holds) && !isError(reconcile)
+  const ok = !isError(dispatch) && !isError(holds) && !isError(reconcile) && !isError(loop)
 
   return {
     status: ok ? 200 : 500,
@@ -97,6 +116,7 @@ export async function runCronSweeps(runners: CronSweepRunners): Promise<CronSwee
       dispatch: isError(dispatch) ? dispatch : stripDecisions(dispatch),
       holds,
       reconcile,
+      loop,
     },
   }
 }

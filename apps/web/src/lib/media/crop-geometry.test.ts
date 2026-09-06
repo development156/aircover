@@ -11,19 +11,24 @@ const LINKEDIN = targetFor('linkedin', null)
 const GBP = targetFor('gbp', null)
 
 describe('what the specs actually declare', () => {
-  test('linkedin declares no dimension rule of any kind', () => {
-    // The brief's "if one has no declared dimension, SAY SO and leave it alone".
-    // This is the assertion that keeps the report honest: the moment someone adds
-    // imageDims to linkedin, this fails and the report has to be rewritten.
+  test('linkedin declares a floor and no aspect rule', () => {
+    // RETARGETED 2026-09-03, not relaxed. The claim is unchanged: this file says
+    // out loud what each spec declares, so a report can never invent a rule the
+    // Constraint Engine does not hold. What changed is the spec. linkedin
+    // carried no dimension rule at all, so an image the platform refuses passed
+    // every check we make; docs/31 §2.2 gives 552x276 and the engine now holds
+    // it. The moment either number moves, this fails and the report is rewritten.
     expect(LINKEDIN.aspect).toBeNull()
-    expect(LINKEDIN.minW).toBeNull()
-    expect(LINKEDIN.minH).toBeNull()
+    expect(LINKEDIN.minW).toBe(552)
+    expect(LINKEDIN.minH).toBe(276)
   })
 
   test('gbp declares floors but no aspect rule', () => {
+    // RETARGETED with the same reasoning: the floor was 250x250, which is below
+    // what Google Business Profile actually accepts (docs/31 §2.4, 400x300).
     expect(GBP.aspect).toBeNull()
-    expect(GBP.minW).toBe(250)
-    expect(GBP.minH).toBe(250)
+    expect(GBP.minW).toBe(400)
+    expect(GBP.minH).toBe(300)
   })
 
   test('x declares a 4x4 floor and no aspect rule', () => {

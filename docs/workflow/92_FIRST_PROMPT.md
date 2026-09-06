@@ -12,15 +12,15 @@ Everything it needs lives on the **`wt-core`** branch. Not `main`, not `wt-web`.
 ```
 Set up this project from scratch. Do not build anything yet.
 
-REPO:   https://github.com/development156/sahodalabs
+REPO:   https://github.com/development156/aircover
 BRANCH: wt-core        (never `main` — it is 800+ commits stale, a 12-route
                         skeleton, and is NOT the product)
 
 1. Get onto the right code.
 
    If there is no git repo in this folder:
-     git clone https://github.com/development156/sahodalabs.git
-     cd sahodalabs
+     git clone https://github.com/development156/aircover.git
+     cd aircover
      git checkout wt-core
 
    If a repo is already here (cloud sessions usually start this way):
@@ -104,7 +104,7 @@ is **not** the app — do not work there.
 
 ### On a new machine
 
-Wherever you cloned, e.g. `~/sahodalabs/docs/workflow/92_FIRST_PROMPT.md`.
+Wherever you cloned, e.g. `~/aircover/docs/workflow/92_FIRST_PROMPT.md`.
 
 ### In a cloud session
 
@@ -114,9 +114,9 @@ just `docs/workflow/92_FIRST_PROMPT.md` and `scripts/bootstrap.sh`.
 ### On GitHub
 
 ```
-https://github.com/development156/sahodalabs/blob/wt-core/docs/workflow/92_FIRST_PROMPT.md
-https://github.com/development156/sahodalabs/blob/wt-core/docs/workflow/90_CONTEXT_FOR_CLAUDE.md
-https://github.com/development156/sahodalabs/blob/wt-core/docs/workflow/91_ACCOUNT_MIGRATION.md
+https://github.com/development156/aircover/blob/wt-core/docs/workflow/92_FIRST_PROMPT.md
+https://github.com/development156/aircover/blob/wt-core/docs/workflow/90_CONTEXT_FOR_CLAUDE.md
+https://github.com/development156/aircover/blob/wt-core/docs/workflow/91_ACCOUNT_MIGRATION.md
 ```
 
 **These exist only on `wt-core`.** A clone that stays on `main` will not have
@@ -148,7 +148,7 @@ root, from `$HOME`, from `/tmp`, from `/`, and with no `setup.sh` anywhere.
 | --- | --- |
 | 1 | Checks the branch, warns loudly on `main` |
 | 2 | `pnpm install` if `node_modules` is absent |
-| 3 | `git config core.hooksPath .githooks` — **the easiest thing to miss.** Skipping it silently disarms the QA guard *and* the block keeping `wt-karunesh` out of `wt-core` |
+| 3 | `git config core.hooksPath .githooks` — **the easiest thing to miss.** Skipping it silently disarms the QA guard *and* the block keeping every lane but `divas` out of `wt-core` |
 | 4 | Restores the 21 personal rule files; settings **merged**, existing values win, replaced files backed up |
 | 5 | Installs chromium — Playwright ships a downloader, not a browser, which is why the browser tests were unrun on every cloud lane for weeks |
 | 6 | Runs `account-verify.sh`, which **exits non-zero until it is genuinely complete** |

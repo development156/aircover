@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 
 import { saveBrandMemory, type SaveBrandState } from '@/app/actions/brand-resolve'
+import { blankReason } from '@/lib/brand/blank'
 import { BRAIN_FIELDS } from '@/lib/brand/fields'
 import { MAX_OPEN_LIST_ENTRIES } from '@/lib/brand/limits'
 import { leavesEqual, readLeaf, writeLeaf, type BrainLeaf } from '@/lib/brand/leaf'
@@ -31,11 +32,13 @@ function validate(path: string, value: BrainLeaf): string | null {
       return `Keep this list to ${MAX_OPEN_LIST_ENTRIES} entries or fewer.`
     }
     if (value.some((entry) => typeof entry !== 'string')) return 'That list expects text entries.'
-    return null
+    return blankReason(field, value)
   }
 
   if (typeof value !== 'string') return 'That field expects text.'
-  return null
+  // MEASURED 2026-09-06: three spaces were saved as the core promise and marked
+  // confirmed. Shape checks alone let a blank through; see lib/brand/blank.ts.
+  return blankReason(field, value)
 }
 
 /**
@@ -57,6 +60,14 @@ function validate(path: string, value: BrainLeaf): string | null {
 export async function confirmBrainField(
   path: string,
   value: BrainLeaf,
+  /**
+   * `asSeen`: the press meant "this is right as shown", not "write this". If
+   * the stored text has moved since the screen rendered (a teammate corrected
+   * it in another tab), agreeing to the old wording would write it back over
+   * theirs as confirmed. MEASURED 2026-09-06 in two tabs: the version check
+   * alone lets this through, because the action's own read is fresh.
+   */
+  options: { asSeen?: boolean } = {},
 ): Promise<ConfirmFieldState> {
   try {
     const invalid = validate(path, value)
@@ -86,12 +97,22 @@ export async function confirmBrainField(
     // confirmation independently of the text, so agreeing now costs one tap
     // instead of retyping a sentence verbatim.
     const unchangedText = leavesEqual(readLeaf(brain.active, path), value)
+    if (options.asSeen && !unchangedText) {
+      return {
+        ok: false,
+        message:
+          'This field changed since you opened the page. Reload to see the new words before you confirm.',
+      }
+    }
     if (unchangedText && brain.meta?.[path]?.confirmed === true) {
       return { ok: true, version: brain.version, unchanged: true }
     }
 
     const next = unchangedText ? brain.active : writeLeaf(brain.active, path, value)
-    const saved: SaveBrandState = await saveBrandMemory(next, 'manual', [path])
+    // The version this read: the RPC refuses the write if anyone moved it since.
+    const saved: SaveBrandState = await saveBrandMemory(next, 'manual', [path], null, {
+      expectedVersion: brain.version,
+    })
     if (!saved.ok) return { ok: false, message: saved.message }
 
     // The ring lives in the app layout, so a page-scoped revalidate would leave

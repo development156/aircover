@@ -41,7 +41,12 @@ describe('workspaceForWrite', () => {
   test('hands back the workspace when there is one', async () => {
     state.rows = [{ id: 'ws_1', name: 'Corner Bakery', slug: 'corner-bakery' }]
 
-    await expect(workspaceForWrite()).resolves.toEqual({
+    // `toMatchObject`, not `toEqual`. The claim is WHICH workspace comes back,
+    // not how many columns a `Workspace` carries: the row grew `timezone` and
+    // `createdBy` when the shell learned to prefer the workspace you created,
+    // and an exact-shape assertion here would fail every such widening while
+    // saying nothing about the behaviour it is named for.
+    await expect(workspaceForWrite()).resolves.toMatchObject({
       ok: true,
       workspace: { id: 'ws_1', name: 'Corner Bakery', slug: 'corner-bakery' },
     })

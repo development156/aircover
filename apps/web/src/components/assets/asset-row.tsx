@@ -15,13 +15,14 @@ import type { AssetCard } from '@/lib/assets/view'
 import { displayName, lockedSites, usageLine } from '@/lib/assets/view'
 import { formatBytes } from '@/lib/format-bytes'
 import { cn } from '@/lib/utils'
+import { DEFAULT_ZONE } from '@/lib/time/zone'
 
 /** `13 Oct 2025`. IST, same as every other date this screen reads out loud. */
 const DATE = new Intl.DateTimeFormat('en-GB', {
   day: 'numeric',
   month: 'short',
   year: 'numeric',
-  timeZone: 'Asia/Kolkata',
+  timeZone: DEFAULT_ZONE,
 })
 
 /**
@@ -160,7 +161,7 @@ export function AssetRow({
           // `pr-9` reserves the space the "..." trigger floats in, the same
           // trick `library-sidebar-row.tsx` uses — text truncates before it,
           // rather than the button and the trigger sharing one pixel.
-          'flex w-full items-center gap-3 py-2 pr-9 pl-3 text-left transition-micro hover:bg-s1',
+          'flex w-full items-center gap-3 py-2 pr-9 pl-3 text-left transition-micro hover:bg-s2',
           selectable && selected ? 'bg-brand-wash' : '',
         )}
       >

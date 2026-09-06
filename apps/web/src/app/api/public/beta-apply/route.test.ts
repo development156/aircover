@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { CHALLENGE_MISSING_MESSAGE } from '@/components/embed/challenge-copy'
+
 const state = vi.hoisted(() => ({
   minute: { allowed: true, count: 1, unmeasured: false },
   day: { allowed: true, count: 1, unmeasured: false },
@@ -151,6 +153,31 @@ describe('rate limiting', () => {
     expect(response.status).toBe(429)
     expect(state.captchaCalls).toBe(0)
     expect(state.writes).toEqual([])
+  })
+})
+
+describe('the bot check never produced a token', () => {
+  it('says the check could not load, never "check the details"', async () => {
+    // MEASURED 2026-09-02: with the Turnstile widget blocked, the form posts an
+    // empty token and the visitor was told to re-check details that were
+    // already right. Re-checking cannot work, so the sentence must not ask it.
+    const response = await POST(post({ ...GOOD, turnstile_token: '' }))
+
+    expect(response.status).toBe(400)
+    const body = (await response.json()) as { error: string; message: string }
+    expect(body.error).toBe('challenge_missing')
+    expect(body.message).toBe(CHALLENGE_MISSING_MESSAGE)
+    expect(body.message.toLowerCase()).not.toContain('check the details')
+    expect(state.captchaCalls).toBe(0)
+    expect(state.writes).toEqual([])
+  })
+
+  it('keeps the generic sentence when a detail is ALSO wrong, so a real mistake is still named', async () => {
+    const response = await POST(post({ ...GOOD, email: 'not-an-email', turnstile_token: '' }))
+
+    const body = (await response.json()) as { error: string; fields: string[] }
+    expect(body.error).toBe('invalid')
+    expect(body.fields).toContain('email')
   })
 })
 

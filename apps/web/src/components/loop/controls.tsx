@@ -106,19 +106,37 @@ export function LoopControls({
   children,
 }: LoopControlsProps) {
   const [budget, setBudget] = useState(weeklyBudgetCredits)
+  const [savedBudget, setSavedBudget] = useState(weeklyBudgetCredits)
+  const [budgetNote, setBudgetNote] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
-  function saveBudget(value: number) {
-    setBudget(value)
+  // ── BLUR SAVES, SO BLUR MUST KNOW WHAT IT IS SAVING ────────────────────────
+  // `Number('')` is 0. A person who cleared the field to retype it and tabbed
+  // away had a budget of zero written for them, silently, and a reload showed
+  // "0" (MEASURED 2026-09-06). An empty or unparseable field goes back to the
+  // last saved figure and writes nothing; an unchanged figure writes nothing
+  // either, because every blur was a server write before, changed or not.
+  function saveBudget(raw: string) {
     setError(null)
+    if (raw.trim() === '' || !Number.isFinite(Number(raw))) {
+      setBudget(savedBudget)
+      return
+    }
+    const value = Number(raw)
+    if (value === savedBudget) return
+    setBudget(value)
+    setBudgetNote(null)
     startTransition(async () => {
       const result = await setLoopSettings({ weeklyBudgetCredits: value })
       if (!result.ok) {
-        setBudget(weeklyBudgetCredits)
+        setBudget(savedBudget)
         setError(result.message ?? 'Could not save that.')
+        return
       }
+      setSavedBudget(value)
+      setBudgetNote('Saved.')
     })
   }
 
@@ -205,13 +223,38 @@ export function LoopControls({
                 value={budget}
                 disabled={pending}
                 aria-label="Weekly budget in credits"
-                onChange={(e) => setBudget(Number(e.target.value))}
-                onBlur={(e) => saveBudget(Number(e.target.value))}
-                className="w-24 rounded-input bg-s2 px-3 py-2 type-body tabular-nums text-ink outline-none focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-accent"
+                aria-describedby="loop-budget-help"
+                onChange={(e) => {
+                  setBudgetNote(null)
+                  setBudget(
+                    e.target.value === '' ? ('' as unknown as number) : Number(e.target.value),
+                  )
+                }}
+                onBlur={(e) => saveBudget(e.target.value)}
+                className="w-24 rounded-input bg-s2 px-3 py-2 type-body num text-ink outline-none focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-accent"
               />
               <span className="type-sm text-muted">credits</span>
+              {budgetNote ? (
+                <span role="status" className="type-sm text-muted">
+                  {budgetNote}
+                </span>
+              ) : null}
             </span>
-            {run && run.budgetCredits !== null ? (
+            {/* The budget is advisory, not a hard ceiling: the Loop can still
+                spend past it, so the field must say that plainly rather than
+                let the word "budget" imply a cutoff nothing enforces. */}
+            <span id="loop-budget-help" className="type-sm mt-1 block text-muted">
+              A guide, not a limit. Sahoda shows the cost before it spends.
+            </span>
+            {/* `> 0`, not `!== null`. Zero is a real stored budget — it means
+                the Loop may spend nothing — and it is not a bar. Rendered as
+                one it gave `aria-valuemax=0` under `aria-valuenow=85` and read
+                "Used 85 of 0 credits", with the fill drawn EMPTY because
+                `share` divides by it. `CreditsCard` beside it already guards
+                `budget > 0`; this is the same rule. A zero-budget cycle falls
+                to the plain spent line below, which states what happened
+                without drawing a proportion of nothing. */}
+            {run && run.budgetCredits !== null && run.budgetCredits > 0 ? (
               <SpendBar spent={run.spentCredits} budget={run.budgetCredits} />
             ) : run ? (
               <span className="type-sm num mt-2 block text-muted">
@@ -277,10 +320,10 @@ function SpendBar({ spent, budget }: { spent: number; budget: number }) {
         aria-valuemax={budget}
         aria-valuenow={spent}
         aria-label="Credits used this cycle"
-        className="h-1.5 w-full overflow-hidden rounded-full bg-s2"
+        className="h-1.5 w-full overflow-hidden rounded-pill bg-s2"
       >
         <div
-          className="h-full rounded-full bg-accent transition-panel"
+          className="h-full rounded-pill bg-accent transition-panel"
           style={{ width: `${share}%` }}
         />
       </div>

@@ -128,6 +128,7 @@ test.describe('plan & billing @smoke', () => {
     await page.setViewportSize({ width: 390, height: 844 })
 
     await page.goto('/home')
+
     await page
       .locator('#main')
       .getByRole('button', { name: /create workspace/i })

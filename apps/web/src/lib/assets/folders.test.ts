@@ -27,6 +27,7 @@ const card = (over: Partial<AssetCard>): AssetCard => ({
   height: 10,
   createdAt: '2026-08-25T00:00:00Z',
   previewUrl: null,
+  thumbUrl: null,
   usage: [],
   folderIds: [],
   deletedAt: null,

@@ -179,9 +179,16 @@ describe('GET /api/debug/sentry — flush reporting', () => {
     const body = await (await GET(requestFor('message'))).json()
 
     // Assert — an event id still comes back, and it still means nothing.
+    // RETARGETED: `configured`/`flushed` are the route's own INPUTS to
+    // `deliveryVerdict`, and `ok` is a plain boolean a broken rewrite could
+    // still compute correctly by accident. `verdict` and `note` are its
+    // OUTPUT and prove the route actually wired that function in, rather
+    // than deriving `ok` some other way that happens to agree here.
     expect(body.flushed).toBe(false)
     expect(body.configured).toBe(true)
     expect(body.ok).toBe(false)
+    expect(body.verdict).toBe('not-drained')
+    expect(body.note).toMatch(/queue was still full/i)
   })
 
   it('reports ok only when a DSN is configured and the flush drained', async () => {
@@ -210,9 +217,14 @@ describe('GET /api/debug/sentry — flush reporting', () => {
     // Act
     const body = await (await GET(requestFor('message'))).json()
 
-    // Assert
+    // Assert — RETARGETED: pin the coded reason, not only the boolean it
+    // feeds. `verdict`/`note` prove this took the `!configured` branch of
+    // `deliveryVerdict`, not a route that recomputed `ok: false` some other
+    // way and happened to agree on this input.
     expect(body.configured).toBe(false)
     expect(body.ok).toBe(false)
+    expect(body.verdict).toBe('not-configured')
+    expect(body.note).toMatch(/set sentry_dsn/i)
   })
 
   it('treats a whitespace-only DSN as unconfigured, matching buildSentryOptions', async () => {
@@ -224,9 +236,11 @@ describe('GET /api/debug/sentry — flush reporting', () => {
     // Act
     const body = await (await GET(requestFor('message'))).json()
 
-    // Assert
+    // Assert — RETARGETED, same reasoning as the empty-DSN case above.
     expect(body.configured).toBe(false)
     expect(body.ok).toBe(false)
+    expect(body.verdict).toBe('not-configured')
+    expect(body.note).toMatch(/set sentry_dsn/i)
   })
 
   it('never echoes the DSN value into the response body', async () => {

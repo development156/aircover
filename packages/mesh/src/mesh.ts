@@ -24,13 +24,16 @@ import {
   type MeshTaskSpec,
   type RepairEvent,
 } from './engine'
-import { TIER_ROUTES, imageModelForTier } from './routing'
+import { TIER_ROUTES, chooseImageModel } from './routing'
 import { brandGuidelinesTask } from './tasks/brand-guidelines'
 import { brandExtractTask } from './tasks/brand-extract'
 import { captionRewriteTask } from './tasks/caption-rewrite'
 import { contentVariantsTask } from './tasks/content-variants'
 import { planWeekTask } from './tasks/plan-week'
 import { siteGenerateTask } from './tasks/site-generate'
+import { gateClassifyTask } from './tasks/gate-classify'
+import { promptRefineTask } from './tasks/prompt-refine'
+import { brandStartersTask } from './tasks/brand-starters'
 
 /** Rough $/1M-token estimate for ai_provider_logs margin telemetry (not billing). */
 function estimateCostUsd(u: ProviderUsage): number {
@@ -91,9 +94,20 @@ export function createMesh(opts: CreateMeshOptions = {}): Mesh {
    * Undefined when the tier has no image model, which is how `runImage` learns to
    * refuse rather than guess.
    */
-  const planImage = (tier: ModelTier): { provider: Provider; model: string } | undefined => {
-    const model = imageModelForTier(tier)
-    return model === undefined ? undefined : { provider: openRouterByClass.image, model }
+  const planImage = (
+    tier: ModelTier,
+    requested?: string,
+  ): { provider: Provider; model: string } | undefined => {
+    // ── THE REQUESTED MODEL IS CHECKED, NEVER PASSED THROUGH ────────────────
+    // A model id now arrives from a request, because the Studio lets somebody
+    // choose. Handing that string to the provider would let any caller bill this
+    // account against any model on OpenRouter, including ones far dearer than
+    // anything we price. An id that is not on the list is IGNORED rather than
+    // refused here, because the screen has already refused it with a sentence
+    // and this layer's job is to make the wrong thing impossible, not to
+    // explain it twice.
+    const chosen = chooseImageModel(tier, requested)
+    return chosen === undefined ? undefined : { provider: openRouterByClass.image, model: chosen }
   }
 
   const planAttempts = (tier: ModelTier): Attempt[] => {
@@ -161,6 +175,27 @@ export function createMesh(opts: CreateMeshOptions = {}): Mesh {
   register(contentVariantsTask)
   register(planWeekTask)
   register(siteGenerateTask)
+  // ── THE ONE THAT WAS EXPORTED, CALLED, AND NEVER REGISTERED ────────────────
+  // `gateClassifyTask` is exported from index.ts and invoked by
+  // `apps/jobs/src/gate/classifier.ts:113` through this very `runTask`. It was
+  // missing from this map, so that call returned
+  // `VALIDATION_ERROR: unknown mesh task: gate_classify` — PROVEN by probe.
+  //
+  // The consequence was not a logged error. `classifier.ts:141` maps
+  // VALIDATION_ERROR to the state `unparseable`; `verdict.ts:146` turns that
+  // into `decision: 'hold'`; and `gateHoldIsTransient` (verdict.ts:219) is true
+  // only for `unavailable` and `timeout`, so the hold was TERMINAL and never
+  // retried. Every post that passed the literal word checks was held for ever,
+  // and the customer was shown "The wording check answered in a form we could
+  // not read" for a call that was never made.
+  //
+  // `mesh.test.ts` stayed green because it only ever proved that an UNKNOWN
+  // name errors, and every publish test in apps/jobs mocks the gate rather than
+  // wiring the real mesh. `registered-tasks.test.ts` is the guard that closes
+  // the class: it asserts EVERY exported task spec is reachable here.
+  register(gateClassifyTask)
+  register(promptRefineTask)
+  register(brandStartersTask)
 
   async function runTask<I, O>(
     def: MeshTaskDef<I, O>,
@@ -204,6 +239,7 @@ export function createMesh(opts: CreateMeshOptions = {}): Mesh {
         width: size.width,
         height: size.height,
         references: parsed.data.references,
+        modelId: parsed.data.modelId,
       },
       ctx,
     )

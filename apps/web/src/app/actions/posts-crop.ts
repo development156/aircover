@@ -4,6 +4,7 @@ import { auth } from '@clerk/nextjs/server'
 import { revalidatePath } from 'next/cache'
 
 import { readAsset } from '@/lib/assets/read'
+import { ATTACH_NEEDS_RESTORE } from '@/lib/assets/state'
 import { normaliseFocal } from '@/lib/media/crop-geometry'
 import type { AcceptCropState } from '@/lib/media/crop-state'
 import { mintCroppedAttachment } from '@/lib/media/mint'
@@ -69,14 +70,18 @@ export async function acceptCropForUpload(
     const stored = await uploadAsset(formData)
     if (!stored.ok) return { ok: false, message: stored.message }
 
-    const existing = await listMedia(postId)
+    // Hoisted OUT of the call below. `readVariantFormats(postId)` was awaited
+    // inline as an argument, which made it strictly sequential after
+    // `listMedia` even though neither reads the other. `existing` genuinely
+    // feeds the mint (`existingCount`), so only these two are paired.
+    const [existing, formats] = await Promise.all([listMedia(postId), readVariantFormats(postId)])
     const result = await mintCroppedAttachment({
       workspaceId: ws.workspace.id,
       userId,
       postId,
       asset: stored.asset,
       channels: post.channels,
-      formats: await readVariantFormats(postId),
+      formats,
       focal: normaliseFocal({ x: focalX, y: focalY }),
       existingCount: existing.length,
       alt: stored.asset.alt,
@@ -122,15 +127,22 @@ export async function acceptCropForAsset(
     if (read.status !== 'ok') {
       return { ok: false, message: 'Sahoda could not read that file. Reload and try again.' }
     }
+    // A crop of a library file is an attach of it, so the trash rule is the
+    // same one `attachAssetToPost` applies.
+    if (read.asset.asset.deleted_at !== null) return { ok: false, message: ATTACH_NEEDS_RESTORE }
 
-    const existing = await listMedia(postId)
+    // Hoisted OUT of the call below. `readVariantFormats(postId)` was awaited
+    // inline as an argument, which made it strictly sequential after
+    // `listMedia` even though neither reads the other. `existing` genuinely
+    // feeds the mint (`existingCount`), so only these two are paired.
+    const [existing, formats] = await Promise.all([listMedia(postId), readVariantFormats(postId)])
     const result = await mintCroppedAttachment({
       workspaceId: ws.workspace.id,
       userId,
       postId,
       asset: read.asset.asset,
       channels: post.channels,
-      formats: await readVariantFormats(postId),
+      formats,
       focal: normaliseFocal({ x: focalX, y: focalY }),
       existingCount: existing.length,
       alt: read.asset.asset.alt,

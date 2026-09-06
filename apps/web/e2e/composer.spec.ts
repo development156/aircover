@@ -185,6 +185,15 @@ test.describe('the composer keeps one body per channel @smoke', () => {
     // ── 11. READ BACK #2 — a surface that did not write any of it. The dry run
     //       re-reads the rows on the server and reports per channel. It writes
     //       nothing and sends nothing; the live Publish button is never pressed.
+    // Since 2762b816 the finish panel asks how the post goes out before it
+    // shows anything else: "Schedule it" or "Post now", and the dry run lives
+    // under "Post now". A spec that reached for the preview without choosing
+    // waited the whole 300s for a button that was never mounted (run
+    // 34009643341). Choosing is what a writer does, so the spec does it too.
+    await page
+      .getByRole('group', { name: /how this post goes out/i })
+      .getByRole('button', { name: /post now/i })
+      .click()
     const preview = page.locator('[data-guide="post-preview-publish"]')
     await preview.getByRole('button', { name: /^preview publish$/i }).click()
     // The dry run reports per channel. Both appear, and the X result reflects

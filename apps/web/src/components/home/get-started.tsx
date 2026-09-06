@@ -67,7 +67,7 @@ export function GetStarted({ now, steps }: { now: Date; steps: StartStep[] }) {
         <header>
           <h1 className="type-h2">{greetingFor(now)}</h1>
           <p className="type-sm mt-1 max-w-[var(--measure-prose)] text-muted">
-            Nothing has happened in this workspace yet, which is exactly what a new one looks like.
+            Nothing has happened here yet. That is normal for a new workspace.
           </p>
         </header>
       </StaggerItem>
@@ -89,7 +89,7 @@ export function GetStarted({ now, steps }: { now: Date; steps: StartStep[] }) {
              card holds a heading, a button and three rows with their own
              sub-lines, not a paragraph, and at 640 the primary and its price
              line started to crowd. */
-          className="surface-ring max-w-[var(--measure-form)] rounded-card bg-surface p-5"
+          className="surface-ring-lift max-w-[var(--measure-form)] rounded-card bg-surface p-5"
         >
           {/* Capped at the prose measure rather than left to the card. At 1440 the
             card is 1132px and every sentence in it is under 640 — letting the
@@ -98,10 +98,10 @@ export function GetStarted({ now, steps }: { now: Date; steps: StartStep[] }) {
             own header. */}
           <div className="max-w-[var(--measure-prose)]">
             <h2 id="home-get-started-head" className="type-h3 text-ink">
-              Three things start it
+              Three things to start with
             </h2>
             <p className="type-sm mt-1 text-muted">
-              Your week, your approvals queue and your numbers all fill in from these. You can do
+              Your week, your list of things to check and your numbers all fill in from these. Do
               them in any order.
             </p>
 

@@ -81,6 +81,11 @@ export type Read<T> =
  */
 const NOT_DEPLOYED = new Set(['PGRST205', '42703', '42P01'])
 
+const BASE_COLUMNS =
+  'workspace_id, plan_id, status, current_period_start, current_period_end, cancel_at_period_end'
+const LIFECYCLE_COLUMNS =
+  'pending_plan_id, pending_plan_effective_at, grace_ends_at, dunning_attempts, last_failure_at, last_failure_code'
+
 const isNotDeployed = (error: { code?: string } | null): boolean =>
   error?.code !== undefined && NOT_DEPLOYED.has(error.code)
 
@@ -127,39 +132,47 @@ export async function readSubscription(): Promise<SettledRead<SubscriptionView>>
      * separately and are simply ABSENT until the migration lands. Absent is the truth: a
      * column that does not exist records no grace window and no pending change.
      */
-    const base = await supabase
-      .from('subscriptions')
-      .select(
-        'workspace_id, plan_id, status, current_period_start, current_period_end, ' +
-          'cancel_at_period_end',
-      )
-      .eq('workspace_id', ws.id)
-      // `subscriptions_one_live` bounds the LIVE ones, not the closed ones, so a workspace
-      // that has cancelled and resubscribed has several rows. Newest wins; `.maybeSingle()`
-      // would fail with PGRST116 and read as permanently unreadable.
-      .order('created_at', { ascending: false })
-      .limit(1)
+    /**
+     * ── ONE SELECT, AND THE SPLIT READ IS THE FALLBACK ────────────────────────
+     * This was two selects in series — the plan columns, then the lifecycle
+     * columns — because `20260819213000_billing_lifecycle.sql` was once
+     * unapplied and a missing column had to degrade to "nothing recorded".
+     * MEASURED 2026-09-06 on production edge logs: the second read was a whole
+     * extra round trip in front of every /home render, for a migration that has
+     * been applied on production (20260819213000) and staging (20260904072448).
+     *
+     * So the normal path is one select of every column. A database that still
+     * answers "no such column" gets the old split read, and any OTHER failure is
+     * unreadable — never quietly "no dunning, no pending change", which would
+     * tell a customer with a scheduled downgrade that nothing is scheduled.
+     */
+    const select = (columns: string) =>
+      supabase
+        .from('subscriptions')
+        .select(columns)
+        .eq('workspace_id', ws.id)
+        // `subscriptions_one_live` bounds the LIVE ones, not the closed ones, so a
+        // workspace that has cancelled and resubscribed has several rows. Newest
+        // wins; `.maybeSingle()` would fail with PGRST116 and read as permanently
+        // unreadable.
+        .order('created_at', { ascending: false })
+        .limit(1)
 
-    if (base.error) return { status: 'unreadable' }
+    const full = await select(`${BASE_COLUMNS}, ${LIFECYCLE_COLUMNS}`)
 
-    const lifecycle = await supabase
-      .from('subscriptions')
-      .select(
-        'pending_plan_id, pending_plan_effective_at, grace_ends_at, ' +
-          'dunning_attempts, last_failure_at, last_failure_code',
-      )
-      .eq('workspace_id', ws.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-
-    // A missing COLUMN is "not deployed yet". Any other failure is a genuine read failure
-    // and must not be quietly reported as "no dunning, no pending change" — that would tell
-    // a customer with a scheduled downgrade that nothing is scheduled.
-    if (lifecycle.error && !isNotDeployed(lifecycle.error)) return { status: 'unreadable' }
-
-    const data = base.data
-    const extra = (lifecycle.error ? undefined : lifecycle.data?.[0]) as
-      Record<string, unknown> | undefined
+    let data: unknown[] | null
+    let extra: Record<string, unknown> | undefined
+    if (!full.error) {
+      data = full.data as unknown[] | null
+      extra = data?.[0] as Record<string, unknown> | undefined
+    } else if (isNotDeployed(full.error)) {
+      const base = await select(BASE_COLUMNS)
+      if (base.error) return { status: 'unreadable' }
+      data = base.data as unknown[] | null
+      extra = undefined
+    } else {
+      return { status: 'unreadable' }
+    }
 
     /**
      * Read through `unknown`, and let zod be the boundary.

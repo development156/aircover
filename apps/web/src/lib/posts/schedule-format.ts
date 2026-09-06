@@ -1,4 +1,4 @@
-import { DEFAULT_DISPLAY_ZONE, resolveDisplayZone, zoneLabel } from '@/lib/time/zone'
+import { DEFAULT_ZONE, resolveDisplayZone, zoneLabel } from '@/lib/time/zone'
 
 /**
  * `scheduled_at` is stored as a timestamptz. Rendering it means choosing a
@@ -19,12 +19,11 @@ import { DEFAULT_DISPLAY_ZONE, resolveDisplayZone, zoneLabel } from '@/lib/time/
  *
  * ── WHAT IS TRUE NOW ─────────────────────────────────────────────────────────
  * The zone comes from the workspace when it has one, so the setting a customer
- * chose finally reaches a screen, and EVERY time carries its label. What is
- * still not true is that the picker builds in this zone: it uses the reader's
- * own clock. That gap is now visible rather than silent — the composer says
- * which clock it used, these say which clock they are in — and closing it means
- * moving the month grid, the day buckets and the now-line together, which is its
- * own change.
+ * chose reaches every screen, and EVERY time carries its label. Since
+ * 2026-09-06 the picker builds in this zone too (`calendar-month.ts`,
+ * `schedule-choices.ts`), and the planner's month grid, day buckets and
+ * now-line all take it as an argument (`lib/time/day-key.ts`), so the composer
+ * and the planner call one post one time.
  */
 
 /** One formatter per zone. `Intl.DateTimeFormat` is costly to build and these repeat per row. */
@@ -55,7 +54,7 @@ export function formatScheduledAt(value: string | null, zone?: string | null): s
   const parsed = new Date(value)
   // An unparseable timestamp renders nothing rather than "Invalid Date".
   if (Number.isNaN(parsed.getTime())) return null
-  const { zone: display } = resolveDisplayZone(zone ?? DEFAULT_DISPLAY_ZONE)
+  const { zone: display } = resolveDisplayZone(zone ?? DEFAULT_ZONE)
   const formatted = cached(DATE_TIME_CACHE, display, {
     day: '2-digit',
     month: 'short',
@@ -76,11 +75,40 @@ export function formatScheduledAt(value: string | null, zone?: string | null): s
  * confirmation in a different zone. Anything too narrow for the label should
  * make room rather than drop it.
  */
+/**
+ * The clock alone, for a surface that states its zone ONCE for everything on it.
+ *
+ * ── WHY THIS EXISTS RATHER THAN A FLAG ON `formatScheduledTime` ──────────────
+ * The header above is right: a bare clock time beside a confirmation in another
+ * zone is how somebody schedules a post for the wrong hour, so the suffix is
+ * MANDATORY there and must stay hard to drop. The planner's week grid is the one
+ * surface where it is genuinely redundant — every card in it is placed in the
+ * grid's own `zone`, stated once on the hour rail, so the zone is a property of
+ * the grid rather than of each card, and repeating it eleven times cost the
+ * thing beside it: in a
+ * `(760-56)/7 ≈ 100px` column, "09:00 am IST · Scheduled" truncates to the time
+ * and the certainty word disappears.
+ *
+ * A separate, named function so the choice is visible at every call site. Use it
+ * only where the zone is stated for the whole surface.
+ */
+export function formatScheduledClock(value: string | null, zone?: string | null): string | null {
+  if (!value) return null
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return null
+  const { zone: display } = resolveDisplayZone(zone ?? DEFAULT_ZONE)
+  return cached(TIME_CACHE, display, {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  }).format(parsed)
+}
+
 export function formatScheduledTime(value: string | null, zone?: string | null): string | null {
   if (!value) return null
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return null
-  const { zone: display } = resolveDisplayZone(zone ?? DEFAULT_DISPLAY_ZONE)
+  const { zone: display } = resolveDisplayZone(zone ?? DEFAULT_ZONE)
   const formatted = cached(TIME_CACHE, display, {
     hour: '2-digit',
     minute: '2-digit',

@@ -7,11 +7,16 @@
 #   wt-web   NO LANE MAY WRITE IT. Ever. A push here produces a Vercel
 #            deployment with target: production — it IS the live product.
 #   main     Same. Nothing works there; it is a pre-history-reset skeleton.
-#   wt-core  Open to divas, jiban and girija. CLOSED to karunesh.
+#   wt-core  DIVAS ONLY. Closed to girija, jiban, karunesh, and to an unset
+#            owner. Every other lane pulls wt-core into itself and pushes its
+#            own branch; it never writes wt-core.
 #
-# Founder's ruling, 30 August 2026, replacing the 28 August one that closed
-# wt-web to karunesh alone. Lanes integrate into wt-core. Promotion out of
-# wt-core is a separate, deliberate act — see below — and never a lane's push.
+# Founder's ruling, 6 September 2026, replacing the 30 August one that had
+# wt-core open to divas, jiban and girija. One person holds the integration
+# point, so that every merge into it was made by somebody who could see all the
+# lanes at once — the failure git will not raise is two lanes building the same
+# concept, and only a single integrator is positioned to catch it. Promotion out
+# of wt-core is a separate, deliberate act — see below — and never a lane's push.
 #
 # ── HOW IT DECIDES ───────────────────────────────────────────────────────────
 # The lane is named by `git config sahoda.owner`, which /kickoff pins at the
@@ -20,7 +25,8 @@
 # the OWNER is the durable fact.
 #
 # An UNSET owner is still refused wt-web and main. You cannot prove you are not
-# a lane by declining to say who you are.
+# a lane by declining to say who you are. The same is true of wt-core: it is
+# refused unless the owner is exactly `divas`.
 #
 # ── THE PROMOTION ────────────────────────────────────────────────────────────
 # wt-core -> wt-web still has to be possible, so it is, and it has to be
@@ -30,8 +36,8 @@
 #
 # Same shape as SAHODA_E2E_ACK_TARGET, which exists because a suite wrote to
 # production for months. An acknowledgement you must type is not a hole; a habit
-# is. **It does not exist for karunesh** — that check returns before this one is
-# ever read, so no environment variable can reach it.
+# is. **It does not exist for a lane pushing wt-core** — that check returns
+# before this one is ever read, so no environment variable can reach it.
 #
 # ── HOW TO INSTALL ───────────────────────────────────────────────────────────
 #   git config core.hooksPath .githooks
@@ -54,10 +60,11 @@ set -uo pipefail
 
 OWNER="$(git config sahoda.owner 2>/dev/null || true)"
 
-KARUNESH_NEVER='^refs/heads/(wt-core|wt-web|main)$'
+# Refused for every owner that is not divas, including an unset one.
+NOT_DIVAS_NEVER='^refs/heads/(wt-core|wt-web|main)$'
 NO_LANE_EVER='^refs/heads/(wt-web|main)$'
 
-BLOCKED_KARUNESH=''
+BLOCKED_LANE_SHARED=''
 BLOCKED_LANE=''
 
 # pre-push receives: <local ref> <local sha> <remote ref> <remote sha>
@@ -65,12 +72,13 @@ while read -r _local_ref _local_sha remote_ref _remote_sha; do
   [ -z "${remote_ref:-}" ] && continue
   BRANCH="${remote_ref#refs/heads/}"
 
-  # 1 · karunesh, first and unconditionally. This `continue` is why no
-  #     environment variable can buy a way past it: the override below is never
-  #     reached for this owner. Structural, not a comparison somebody can
-  #     accidentally reorder.
-  if [ "$OWNER" = "karunesh" ] && printf '%s' "$remote_ref" | grep -Eq "$KARUNESH_NEVER"; then
-    BLOCKED_KARUNESH="$BLOCKED_KARUNESH $BRANCH"
+  # 1 · anybody who is not divas, first and unconditionally. This `continue` is
+  #     why no environment variable can buy a way past it: the override below is
+  #     never reached for these owners. Structural, not a comparison somebody can
+  #     accidentally reorder. An UNSET owner lands here too — you cannot acquire
+  #     the right to write wt-core by declining to say who you are.
+  if [ "$OWNER" != "divas" ] && printf '%s' "$remote_ref" | grep -Eq "$NOT_DIVAS_NEVER"; then
+    BLOCKED_LANE_SHARED="$BLOCKED_LANE_SHARED $BRANCH"
     continue
   fi
 
@@ -84,16 +92,16 @@ while read -r _local_ref _local_sha remote_ref _remote_sha; do
   fi
 done
 
-if [ -n "$BLOCKED_KARUNESH" ]; then
-  # Name HIS branch, not a literal. There are three karunesh lanes and telling a
+if [ -n "$BLOCKED_LANE_SHARED" ]; then
+  # Name THEIR branch, not a literal. Each person runs three lanes and telling a
   # wt-karunesh3 session to `git push origin wt-karunesh` would push lane 3's
   # HEAD at lane 1's branch — advice that loses work is worse than none.
   YOURS="$(git config sahoda.lane 2>/dev/null || true)"
   [ -n "$YOURS" ] || YOURS="$(git branch --show-current 2>/dev/null || true)"
-  # The fallback must never name a branch he is not allowed to write to. With
+  # The fallback must never name a branch they are not allowed to write to. With
   # sahoda.lane unset on a wt-core checkout it resolved to `wt-core` and the
   # message advised the exact push it had just refused.
-  if [ -z "$YOURS" ] || printf '%s' "refs/heads/$YOURS" | grep -Eq "$KARUNESH_NEVER"; then
+  if [ -z "$YOURS" ] || printf '%s' "refs/heads/$YOURS" | grep -Eq "$NOT_DIVAS_NEVER"; then
     YOURS="<your lane>"
   fi
   cat >&2 <<MSG
@@ -107,11 +115,17 @@ if [ -n "$BLOCKED_KARUNESH" ]; then
   "wt-web" is the live product your customers use. Your lane can read from
   both, and can never write to either.
 
-  Your own branch is yours completely — push to it as often as you like:
+  Reading is not just allowed, it is how you stay current. Bring wt-core
+  into your own lane whenever you like:
+
+      git fetch --all --prune && git merge origin/wt-core
+
+  Your own branch is yours completely. Push to it as often as you like:
 
       git push origin $YOURS
 
-  When your work is ready for the others, ask Divas to bring it in.
+  When your work is ready for the others, say so in your handoff. Divas
+  does the merge into wt-core.
   ─────────────────────────────────────────────────────────────────────────
 
 MSG

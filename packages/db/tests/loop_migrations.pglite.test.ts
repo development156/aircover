@@ -611,11 +611,14 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
     // ORCHESTRATOR, which writes over an owner connection and could set
     // status='creating' itself. Pinned here because it is the statement, and a
     // TypeScript test would only prove the function called something.
+    // status in ('creating', 'staging'): the ResumeCreate fix (7c284739) lets a
+    // stuck 'staging' cycle be resumed, so the orchestrator's gate admits both.
+    // Approval is still required — cost_approved_at and approved_credits not null.
     const GATE = `select * from loop_cycles
       where id = $1 and workspace_id = $2
         and cost_approved_at is not null
         and approved_credits is not null
-        and status = 'creating'`
+        and status in ('creating', 'staging')`
 
     const G = 'cccccccc-0001-4ccc-8ccc-cccccccccccc'
 

@@ -51,9 +51,13 @@ not a description somebody wrote down — it is a fact about how the database is
 holding a customer's data carries a `workspace_id` column, and the boundary between two customers is
 enforced by the database itself (PostgreSQL row-level security), not by the application.
 
-**MEASURED 2026-08-29: 58 tables.** They are listed in full in §3, and
+**MEASURED 2026-09-06: 62 tables.** They are listed in full in §3, and
 `packages/db/tests/data_handling_doc.pglite.test.ts` fails the build if that number or that list
-stops matching the database. (It read 52 on 2026-08-26, the figure this sentence carried until now.
+stops matching the database. (It read 59 on 2026-09-01. Three arrived on 2026-09-06 from two lanes,
+which is why neither lane's own figure, 61 and 60, was right: each counted only its own.
+`post_approvals` and `post_comments` came when approval became a recorded gate, and
+`brand_starters` holds the picture ideas written from a workspace's Brand Brain, so the Studio
+stops offering every business the same five. It read 52 on 2026-08-26.
 FOUR arrived on 2026-08-28 from three different lanes, which is why no lane's own figure — 53, 54
 and 53 again — was right: each counted only its own. Studio's `studio_designs` and
 `studio_exports`, which arrived when Studio stopped being a roadmap screen and started saving a
@@ -63,10 +67,11 @@ and `marketing_pass_runs`, which records when Sahoda last looked at your marketi
 `asset_folder_items` and `asset_smart_folders`. It read 48 on 2026-08-23; the forty-ninth was
 `marketing_observations`.)
 
-> **Production holds 52 of those 58 today.** MEASURED against production on 2026-08-28 by counting
-> `public` base tables carrying a `workspace_id` column, not inferred from the migration list, and
-> re-taken at the merge rather than carried over — the reading below it moved when the last two
-> lanes both edited this paragraph.
+> **Production held 52 of them when it was last counted, on 2026-08-28, against a list of 58.**
+> MEASURED then against production by counting `public` base tables carrying a `workspace_id`
+> column, not inferred from the migration list. **It has NOT been re-taken since**, and the list
+> has grown to 62, so the gap today is at least the four below and may be larger. The count needs
+> a credential this worktree does not hold; re-take it before this paragraph is quoted to anyone.
 >
 > **Four are missing, and all four are written-not-applied:** `loop_autopilot_log`,
 > `studio_designs`, `studio_exports` and `marketing_pass_runs`. MEASURED by asking the catalog for
@@ -115,6 +120,7 @@ the table belongs to one identified workspace.
 | `asset_derivatives` | the per-channel crops made from your pictures | `created_by` | removed |
 | `asset_folder_items` | which folders you filed each picture in | `added_by` | removed |
 | `asset_folders` | the folders you made, and their names | `name` `created_by` | removed |
+| `asset_logo_facts` | what Sahoda measured about each logo you uploaded: whether it has transparency, where the mark sits inside the file, and whether its ink is light or dark | no direct identifiers | removed |
 | `asset_smart_folders` | the saved searches you named, and their rules | `name` `query` `created_by` | removed |
 | `asset_usages` | where each picture is used | no direct identifiers | removed |
 | `assets` | your picture library, including anything in its trash | `title` `created_by` | removed |
@@ -122,6 +128,7 @@ the table belongs to one identified workspace.
 | `audit_logs` | a record of admin actions | `actor` | removed |
 | `billing_profiles` | who your invoices are made out to | `legal_name` `address` `billing_email` | removed |
 | `brand_memory` | your Brand Brain | `payload` `created_by` | removed |
+| `brand_starters` | the picture ideas Sahoda wrote for you from your Brand Brain | `starters` | removed |
 | `campaign_posts` | posts inside campaigns | no direct identifiers | removed |
 | `campaigns` | your campaigns | `name` `created_by` | removed |
 | `competitor_subscriptions` | the businesses you asked Radar to watch | `created_by` | removed |
@@ -148,6 +155,8 @@ the table belongs to one identified workspace.
 | `playbook_run_items` | what each playbook run produced | `title` `body` | removed |
 | `playbook_runs` | every playbook run | `created_by` | removed |
 | `playbooks` | your playbooks | `created_by` | removed |
+| `post_approvals` | who sent each post for review, who cleared it, who sent it back and why | `actor` `reason` | removed |
+| `post_comments` | the notes people left on posts while they were being written | `author` `body` | removed |
 | `post_media` | pictures attached to posts | no direct identifiers | removed |
 | `post_metric_snapshots` | how your posts performed | no direct identifiers | removed |
 | `post_publish_logs` | every publish attempt | no direct identifiers | removed |
@@ -576,9 +585,16 @@ Two things are **deliberately kept**, and both should be understood rather than 
 **Resend** — email. **Used only to reach Sahoda's own staff** — an approval code for a credit
 top-up, and an alert when a scheduled job stops. **No email is ever sent to a customer or a lead.**
 
-**Apify and Zyte** — Radar's page fetching, run from the nightly job. Apify receives **an Instagram
-handle** and nothing else. Zyte receives **a URL** and nothing else. Both describe a **competitor**
-the customer chose to watch, not the customer. Nothing identifying the Sahoda customer is sent.
+**Apify and TinyFish** — Radar's page fetching, run from the nightly job. Apify receives **an Instagram
+handle** and nothing else. TinyFish (which replaced Zyte on 2026-09-06) receives **a URL** and nothing
+else, and reads it through a residential IP outside India (US, GB, CA, DE, FR, JP, AU). Both describe a
+**competitor** the customer chose to watch, not the customer. Nothing identifying the Sahoda customer is
+sent.
+
+**TinyFish, at onboarding** — the same Fetch API is tier 3 of the customer's own site read, armed only
+when `TINYFISH_API_KEY` is set and only after our own fetch found a JavaScript-only or thin site. It then
+receives **the customer's own URL**, which is the one thing tier 1 never discloses. Nothing else about the
+customer travels with it, and the result is quarantined exactly as tier 1's is.
 
 > **⚠ A customer-typed value reaches an outbound fetch with no server-side URL guard.** The
 > onboarding path has a full one — scheme check, private-address blocklist, DNS pinning — and the
@@ -601,8 +617,8 @@ served from its own servers.
 
 Named so that reading the dependency list does not produce a false answer. Each of these has code
 and no live path: **Trigger.dev** (never deployed), the **direct X and Google Business Profile
-APIs** (every call stops at an unwired credential store), **Firecrawl** and **Jina Reader** (behind
-a flag that is off, and both would send the customer's own URL), **Stripe** and **Razorpay** (names
+APIs** (every call stops at an unwired credential store), **Jina Reader** (behind a flag that is off; it
+would send the customer's own URL; Firecrawl, which sat beside it, was replaced by TinyFish on 2026-09-06), **Stripe** and **Razorpay** (names
 in a database column and nothing more).
 
 ### 7.7 · What has not been done

@@ -84,6 +84,14 @@ export interface GeneratedVariant {
   channel: Channel
   body: string
   charCount: number
+  /**
+   * The search keywords the model wrote for this channel, bare and normalised
+   * (the product publishes them as `[keyword]`; see §34). Carried through so
+   * applying a generated version fills the keyword field automatically instead
+   * of leaving the writer to retype what the model already chose. Empty or
+   * absent when the model returned none (GBP is told to produce none at all).
+   */
+  hashtags?: string[]
 }
 
 export type GenerateState =

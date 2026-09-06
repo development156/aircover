@@ -45,10 +45,6 @@ vi.mock('@/app/actions/posts-ai', () => ({
   generateVariants: vi.fn(async () => insufficient(3)),
   rewriteCaption: vi.fn(async () => insufficient(1)),
 }))
-vi.mock('@/app/actions/posts-image', () => ({
-  generateImage: vi.fn(async () => insufficient(6)),
-}))
-
 /** Both numbers, as digits, somewhere in the refusal. */
 function expectsShortfall(required: number) {
   const body = document.body.textContent ?? ''
@@ -120,32 +116,43 @@ describe('making a picture, which now lives in the Studio', () => {
     render(
       <StudioWorkbench
         formats={generatableFormats()}
-        cost={creditCost('image_standard')}
-        library={[]}
+        library={{ status: 'ok', pictures: [] }}
         pictures={[]}
+        signals={[]}
       />,
     )
-    // `MESH_TASK_ACTION.image_generate` maps to `image_standard` (6), not
-    // `image_premium` (12): a customer who asked for "a picture" and was charged
-    // for a tier they never chose has been overcharged, and the reverse never
-    // happens.
+    // The DEFAULT model is the draft tier, priced at `image_standard` (6) and
+    // not `image_premium` (12): a customer who asked for "a picture" without
+    // choosing the dear model is charged the cheap one. The premium price is
+    // reachable only by picking a finish-tier model, whose card names it. The
+    // price is no longer handed in by the page; the workbench derives it from
+    // the chosen model, which is why the prop is gone.
     expect(creditCost('image_standard')).toBe(6)
-    expect(document.body.textContent).toMatch(/6\s*credits/)
+    // RETARGETED for the bar redesign: the price is no longer a separate
+    // label with a pipe separator — it is the primary button's own second
+    // line, so the price and the press are one decision.
+    expect(screen.getByRole('button', { name: /generate image/i }).textContent).toMatch(
+      /6\s*credits/,
+    )
   })
 
   test('refuses with both numbers, and says nothing was charged', async () => {
     render(
       <StudioWorkbench
         formats={generatableFormats()}
-        cost={creditCost('image_standard')}
-        library={[]}
+        library={{ status: 'ok', pictures: [] }}
         pictures={[]}
+        signals={[]}
       />,
     )
     await userEvent.type(screen.getByPlaceholderText(/plate of fresh samosas/i), 'a cup of chai')
-    await userEvent.click(screen.getByRole('button', { name: /make this picture/i }))
-    await screen.findByText(/needs/i)
-    expect(document.body.textContent).toMatch(/needs\s*6\s*credits and you have\s*0\s*credits/)
-    expect(document.body.textContent).toMatch(/nothing was charged/i)
+    await userEvent.click(screen.getByRole('button', { name: /generate image/i }))
+    // Scoped to the ALERT, not to the whole document. `/needs/i` used to be
+    // unique on this screen and stopped being so when the model picker landed:
+    // one model's description ends "this is what a carousel needs". The claim
+    // was always about the refusal, so the query now asks the refusal.
+    const refusal = await screen.findByRole('alert')
+    expect(refusal.textContent).toMatch(/needs\s*6\s*credits and you have\s*0\s*credits/)
+    expect(refusal.textContent).toMatch(/nothing was charged/i)
   })
 })

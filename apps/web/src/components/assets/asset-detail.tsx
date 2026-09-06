@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { Trash2 } from 'lucide-react'
 
 import { updateAsset } from '@/app/actions/assets'
 import { formatBytes } from '@/lib/format-bytes'
@@ -12,7 +13,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Unmeasured } from '@/components/design-system/absence-row'
 
-import { AssetDeleteButton } from './asset-delete'
 import { AssetThumb } from './asset-thumb'
 import { UsageList } from './usage-list'
 
@@ -30,8 +30,17 @@ import { UsageList } from './usage-list'
  * `assets.alt` rides on the FILE, so describing a photo once describes it
  * everywhere it is used. `attachAssetToPost` copies it onto the attachment, which
  * is why the field is here and not repeated per post.
+ *
+ * ── THE DRAWER MOVES TO THE TRASH; IT DOES NOT DELETE ────────────────────────
+ * This rendered `AssetDeleteButton`, the permanent delete. MEASURED 2026-09-06:
+ * "Delete file" on an unused LIVE file removed it for good in one press, with
+ * no confirmation and no trash entry, while the file menu two inches away
+ * offered "Move to trash" with Undo. Same file, two doors, one of them a hole.
+ * The drawer now takes the same path the menu takes (`trashSingle`, which
+ * reports in the banner and carries the Undo), and `deleteAsset` itself now
+ * refuses a live row, so no third door can open this way again.
  */
-export function AssetDetail({ card, onDeleted }: { card: AssetCard; onDeleted?: () => void }) {
+export function AssetDetail({ card, onTrash }: { card: AssetCard; onTrash: () => void }) {
   const name = displayName(card)
   const size = formatBytes(card.bytes)
 
@@ -61,8 +70,21 @@ export function AssetDetail({ card, onDeleted }: { card: AssetCard; onDeleted?: 
 
       {/* Last, and given no standing space anywhere else: a destructive action
           never sits in a list row (docs/26 §1.5). */}
-      <section className="border-t border-line-soft pt-4">
-        <AssetDeleteButton assetId={card.id} fileName={name} onDeleted={onDeleted} />
+      <section className="space-y-2 border-t border-line-soft pt-4">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onTrash}
+          aria-label={`Move ${name} to the trash`}
+          data-guide="assets.trash"
+        >
+          <Trash2 size={14} strokeWidth={1.8} aria-hidden />
+          Move to trash
+        </Button>
+        <p className="type-meta text-muted">
+          It stays on its posts and in its folders, and Restore in the trash puts it back. Deleting
+          for good happens from the trash.
+        </p>
       </section>
     </div>
   )
@@ -149,7 +171,7 @@ function AssetNameAndAlt({ card }: { card: AssetCard }) {
           placeholder="Describe what is in the photo"
           aria-describedby={`asset-alt-help-${card.id}`}
         />
-        <p id={`asset-alt-help-${card.id}`} className="text-[12px] text-muted">
+        <p id={`asset-alt-help-${card.id}`} className="type-meta text-muted">
           Written once here, and carried onto every post that uses this photo.
         </p>
       </div>

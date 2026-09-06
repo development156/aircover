@@ -10,6 +10,18 @@ import { PageTitle } from '@/components/page-title'
 import { Unreadable } from '@/components/design-system/absence-row'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
 import { readApprovalQueue } from '@/lib/approvals/read'
+import {
+  readApprovals,
+  readComments,
+  readQueueThumbnails,
+  readReviewer,
+  readVariantBodies,
+} from '@/lib/approvals/history'
+import { buildQueueContext } from '@/lib/approvals/queue-context'
+import { readConnectedChannels } from '@/lib/connections/read'
+import { resolveDisplayZone } from '@/lib/time/zone'
+import { canApproveAsRole } from '@/lib/workspace-role'
+import { getActiveWorkspace } from '@/lib/workspaces'
 import { STATUS_WORD } from '@/lib/posts/status-word'
 import type { DisplayPost } from '@/lib/posts/display-post'
 
@@ -50,7 +62,35 @@ export const metadata = { title: 'Approvals' }
  */
 
 export default async function ApprovalsPage() {
-  const read = await readApprovalQueue()
+  // One batch: the queue, who is looking, the connected channels and the
+  // workspace's clock. `read-waterfall.test.ts` counts sequential awaits here.
+  const [read, reviewer, connected, workspace] = await Promise.all([
+    readApprovalQueue(),
+    readReviewer(),
+    readConnectedChannels(),
+    getActiveWorkspace(),
+  ])
+  const zone = resolveDisplayZone(workspace?.timezone).zone
+  const decisions = read.status === 'ok' ? read.decisions : []
+  const ids = decisions.map((post) => post.id)
+  // The context every row needs to be decided on (F-23): history, comments,
+  // the first attachment and each channel version. Four reads, in parallel,
+  // each degrading to "not read" rather than to an empty claim.
+  const [approvals, comments, thumbnails, versions] = await Promise.all([
+    readApprovals(ids),
+    readComments(ids, 3),
+    readQueueThumbnails(ids),
+    readVariantBodies(ids),
+  ])
+  const context = buildQueueContext(decisions, {
+    zone,
+    userId: reviewer.userId,
+    approvals,
+    comments,
+    thumbnails,
+    versions,
+    connected,
+  })
 
   return (
     <div className="space-y-grid">
@@ -81,12 +121,20 @@ export default async function ApprovalsPage() {
         <EmptyState
           icon={CheckCheck}
           title="Nothing is waiting on you"
-          body="Anything sent for review, and anything that failed to go out, appears here. That is a real answer. It is not a screen that has yet to load."
-          tip="Posts you are still writing live under Posts. They are not waiting on a decision, so they are not here."
+          body="A post with a date and a channel, anything sent for review, and anything that failed to go out appears here. That is a real answer. It is not a screen that has yet to load."
+          tip="Posts with no date yet live under Posts. They are not waiting on a decision, so they are not here."
         />
       ) : (
         <>
-          {read.decisions.length > 0 ? <ReviewQueue posts={read.decisions} /> : null}
+          {read.decisions.length > 0 ? (
+            <ReviewQueue
+              posts={read.decisions}
+              context={context}
+              zone={zone}
+              currentUserId={reviewer.userId}
+              decides={canApproveAsRole(reviewer.role)}
+            />
+          ) : null}
           {read.repairs.length > 0 ? <RepairList posts={read.repairs} /> : null}
         </>
       )}
@@ -96,7 +144,8 @@ export default async function ApprovalsPage() {
         <Link href="/loop" className="font-[550] text-accent underline underline-offset-2">
           autonomy setting
         </Link>
-        . It is not built yet, so every post reaches this queue.
+        . It is not built yet, so a post with a date and a channel waits here, and approving it
+        books it for that time.
       </p>
     </div>
   )

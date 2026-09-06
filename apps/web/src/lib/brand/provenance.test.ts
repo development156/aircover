@@ -77,3 +77,21 @@ describe('hasEdits', () => {
     expect(hasEdits(BASE, BASE)).toBe(false)
   })
 })
+
+describe('provenanceOf — the intake state', () => {
+  test('a field sourced from an intake answer reads as intake, not as a guess', () => {
+    const p = provenanceOf({
+      'taboo.red_lines': { kind: 'asked', confirmed: false, source: 'intake' },
+    })
+    expect(stateOf(p, 'taboo.red_lines')).toBe('intake')
+    // Still not confirmed: nobody has agreed to the wording.
+    expect(stateOf(p, 'taboo.red_lines')).not.toBe('confirmed')
+  })
+
+  test('a confirmed field is confirmed whatever its source string says', () => {
+    const p = provenanceOf({
+      'taboo.red_lines': { kind: 'asked', confirmed: true, source: 'intake' },
+    })
+    expect(stateOf(p, 'taboo.red_lines')).toBe('confirmed')
+  })
+})

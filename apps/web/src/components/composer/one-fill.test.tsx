@@ -83,6 +83,7 @@ function composer(channels: readonly string[] = CHANNELS) {
   return render(
     <Composer
       post={{ ...post, channels } as unknown as Post}
+      zone="Asia/Kolkata"
       variants={[] as PostVariant[]}
       media={[]}
       templates={{ ok: true, templates: [] } as never}

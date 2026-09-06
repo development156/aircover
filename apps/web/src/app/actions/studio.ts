@@ -5,10 +5,17 @@ import { auth } from '@clerk/nextjs/server'
 import { createPgLedgerPort, createWithCredits, loadBillingEnv } from '@sahoda/billing'
 import { createMesh, type Mesh } from '@sahoda/mesh'
 import {
+  DEFAULT_STAMP_OPTIONS,
   GenerationModeSchema,
-  MESH_TASK_ACTION,
+  IMAGE_PROMPT_MAX_CHARS,
+  LeaveOutSchema,
+  ReferenceFollowSchema,
+  StampOptionsSchema,
+  StudioGenerationRowSchema,
   StudioGenerationSchema,
   type BrandSignal,
+  type StampAnchor,
+  type StampAnchorMoveReason,
   type WithCreditsFn,
 } from '@sahoda/shared'
 import { revalidatePath } from 'next/cache'
@@ -22,15 +29,22 @@ import {
   chargeFailureState,
   type ChargeFailureState,
 } from '@/lib/posts/charge-failure'
-import { MEDIA_BUCKET, MEDIA_UPLOAD_CAP_BYTES } from '@/lib/posts/media-constants'
+import { CHANNEL_MEDIA_CAP_BYTES, MEDIA_BUCKET } from '@/lib/posts/media-constants'
 import { assetObjectPath } from '@/lib/posts/media-path'
 import { signMediaPreviews } from '@/lib/posts/media-url'
 import { sniffImage } from '@/lib/posts/sniff-image'
 import { brandSignalsFor } from '@/lib/studio/brand-signals'
 import { formatById } from '@/lib/studio/formats'
-import { MAX_TRIES_PER_PRESS, describeModeBlock } from '@/lib/studio/modes'
+import { MAX_REFERENCES, MAX_TRIES_PER_PRESS, describeModeBlock } from '@/lib/studio/modes'
+import {
+  defaultModelId,
+  describeModelBlock,
+  imageActionFor,
+  imageTierFor,
+} from '@/lib/studio/models'
 import { ReferenceIdsSchema } from '@/lib/studio/reference-ids'
 import { conditionPrompt } from '@/lib/studio/prompt'
+import { stampGeneratedPicture, type StampResult } from '@/lib/studio/stamp-generated'
 import { attachAssetToPost } from '@/app/actions/assets'
 import { createPost } from '@/app/actions/posts'
 import { createServerSupabase } from '@/lib/supabase/server'
@@ -55,8 +69,14 @@ import { workspaceForWrite } from '@/lib/workspaces'
  * `withCredits` reserves the credits, the work runs inside the callback, and a
  * THROW in there releases the hold so nothing is charged. Every refusal below is
  * a throw for exactly that reason. The action string comes from
- * `MESH_TASK_ACTION`, never a literal: the mesh task is `image_generate` and the
- * pricing key is `image_standard`, and hardcoding either is how the two drift.
+ * `imageActionFor(modelId)`, which reads the shared `IMAGE_TIER_ACTION` map,
+ * never a literal: the mesh task is `image_generate` whichever model draws, and
+ * the pricing key is `image_standard` for a draft-tier model and `image_premium`
+ * for a finish-tier one. It was `MESH_TASK_ACTION.image_generate` for every
+ * model until 2026-09-03, so the two the catalogue calls "billed by what it
+ * draws" and "the dearest" were sold at the flat everyday price on every press.
+ * The key is resolved BEFORE the first hold, from the same catalogue the picker
+ * shows the price from, so what the person read is what the ledger records.
  *
  * ── THE BYTES GO THROUGH THE SAME GATE AS AN UPLOAD ─────────────────────────
  * `sniffImage` reads the real format and dimensions from the BYTES rather than
@@ -102,6 +122,48 @@ const GenerateInputSchema = z.object({
    * a hundred.
    */
   count: z.number().int().min(1).max(MAX_TRIES_PER_PRESS).default(1),
+  /**
+   * Which model draws it. Defaulted rather than required, so a caller that
+   * predates the picker still works and gets the everyday model.
+   */
+  modelId: z.string().min(1).default(defaultModelId()),
+  /**
+   * Where the logo goes, how big, and whether it happens at all.
+   *
+   * Optional so an old client and any hand-made request stay safe: absent
+   * means `DEFAULT_STAMP_OPTIONS`, which is exactly the picture this product
+   * has always drawn (on, bottom-right, 14% of the shorter edge). Validated
+   * through `@sahoda/shared`'s own schema rather than re-checked here, so a
+   * request that reaches this action and one built by hand can never disagree
+   * about what a valid choice is.
+   */
+  stamp: StampOptionsSchema.optional(),
+  /**
+   * A few words describing what the picture should not show. Absent means
+   * nothing is excluded. See `LeaveOutSchema`'s own header in
+   * `@sahoda/shared`: this is prompt-level guidance, never a guarantee, and
+   * it is appended to `prompt_sent` and never touches `prompt_given`.
+   */
+  excludeText: LeaveOutSchema.optional(),
+  /**
+   * How closely to follow the reference images picked for this press.
+   * Defaulted to `balanced` by the schema itself, which adds nothing to the
+   * prompt (see `ReferenceFollowSchema`). Meaningless without a reference:
+   * this action drops it to the default when `referenceAssetIds` is empty,
+   * the same way the composer disables the control for the same reason.
+   */
+  referenceFollow: ReferenceFollowSchema,
+  /**
+   * True exactly when `wanted` is a refined prompt (or a small edit of one)
+   * that already weaves the brand into its own sentence. Told to
+   * `conditionPrompt` so it skips its `Brand context:` block rather than
+   * repeating what the sentence already says. Defaulted to `false`, which is
+   * exactly today's behaviour: a hand-made request, an old client, and a
+   * remix seeded from a past generation's `prompt_given` (which carries no
+   * way to know this fact, see `components/studio/use-composer.ts`'s own
+   * comment on `brandCarried`) all get the block exactly as they always have.
+   */
+  brandAlreadyCarried: z.boolean().default(false),
 })
 
 export type QueueGenerationState =
@@ -122,10 +184,60 @@ const REFUSALS = {
   malformed: 'Describe the picture you want, in a few words at least.',
   unknownFormat: 'That size is not one Sahoda can make, so nothing was charged.',
   failed: 'Sahoda could not make this image. Nothing was charged.',
-  unusable:
-    'The model returned something Sahoda could not read as a picture. Nothing was charged, and you can try again.',
-  stored: 'The image was made but could not be saved to your library. Nothing was charged.',
+  /**
+   * Every picture the person picked was unreadable by the time we went to use it.
+   *
+   * Its own sentence rather than the mode block's, because the two say different
+   * things. "Pick the picture you want changed" is wrong here: they DID pick one,
+   * and telling them to do the thing they just did is a remedy that cannot work.
+   */
+  referencesUnreadable:
+    'Sahoda could not open the pictures you picked, so nothing was made and nothing was charged. Try picking them again.',
+  /**
+   * The request named more pictures than any mode accepts.
+   *
+   * Its own sentence because `malformed` is about the PROMPT. A hand-made
+   * request carrying four references was told "Describe the picture you want, in
+   * a few words at least", which describes a different field entirely: the parse
+   * failed on `referenceAssetIds` and every failure mapped to one line.
+   */
+  tooManyReferences: `Pick at most ${MAX_REFERENCES} pictures for Sahoda to match.`,
+  /**
+   * The prompt actually sent (the customer's words, plus the mode's own
+   * direction, brand context, "leave out" and "follow how closely" when
+   * given) is over the provider's limit once everything is added together.
+   * Both halves of the remedy actually work: shortening either field brings
+   * the total back under the ceiling, so this never offers a fix that cannot
+   * work.
+   */
+  promptTooLong:
+    'This request is too long once everything is added together. Shorten your description or what to leave out.',
 } as const
+
+/**
+ * The two anchor columns for one image row, from what the renderer did.
+ *
+ * `stamped_anchor` is where the mark LANDED; `stamp_anchor_moved_reason` is why,
+ * when it differs from the corner asked for. An `as_chosen` result carries no
+ * anchor of its own (the renderer kept the customer's choice), so the corner it
+ * landed in IS the chosen one, and that is the single value this file holds that
+ * `stampGeneratedPicture` does not. Anything other than a placed mark (no logo,
+ * skipped, a stamp that failed) has no corner at all, so both are null and the
+ * result screen stays silent about placement rather than inventing one.
+ */
+function stampAnchorColumns(
+  stamped: StampResult | { outcome: 'skipped' },
+  chosen: StampAnchor,
+): { stamped_anchor: StampAnchor | null; stamp_anchor_moved_reason: StampAnchorMoveReason | null } {
+  if (stamped.outcome !== 'stamped') {
+    return { stamped_anchor: null, stamp_anchor_moved_reason: null }
+  }
+  const choice = stamped.anchorChoice
+  if (choice.kind === 'moved') {
+    return { stamped_anchor: choice.to, stamp_anchor_moved_reason: choice.reason }
+  }
+  return { stamped_anchor: chosen, stamp_anchor_moved_reason: null }
+}
 
 /**
  * Ask for one image.
@@ -135,7 +247,6 @@ const REFUSALS = {
  * at 1, so no row ever claims to have asked for more than was asked for.
  */
 export async function queueGeneration(input: unknown): Promise<QueueGenerationState> {
-  const action = MESH_TASK_ACTION.image_generate
   let workspaceId: string | undefined
 
   try {
@@ -148,7 +259,22 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
     workspaceId = workspace.id
 
     const parsed = GenerateInputSchema.safeParse(input)
-    if (!parsed.success) return { ok: false, insufficient: false, message: REFUSALS.malformed }
+    if (!parsed.success) {
+      // WHICH field failed, not one sentence for all of them. `safeParse` runs
+      // before `describeModeBlock`, so the reference bound is met here first and
+      // was reported as a complaint about the prompt.
+      const onReferences = parsed.error.issues.some(
+        (issue) => issue.path[0] === 'referenceAssetIds',
+      )
+      return {
+        ok: false,
+        insufficient: false,
+        message: onReferences ? REFUSALS.tooManyReferences : REFUSALS.malformed,
+      }
+    }
+
+    // Absent means exactly today's picture. See the field's own comment above.
+    const stampOptions = parsed.data.stamp ?? DEFAULT_STAMP_OPTIONS
 
     // Through the SAME function the picker uses, so a hand-made request cannot
     // reach a size the screen refused to offer.
@@ -157,11 +283,34 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
       return { ok: false, insufficient: false, message: REFUSALS.unknownFormat }
     }
 
+    // ── THE MODEL, BEFORE THE MODE ──────────────────────────────────────────
+    // Checked first because every rule below depends on it: what a mode may do
+    // and how many references it takes are the CHOSEN MODEL's answer. A model
+    // the router cannot reach is refused here rather than spending a hold on a
+    // call that cannot be made.
+    const modelBlocked = describeModelBlock(parsed.data.modelId)
+    if (modelBlocked !== null) {
+      return { ok: false, insufficient: false, message: modelBlocked }
+    }
+
+    // ── THE PRICE, FROM THE MODEL, BEFORE ANY HOLD ──────────────────────────
+    // The pricing key is a fact about the chosen model's tier, read through
+    // the shared map. Null is an id the catalogue does not carry, which the
+    // block above already refused, so this arm is unreachable; it refuses
+    // rather than pricing at a guess, because a guessed price is one a
+    // hand-made request would be sold at.
+    const action = imageActionFor(parsed.data.modelId)
+    const imageTier = imageTierFor(parsed.data.modelId)
+    if (action === null || imageTier === null) {
+      return { ok: false, insufficient: false, message: REFUSALS.failed }
+    }
+
     // The mode's own rule, asked through the SAME function the screen asks, so
     // a request that skipped the screen cannot reach a mode the screen refused.
     const blocked = describeModeBlock({
       mode: parsed.data.mode,
       references: parsed.data.referenceAssetIds.length,
+      modelId: parsed.data.modelId,
     })
     if (blocked !== null) return { ok: false, insufficient: false, message: blocked }
 
@@ -173,7 +322,25 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
       mode: parsed.data.mode,
       wanted: parsed.data.wanted,
       signals,
+      excludeText: parsed.data.excludeText,
+      // Meaningless without a reference, so a request that named none gets
+      // the default rather than a clause about pictures it is not looking
+      // at. Defensive: the composer already disables the control for the
+      // same reason, but a hand-made request must be held to it too.
+      referenceFollow:
+        parsed.data.referenceAssetIds.length > 0 ? parsed.data.referenceFollow : undefined,
+      brandAlreadyCarried: parsed.data.brandAlreadyCarried,
     })
+
+    // ── THE CEILING IS CHECKED BEFORE ANYTHING IS HELD, NOT DISCOVERED AFTER ──
+    // `ImageGenerateInputSchema` refuses a prompt over this length anyway, but
+    // only once a hold already exists and the mesh has been asked. Checking
+    // here means a request that cannot be sent is never charged for, never
+    // written as a row, and told a reason that names the actual cause rather
+    // than the generic "Sahoda could not make this image."
+    if (conditioned.prompt.length > IMAGE_PROMPT_MAX_CHARS) {
+      return { ok: false, insufficient: false, message: REFUSALS.promptTooLong }
+    }
 
     const supabase = createServerSupabase()
 
@@ -195,6 +362,33 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
       parsed.data.referenceAssetIds,
     )
 
+    // ── ASK THE MODE'S RULE AGAIN, AGAINST WHAT SURVIVED SIGNING ─────────────
+    //
+    // The block above ran against the count the person PICKED. Signing drops
+    // anything it cannot resolve and returns `[]` outright on a query error, so
+    // a mode with a floor of one could reach the model with zero references —
+    // `edit` would send a bare prompt, get back a fresh unrelated picture
+    // instead of the edit, and charge in full for it. Dropping SOME references
+    // is the documented, deliberate behaviour; dropping ALL of them for a mode
+    // that structurally requires one is not the same event.
+    //
+    // Re-asking the same function is what makes this exact rather than a second
+    // rule that can drift from the first. A smaller count can only trip the
+    // `minReferences` branch, never the `maxReferences` one, so a non-null here
+    // can ONLY mean signing took it below the floor.
+    if (
+      describeModeBlock({
+        mode: parsed.data.mode,
+        references: referenceUrls.length,
+        // The SAME model the first check used. `ruleFor(mode, modelId)` reads the
+        // chosen model's own reference bounds, so asking without it would check a
+        // different model's floor than the one this request will run on.
+        modelId: parsed.data.modelId,
+      }) !== null
+    ) {
+      return { ok: false, insufficient: false, message: REFUSALS.referencesUnreadable }
+    }
+
     // ── THE ROW, BEFORE THE MODEL ────────────────────────────────────────────
     const queued = await supabase
       .from('studio_generations')
@@ -208,6 +402,14 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
         width: format.width,
         height: format.height,
         requested_count: parsed.data.count,
+        // Recorded at REQUEST time, not after the call. A row that only learns
+        // its model on success cannot say what a failure was trying to use,
+        // which is the case where somebody most wants to know.
+        model_id: parsed.data.modelId,
+        // The tier it is CHARGED at, in the column the migration made for it and
+        // nothing had written. Recorded rather than derived from `model_id`,
+        // because the catalogue moves and a row must still say what it cost.
+        image_tier: imageTier,
         reference_asset_ids: parsed.data.referenceAssetIds,
         // Explore legitimately used nothing, and `[]` says that. A null here
         // would mean conditioning never ran, which is a different claim.
@@ -256,6 +458,9 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
       // know whether the callback reached its end, and the error alone cannot say.
       let failure: string | null = null
       let deliveredThis = false
+      // What THIS press reserved, carried out of the callback so it can be added
+      // to `charged` only after the debit is known to have committed.
+      let chargedThis = 0
 
       const credits = await getWithCredits()(
         { workspaceId: workspace.id, action, objectRef: objectRefFor(idx) },
@@ -279,6 +484,16 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
               // entirely for an empty list, because a field carrying [] and a
               // field that is not there are different requests.
               references: referenceUrls,
+              // ── THE CHOICE HAD TO TRAVEL, AND DID NOT ────────────────────
+              // The field existed at BOTH ends and nothing carried it across:
+              // `ImageGenerateInputSchema` declares `modelId`, `engine.ts`
+              // reads `req.modelId` and hands it to `planImage`, and this call
+              // omitted it. So a person picked a model, `describeModelBlock`
+              // vetted it, `model_id` was written on the row, and the mesh
+              // routed to the TIER DEFAULT — the row recorded a model that had
+              // not drawn the picture. Same shape as the `keywordBrackets`
+              // defect on the publish path.
+              modelId: parsed.data.modelId,
             },
             {
               workspaceId: workspace.id,
@@ -306,20 +521,23 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
           }
 
           const bytes = Uint8Array.from(Buffer.from(result.data.base64, 'base64'))
-          if (bytes.byteLength === 0 || bytes.byteLength > MEDIA_UPLOAD_CAP_BYTES) {
-            failure = REFUSALS.unusable
+          // The CHANNEL ceiling, not the upload cap: these bytes came back from
+          // the mesh inside this function and never crossed Vercel's edge, so
+          // the request-body limit that lowered the upload cap does not apply.
+          if (bytes.byteLength === 0 || bytes.byteLength > CHANNEL_MEDIA_CAP_BYTES) {
+            failure = FAILURE_REASON.IMAGE_UNREADABLE
             throw new Error('IMAGE_UNUSABLE')
           }
 
           // Facts, not the model's claim. `result.data.mime` is deliberately unused.
           const sniffed = sniffImage(bytes)
           if (!sniffed.ok) {
-            failure = REFUSALS.unusable
+            failure = FAILURE_REASON.IMAGE_UNREADABLE
             throw new Error('IMAGE_UNREADABLE')
           }
           const kind = kindForProvenMime(sniffed.image.mime)
           if (kind === null) {
-            failure = REFUSALS.unusable
+            failure = FAILURE_REASON.IMAGE_UNREADABLE
             throw new Error('IMAGE_UNSUPPORTED')
           }
 
@@ -334,7 +552,7 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
             upsert: false,
           })
           if (upload.error) {
-            failure = REFUSALS.stored
+            failure = FAILURE_REASON.IMAGE_NOT_STORED
             throw new Error('STORAGE_FAILED')
           }
 
@@ -353,25 +571,141 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
             // The object is already in storage and nothing points at it. Remove it
             // rather than leaving bytes nobody can reach or delete.
             await supabase.storage.from(MEDIA_BUCKET).remove([objectPath])
-            failure = REFUSALS.stored
+            failure = FAILURE_REASON.IMAGE_NOT_STORED
             throw new Error('ASSET_ROW_FAILED')
           }
 
-          charged += ctx.creditsCharged
-          await supabase.from('studio_generation_images').insert({
+          // ── THE STAMP RIDES ALONG, AND NEVER COSTS THE GENERATION ─────────
+          // Local compute, so nothing above changes: no second hold, no second
+          // charge, `ctx.creditsCharged` untouched. `stampGeneratedPicture` is
+          // total by contract (it returns null for every failure and throws for
+          // none), which is why there is no try around it here: a throw in this
+          // callback releases the hold and refuses a picture the customer
+          // already has, and one owner of that guarantee is testable where two
+          // are not. See `lib/studio/stamp-generated.ts`.
+          //
+          // ── UNLESS THE PERSON TURNED IT OFF FOR THIS PRESS ────────────────
+          // `stampOptions.enabled === false` means the function is never
+          // called: no read of the logo file, no compositing, no second asset,
+          // no extra cost. The row records `skipped`, NOT null.
+          //
+          // Null would have been the smaller change and it would have lied. A
+          // row carrying null renders as "made before Sahoda placed logos",
+          // which is false about a picture somebody drew today with the toggle
+          // off. A choice the customer made a minute ago and a fact about when
+          // the product shipped are not the same sentence, so they are not the
+          // same value.
+          const stamped = stampOptions.enabled
+            ? await stampGeneratedPicture({
+                workspaceId: workspace.id,
+                userId,
+                picture: bytes,
+                supabase,
+                anchor: stampOptions.anchor,
+                sizeStep: stampOptions.sizeStep,
+              })
+            : ({ outcome: 'skipped' } as const)
+
+          const imageRow = {
             workspace_id: workspace.id,
             generation_id: generationId,
             idx,
             asset_id: newAssetId,
             width: sniffed.image.width,
             height: sniffed.image.height,
-          })
+          }
+
+          // ── DEPLOY-SAFE, THE SAME WAY `assets.ts` IS ──────────────────────
+          // These columns arrive with migrations a human applies, and this code
+          // ships before that happens. They go in the SAME insert rather than a
+          // follow-up update because this table is append-only: it carries
+          // `block_mutations` and has no UPDATE policy, so a second statement
+          // could never land.
+          //
+          // The link and the outcome are in migration `20260831150000`, applied
+          // in production. When the stamp is off, `stamped` is the `skipped`
+          // result and both land as: `stamped_asset_id` null,
+          // `stamp_outcome` 'skipped'.
+          const stampRow = {
+            ...imageRow,
+            stamped_asset_id:
+              stamped !== null && stamped.outcome === 'stamped' ? stamped.assetId : null,
+            // WHY, beside the pointer and in the SAME insert. The pointer's
+            // null is one fact standing in for several situations and the
+            // screen has to tell them apart; the migration's step 5 carries
+            // the reasoning.
+            stamp_outcome: stamped === null ? null : stamped.outcome,
+          }
+          // WHERE the mark landed and WHY, in the LATER migration `20260904160000`.
+          const anchorCols = stampAnchorColumns(stamped, stampOptions.anchor)
+
+          let image = await supabase
+            .from('studio_generation_images')
+            .insert({ ...stampRow, ...anchorCols })
+
+          // ── DEGRADE IN TWO STEPS, THE NEWEST COLUMNS FIRST ─────────────────
+          // `stamped_anchor` / `stamp_anchor_moved_reason` are a LATER migration
+          // than the link and the outcome. On `42703` (undefined column) drop
+          // ONLY that pair, so a deploy missing just this file keeps recording
+          // the logo link that is already applied in production. Only if the
+          // link+outcome write ALSO 42703s (the older stamped_asset migration is
+          // unapplied too) fall back to the bare row. A missing column then costs
+          // the placement note or the link, never the record of a generation
+          // somebody paid for.
+          if (image.error?.code === '42703') {
+            image = await supabase.from('studio_generation_images').insert(stampRow)
+          }
+          if (image.error?.code === '42703') {
+            image = await supabase.from('studio_generation_images').insert(imageRow)
+          }
+
+          // ── THE PROVENANCE ROW, CHECKED LIKE EVERY OTHER WRITE ABOVE ───────
+          //
+          // This insert used to be awaited with its `.error` never read, while
+          // the storage upload and the `assets` insert directly above it both
+          // checked and threw. A lost row meant the person was charged, the
+          // picture reached their library, and NOTHING recorded which
+          // generation made it — after which `describeCount` would tell them
+          // "3 of the 4 options you asked for arrived. You were charged for
+          // those and for nothing else" about four they had paid for.
+          //
+          // Rolled back the same way the asset row above rolls back, so the
+          // failure costs a released hold rather than a false claim about
+          // money. The migration's §6 states this contract: an image row is
+          // written once, "create it, or do nothing".
+          //
+          // THE STAMPED COPY IS ROLLED BACK TOO, and it is listed first
+          // because it is the one a person would SEE. Both asset rows are in
+          // the library by now; undoing only the generation's own would leave a
+          // stamped picture sitting there for a generation that was refused and
+          // refunded. Each undo is independent — a failure to remove the
+          // stamped copy must not stop the generation's own from being removed
+          // — so they are separate statements rather than one chain.
+          if (image.error) {
+            if (stamped !== null && stamped.outcome === 'stamped') {
+              await supabase.from('assets').delete().eq('id', stamped.assetId)
+              await supabase.storage.from(MEDIA_BUCKET).remove([stamped.objectPath])
+            }
+            await supabase.from('assets').delete().eq('id', newAssetId)
+            await supabase.storage.from(MEDIA_BUCKET).remove([objectPath])
+            failure = FAILURE_REASON.IMAGE_NOT_STORED
+            throw new Error('IMAGE_ROW_FAILED')
+          }
+
+          chargedThis = ctx.creditsCharged
           deliveredThis = true
         },
       )
 
       if (credits.ok) {
         delivered += 1
+        // ── COUNTED ONLY ONCE THE DEBIT ACTUALLY COMMITTED ─────────────────
+        // `withCredits` reaches its DEBIT after the callback returns, so a
+        // failure there releases the hold and charges nothing. Incrementing
+        // inside the callback counted a credit that never left the wallet, and
+        // when an earlier picture had succeeded the row was still written
+        // `ready` with `cost_credits` claiming it.
+        charged += chargedThis
         balanceAfter = credits.data.balanceAfter
         continue
       }
@@ -460,7 +794,8 @@ export async function readGeneration(
   if (error) return { ok: false, message: 'Sahoda could not read that image request just now.' }
   if (!data) return { ok: false, message: 'That image request does not exist.' }
 
-  const row = StudioGenerationSchema.safeParse(data)
+  // The refined schema, for the reason `read.ts` gives at its own call site.
+  const row = StudioGenerationRowSchema.safeParse(data)
   if (!row.success) {
     reportServerError(new Error('studio: generation row did not parse'), {
       action: 'readGeneration',
@@ -508,7 +843,23 @@ async function signReferences(
     .filter((url): url is string => typeof url === 'string')
 }
 
-export type StartPostState = { ok: true; postId: string } | { ok: false; message: string }
+export type StartPostState =
+  | { ok: true; postId: string }
+  | {
+      ok: false
+      message: string
+      /**
+       * The draft that DOES exist, when the picture is the half that failed.
+       *
+       * The header below promises the person is "sent to it with a sentence
+       * about the picture", and the failure arm returned no id, so nothing could
+       * send them anywhere: `picture-actions.tsx` only set a note, the draft was
+       * created and unreachable from that screen, and pressing the button again
+       * made another empty one. Present here exactly when there is somewhere to
+       * go, so a caller cannot navigate to a post that was never created.
+       */
+      postId?: string
+    }
 
 /**
  * TURN A PICTURE INTO A POST, WITHOUT A TRIP THROUGH THE LIBRARY.
@@ -571,8 +922,9 @@ export async function startPostFromPicture(assetId: unknown): Promise<StartPostS
     const attached = await attachAssetToPost(post.postId, parsed.data)
     if (!attached.ok) {
       // The draft exists. Sending them to it with the picture missing beats
-      // losing the half that worked.
-      return { ok: false, message: attached.message }
+      // losing the half that worked — and that needs the id, which this arm did
+      // not carry.
+      return { ok: false, message: attached.message, postId: post.postId }
     }
 
     revalidatePath('/posts')

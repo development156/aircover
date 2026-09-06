@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState, type RefObject } from 'react'
+import { useCallback, useRef, useState, type RefObject } from 'react'
 import type { Channel, ChannelSet } from '@sahoda/shared'
 
 import { cancelSchedule, schedulePost } from '@/app/actions/posts-schedule'
@@ -52,6 +52,23 @@ export function useComposerActions(
   const [scheduleError, setScheduleError] = useState<string | null>(null)
   const [savingAll, setSavingAll] = useState(false)
 
+  /**
+   * ── WHY A CHANNEL CAN BE SAVING WITHOUT THE BUTTON KNOWING ───────────────────
+   * `saveVersion` awaits `flushAndResolve()` — a round trip that writes the post —
+   * BEFORE it calls `variants.saveNow`, and only `saveNow` sets the variant's
+   * `saving` flag. So during the flush the version card's Save button, which
+   * disables on `state.saving`, is still live. A second press then starts a
+   * second flush and a second `saveNow`, both compare-and-setting against the
+   * same version the first is still holding — and the second loses to a conflict
+   * the writer caused against themselves ("Someone else saved this version").
+   *
+   * This ref closes that window synchronously, per channel, in the one place both
+   * the button and `saveAllAndWait` funnel through. A concurrent call for a
+   * channel already in flight AWAITS the existing write rather than starting a
+   * new one, so the caller (a publish, say) still gets the real verdict.
+   */
+  const savingVersions = useRef<Partial<Record<Channel, Promise<boolean>>>>({})
+
   const flushAndResolve = useCallback(async (): Promise<string | null> => {
     const ok = await autosave.flush({ create: true })
     return ok ? postIdRef.current : null
@@ -69,12 +86,23 @@ export function useComposerActions(
    * would carry one is frozen. So it is a second write, and it needs a row.
    */
   const saveVersion = useCallback(
-    async (channel: Channel): Promise<boolean> => {
-      const id = await flushAndResolve()
-      if (id === null) return false
-      const saved = await variants.saveNow(channel)
-      if (saved) await formats.reapply(channel)
-      return saved
+    (channel: Channel): Promise<boolean> => {
+      // Already writing this channel? Hand back that write, don't start a race.
+      const inFlight = savingVersions.current[channel]
+      if (inFlight) return inFlight
+      const run = (async () => {
+        const id = await flushAndResolve()
+        if (id === null) return false
+        const saved = await variants.saveNow(channel)
+        if (saved) await formats.reapply(channel)
+        return saved
+      })()
+      savingVersions.current[channel] = run
+      void run.finally(() => {
+        // Only clear if it is still THIS write — a later save may have replaced it.
+        if (savingVersions.current[channel] === run) delete savingVersions.current[channel]
+      })
+      return run
     },
     [flushAndResolve, formats, variants],
   )

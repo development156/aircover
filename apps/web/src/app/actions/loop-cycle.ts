@@ -23,9 +23,19 @@ import { reflect } from '@/lib/loop/reflect'
 import * as store from '@/lib/loop/store'
 import { normalizeSlot } from '@/lib/planner/slots'
 import { reportServerError } from '@/lib/observability/report'
-import { CHANNELS_UNREADABLE_MESSAGE, noChannelsMessage } from '@/lib/loop/refusal-copy'
+import {
+  BRAIN_NOT_RESOLVED_MESSAGE,
+  CHANNELS_UNREADABLE_MESSAGE,
+  noChannelsMessage,
+} from '@/lib/loop/refusal-copy'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { workspaceForWrite } from '@/lib/workspaces'
+import {
+  getWorkspaceRole,
+  canManageLoop,
+  LOOP_ROLE_REFUSAL,
+  LOOP_ROLE_UNKNOWN,
+} from '@/lib/workspace-role'
 
 /**
  * ONE CYCLE, UP TO THE HALT — collect, reflect, plan, then STOP.
@@ -151,6 +161,14 @@ export async function runCycleToPreview(
     if (!ws.ok) return { ok: false, insufficient: false, message: ws.message }
     workspaceId = ws.workspace.id
 
+    // ── ROLE GATE ─────────────────────────────────────────────────────────
+    // A viewer may read the Loop but not change it. The durable wall is RLS on
+    // these tables; this is the application half, checked before the write.
+    const _role = await getWorkspaceRole(workspaceId)
+    if (!canManageLoop(_role)) {
+      return { ok: false, message: _role === null ? LOOP_ROLE_UNKNOWN : LOOP_ROLE_REFUSAL }
+    }
+
     const now = nowIso ? new Date(nowIso) : new Date()
     if (Number.isNaN(now.getTime())) return { ok: false, message: 'Could not read the time.' }
 
@@ -167,6 +185,20 @@ export async function runCycleToPreview(
       return { ok: false, message: 'The Loop is paused. Turn it back on to plan a week.' }
     }
     const budget = (settings?.weekly_budget_credits as number | undefined) ?? null
+
+    // ── BRAIN GATE, before any cycle is opened or charged ─────────────────
+    // The plan step is grounded in the Brand Brain. With no active brand_memory
+    // row the model plans from nothing, yet the 20-credit orchestration charge
+    // still lands. Refuse here so a no-brain workspace pays nothing and is told
+    // the one thing to do. `assess` treats brain_not_resolved as the first stop.
+    const { count: brainCount } = await supabase
+      .from('brand_memory')
+      .select('version', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)
+      .eq('status', 'active')
+    if (!brainCount) {
+      return { ok: false, insufficient: false, message: BRAIN_NOT_RESOLVED_MESSAGE }
+    }
 
     const { isoYear, isoWeek } = planningWeekFor(now)
     const opened = await store.openCycle({
@@ -276,7 +308,9 @@ export async function runCycleToPreview(
 
       const result = await getMesh().runTask(
         planWeekTask.def,
-        { goals: parsed.data.goals, channels },
+        // `nowIso` is the anchor: without it the model plans in an arbitrary
+        // era and every slot is clamped (loop-cycle.now-iso.test.ts).
+        { goals: parsed.data.goals, channels, nowIso: parsed.data.nowIso },
         {
           workspaceId: workspaceId as string,
           traceId: cycle.id,

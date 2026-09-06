@@ -12,6 +12,11 @@ import type { FocalPoint } from '@/lib/media/crop-geometry'
 import { NO_OFFER_COPY } from '@/lib/media/offer-state'
 import type { AcceptCropState } from '@/lib/media/crop-state'
 import type { AttachMediaState } from '@/lib/posts/media-state'
+import {
+  MEDIA_UPLOAD_CAP_BYTES,
+  MEDIA_UPLOAD_TOO_LARGE,
+  uploadTransportRefusal,
+} from '@/lib/posts/media-constants'
 import { cn } from '@/lib/utils'
 
 import { ChannelObjections } from './channel-objections'
@@ -36,6 +41,12 @@ export interface MediaAttachProps {
  * hint only. Nothing here is a check: `File.type` is whatever the browser was
  * told to say and the size is trivially spoofable, so the server sniffs the
  * bytes and makes the decision. This component only reports it.
+ *
+ * The one exception is the size CAP, read here before the action is called.
+ * Not as a check the server relies on, but because a file over it never
+ * reaches the server: the platform answers 413 at the edge and the awaited
+ * action throws (see `asset-upload.tsx`, where it took the whole screen). The
+ * action calls are wrapped for the same reason.
  *
  * Attaching spends NO credits — it stores a file and runs the engine, neither
  * of which touches the ledger — so no cost is quoted, only the size ceiling.
@@ -107,12 +118,17 @@ export function MediaAttach({ postId, channels }: MediaAttachProps) {
     input.value = ''
     if (!file) return
 
-    // `change` only fires after the writer drove this control, so the focus
-    // about to be destroyed by `disabled` is ours to give back.
-    reclaimFocus.current = true
     setResult(null)
     setCropError(null)
     setCropped(null)
+    if (file.size > MEDIA_UPLOAD_CAP_BYTES) {
+      setResult({ ok: false, message: MEDIA_UPLOAD_TOO_LARGE })
+      return
+    }
+
+    // `change` only fires after the writer drove this control, so the focus
+    // about to be destroyed by `disabled` is ours to give back.
+    reclaimFocus.current = true
     pickedRef.current = file
     setLocalSrc((previous) => {
       if (previous !== null) URL.revokeObjectURL(previous)
@@ -122,7 +138,13 @@ export function MediaAttach({ postId, channels }: MediaAttachProps) {
     formData.append('file', file)
 
     startTransition(async () => {
-      const state = await attachMedia(postId, formData)
+      let state: AttachMediaState
+      try {
+        state = await attachMedia(postId, formData)
+      } catch {
+        setResult({ ok: false, message: uploadTransportRefusal(file.name || 'that file') })
+        return
+      }
       setResult(state)
       // The refusal is rendered either way. The dialog is an ADDITION on top of
       // it, so dismissing the dialog leaves the writer looking at exactly the
@@ -266,7 +288,13 @@ export function MediaAttach({ postId, channels }: MediaAttachProps) {
             const formData = new FormData()
             formData.append('file', file)
             startTransition(async () => {
-              const state = await acceptCropForUpload(postId, formData, focal.x, focal.y)
+              let state: AcceptCropState
+              try {
+                state = await acceptCropForUpload(postId, formData, focal.x, focal.y)
+              } catch {
+                setCropError(uploadTransportRefusal(file.name || 'that file'))
+                return
+              }
               if (!state.ok) {
                 setCropError(state.message)
                 return

@@ -23,7 +23,6 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 const WS_ID = '22222222-2222-4222-8222-222222222222'
 const CAMPAIGN_ID = '33333333-3333-4333-8333-333333333333'
 const POST_ID = '44444444-4444-4444-8444-444444444444'
-const THREAD_ID = '55555555-5555-4555-8555-555555555555'
 
 const state = vi.hoisted(() => ({
   userId: 'user_abc' as string | null,
@@ -90,7 +89,6 @@ vi.mock('@/lib/supabase/server', () => {
 
 const { removePostFromCampaign, deleteCampaign, setCampaignStatus, updateCampaign } =
   await import('./campaigns')
-const { setThreadStatus } = await import('./inbox')
 
 beforeEach(() => {
   state.userId = 'user_abc'
@@ -135,12 +133,10 @@ describe('a write that matched nothing is reported as a refusal', () => {
     expect(ok(await updateCampaign(CAMPAIGN_ID, form))).toBe(true)
   })
 
-  test('setThreadStatus refuses when no thread row matched', async () => {
-    expect(ok(await setThreadStatus(THREAD_ID, 'resolved'))).toBe(false)
-
-    state.rows = [{ id: THREAD_ID }]
-    expect(ok(await setThreadStatus(THREAD_ID, 'resolved'))).toBe(true)
-  })
+  // `setThreadStatus` was the fifth site and had its case here until 2026-09-06,
+  // when `actions/inbox.ts` was deleted: a `'use server'` export is a callable
+  // RPC whether or not a screen calls it, and no screen ever did (docs/51,
+  // Q-07). The four that remain are all mounted.
 
   test('each one asks the database which rows it changed', async () => {
     // The guard IS `.select(...)`: without it there is nothing to count and the
@@ -154,8 +150,7 @@ describe('a write that matched nothing is reported as a refusal', () => {
     await deleteCampaign(CAMPAIGN_ID)
     await setCampaignStatus(CAMPAIGN_ID, 'active')
     await updateCampaign(CAMPAIGN_ID, form)
-    await setThreadStatus(THREAD_ID, 'resolved')
 
-    expect(state.selects).toHaveLength(5)
+    expect(state.selects).toHaveLength(4)
   })
 })

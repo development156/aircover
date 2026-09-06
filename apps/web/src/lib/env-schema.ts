@@ -60,6 +60,13 @@ const EnvSchema = z.object({
   /** Delivers the two-admin OTP. Absent → creating a credit request fails honestly. */
   RESEND_API_KEY: z.string().min(1).optional(),
   /**
+   * TinyFish Fetch, tier 3 of the onboarding site read and the rendered rung of
+   * Radar's website ladder. Optional: absent means a JavaScript-only site is
+   * read from the customer's answers alone, and Radar records a bot-walled page
+   * as a gap. Free per call; the key's 1,000 daily fetches are the budget.
+   */
+  TINYFISH_API_KEY: z.string().min(1).optional(),
+  /**
    * Zernio publishing rail. `sk_` + 64 hex = 67 chars, shown once, stored by them
    * as SHA-256 (doc 13 §1). The length is validated because a truncated paste is
    * otherwise indistinguishable from a wrong key until the first 401 — and that

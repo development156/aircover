@@ -17,7 +17,7 @@ import { creditWord } from '@/lib/credit-words'
 const INSTRUCTIONS = [
   { value: 'rewrite', label: 'Rewrite' },
   { value: 'shorten', label: 'Shorten' },
-  { value: 'hookify', label: 'Hookify' },
+  { value: 'hookify', label: 'Add a hook' },
 ] as const
 
 const PENDING_LINES = [
@@ -72,27 +72,38 @@ export function InlineRewrite({ body, selection, onReplace }: InlineRewriteProps
     setStranded(null)
 
     startTransition(async () => {
-      const result = await rewriteCaption(fragment, instruction, fragment)
+      try {
+        const result = await rewriteCaption(fragment, instruction, fragment)
 
-      if (result.ok) {
-        if (!onReplace(range, result.text, fragment)) {
-          setStranded(result.text)
+        if (result.ok) {
+          if (!onReplace(range, result.text, fragment)) {
+            setStranded(result.text)
+            return
+          }
+          toast.success(
+            <span>
+              Rewrote the selection · <span className="tabular-nums">{result.creditsCharged}</span>{' '}
+              {creditWord(result.creditsCharged)} used ·{' '}
+              <span className="tabular-nums">{result.balanceAfter}</span> left
+            </span>,
+          )
           return
         }
-        toast.success(
-          <span>
-            Rewrote the selection · <span className="tabular-nums">{result.creditsCharged}</span>{' '}
-            {creditWord(result.creditsCharged)} used ·{' '}
-            <span className="tabular-nums">{result.balanceAfter}</span> left
-          </span>,
+        setFailure(
+          result.insufficient
+            ? { kind: 'insufficient', required: result.required, available: result.available }
+            : { kind: 'message', message: result.message },
         )
-        return
+      } catch {
+        // A server action REJECTS on a dropped connection rather than resolving
+        // to `{ ok: false }`. Unguarded, the rejection escapes the transition and
+        // crashes the composer to its route error boundary. Inline instead; the
+        // wallet is the truth on whether anything was spent, not this sentence.
+        setFailure({
+          kind: 'message',
+          message: 'Sahoda couldn’t finish that just now. Check your wallet, then try again.',
+        })
       }
-      setFailure(
-        result.insufficient
-          ? { kind: 'insufficient', required: result.required, available: result.available }
-          : { kind: 'message', message: result.message },
-      )
     })
   }
 

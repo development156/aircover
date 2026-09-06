@@ -6,6 +6,7 @@ import type { LedgerEntry } from '@sahoda/shared'
 
 import { Select } from '@/components/ui/select'
 import { settledHoldIds } from '@/lib/wallet/hold-settlement'
+import { groupCorrections } from '@/lib/wallet/group-entries'
 import {
   ACTIVITY_KINDS,
   GAP,
@@ -112,6 +113,18 @@ export function CreditActivity({
    */
   const settled = useMemo(() => settledHoldIds(entries), [entries])
 
+  /**
+   * Computed over EVERY entry read, for the same reason and by the same rule.
+   *
+   * This is the sibling `settled` left open. A correction's re-issue points at an
+   * entry far down the list, so in any workspace with more than one page the
+   * original and its correction sit on DIFFERENT pages: `LedgerTable`'s own
+   * derivation, given ten rows, finds no correction and renders the superseded
+   * row with no note, which reads as though it still stands. Only the SET is
+   * hoisted; the rows on screen stay the page's own.
+   */
+  const correctedSeqs = useMemo(() => groupCorrections(entries).correctedSeqs, [entries])
+
   const filtered = useMemo(() => filterEntries(entries, { kind, query }), [entries, kind, query])
   const totals = useMemo(() => totalsFor(filtered), [filtered])
 
@@ -202,7 +215,9 @@ export function CreditActivity({
             ) : (
               scope
             )}
-            . Holds and returns count as nothing, because neither moves your balance.
+            . Holds and returns count as nothing here, because neither changes your total. The
+            balance column shows what was spendable after each entry, so a hold lowers it until the
+            action settles or returns.
             {!filtering && windowed ? ' Older activity is not counted here.' : ''}
           </p>
         </>
@@ -244,6 +259,7 @@ export function CreditActivity({
           skipped={skipped}
           limit={limit}
           settled={settled}
+          correctedSeqs={correctedSeqs}
           showBalance
           notes={false}
         />

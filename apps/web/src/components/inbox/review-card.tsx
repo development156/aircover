@@ -5,12 +5,13 @@ import { cn } from '@/lib/utils'
 
 import { platformLabel } from './platform-label'
 import { ReviewReply } from './review-reply'
+import { DEFAULT_ZONE } from '@/lib/time/zone'
 
 const WHEN = new Intl.DateTimeFormat('en-IN', {
   day: '2-digit',
   month: 'short',
   year: 'numeric',
-  timeZone: 'Asia/Kolkata',
+  timeZone: DEFAULT_ZONE,
 })
 
 function formatWhen(value: string | undefined): string | null {

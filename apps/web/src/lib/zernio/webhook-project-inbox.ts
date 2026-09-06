@@ -77,9 +77,26 @@ export async function projectMessage(
     body: str(msg, 'text') ?? '',
     platformMessageId,
     sentAt: str(msg, 'sentAt'),
+    attachments: attachmentsOf(msg),
   })
 
   return { kind: 'projected', surface: 'inbox', rows }
+}
+
+/**
+ * The message's attachments, as Zernio sent them, narrowed to entries with a url.
+ *
+ * Stored whole (`type`, `url`, `payload`) rather than re-shaped: the url on
+ * Instagram and Facebook expires, and the renderer resolves those by POSITION
+ * through Zernio's re-mint endpoint, so the array order is load-bearing and an
+ * entry is never dropped from the middle. One without a url is kept as-is too,
+ * for the same reason; `storedAttachments` in store-read.ts skips it on render.
+ */
+function attachmentsOf(msg: unknown): unknown[] {
+  if (typeof msg !== 'object' || msg === null) return []
+  const list = (msg as Record<string, unknown>).attachments
+  if (!Array.isArray(list)) return []
+  return list.filter((entry) => typeof entry === 'object' && entry !== null)
 }
 
 /** `comment.received` — a comment on a post. */

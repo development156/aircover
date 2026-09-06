@@ -1,0 +1,28 @@
+-- `workspace_storage_bytes` was still executable by `anon`, and the migration that
+-- created it thought it had prevented that.
+--
+-- WHAT WAS MEASURED, on both projects, after 20260904090000 applied:
+--
+--   grantees on EXECUTE = service_role, authenticated, anon, postgres
+--
+-- The creating migration ends `revoke all … from public; grant execute … to
+-- authenticated`, and both statements ran. They were not enough. Supabase ships an
+-- `alter default privileges` that grants EXECUTE on every new function in `public`
+-- to `anon`, `authenticated` and `service_role` INDIVIDUALLY — those are not the
+-- `PUBLIC` pseudo-role, so revoking PUBLIC leaves each of them untouched. The
+-- assertion in `workspace_storage_bytes.pglite.test.ts` reads `not.toContain('PUBLIC')`
+-- and passes, because PGlite has no such default privilege to reproduce; the real
+-- database is where this was visible at all.
+--
+-- WHY IT WAS NOT AN EXPOSURE, AND IS STILL WRONG. MEASURED on the live project: a
+-- call as `anon` raises `42501 not a member of this workspace` from line 13 of the
+-- function, because `auth.jwt() ->> 'sub'` is null for an anonymous caller and the
+-- membership predicate therefore matches nothing. The tenant boundary held. But a
+-- `security definer` function that reads four tables past RLS should not be
+-- addressable by the unauthenticated role at all, and its own creating migration
+-- says as much. One predicate is not a wall.
+--
+-- `service_role` keeps EXECUTE: it is the server-side key and the app's own read
+-- may run under it.
+
+revoke execute on function public.workspace_storage_bytes(uuid) from anon;

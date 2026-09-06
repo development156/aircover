@@ -27,6 +27,7 @@ function deps(over: Partial<ClaimedPublishDeps> = {}): ClaimedPublishDeps {
     },
     writeLog: async () => {},
     markVariant: async () => {},
+    recordPublished: async () => {},
     ...over,
   } as ClaimedPublishDeps
 }

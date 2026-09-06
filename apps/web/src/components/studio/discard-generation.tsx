@@ -26,10 +26,17 @@ import { Modal } from '@/components/ui/modal'
 export function DiscardGeneration({
   generationId,
   prompt,
+  onRemoved,
 }: {
   generationId: string
   /** Named in the confirmation, so nobody removes the wrong one. */
   prompt: string
+  /**
+   * Called once the record is gone. The wall re-reads and the tile vanishes;
+   * the viewer is LOOKING at that record and has to leave, since a reload of
+   * its route would be a 404 wearing a picture.
+   */
+  onRemoved?: () => void
 }) {
   const [asking, setAsking] = useState(false)
   const [note, setNote] = useState<string | null>(null)
@@ -54,19 +61,20 @@ export function DiscardGeneration({
         onClose={() => setAsking(false)}
         title="Remove this request?"
         description="This removes the record of what you asked for and what it cost. Any picture it made stays in your library, and anything you have already posted is untouched."
-      >
-        <div className="flex flex-col gap-3">
-          <p className="type-sm text-muted">
-            You asked for: <span className="text-ink">{prompt}</span>
-          </p>
-
-          <div className="flex flex-wrap items-center gap-2">
+        footer={
+          <>
+            {/* A real secondary control, not an underlined word: in a footer
+                beside a filled button, a bare text link reads as a caption. */}
+            <Button variant="ghost" onClick={() => setAsking(false)} disabled={busy}>
+              Keep it
+            </Button>
             <Button
               onClick={() =>
                 start(async () => {
                   const result = await discardGeneration(generationId)
                   if (result.ok) {
                     setAsking(false)
+                    onRemoved?.()
                     return
                   }
                   setNote(result.message)
@@ -76,14 +84,13 @@ export function DiscardGeneration({
             >
               Remove the request
             </Button>
-            <button
-              type="button"
-              onClick={() => setAsking(false)}
-              className="type-sm text-muted underline underline-offset-2 transition-micro hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            >
-              Keep it
-            </button>
-          </div>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3">
+          <p className="type-sm text-muted">
+            You asked for: <span className="text-ink">{prompt}</span>
+          </p>
 
           {note === null ? null : (
             <p role="alert" className="type-sm text-ink">

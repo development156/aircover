@@ -25,6 +25,17 @@ export { sweepExpiredHolds } from './holds/sweep'
 export type { ExpiredHold, HoldSweepDeps, HoldSweepReport } from './holds/sweep'
 
 export { dispatchSweepDeps, holdSweepDeps, getRuntime } from './runtime'
+
+// The media-bucket orphan sweep. SQL plus the storage REST endpoint, nothing from
+// @sahoda/publishing, so it belongs on this SDK-free entry point. Dry-run unless
+// `SAHODA_STORAGE_RECONCILE=delete`.
+export { runStorageReconcile, storageReconcileMode } from './storage/reconcile'
+export type {
+  StorageReconcileDeps,
+  StorageReconcileMode,
+  StorageReconcileReport,
+} from './storage/reconcile'
+export { storageReconcileDeps } from './storage/deps'
 export type { SweepBatchOptions } from './runtime'
 
 export { loadJobsEnv } from './env'

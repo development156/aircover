@@ -82,6 +82,7 @@ function landscape(): Record<string, unknown> {
     width: 1600,
     height: 900,
     alt: 'The shopfront',
+    deleted_at: null,
   }
 }
 
@@ -164,6 +165,22 @@ describe('attachAssetToPost reads the version formats', () => {
  *   the per-format rule   a Story accepting a landscape photo — the exact case
  *                         the comment at the call site was written about
  */
+describe('a trashed file cannot be put on a post', () => {
+  test('a file in the trash is refused, pointing at Restore, and nothing is written', async () => {
+    // The person put it in the trash to stop using it. MEASURED 2026-09-06:
+    // the picker never lists trashed files, but the action took the id all the
+    // same, because `readAsset` reads live and trashed rows alike.
+    state.asset = { ...landscape(), deleted_at: '2026-09-01T00:00:00.000Z' }
+
+    const result = await attachAssetToPost(POST_ID, ASSET_ID)
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.message).toMatch(/restore/i)
+    expect(state.inserted).toEqual([])
+  })
+})
+
 describe('an unreadable read refuses the attach rather than admitting it', () => {
   test('an unreadable media list writes nothing', async () => {
     state.existingMedia = null

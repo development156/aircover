@@ -1,5 +1,5 @@
 import { CONSTRAINTS } from '@sahoda/shared'
-import type { Channel, ConstraintViolation } from '@sahoda/shared'
+import type { Channel } from '@sahoda/shared'
 import { describe, expect, test } from 'vitest'
 
 import { decideAttach } from './attach-decision'
@@ -92,7 +92,13 @@ describe('decideAttach — no channel can use it', () => {
   })
 
   test('refuses a gif when gbp is the only channel', () => {
-    expect(decideAttach(['gbp'], GIF, 0, {}).ok).toBe(false)
+    // RETARGETED: `expectRejected` throws if the decision were ever `ok:
+    // true`, so this is strictly stronger than the bare `.ok` check it
+    // replaces, and it pins WHY: gbp's own MEDIA_TYPE objection, in the
+    // sentence a writer would actually see.
+    const { rejections, message } = expectRejected(decideAttach(['gbp'], GIF, 0, {}))
+    expect(codesFor(rejections, 'gbp')).toContain('MEDIA_TYPE')
+    expect(message).toMatch(/no channel on this post can use it/i)
   })
 })
 
@@ -144,21 +150,49 @@ describe('decideAttach — inputs it cannot measure', () => {
   })
 
   test('refuses a zero-byte candidate rather than calling it under every cap', () => {
-    expect(decideAttach(ALL_CHANNELS, { ...GOOD_JPEG, bytes: 0 }, 0, {}).ok).toBe(false)
+    // RETARGETED: distinguishes the UNVERIFIABLE branch ("could not be
+    // checked") from the ordinary MEDIA_SIZE rejection every channel cap
+    // would otherwise produce — the claim the test name actually makes.
+    const { rejections, message } = expectRejected(
+      decideAttach(ALL_CHANNELS, { ...GOOD_JPEG, bytes: 0 }, 0, {}),
+    )
+    expect(rejections).toEqual([])
+    expect(message).toMatch(/could not be checked/i)
   })
 
-  test('refuses a 0x0 image, which linkedin and instagram check no dimensions for', () => {
-    // linkedin/instagram have no imageDims, so a 0x0 file would otherwise pass them.
-    expect(CONSTRAINTS.linkedin.imageDims).toBeUndefined()
-    expect(
-      decideAttach(['linkedin', 'instagram'], { ...GOOD_JPEG, width: 0, height: 0 }, 0, {}).ok,
-    ).toBe(false)
+  test('refuses a 0x0 image on its own account, not by a channel floor', () => {
+    // RETARGETED 2026-09-03. The claim is unchanged and the premise moved: this
+    // test used to prove the 0x0 guard mattered by naming the two channels that
+    // declared no `imageDims`, so a zero-size file would otherwise have walked
+    // through them. instagram gained a floor earlier, and linkedin gained
+    // 552x276 from docs/31 §2.2, so every channel now declares one and the old
+    // premise assertion asserted something false.
+    //
+    // The guard still has to be its own: a file whose dimensions read as zero is
+    // a file nothing measured, and it must be refused for that reason rather
+    // than because some channel happens to declare a floor above zero.
+    expect(CONSTRAINTS.linkedin.imageDims).toEqual({ minW: 552, minH: 276 })
+    // RETARGETED: proves the refusal is the UNVERIFIABLE "cannot measure"
+    // branch — the guard this test is about — and not some other rejection
+    // (e.g. a channel-floor MEDIA_DIMS) that would also read as `ok: false`.
+    const { rejections, message } = expectRejected(
+      decideAttach(['linkedin', 'instagram'], { ...GOOD_JPEG, width: 0, height: 0 }, 0, {}),
+    )
+    expect(rejections).toEqual([])
+    expect(message).toMatch(/could not be checked/i)
   })
 
   test('refuses an existing count that is not a whole non-negative number', () => {
-    expect(decideAttach(['x'], GOOD_JPEG, Number.NaN, {}).ok).toBe(false)
-    expect(decideAttach(['x'], GOOD_JPEG, -1, {}).ok).toBe(false)
-    expect(decideAttach(['x'], GOOD_JPEG, 1.5, {}).ok).toBe(false)
+    // RETARGETED: each bare `.ok` check passed for ANY refusal reason; pin
+    // that all three take the UNVERIFIABLE branch specifically, not some
+    // other rejection that happens to also be `ok: false`.
+    for (const existingCount of [Number.NaN, -1, 1.5]) {
+      const { rejections, message } = expectRejected(
+        decideAttach(['x'], GOOD_JPEG, existingCount, {}),
+      )
+      expect(rejections).toEqual([])
+      expect(message).toMatch(/could not be checked/i)
+    }
   })
 
   /**
@@ -168,17 +202,28 @@ describe('decideAttach — inputs it cannot measure', () => {
    * 0×0 case lets either guard be deleted with the suite still green.
    */
   test('refuses a file whose height alone is unreadable', () => {
-    expect(decideAttach(['linkedin', 'instagram'], { ...GOOD_JPEG, height: 0 }, 0, {}).ok).toBe(
-      false,
-    )
-    expect(decideAttach(['linkedin'], { ...GOOD_JPEG, height: Number.NaN }, 0, {}).ok).toBe(false)
+    // RETARGETED: pins the UNVERIFIABLE branch for both cases, not just
+    // "some rejection or other". Channel lists kept exactly as before.
+    for (const [channels, candidate] of [
+      [['linkedin', 'instagram'], { ...GOOD_JPEG, height: 0 }],
+      [['linkedin'], { ...GOOD_JPEG, height: Number.NaN }],
+    ] as const) {
+      const { rejections, message } = expectRejected(decideAttach(channels, candidate, 0, {}))
+      expect(rejections).toEqual([])
+      expect(message).toMatch(/could not be checked/i)
+    }
   })
 
   test('refuses a file whose width alone is unreadable', () => {
-    expect(decideAttach(['linkedin', 'instagram'], { ...GOOD_JPEG, width: 0 }, 0, {}).ok).toBe(
-      false,
-    )
-    expect(decideAttach(['linkedin'], { ...GOOD_JPEG, width: Number.NaN }, 0, {}).ok).toBe(false)
+    // RETARGETED, same reasoning as height above.
+    for (const [channels, candidate] of [
+      [['linkedin', 'instagram'], { ...GOOD_JPEG, width: 0 }],
+      [['linkedin'], { ...GOOD_JPEG, width: Number.NaN }],
+    ] as const) {
+      const { rejections, message } = expectRejected(decideAttach(channels, candidate, 0, {}))
+      expect(rejections).toEqual([])
+      expect(message).toMatch(/could not be checked/i)
+    }
   })
 
   /**
@@ -188,16 +233,28 @@ describe('decideAttach — inputs it cannot measure', () => {
    * same rule the count already enforces (1.5 above).
    */
   test('refuses a byte count that is not a whole number', () => {
-    expect(decideAttach(['linkedin'], { ...GOOD_JPEG, bytes: 0.5 }, 0, {}).ok).toBe(false)
-    expect(decideAttach(['linkedin'], { ...GOOD_JPEG, bytes: 1.5 }, 0, {}).ok).toBe(false)
-    expect(
-      decideAttach(['linkedin'], { ...GOOD_JPEG, bytes: Number.POSITIVE_INFINITY }, 0, {}).ok,
-    ).toBe(false)
+    // RETARGETED: pins the UNVERIFIABLE branch for all three, not just
+    // "some rejection or other" — a fractional or infinite byte count reads
+    // as valid under every cap otherwise, which is the whole claim here.
+    for (const bytes of [0.5, 1.5, Number.POSITIVE_INFINITY]) {
+      const { rejections, message } = expectRejected(
+        decideAttach(['linkedin'], { ...GOOD_JPEG, bytes }, 0, {}),
+      )
+      expect(rejections).toEqual([])
+      expect(message).toMatch(/could not be checked/i)
+    }
   })
 
   test('refuses pixel dimensions that are not whole numbers', () => {
-    expect(decideAttach(['linkedin'], { ...GOOD_JPEG, width: 100.5 }, 0, {}).ok).toBe(false)
-    expect(decideAttach(['linkedin'], { ...GOOD_JPEG, height: 100.5 }, 0, {}).ok).toBe(false)
+    // RETARGETED, same reasoning as the byte count above.
+    for (const candidate of [
+      { ...GOOD_JPEG, width: 100.5 },
+      { ...GOOD_JPEG, height: 100.5 },
+    ]) {
+      const { rejections, message } = expectRejected(decideAttach(['linkedin'], candidate, 0, {}))
+      expect(rejections).toEqual([])
+      expect(message).toMatch(/could not be checked/i)
+    }
   })
 })
 

@@ -100,7 +100,7 @@ export function CreditChip({ balance }: { balance: BalanceRead }) {
       aria-live="polite"
       aria-label={content.label}
       className={cn(
-        'flex flex-none items-center gap-[7px] rounded-pill border-[1.5px] border-primary bg-bg px-[13px] py-1.5 font-semibold whitespace-nowrap transition-micro hover:bg-tint-50 active:scale-[.97] max-narrow:min-h-[44px] dark:hover:bg-s2',
+        'flex h-control flex-none items-center gap-[7px] rounded-pill border-[1.5px] border-primary bg-bg px-[13px] font-semibold whitespace-nowrap transition-micro hover:bg-tint-50 active:scale-[.97] max-narrow:h-11 dark:hover:bg-s2',
         hideOnNarrow && 'max-narrow:hidden',
       )}
     >
@@ -112,8 +112,15 @@ export function CreditChip({ balance }: { balance: BalanceRead }) {
             aria-hidden via the Unreadable component's own markup. */}
         {content.text ?? <Unreadable what="Your credit balance" />}
       </span>
+      {/* The word is for the eye at desktop widths only; the link's accessible
+          name already says "N credits available". MEASURED 2026-09-05 (smoke,
+          campaigns and composer-widths, then reproduced at 360/390 with a
+          workspace and no brain): the trailing cluster overran the viewport by
+          35px at 390 and 65px at 360, and this word was 50px of it. */}
       {content.suffix !== null ? (
-        <span className="text-[13px] font-medium text-muted">{content.suffix}</span>
+        <span className="text-[13px] font-medium text-muted max-narrow:sr-only">
+          {content.suffix}
+        </span>
       ) : null}
     </Link>
   )

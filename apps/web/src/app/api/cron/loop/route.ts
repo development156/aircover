@@ -97,10 +97,17 @@ export async function GET(request: Request): Promise<Response> {
     return Response.json({ ok: true, ...result })
   } catch (error) {
     reportServerError(error, { action: 'cron.loop' })
-    // 200 with an error body, not a 500. Vercel retries a failing cron, and a
-    // retry here would re-enter workspaces whose cycles already opened — the
-    // one-live-cycle-per-week index makes that safe, but a retry storm on a
-    // paid path is not something to invite.
-    return Response.json({ ok: false, error: 'LOOP_CRON_FAILED' })
+    // 500, the same as the metrics, radar and autopilot siblings, and for the
+    // reason metrics states next door: a 4xx would call it the caller's mistake
+    // and a 200 would hide it from Vercel's cron log, from every 5xx filter and
+    // from every alert built on either. That mattered here more than anywhere,
+    // because the heartbeat above is stamped BEFORE the work, so a pass that
+    // fires and throws still reads as alive on the ops surface.
+    //
+    // This said "200, because Vercel retries a failing cron". Vercel's cron
+    // documentation describes no automatic retry, so the retry storm the 200
+    // avoided was never on the table; and the one-live-cycle-per-week index
+    // makes a re-entry safe anyway, which the old comment said itself.
+    return Response.json({ ok: false, error: 'LOOP_CRON_FAILED' }, { status: 500 })
   }
 }

@@ -56,10 +56,30 @@ export interface KnowledgeDocument extends KnowledgeDocumentRow {
 }
 
 export type LibraryRead =
-  | { status: 'ok'; documents: KnowledgeDocument[]; workspaceId: string }
+  | {
+      status: 'ok'
+      documents: KnowledgeDocument[]
+      workspaceId: string
+      /**
+       * The read hit `LIST_LIMIT` — there are documents this list is not
+       * showing. `true` is a bounded fact, never a fabricated count of the
+       * hidden rows: the count line and the empty message are only honest if
+       * they can SAY the list is capped. `lib/campaigns/read.ts` carries the
+       * same flag for the same reason.
+       */
+      truncated: boolean
+    }
   | { status: 'empty'; workspaceId: string }
   | { status: 'no-workspace' }
   | { status: 'unreadable' }
+
+/**
+ * The most documents one library read returns. Following `campaigns/read.ts`:
+ * a plain `.limit(LIST_LIMIT)` with `truncated = rows >= LIST_LIMIT`, rather
+ * than a fabricated total. `readLibrary` was previously unbounded, so a large
+ * library ran a full scan and rendered every row on one page.
+ */
+export const LIST_LIMIT = 200
 
 const DOCUMENT_COLUMNS =
   'id, title, source_kind, source_ref, storage_path, bytes, status, failure_code, failure_detail, chunk_count, char_count, addressed_instructions, instruction_samples, created_at, updated_at, indexed_at'
@@ -91,6 +111,7 @@ export const readLibrary = cache(async (): Promise<LibraryRead> => {
       .select(DOCUMENT_COLUMNS)
       .eq('workspace_id', workspaceId)
       .order('created_at', { ascending: false })
+      .limit(LIST_LIMIT)
 
     if (error) {
       console.error('[knowledge] library read failed', error.code, error.message)
@@ -102,6 +123,12 @@ export const readLibrary = cache(async (): Promise<LibraryRead> => {
     return {
       status: 'ok',
       workspaceId,
+      // Measured on the ROWS RETURNED. At exactly LIST_LIMIT the read cannot
+      // tell a full page from a truncated one, so it reports truncated — the
+      // same conservative call campaigns makes, and the honest direction: a
+      // list that says it MIGHT be capped when it is exactly full beats one
+      // that says it is whole when it is not.
+      truncated: data.length >= LIST_LIMIT,
       documents: (data as KnowledgeDocumentRow[]).map((row) => withShownStatus(row, now)),
     }
   } catch (error) {
@@ -172,6 +199,8 @@ export async function searchLibrary(query: string, limit = 20): Promise<SearchRe
     const { data, error } = await supabase
       .from('knowledge_current_chunks')
       .select('id, document_id, document_title, ordinal, text')
+      // BR-05: the view admits every workspace the person belongs to.
+      .eq('workspace_id', workspace.workspace.id)
       .textSearch('tsv', trimmed, { type: 'plain', config: 'english' })
       .limit(limit)
 
@@ -205,6 +234,7 @@ export async function readCurrentPassages(limit: number): Promise<SearchRead> {
     const { data, error } = await supabase
       .from('knowledge_current_chunks')
       .select('id, document_id, document_title, ordinal, text')
+      .eq('workspace_id', workspace.workspace.id)
       .order('document_id', { ascending: true })
       .order('ordinal', { ascending: true })
       .limit(limit)
@@ -375,4 +405,43 @@ export async function countPendingLibrarySuggestions(): Promise<number | null> {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
+}
+
+/**
+ * What deleting a document would orphan, in the ONE workspace it belongs to.
+ *
+ * Both reads used to run without a workspace filter. With two memberships the
+ * `brand_memory` read returned two active rows and `.maybeSingle()` errored, so
+ * the count came back 0 and the confirm dialog promised no impact.
+ */
+export async function readDeleteImpactFor(
+  workspaceId: string,
+  documentId: string,
+): Promise<{ brandFields: number; pendingProposals: number }> {
+  const supabase = createServerSupabase()
+  const cite = `document:${documentId}`
+
+  const brain = await supabase
+    .from('brand_memory')
+    .select('payload')
+    .eq('workspace_id', workspaceId)
+    .eq('status', 'active')
+    .maybeSingle()
+
+  let brandFields = 0
+  const meta = (brain.data as { payload?: { field_meta?: Record<string, { source?: string }> } })
+    ?.payload?.field_meta
+  if (meta) brandFields = Object.values(meta).filter((m) => m?.source === cite).length
+
+  const proposals = await supabase
+    .from('memory_events')
+    .select('id, evidence_refs')
+    .eq('workspace_id', workspaceId)
+    .eq('status', 'pending')
+
+  const pendingProposals = (proposals.data ?? []).filter((row) =>
+    JSON.stringify((row as { evidence_refs?: unknown }).evidence_refs ?? '').includes(documentId),
+  ).length
+
+  return { brandFields, pendingProposals }
 }

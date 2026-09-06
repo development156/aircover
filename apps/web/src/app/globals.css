@@ -213,6 +213,7 @@
   --color-primary: var(--p);
   --color-primary-foreground: var(--pfg);
   --color-primary-strong: var(--pstrong);
+  --color-primary-strong-foreground: var(--pstrong-fg);
   --color-accent: var(--acc);
   --color-tint-50: var(--t50);
   --color-tint-100: var(--t100);
@@ -511,19 +512,38 @@
   }
 }
 
-/* v3 type scale as utilities, so components never hand-write a font shorthand. */
+/* v3 type scale as utilities, so components never hand-write a font shorthand.
+
+   ── A WEIGHT UTILITY BESIDE A TYPE STEP WAS SILENTLY IGNORED ─────────────────
+   MEASURED 2026-08-31, rendered in Chromium against the compiled stylesheet:
+   `type-sm font-semibold` computed to font-weight **400**, in EITHER order.
+   Tailwind emits these custom utilities AFTER its own `font-*` utilities in the
+   same layer, and `font:` is a shorthand, so the step's weight overwrote the
+   modifier every time. 82 call sites in the app write exactly that pair and
+   every one of them was rendering at the step's resting weight — a label its
+   author set to 600 was 400, and nothing but a ruler could tell.
+
+   The fix is one longhand after each shorthand: `font-weight` reads
+   `--tw-font-weight`, the variable Tailwind's own `font-*` utilities set, and
+   falls back to the step's resting weight when no modifier is present. The
+   fallback duplicates the weight inside the token, deliberately: it is the one
+   number that has to be readable here, and `pnpm test` grades that the two
+   agree (type-step-weights.test.ts). */
 @utility type-display {
   font: var(--t-display);
+  font-weight: var(--tw-font-weight, 700);
   letter-spacing: var(--ls-display);
   word-spacing: var(--ws-word);
 }
 @utility type-h1 {
   font: var(--t-h1);
+  font-weight: var(--tw-font-weight, 650);
   letter-spacing: var(--ls-display);
   word-spacing: var(--ws-word);
 }
 @utility type-h2 {
   font: var(--t-h2);
+  font-weight: var(--tw-font-weight, 650);
   letter-spacing: var(--ls-heading);
   word-spacing: var(--ws-word);
 }
@@ -532,6 +552,7 @@
    headings drifted between routes. */
 @utility type-h3 {
   font: var(--t-h3);
+  font-weight: var(--tw-font-weight, 650);
   letter-spacing: var(--ls-heading);
   word-spacing: var(--ws-word);
 }
@@ -539,16 +560,19 @@
    reflows its digits as it changes reads as unstable. */
 @utility type-hero-num {
   font: var(--t-hero-num);
+  font-weight: var(--tw-font-weight, 650);
   letter-spacing: var(--ls-hero-num);
   font-variant-numeric: tabular-nums;
   word-spacing: var(--ws-word);
 }
 @utility type-body {
   font: var(--t-body);
+  font-weight: var(--tw-font-weight, 400);
   word-spacing: var(--ws-word);
 }
 @utility type-sm {
   font: var(--t-sm);
+  font-weight: var(--tw-font-weight, 400);
   word-spacing: var(--ws-word);
 }
 /* v5 · THE META RUNG — table cells, captions, timestamps, helper text.
@@ -558,6 +582,7 @@
    single largest block of off-scale type in the app. This is that rung. */
 @utility type-meta {
   font: var(--t-xs);
+  font-weight: var(--tw-font-weight, 400);
   word-spacing: var(--ws-word);
 }
 /* The chip step — 11px/600, NOT uppercase.
@@ -566,9 +591,10 @@
    font-semibold` and every chip after it copied the literal. That is the same
    drift `type-h3` was added to stop, one rung further down. Uppercase is the only
    thing separating this from `type-eyebrow`, and it is exactly the wrong thing on
-   a chip whose label is a sentence fragment ("Not proven live"). */
+   a chip whose label is a sentence fragment ("Not yet confirmed live"). */
 @utility type-chip {
   font: var(--t-chip);
+  font-weight: var(--tw-font-weight, 600);
   word-spacing: var(--ws-word);
 }
 /* The embed field step — see `--t-input-embed` in tokens.css for why 16px is a
@@ -578,10 +604,12 @@
    same drift `type-h3` and `type-chip` were added to stop. */
 @utility type-input-embed {
   font: var(--t-input-embed);
+  font-weight: var(--tw-font-weight, 400);
   word-spacing: var(--ws-word);
 }
 @utility type-eyebrow {
   font: var(--t-eyebrow);
+  font-weight: var(--tw-font-weight, 600);
   letter-spacing: var(--t-eyebrow-ls);
   text-transform: uppercase;
   word-spacing: var(--ws-word);
@@ -599,6 +627,41 @@
 /* The firmer ring — controls, and cards that need to separate from a fill. */
 @utility surface-ring-firm {
   box-shadow: inset 0 0 0 1px var(--line);
+}
+
+/* ---- The ring PLUS a resting lift, in ONE declaration ----
+   Founder's ruling, 2026-09-03: container cards sit slightly above the white
+   page. `--sh-rest` carries his value and is zero in dark and in the inverse
+   scope, so this composites to the plain hairline there.
+
+   ── WHY IT IS ONE UTILITY AND NOT `surface-ring shadow-card` ───────────────
+   Because that combination has never worked, and the dashboard is where it did
+   not. `box-shadow` is ONE property: two classes both setting it means the
+   later rule in the stylesheet wins outright, and `.surface-ring` is emitted
+   after `.shadow-card` — MEASURED in the compiled output, `.shadow-card` at
+   line 3009 and `.surface-ring` at 3045, same specificity. `home/section.tsx`
+   has carried `surface-ring rounded-card bg-surface shadow-card` for its whole
+   life and **the shadow half painted nothing**, silently, because the ring
+   overwrote it. Anyone adding a shadow class beside `surface-ring` reproduces
+   that, and nothing warns them.
+
+   So the two layers are written together, comma-separated, which is how CSS
+   actually stacks them. `card.tsx`'s interactive hover already did exactly
+   this — `shadow-[inset_0_0_0_1px_var(--line-firm),var(--sh-card)]` — and that
+   was the clue.
+
+   ── WHAT IT IS DELIBERATELY NOT ON ────────────────────────────────────────
+   `surface-ring` is on 160 files, including chips, rows and controls. This is
+   NOT that utility with a shadow bolted on: it is a separate one applied only
+   to container cards, because the brief excludes buttons, icons, navigation
+   and small elements by name. `Tile` keeps `surface-ring` and stays flat, and
+   so do the 8px rows inside `needs-attention.tsx` and `rail-cards.tsx`. The
+   line between them is `rounded-card` for a container and `rounded-[8px]` for
+   something living inside one. */
+@utility surface-ring-lift {
+  box-shadow:
+    inset 0 0 0 1px var(--line-soft),
+    var(--sh-rest);
 }
 
 /* ============================================================
@@ -923,4 +986,231 @@
   50% {
     opacity: 1;
   }
+}
+
+/* ── THE SPARKLINE DRAW-IN ───────────────────────────────────────────────────
+   Reveals a line that is already in the markup, left to right, over the same
+   `--dur-count` the settled figures count up in, so a stat cell's number and
+   its shape arrive together. `pathLength="1"` on the path makes the dash
+   arithmetic unit-free. The global reduced-motion block in tokens.css
+   collapses this to 10ms like every other animation. */
+@keyframes spark-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.spark-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  animation: spark-draw var(--dur-count, 560ms) cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── THE BRAND BRAIN LIGHTING UP ─────────────────────────────────────────────
+   `components/brain/brain-map.tsx`. A node is a field; it lights when a person
+   confirms it. Everything here is transform or opacity, nothing runs longer
+   than --dur-slow, and every keyframe is one-shot: a map that keeps moving is
+   a map nobody reads. The global reduced-motion block in tokens.css collapses
+   all of it, delays included. */
+@keyframes brain-lit {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.5);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes brain-halo {
+  0% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(3.2);
+  }
+}
+@keyframes certainty-pop {
+  0% {
+    transform: scale(0.9);
+  }
+  55% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes num-pop {
+  0% {
+    transform: translateY(0);
+  }
+  35% {
+    transform: translateY(-3px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+@keyframes value-lit {
+  0% {
+    box-shadow: 0 0 0 0 var(--brand-wash);
+  }
+  100% {
+    box-shadow: 0 0 0 10px transparent;
+  }
+}
+.brain-node,
+.brain-halo,
+.brain-core {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.brain-node {
+  transition:
+    fill var(--dur-base) var(--ease),
+    stroke var(--dur-base) var(--ease);
+}
+.brain-node[data-lit='true'] {
+  animation: brain-lit var(--dur-slow) var(--ease) both;
+}
+.brain-halo {
+  animation: brain-halo var(--dur-slow) var(--ease) both;
+  pointer-events: none;
+}
+.brain-core[data-lit='true'] {
+  animation: certainty-pop var(--dur-slow) var(--ease) both;
+}
+.brain-edge {
+  transition:
+    stroke var(--dur-slow) var(--ease),
+    stroke-opacity var(--dur-slow) var(--ease);
+}
+.certainty-pop {
+  animation: certainty-pop var(--dur-base) var(--ease) both;
+}
+.num-pop {
+  display: inline-block;
+  animation: num-pop var(--dur-base) var(--ease) both;
+}
+.value-lit {
+  animation: value-lit var(--dur-slow) var(--ease) both;
+}
+
+/* ── THE BARS GROW IN ─────────────────────────────────────────────────────────
+   Same clock as the count-up and the line's draw-in, from the baseline up.
+   The bar exists at full height in the markup; this only animates its
+   transform, and the global reduced-motion block collapses it. */
+@keyframes bar-grow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+.bar-grow {
+  transform-origin: bottom;
+  transform-box: fill-box;
+  animation: bar-grow var(--dur-count, 560ms) cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── The week's pictures landing (components/planner/week-illustrator.tsx) ──
+   Four small motions, each true about a state: a light sweep and a breathing
+   ring while a real request is in flight, a scale-in when the picture arrives,
+   a tick that pops after it. All transform/opacity, so they cost nothing to
+   paint; the global reduced-motion block in tokens.css collapses them. */
+@keyframes illustrate-sweep {
+  from {
+    transform: translateX(-100%) skewX(-12deg);
+  }
+  to {
+    transform: translateX(200%) skewX(-12deg);
+  }
+}
+@keyframes illustrate-breathe {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 0 0 1px var(--line),
+      0 0 0 0 var(--t100);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 1px var(--brand),
+      0 0 0 6px var(--t50);
+  }
+}
+@keyframes illustrate-spark {
+  0%,
+  100% {
+    transform: scale(0.9) rotate(-6deg);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.15) rotate(6deg);
+    opacity: 1;
+  }
+}
+@keyframes illustrate-arrive {
+  from {
+    transform: scale(1.12);
+    opacity: 0;
+    filter: saturate(0.4) blur(6px);
+  }
+  60% {
+    filter: saturate(1) blur(0);
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes illustrate-tick {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.25);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes illustrate-settle {
+  0% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-4px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+.illustrate-sweep {
+  background: linear-gradient(100deg, transparent 20%, var(--t100) 50%, transparent 80%);
+  animation: illustrate-sweep 1.6s ease-in-out infinite;
+}
+.illustrate-breathe {
+  animation: illustrate-breathe 1.8s ease-in-out infinite;
+}
+.illustrate-spark {
+  animation: illustrate-spark 1.4s ease-in-out infinite;
+}
+.illustrate-arrive {
+  animation: illustrate-arrive 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.illustrate-tick {
+  animation: illustrate-tick 420ms 500ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.illustrate-settle {
+  animation: illustrate-settle 600ms ease-out both;
 }

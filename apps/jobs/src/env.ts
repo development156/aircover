@@ -54,12 +54,13 @@ export interface JobsEnv {
    */
   apifyToken: string | undefined
   /**
-   * Zyte, the last rung of the website ladder. Optional: absent means a page
-   * behind a bot wall is recorded as a gap instead of being bought. Ordinary
-   * pages never reach this — they are served by a conditional GET that costs
-   * nothing — so most of Radar works without it.
+   * TinyFish Fetch, the last rung of the website ladder. Optional: absent means
+   * a page behind a bot wall is recorded as a gap instead of being rendered.
+   * Ordinary pages never reach this — they are served by a conditional GET
+   * that costs nothing — so most of Radar works without it. Free per call;
+   * the key's 1,000 daily fetches are the only budget.
    */
-  zyteApiKey: string | undefined
+  tinyfishApiKey: string | undefined
   supabaseUrl: string
   serviceRoleKey: string
   databaseUrl: string
@@ -138,7 +139,7 @@ export function loadJobsEnv(source: NodeJS.ProcessEnv = process.env): JobsEnv {
   // process with it. A wrong key here fails at the provider, on one source, and
   // is recorded as the gap it is.
   const apifyToken = source.APIFY_TOKEN || undefined
-  const zyteApiKey = source.ZYTE_API_KEY || undefined
+  const tinyfishApiKey = source.TINYFISH_API_KEY || undefined
 
   const dispatchMode = readMode(source, 'SAHODA_PUBLISH_DISPATCH_MODE', invalid)
   const holdSweepMode = readMode(source, 'SAHODA_HOLD_SWEEP_MODE', invalid)
@@ -166,7 +167,7 @@ export function loadJobsEnv(source: NodeJS.ProcessEnv = process.env): JobsEnv {
     publishMode,
     zernioApiKey,
     apifyToken,
-    zyteApiKey,
+    tinyfishApiKey,
     supabaseUrl: toOrigin(rawUrl),
     serviceRoleKey,
     databaseUrl,

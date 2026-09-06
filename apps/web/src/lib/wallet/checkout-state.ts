@@ -9,8 +9,16 @@ import type { PlanId } from '@sahoda/shared'
  * sandbox session as a completed purchase by forgetting a check.
  */
 export type CheckoutState =
-  | { ok: true; simulated: true; mode: 'fixture' | 'sandbox'; sessionId: string; planId: PlanId }
-  | { ok: true; simulated: false; mode: 'live'; sessionId: string; url: string }
+  | {
+      ok: true
+      simulated: true
+      mode: 'fixture' | 'sandbox'
+      sessionId: string
+      planId: PlanId
+      /** An order an earlier call opened for the same pack, still unpaid. */
+      reused?: true
+    }
+  | { ok: true; simulated: false; mode: 'live'; sessionId: string; url: string; reused?: true }
   | { ok: false; message: string }
 
 /**

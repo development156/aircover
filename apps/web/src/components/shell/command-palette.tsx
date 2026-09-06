@@ -166,10 +166,13 @@ export function CommandPalette() {
       // previous frame's answer back into this one.
       const wanted = panelWidthFor({
         triggerWidth: box && box.width > 0 ? box.width : null,
-        // `p-2.5` around the field, and the ring's overhang. Named rather than
+        // `p-4` around the field, and the ring's overhang. Named rather than
         // read from computed style, which would make this depend on the panel
-        // having been painted already.
-        pad: 10,
+        // having been painted already. 16, not the 10 it was: with the field
+        // running to the panel's right edge, a 10px pad left the ring 6px
+        // inside a 28px corner that needs 10.7px there (run 34017127220,
+        // both themes). At 16 the ring sits 12px inside, where the arc is 5px.
+        pad: 16,
         ringOverhang: RING_OVERHANG,
         max: PANEL_MAX,
       })
@@ -228,7 +231,7 @@ export function CommandPalette() {
           setOpen(true)
         }}
         data-guide="topbar.search"
-        className="surface-ring mx-auto flex h-9 w-[min(420px,100%)] items-center gap-2 rounded-lg bg-s2 px-[10px] text-left text-[13px] text-muted transition-micro hover:shadow-[inset_0_0_0_1px_var(--line)] max-narrow:hidden"
+        className="surface-ring flex h-control w-full min-w-0 max-w-[460px] shrink items-center gap-2 rounded-input bg-s2 px-3 text-left text-[13px] text-muted transition-micro hover:shadow-[inset_0_0_0_1px_var(--line)] max-narrow:hidden"
       >
         <Search size={15} className="shrink-0" aria-hidden />
         <span className="truncate">Search Sahoda</span>
@@ -387,10 +390,10 @@ export function CommandPalette() {
               MEASURED with the old full-bleed 46px input in a 12px-padded row:
               the ring's top edge landed 4px ABOVE the panel's own top edge, and
               `--r-xl` is 28px, so it cut straight across the rounded corner and
-              the divider. Inset like this it sits 7px inside the top where the
-              corner needs 2.3px, and 17px inside the right edge.
+              the divider. Inset at 16px it sits 12px inside the top and the
+              right, where the 28px corner needs 5px.
             */}
-                <div className="p-2.5">
+                <div className="p-4">
                   {/*
                     THE ICON IS OUT OF FLOW, AND THAT IS WHAT MAKES THE PILL LINE
                     UP. It used to be a flex sibling, so it pushed the input
@@ -423,7 +426,7 @@ export function CommandPalette() {
                       onKeyDown={onInputKey}
                       placeholder="Go to…"
                       aria-label="Search destinations"
-                      className="h-9 w-full rounded-lg border border-line bg-bg pl-8 pr-3 type-sm text-ink placeholder:text-muted"
+                      className="h-9 w-full rounded-input border border-line bg-bg pl-8 pr-3 type-sm text-ink placeholder:text-muted"
                     />
                   </div>
                 </div>
@@ -449,7 +452,9 @@ export function CommandPalette() {
                           aria-current={index === active ? 'true' : undefined}
                           className={cn(
                             'flex h-[38px] w-full items-center gap-3 rounded-sm px-[9px] text-left text-[13px] transition-micro',
-                            index === active ? 'bg-brand-wash text-accent' : 'text-ink-body',
+                            // Ink on the wash, as the rail's active row: accent
+                            // on --t50 is 2.75:1 (tokens.css).
+                            index === active ? 'bg-brand-wash text-ink' : 'text-ink-body',
                           )}
                         >
                           <span className="font-medium">{destination.label}</span>

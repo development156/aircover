@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
+import { createWithCredits } from '@sahoda/billing'
 
+import { FakeLedger } from './fake-ledger'
 import { runRadarPass } from './run'
 import type { DueSource, RadarDb } from './db'
 
@@ -45,6 +47,9 @@ const HOSTILE: ReadonlyArray<readonly [string, string]> = [
   ['this-network', '0.0.0.0'],
 ]
 
+/** The one workspace watching every hostile source below. */
+const WATCHER = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+
 function sourceFor(locator: string): DueSource {
   return {
     sourceId: 'src-1',
@@ -71,6 +76,12 @@ function spyDb(source: DueSource) {
   }
   const db: RadarDb = {
     dueSources: async () => [source],
+    // Never reached: only the manual "Read now" path scopes to a competitor.
+    sourcesForCompetitor: async () => [source],
+    // A real watcher, so a refused address is also proved to be a refused
+    // CHARGE. A source nobody subscribes to would never reach the ledger and
+    // the "nothing was billed" half of this file would be vacuous.
+    subscribers: async () => [WATCHER],
     beginFetch: async () => ({ allowed: true, reservationId: 'res-1', subscriberCount: 1 }),
     finishFetch: async (r) => {
       calls.finished.push(r.outcome)
@@ -96,8 +107,20 @@ describe('the nightly pass, with no page transport named', () => {
       const neverCalled = (async () => {
         throw new Error('the provider transport must not be reached for a website check')
       }) as never
+      const ledger = new FakeLedger({ [WATCHER]: 100 })
 
-      const report = await runRadarPass({ db, fetch: neverCalled })
+      const report = await runRadarPass({
+        db,
+        fetch: neverCalled,
+        withCredits: createWithCredits(ledger),
+      })
+
+      // AND NOBODY PAID FOR IT. The hold is taken before the read and released
+      // when the read sees nothing, so an address we refuse to look at costs the
+      // customer nothing — the same sentence /radar prints about a page that
+      // will not load.
+      expect(ledger.entries('DEBIT')).toHaveLength(0)
+      expect(await ledger.balance(WATCHER)).toEqual({ total: 100, held: 0 })
 
       expect(report.couldNotCheck).toBe(1)
       expect(report.changed).toBe(0)
@@ -124,6 +147,7 @@ describe('the nightly pass, with no page transport named', () => {
     const seen: string[] = []
     const report = await runRadarPass({
       db,
+      withCredits: createWithCredits(new FakeLedger({ [WATCHER]: 100 })),
       fetch: (async () => {
         throw new Error('provider transport must not be reached')
       }) as never,

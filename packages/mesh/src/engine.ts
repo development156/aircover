@@ -16,6 +16,7 @@ import type { LogSink, ProviderLogRow } from './telemetry'
 import type { BrandContextProvider } from './brand-context'
 import type { KnowledgeContextProvider } from './knowledge-context'
 import type { MarketContextProvider } from './market-context'
+import { IMAGE_TIMEOUT_MS, chatTimeoutMsFor } from './timeouts'
 
 /** One ordered provider+model to try for a task (primary OpenRouter, then OpenAI). */
 export interface Attempt {
@@ -112,7 +113,17 @@ export interface MeshRunnerDeps {
    * is not configured, and `runImage` then fails honestly rather than reaching for
    * a text model that would return a paragraph describing a picture.
    */
-  planImage?: (tier: ModelTier) => { provider: Provider; model: string } | undefined
+  planImage?: (
+    tier: ModelTier,
+    requested?: string,
+  ) => { provider: Provider; model: string } | undefined
+  /**
+   * Per-call ceilings, in ms. Default to the tables in `timeouts.ts`; injected
+   * so a test can prove a stalled transport ends inside the ceiling without
+   * waiting ninety seconds for it.
+   */
+  chatTimeoutMs?: (task: string) => number
+  imageTimeoutMs?: number
 }
 
 export type MeshResult<O> = (
@@ -123,12 +134,38 @@ export type MeshResult<O> = (
 }
 
 const REPAIR_CODE = 'JSON_REPAIR_FAILED'
+
+/**
+ * THE MARKER A DOUBLE-PARSE FAILURE CARRIES, on `AppError.details.reason`.
+ *
+ * The shared `ErrorCode` enum is frozen, and both "no provider answered" and
+ * "the model answered twice and neither answer fit the schema" come back as
+ * PROVIDER_ERROR. They need opposite handling downstream: the first is an
+ * outage worth a retry, the second fails identically on every retry, so the
+ * refusal gate's classifier must hold the post for a person rather than re-ask
+ * on every tick. `isUnparseableOutput` is how a caller tells them apart.
+ */
+export const OUTPUT_UNPARSEABLE = 'OUTPUT_UNPARSEABLE' as const
+
+export function isUnparseableOutput(error: { code: string; details?: unknown }): boolean {
+  const details = error.details
+  return (
+    typeof details === 'object' &&
+    details !== null &&
+    (details as { reason?: unknown }).reason === OUTPUT_UNPARSEABLE
+  )
+}
 /** First attempt failed its schema, the one retry rescued it. Cost: two calls. */
 const REPAIRED_CODE = 'JSON_REPAIRED'
 /** The answer was cut off at max_tokens. A ceiling problem, not a model problem. */
 const TRUNCATED_CODE = 'OUTPUT_TRUNCATED'
 
-function buildRequest(model: string, messages: ChatMessage[], maxTokens: number): ChatRequest {
+function buildRequest(
+  model: string,
+  messages: ChatMessage[],
+  maxTokens: number,
+  timeoutMs: number,
+): ChatRequest {
   const carriesFile = messages.some((m) => (m.files?.length ?? 0) > 0)
   // Spelled out on every file-bearing call. See ChatRequest.pdfEngine: the
   // provider default is not free.
@@ -137,6 +174,7 @@ function buildRequest(model: string, messages: ChatMessage[], maxTokens: number)
     messages,
     maxTokens,
     jsonMode: true,
+    timeoutMs,
     ...(carriesFile ? { pdfEngine: FREE_PDF_ENGINE } : {}),
   }
 }
@@ -286,6 +324,7 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
     const attempts = deps
       .planAttempts(def.tier)
       .filter((a) => !carriesFile || a.provider.supportsFiles === true)
+    const timeoutMs = (deps.chatTimeoutMs ?? chatTimeoutMsFor)(def.name)
 
     // 1) Fallback chain: try each provider until one responds.
     let responded: { attempt: Attempt; chat: ChatResponse; latencyMs: number } | undefined
@@ -294,7 +333,7 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
       const started = deps.now()
       try {
         const chat = await attempt.provider.chat(
-          buildRequest(attempt.model, messages, def.maxTokens),
+          buildRequest(attempt.model, messages, def.maxTokens, timeoutMs),
         )
         responded = { attempt, chat, latencyMs: deps.now() - started }
         break
@@ -308,8 +347,14 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
     }
 
     if (!responded) {
+      // A stalled provider is named as such: an outage and a ceiling need
+      // different people looking at them.
       const code =
-        carriesFile && attempts.length === 0 ? 'NO_FILE_PROVIDER' : 'PROVIDER_UNAVAILABLE'
+        carriesFile && attempts.length === 0
+          ? 'NO_FILE_PROVIDER'
+          : lastProviderError?.timedOut
+            ? 'PROVIDER_TIMEOUT'
+            : 'PROVIDER_UNAVAILABLE'
       // No provider answered at all, so there was no output to fail a schema and
       // no repair to spend.
       await writeLog(toLogRow(def, ctx, undefined, 'error', code, false))
@@ -371,7 +416,7 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
       const started = deps.now()
       try {
         const repair = await responded.attempt.provider.chat(
-          buildRequest(responded.attempt.model, repairMessages, def.maxTokens),
+          buildRequest(responded.attempt.model, repairMessages, def.maxTokens, timeoutMs),
         )
         latencyMs += deps.now() - started
         combined = sumUsage(combined, repair.usage)
@@ -446,7 +491,13 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
     await writeLog(toLogRow(def, ctx, usage, 'error', REPAIR_CODE, repaired))
     return {
       ok: false,
-      error: appError('PROVIDER_ERROR', 'model returned unparseable output', ctx.traceId),
+      // Still PROVIDER_ERROR (the frozen runner contract), but marked: see
+      // OUTPUT_UNPARSEABLE for why a caller has to be able to tell this from
+      // an outage.
+      error: appError('PROVIDER_ERROR', 'model returned unparseable output', ctx.traceId, {
+        task: def.name,
+        reason: OUTPUT_UNPARSEABLE,
+      }),
       usage,
     }
   }
@@ -499,7 +550,7 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
     req: Omit<ImageRequest, 'model'>,
     ctx: MeshContext,
   ): Promise<MeshResult<{ base64: string; mime: string; providerCostUsd?: number }>> {
-    const planned = deps.planImage?.(def.tier)
+    const planned = deps.planImage?.(def.tier, req.modelId)
     if (!planned?.provider.image) {
       await writeLog(toLogRow(def, ctx, undefined, 'error', 'NO_IMAGE_PROVIDER', false))
       return {
@@ -510,7 +561,11 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
 
     const started = deps.now()
     try {
-      const result = await planned.provider.image({ ...req, model: planned.model })
+      const result = await planned.provider.image({
+        ...req,
+        model: planned.model,
+        timeoutMs: deps.imageTimeoutMs ?? IMAGE_TIMEOUT_MS,
+      })
       const usage: MeshUsage = {
         ...result.usage,
         // THE PROVIDER'S OWN FIGURE WINS. `deps.price` applies CHAT token rates,
@@ -535,13 +590,14 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
       }
     } catch (e) {
       const status = e instanceof ProviderCallError ? e.status : null
+      const timedOut = e instanceof ProviderCallError && e.timedOut
       await writeLog(
         toLogRow(
           def,
           ctx,
           undefined,
           'error',
-          status === null ? 'NETWORK' : `HTTP_${status}`,
+          timedOut ? 'TIMEOUT' : status === null ? 'NETWORK' : `HTTP_${status}`,
           false,
         ),
       )

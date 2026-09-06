@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { DispatchSweepReport, HoldSweepReport } from '@sahoda/jobs/sweeps'
 import type { ReconcileReport } from '@sahoda/jobs/publish'
+import type { LoopSweepReport } from '@/lib/loop/sweep'
 import { runCronSweeps } from './run-sweeps'
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
@@ -59,6 +60,10 @@ function holdReport(over: Partial<HoldSweepReport> = {}): HoldSweepReport {
   }
 }
 
+function loopReport(over: Partial<LoopSweepReport> = {}): LoopSweepReport {
+  return { scanned: 0, expired: 0, ...over }
+}
+
 describe('runCronSweeps', () => {
   it('returns the counters from both sweeps', async () => {
     const outcome = await runCronSweeps({
@@ -66,6 +71,7 @@ describe('runCronSweeps', () => {
       runDispatch: async () => dispatchReport({ scanned: 4, expired: 3, queueUnavailable: 1 }),
       runHolds: async () => holdReport({ scanned: 2, released: 2 }),
       runReconcile: async () => reconcileReport(),
+      runLoop: async () => loopReport(),
     })
 
     expect(outcome.status).toBe(200)
@@ -96,6 +102,7 @@ describe('runCronSweeps', () => {
         }),
       runHolds: async () => holdReport(),
       runReconcile: async () => reconcileReport(),
+      runLoop: async () => loopReport(),
     })
 
     const serialized = JSON.stringify(outcome.body)
@@ -116,6 +123,7 @@ describe('runCronSweeps', () => {
       },
       runHolds,
       runReconcile: async () => reconcileReport(),
+      runLoop: async () => loopReport(),
     })
 
     expect(runHolds).toHaveBeenCalledOnce()
@@ -130,6 +138,7 @@ describe('runCronSweeps', () => {
       },
       runHolds: async () => holdReport(),
       runReconcile: async () => reconcileReport(),
+      runLoop: async () => loopReport(),
     })
     const holdsFailed = await runCronSweeps({
       config: SIMULATED_RAIL,
@@ -138,12 +147,20 @@ describe('runCronSweeps', () => {
         throw new Error('boom')
       },
       runReconcile: async () => reconcileReport(),
+      runLoop: async () => loopReport(),
     })
 
+    // RETARGETED: a bare `status`/`ok` pair cannot tell which sweep failed, and
+    // this is the ONE test that throws from `runHolds` — nothing else pins
+    // that `attempt()` names the RIGHT scope for a holds failure rather than
+    // mislabelling it as the dispatch sweep, which `isError`/`ok` alone would
+    // not catch since both produce the same shape.
     expect(dispatchFailed.status).toBe(500)
     expect(holdsFailed.status).toBe(500)
     expect(dispatchFailed.body.ok).toBe(false)
     expect(holdsFailed.body.ok).toBe(false)
+    expect(dispatchFailed.body.dispatch).toEqual({ error: 'dispatch-sweep-failed' })
+    expect(holdsFailed.body.holds).toEqual({ error: 'hold-sweep-failed' })
   })
 
   it('names the failing sweep without echoing the error', async () => {
@@ -155,6 +172,7 @@ describe('runCronSweeps', () => {
       },
       runHolds: async () => holdReport(),
       runReconcile: async () => reconcileReport(),
+      runLoop: async () => loopReport(),
     })
 
     const serialized = JSON.stringify(outcome.body)
@@ -175,10 +193,62 @@ describe('runCronSweeps', () => {
       },
       runHolds: async () => holdReport(),
       runReconcile: async () => reconcileReport(),
+      runLoop: async () => loopReport(),
       onError,
     })
 
     expect(onError).toHaveBeenCalledWith('dispatch', boom)
+  })
+
+  it('runs the reconcile pass BEFORE dispatch, so an accepted post is settled before it can be re-sent', async () => {
+    // Tick T0 publishes an Instagram variant; Meta takes longer than the adapter's 36s
+    // poll; the adapter throws STILL_PROCESSING and the claim is handed back as
+    // `scheduled`. If the next tick dispatched first, the reconcile pass that would have
+    // found the first post live would run AFTER the second POST had already gone out.
+    // Reconcile is one bounded batch of Zernio reads; dispatch can spend ~200s
+    // publishing, so the pass that can wait is also the one that must not be last.
+    const order: string[] = []
+    const outcome = await runCronSweeps({
+      config: SIMULATED_RAIL,
+      runDispatch: async () => {
+        order.push('dispatch')
+        return dispatchReport()
+      },
+      runHolds: async () => {
+        order.push('holds')
+        return holdReport()
+      },
+      runReconcile: async () => {
+        order.push('reconcile')
+        return reconcileReport()
+      },
+      runLoop: async () => {
+        order.push('loop')
+        return loopReport()
+      },
+    })
+
+    expect(outcome.status).toBe(200)
+    expect(order.indexOf('reconcile')).toBeLessThan(order.indexOf('dispatch'))
+    expect(order).toEqual(['reconcile', 'holds', 'loop', 'dispatch'])
+  })
+
+  it('still dispatches when the reconcile pass throws, so a Zernio outage cannot stop publishing', async () => {
+    const runDispatch = vi.fn(async () => dispatchReport({ scanned: 1, enqueued: 1 }))
+
+    const outcome = await runCronSweeps({
+      config: SIMULATED_RAIL,
+      runDispatch,
+      runHolds: async () => holdReport(),
+      runReconcile: async () => {
+        throw new Error('Zernio returned 500')
+      },
+      runLoop: async () => loopReport(),
+    })
+
+    expect(runDispatch).toHaveBeenCalledOnce()
+    expect(outcome.body.dispatch).toMatchObject({ enqueued: 1 })
+    expect(outcome.body.reconcile).toEqual({ error: 'reconcile-sweep-failed' })
   })
 
   it('is an all-zero no-op when every flag is off', async () => {
@@ -190,6 +260,7 @@ describe('runCronSweeps', () => {
       runDispatch: async () => dispatchReport({ mode: 'off' }),
       runHolds: async () => holdReport({ mode: 'off' }),
       runReconcile: async () => reconcileReport({ mode: 'off' }),
+      runLoop: async () => loopReport(),
     })
 
     expect(outcome.status).toBe(200)
@@ -238,6 +309,8 @@ describe('runCronSweeps', () => {
         failed: 0,
         failures: [],
       },
+      // The stale-Loop-cycle reaper: counts only, and zero on a tick that finds nothing.
+      loop: { scanned: 0, expired: 0 },
     })
   })
 })
@@ -263,6 +336,7 @@ describe('the tick says which publish rail it is on', () => {
     runDispatch: () => Promise.resolve(dispatchReport()),
     runHolds: () => Promise.resolve(holdReport()),
     runReconcile: () => Promise.resolve(reconcileReport()),
+    runLoop: () => Promise.resolve(loopReport()),
   }
 
   it('reports the resolved publish mode and whether publishing is permitted', async () => {

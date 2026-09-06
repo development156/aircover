@@ -72,6 +72,39 @@ describe('every profile-scoped read puts profileId on the wire', () => {
       'postAnalytics',
       (r: ReturnType<typeof readsWith>['reads']) => r.postAnalytics(profile, IG_MEDIA_ID),
     ],
+    [
+      'dailyMetrics',
+      (r: ReturnType<typeof readsWith>['reads']) =>
+        r.dailyMetrics(profile, { fromDate: '2026-08-01', attribution: 'publish' }),
+    ],
+    [
+      'inboxVolume',
+      (r: ReturnType<typeof readsWith>['reads']) =>
+        r.inboxVolume(profile, { fromDate: '2026-08-01' }),
+    ],
+    [
+      'inboxHeatmap',
+      (r: ReturnType<typeof readsWith>['reads']) =>
+        r.inboxHeatmap(profile, { fromDate: '2026-08-01' }),
+    ],
+    [
+      'inboxSourceBreakdown',
+      (r: ReturnType<typeof readsWith>['reads']) =>
+        r.inboxSourceBreakdown(profile, { fromDate: '2026-08-01' }),
+    ],
+    [
+      'inboxResponseTime',
+      (r: ReturnType<typeof readsWith>['reads']) =>
+        r.inboxResponseTime(profile, { fromDate: '2026-08-01' }),
+    ],
+    [
+      'inboxTopAccounts',
+      (r: ReturnType<typeof readsWith>['reads']) =>
+        r.inboxTopAccounts(profile, { fromDate: '2026-08-01' }),
+    ],
+    ['followerStats', (r: ReturnType<typeof readsWith>['reads']) => r.followerStats(profile)],
+    ['postingFrequency', (r: ReturnType<typeof readsWith>['reads']) => r.postingFrequency(profile)],
+    ['contentDecay', (r: ReturnType<typeof readsWith>['reads']) => r.contentDecay(profile)],
   ])('%s sends profileId', async (_name, call) => {
     const { reads, cap } = readsWith()
     await call(reads)
@@ -205,5 +238,385 @@ describe('omitting or forging the scope is a COMPILE error, not a review item', 
     // If any @ts-expect-error above stops erroring, typecheck fails and the guarantee
     // is gone. The runtime assertion is incidental — the compile step is the test.
     expect(true).toBe(true)
+  })
+})
+
+describe('messageAttachmentUrl', () => {
+  it('asks for JSON with the account on the wire, and returns the minted url', async () => {
+    const { reads, cap } = readsWith({ url: 'https://cdn.example/fresh.jpg' })
+    const url = await reads.messageAttachmentUrl(account, 'conv-1', 'msg-1', 2)
+    expect(url).toBe('https://cdn.example/fresh.jpg')
+    const req = cap.last()
+    expect(req.method).toBe('GET')
+    expect(req.url).toContain('/inbox/conversations/conv-1/messages/msg-1/attachments/2?')
+    expect(req.url).toContain('format=json')
+    expect(req.url).toContain(`accountId=${account}`)
+  })
+
+  it('answers null, not a throw, when the platform cannot re-mint (404)', async () => {
+    const { reads } = readsWith({ error: 'not_found' }, 404)
+    await expect(reads.messageAttachmentUrl(account, 'conv-1', 'msg-1', 0)).resolves.toBeNull()
+  })
+})
+
+describe('dailyMetrics', () => {
+  const DAY = {
+    date: '2026-08-01',
+    postCount: 3,
+    platforms: { instagram: 2, twitter: 1 },
+    metrics: {
+      impressions: 4520,
+      reach: 3200,
+      likes: 312,
+      comments: 45,
+      shares: 28,
+      saves: 67,
+      clicks: 89,
+      views: 1560,
+    },
+  }
+
+  it('shapes the days and the per-platform breakdown', async () => {
+    const { reads } = readsWith({
+      dailyData: [DAY],
+      platformBreakdown: [
+        {
+          platform: 'instagram',
+          postCount: 142,
+          impressions: 89400,
+          reach: 62100,
+          likes: 8930,
+          comments: 1204,
+          shares: 567,
+          saves: 2103,
+          clicks: 3402,
+          views: 45200,
+        },
+      ],
+    })
+    const result = await reads.dailyMetrics(profile, {
+      fromDate: '2026-08-01',
+      attribution: 'publish',
+    })
+
+    expect(result.dailyData[0]?.date).toBe('2026-08-01')
+    expect(result.dailyData[0]?.postCount).toBe(3)
+    expect(result.dailyData[0]?.platforms).toEqual({ instagram: 2, twitter: 1 })
+    expect(result.dailyData[0]?.metrics.saves).toBe(67)
+    expect(result.platformBreakdown[0]?.platform).toBe('instagram')
+    expect(result.platformBreakdown[0]?.comments).toBe(1204)
+  })
+
+  it('sends the wire names Zernio actually reads, and the attribution it was given', async () => {
+    // `fromDate`/`toDate`, not `from`/`to`. A parameter Zernio does not know is
+    // silently ignored, and the answer comes back as the last 180 days under a
+    // heading that says thirty.
+    const { reads, cap } = readsWith()
+    await reads.dailyMetrics(profile, {
+      fromDate: '2026-08-01',
+      toDate: '2026-08-31',
+      platform: 'instagram',
+      attribution: 'received',
+    })
+    const url = cap.last().url
+    expect(url).toContain('/analytics/daily-metrics?')
+    expect(url).toContain('fromDate=2026-08-01')
+    expect(url).toContain('toDate=2026-08-31')
+    expect(url).toContain('platform=instagram')
+    expect(url).toContain('attribution=received')
+    expect(url).not.toContain('from=2026')
+  })
+
+  it('never turns a metric it did not receive into a zero', async () => {
+    // The schema promises eight integers. What arrives decides, and a missing
+    // key must reach the table as the absence mark, not as a measurement of
+    // none — every other reading on /analytics obeys the same rule.
+    const { reads } = readsWith({
+      dailyData: [{ date: '2026-08-01', postCount: 1, metrics: { impressions: 10 } }],
+    })
+    const day = (
+      await reads.dailyMetrics(profile, { fromDate: '2026-08-01', attribution: 'publish' })
+    ).dailyData[0]
+
+    expect(day?.metrics.impressions).toBe(10)
+    expect(day?.metrics.saves).toBeNull()
+    expect(day?.metrics.likes).toBeNull()
+  })
+
+  it('keeps a real zero, which is a reading', async () => {
+    const { reads } = readsWith({
+      dailyData: [{ date: '2026-08-01', postCount: 1, metrics: { likes: 0 } }],
+    })
+    const day = (
+      await reads.dailyMetrics(profile, { fromDate: '2026-08-01', attribution: 'publish' })
+    ).dailyData[0]
+    expect(day?.metrics.likes).toBe(0)
+  })
+
+  it('drops a day with no readable date rather than inventing a column', async () => {
+    const { reads } = readsWith({ dailyData: [{ postCount: 4 }, { date: 'soon' }, DAY] })
+    const result = await reads.dailyMetrics(profile, {
+      fromDate: '2026-08-01',
+      attribution: 'publish',
+    })
+    expect(result.dailyData).toHaveLength(1)
+    expect(result.dailyData[0]?.date).toBe('2026-08-01')
+  })
+
+  it('answers empty arrays for a response holding neither key', async () => {
+    // A workspace with the add-on and no posts. Not an error, and not a throw.
+    const { reads } = readsWith({})
+    const result = await reads.dailyMetrics(profile, {
+      fromDate: '2026-08-01',
+      attribution: 'publish',
+    })
+    expect(result).toEqual({ dailyData: [], platformBreakdown: [] })
+  })
+
+  it('throws on the add-on refusal so the caller can tell it apart from empty', async () => {
+    // HTTP 402 `analytics_addon_required`. Answering `{ dailyData: [] }` here
+    // would tell a paying customer their accounts reported nothing, which is a
+    // claim about their shop drawn from a fact about their plan.
+    const { reads } = readsWith({ error: 'Analytics add-on required' }, 402)
+    await expect(
+      reads.dailyMetrics(profile, { fromDate: '2026-08-01', attribution: 'publish' }),
+    ).rejects.toThrow()
+  })
+})
+
+describe('inbox analytics reads', () => {
+  it('inboxVolume shapes the summary, timeseries and per-platform split', async () => {
+    const { reads, cap } = readsWith({
+      from: '2026-08-01',
+      to: '2026-08-31',
+      summary: { received: 40, sent: 22, read: 18, failed: 2, uniqueConversations: 9 },
+      timeseries: [{ date: '2026-08-01', sent: 1, received: 2, read: 1, failed: 0 }],
+      byPlatform: [{ platform: 'instagram', sent: 1, received: 2, read: 1, failed: 0 }],
+    })
+    const result = await reads.inboxVolume(profile, {
+      fromDate: '2026-08-01',
+      toDate: '2026-08-31',
+    })
+    expect(result.summary.received).toBe(40)
+    expect(result.summary.uniqueConversations).toBe(9)
+    expect(result.timeseries).toHaveLength(1)
+    expect(result.byPlatform[0]?.platform).toBe('instagram')
+    expect(cap.last().url).toContain('fromDate=2026-08-01')
+    expect(cap.last().url).toContain('toDate=2026-08-31')
+  })
+
+  it('inboxVolume defaults an absent summary to zeroes, not undefined', async () => {
+    const { reads } = readsWith({ from: '2026-08-01', to: null })
+    const result = await reads.inboxVolume(profile, { fromDate: '2026-08-01' })
+    expect(result.summary).toEqual({
+      received: 0,
+      sent: 0,
+      read: 0,
+      failed: 0,
+      uniqueConversations: 0,
+    })
+    expect(result.timeseries).toEqual([])
+  })
+
+  it('inboxHeatmap passes the sparse buckets through and sends the action filter', async () => {
+    const { reads, cap } = readsWith({
+      from: '2026-08-01',
+      to: null,
+      buckets: [{ dow: 1, hour: 9, received: 3, sent: 1, read: 1 }],
+    })
+    const result = await reads.inboxHeatmap(profile, {
+      fromDate: '2026-08-01',
+      action: 'message.received',
+    })
+    expect(result.buckets).toEqual([{ dow: 1, hour: 9, received: 3, sent: 1, read: 1 }])
+    expect(cap.last().url).toContain('action=message.received')
+  })
+
+  it('inboxSourceBreakdown carries the per-source per-platform split', async () => {
+    const { reads } = readsWith({
+      from: '2026-08-01',
+      to: null,
+      sources: [
+        {
+          source: 'human',
+          received: 10,
+          sent: 8,
+          read: 6,
+          byPlatform: [{ platform: 'instagram', received: 10, sent: 8, read: 6 }],
+        },
+      ],
+    })
+    const result = await reads.inboxSourceBreakdown(profile, { fromDate: '2026-08-01' })
+    expect(result.sources[0]?.source).toBe('human')
+    expect(result.sources[0]?.byPlatform[0]?.platform).toBe('instagram')
+  })
+
+  it('inboxResponseTime turns a zero sampleSize summary into null, not a zero median', async () => {
+    const { reads } = readsWith({
+      from: '2026-08-01',
+      to: null,
+      summary: {
+        sampleSize: 0,
+        medianSeconds: 0,
+        p90Seconds: 0,
+        p99Seconds: 0,
+        meanSeconds: 0,
+        fastestSeconds: 0,
+        slowestSeconds: 0,
+      },
+      histogram: [],
+    })
+    const result = await reads.inboxResponseTime(profile, { fromDate: '2026-08-01' })
+    expect(result.summary).toBeNull()
+  })
+
+  it('inboxResponseTime keeps a real summary when sampleSize is positive', async () => {
+    const { reads } = readsWith({
+      from: '2026-08-01',
+      to: null,
+      summary: {
+        sampleSize: 12,
+        medianSeconds: 90,
+        p90Seconds: 400,
+        p99Seconds: 900,
+        meanSeconds: 150,
+        fastestSeconds: 5,
+        slowestSeconds: 1200,
+      },
+      histogram: [{ bucket: '1-5m', lowerSeconds: 60, upperSeconds: 300, count: 4 }],
+    })
+    const result = await reads.inboxResponseTime(profile, { fromDate: '2026-08-01' })
+    expect(result.summary?.medianSeconds).toBe(90)
+    expect(result.histogram[0]?.bucket).toBe('1-5m')
+  })
+
+  it('inboxTopAccounts sends limit and passes the leaderboard through', async () => {
+    const { reads, cap } = readsWith({
+      from: '2026-08-01',
+      to: null,
+      accounts: [
+        {
+          accountId: ACCOUNT,
+          platform: 'instagram',
+          displayName: 'Test Shop',
+          username: 'testshop',
+          received: 20,
+          sent: 15,
+          total: 35,
+          conversations: 10,
+          medianResponseSeconds: 0,
+          repliedCount: 0,
+        },
+      ],
+    })
+    const result = await reads.inboxTopAccounts(profile, { fromDate: '2026-08-01', limit: 5 })
+    expect(result.accounts[0]?.repliedCount).toBe(0)
+    expect(cap.last().url).toContain('limit=5')
+  })
+})
+
+describe('followerStats', () => {
+  it('joins each account to its own series and keeps the platform', async () => {
+    const { reads, cap } = readsWith({
+      accounts: [
+        {
+          _id: 'acc_a',
+          platform: 'twitter',
+          username: '@acme',
+          currentFollowers: 1250,
+          growth: 50,
+          growthPercentage: 4.17,
+          dataPoints: 30,
+        },
+      ],
+      stats: {
+        acc_a: [
+          { date: '2026-08-02', followers: 1250 },
+          { date: '2026-08-01', followers: 1200 },
+        ],
+      },
+      granularity: 'daily',
+    })
+    const result = await reads.followerStats(profile, { fromDate: '2026-08-01' })
+
+    expect(result.accounts[0]?.platform).toBe('twitter')
+    expect(result.accounts[0]?.currentFollowers).toBe(1250)
+    // Oldest first, whatever order it arrived in: a chart plots left to right.
+    expect(result.stats.acc_a?.map((point) => point.date)).toEqual(['2026-08-01', '2026-08-02'])
+    expect(cap.last().url).toContain('/accounts/follower-stats?')
+    expect(cap.last().url).toContain('fromDate=2026-08-01')
+  })
+
+  it('drops a point missing either half rather than plotting half of it', async () => {
+    // A date with no count is not a day of zero followers, and a count with no
+    // date cannot be placed on an axis.
+    const { reads } = readsWith({
+      accounts: [],
+      stats: { acc_a: [{ date: '2026-08-01' }, { followers: 10 }, { date: 'soon', followers: 1 }] },
+    })
+    expect((await reads.followerStats(profile)).stats.acc_a).toEqual([])
+  })
+
+  it('drops an account with no id, which could never be joined to a series', async () => {
+    const { reads } = readsWith({ accounts: [{ platform: 'instagram' }, { _id: 'x' }] })
+    expect((await reads.followerStats(profile)).accounts).toEqual([])
+  })
+
+  it('answers empty rather than throwing on a response with neither key', async () => {
+    const { reads: r } = readsWith({})
+    expect(await r.followerStats(profile)).toEqual({
+      accounts: [],
+      stats: {},
+      granularity: null,
+    })
+  })
+})
+
+describe('postingFrequency and contentDecay — [DOC] shapes, never seen on the wire', () => {
+  it('carries the cadence rows with the sample behind each', async () => {
+    const { reads } = readsWith({
+      frequency: [
+        {
+          platform: 'instagram',
+          posts_per_week: 2,
+          avg_engagement_rate: 44.4,
+          avg_engagement: 512,
+          weeks_count: 18,
+        },
+      ],
+    })
+    const result = await reads.postingFrequency(profile)
+    expect(result.frequency[0]?.postsPerWeek).toBe(2)
+    // The sample. A rate from one week is not a finding, and this is what lets
+    // the screen refuse to draw one as though it were.
+    expect(result.frequency[0]?.weeksCount).toBe(18)
+  })
+
+  it('drops a cadence row that names neither a platform nor a frequency', async () => {
+    const { reads } = readsWith({ frequency: [{ avg_engagement_rate: 9 }] })
+    expect((await reads.postingFrequency(profile)).frequency).toEqual([])
+  })
+
+  it('orders the decay buckets by their own order, not by arrival', async () => {
+    const { reads } = readsWith({
+      buckets: [
+        { bucket_order: 2, bucket_label: '12-24h', avg_pct_of_final: 14.1, post_count: 85 },
+        { bucket_order: 0, bucket_label: '0-6h', avg_pct_of_final: 45.2, post_count: 89 },
+      ],
+    })
+    const result = await reads.contentDecay(profile)
+    expect(result.buckets.map((bucket) => bucket.label)).toEqual(['0-6h', '12-24h'])
+  })
+
+  it('drops an unlabelled bucket rather than placing it on the axis', async () => {
+    const { reads } = readsWith({ buckets: [{ bucket_order: 1 }, { bucket_label: 'later' }] })
+    expect((await reads.contentDecay(profile)).buckets).toEqual([])
+  })
+
+  it('never reads a missing percentage as a zero share', async () => {
+    const { reads } = readsWith({
+      buckets: [{ bucket_order: 0, bucket_label: '0-6h', post_count: 3 }],
+    })
+    expect((await reads.contentDecay(profile)).buckets[0]?.avgPctOfFinal).toBeNull()
   })
 })

@@ -24,9 +24,41 @@
 # `ALLOW_QA_PENDING=1 git commit …`. There is one legitimate case: a deliberate
 # change to the file's SHAPE rather than to a run's contents. That is rare
 # enough to be worth typing.
+#
+# ── THE FLOOR UNDER THE HATCH ────────────────────────────────────────────────
+# On 2026-08-31 a red unit run's assertion diff carried the production Postgres
+# URL, password included, and the scratch file was committed with it to a
+# public repository. The password had to be rotated. So a staged copy of the
+# file that holds a credential SHAPE is refused whether or not the hatch is set:
+# a URL with a password in it, a Bearer token, a JWT, a vendor key prefix, or a
+# `…key=`/`…token=`/`…password=` parameter. The shapes mirror the ones
+# `scripts/lib/ops-classify.mjs` redacts on the way in; this is the second wall.
 set -euo pipefail
 
 SCRATCH='ops/state/qa.pending.json'
+
+# One grep -E alternation. Kept in one place so the shapes can be read as a list.
+# The URL rule skips a password that STARTS with `[`: an already-redacted line
+# reads `postgres:[REDACTED]@host` and must not refuse the commit that redacted it.
+SECRET_SHAPES='[A-Za-z][A-Za-z0-9+.-]{1,15}://[^:/?#[:space:]]{1,256}:[^]@/?#[[:space:]][^@/?#[:space:]]{0,255}@|[Bb][Ee][Aa][Rr][Ee][Rr][[:space:]]{1,8}[A-Za-z0-9._~+/=-]{16,}|eyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}|[a-zA-Z]{2}_(live|test)_[A-Za-z0-9]{8,}|whsec_[A-Za-z0-9]{8,}|gh[pousr]_[A-Za-z0-9]{16,}|sk-[A-Za-z0-9_-]{16,}|sb_(secret|publishable)_[A-Za-z0-9_-]{8,}|(^|[?&#;[:space:]"'"'"'{,])[A-Za-z0-9_.-]{0,64}(access_token|refresh_token|id_token|client_secret|api_?key|token|secret|password|passwd|signature|sig|ticket|credential)=[^&[:space:]"'"'"'#]{1,}'
+
+if git diff --cached --name-only | grep -qx "$SCRATCH"; then
+  # `git show :path` reads the STAGED blob, not the working tree, so what is
+  # checked is exactly what would be committed. The match is never printed:
+  # a refusal that echoes the secret puts it in the terminal log instead.
+  if git show ":$SCRATCH" | grep -Eq "$SECRET_SHAPES"; then
+    echo "Refusing the commit: $SCRATCH holds something shaped like a credential." >&2
+    echo >&2
+    echo "  A URL with a password, a Bearer token, a JWT, a vendor key or a" >&2
+    echo "  key=value parameter is in the staged copy. This file is tracked on a" >&2
+    echo "  public repository. There is no hatch for this." >&2
+    echo >&2
+    echo "  Unstage it:   git restore --staged $SCRATCH" >&2
+    echo "  And revert:   git checkout -- $SCRATCH" >&2
+    echo "  Then rotate whatever credential the run printed." >&2
+    exit 1
+  fi
+fi
 
 if [ -n "${ALLOW_QA_PENDING:-}" ]; then
   exit 0
@@ -44,6 +76,29 @@ if git diff --cached --name-only | grep -qx "$SCRATCH"; then
   echo >&2
   echo "  Genuinely changing its SHAPE?  ALLOW_QA_PENDING=1 git commit ..." >&2
   exit 1
+fi
+
+# ── EVERY OTHER FILE ─────────────────────────────────────────────────────────
+# Everything above guards ONE path, because that is the path that leaked on
+# 2026-08-31. A credential pasted into a scratch script, a handoff, a test
+# fixture or a log walks straight past it — the sibling-shape defect this
+# repository has been bitten by more than once.
+#
+# The obvious widening, running SECRET_SHAPES over every staged file, cannot
+# ship: this tree deliberately contains dozens of credential-SHAPED fixtures,
+# several of which exist to prove the redaction scrubber works. A shape scan
+# refuses every honest commit to those files, and a guard that cries wolf gets
+# turned off.
+#
+# So the scan below matches VALUES, read from apps/web/.env* at commit time. A
+# fixture never equals the live secret, so false positives are structurally
+# impossible, and what is refused is exactly what could be used against
+# production. It names the variable, never the value.
+#
+# No `|| true`: a scanner that fails open is worse than none, because the
+# refusal it never prints is indistinguishable from a clean tree.
+if [ -f scripts/lib/staged-secret-scan.mjs ]; then
+  node scripts/lib/staged-secret-scan.mjs || exit 1
 fi
 
 exit 0

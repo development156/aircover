@@ -69,7 +69,12 @@ export function HomeSection({
     <section
       aria-labelledby={id}
       data-guide={guide}
-      className={cn('surface-ring rounded-card bg-surface shadow-card', className)}
+      /* `surface-ring-lift`, not `surface-ring ... shadow-card`. The old pair
+         looked like a ring plus a shadow and rendered as a ring ALONE: both set
+         `box-shadow`, and `.surface-ring` is emitted after `.shadow-card` in
+         the compiled sheet, so it won. The shadow half was dead the whole time.
+         See the utility in globals.css. */
+      className={cn('surface-ring-lift rounded-card bg-surface', className)}
     >
       <header className="flex items-center gap-2.5 px-5 pt-5 pb-3 max-narrow:px-4 max-narrow:pt-4">
         <h2 id={id} className="type-h3 text-ink">
@@ -82,7 +87,7 @@ export function HomeSection({
              4pt ladder and `design-lint` refuses it in a new file. 6 is the
              rung, and a chip holding one or two digits is 18px wide either
              way. */
-          <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-brand-tint px-1.5 type-meta font-bold text-accent tabular-nums">
+          <span className="grid h-[18px] min-w-[18px] place-items-center rounded-pill bg-brand-tint px-1.5 type-meta font-bold text-accent tabular-nums">
             {count}
           </span>
         ) : null}

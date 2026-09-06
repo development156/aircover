@@ -4,12 +4,20 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 import { ConfirmAll } from './confirm-all'
 
-const confirmBrainField = vi.hoisted(() => vi.fn())
-vi.mock('@/app/actions/brand-field', () => ({ confirmBrainField }))
+/**
+ * MEASURED 2026-09-06 on the wt-core preview against production: "Confirm all
+ * 4" on the Customer persona card fired four sequential POSTs and wrote
+ * versions 4, 5, 6 and 7 of the QA workspace's brain inside 1.1 seconds. The
+ * console's "Confirm selected" wrote two fields as ONE version in the same
+ * session. `brain-resolve-fields.ts` exists so a gesture is one write; this
+ * button was the one caller still looping the per-field action.
+ */
+const confirmBrainFields = vi.hoisted(() => vi.fn())
+vi.mock('@/app/actions/brain-resolve-fields', () => ({ confirmBrainFields }))
 
 beforeEach(() => {
   vi.clearAllMocks()
-  confirmBrainField.mockResolvedValue({ ok: true, version: 2, unchanged: false })
+  confirmBrainFields.mockResolvedValue({ ok: true, version: 2, confirmed: 2 })
 })
 
 const TARGETS = [
@@ -18,14 +26,13 @@ const TARGETS = [
 ]
 
 describe('ConfirmAll', () => {
-  test('confirms every remaining guess, each with its own value', async () => {
+  test('confirms every remaining guess in ONE write', async () => {
     render(<ConfirmAll targets={TARGETS} />)
 
     await userEvent.click(screen.getByRole('button', { name: /Confirm all/ }))
 
-    expect(confirmBrainField).toHaveBeenCalledTimes(2)
-    expect(confirmBrainField).toHaveBeenCalledWith('voice.how_it_sounds', 'warm')
-    expect(confirmBrainField).toHaveBeenCalledWith('voice.never_say', ['synergy'])
+    expect(confirmBrainFields).toHaveBeenCalledTimes(1)
+    expect(confirmBrainFields).toHaveBeenCalledWith(['voice.how_it_sounds', 'voice.never_say'])
   })
 
   test('says how many there are, so the press is not a leap', () => {
@@ -41,29 +48,26 @@ describe('ConfirmAll', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  test('reports a partial failure instead of leaving the counts to be compared', async () => {
-    confirmBrainField
-      .mockResolvedValueOnce({ ok: true, version: 2, unchanged: false })
-      .mockResolvedValueOnce({ ok: false, message: 'nope' })
+  test('a refusal is shown in the server’s words, and nothing is half-done', async () => {
+    confirmBrainFields.mockResolvedValueOnce({
+      ok: false,
+      message: 'Could not confirm those fields.',
+    })
     render(<ConfirmAll targets={TARGETS} />)
 
     await userEvent.click(screen.getByRole('button', { name: /Confirm all/ }))
 
-    // The CLAIM, not the wording: one did not land, and the rest did.
-    const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent('1 of 2')
-    expect(alert).toHaveTextContent(/rest were/i)
+    // One write means one outcome: there is no "1 of 2" to report any more.
+    expect(await screen.findByRole('alert')).toHaveTextContent(/could not confirm/i)
   })
 
-  test('counts a throw as a failure rather than as a success', async () => {
-    confirmBrainField.mockRejectedValue(new Error('network'))
+  test('a throw (no network) is reported, not swallowed and not rendered as a crash', async () => {
+    confirmBrainFields.mockRejectedValue(new TypeError('Failed to fetch'))
     render(<ConfirmAll targets={TARGETS} />)
 
     await userEvent.click(screen.getByRole('button', { name: /Confirm all/ }))
 
-    // A rejected promise and an `ok: false` read the same to the person: still
-    // a guess. Asserting the sentence, because a swallowed throw would leave
-    // this silent and the marks unchanged.
-    expect(await screen.findByRole('alert')).toHaveTextContent('2 of 2')
+    expect(await screen.findByRole('alert')).toHaveTextContent(/connection|reach/i)
+    expect(screen.getByRole('button', { name: /Confirm all 2/ })).toBeEnabled()
   })
 })

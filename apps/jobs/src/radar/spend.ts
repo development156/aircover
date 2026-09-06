@@ -31,7 +31,7 @@ import type { RadarDb } from './db'
 export interface SpendRequest {
   sourceId: string
   mode: 'cheap' | 'render'
-  provider: 'direct' | 'zyte' | 'apify'
+  provider: 'direct' | 'tinyfish' | 'apify'
   estimateMicros: number
   /**
    * Whether the number above can ever become a measurement.

@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { accessPatternsSeen, findScanners } from './scanner-registry.mjs'
+import { accessPatternsSeen, findScanners, readsSource } from './scanner-registry.mjs'
 
 /**
  * The guard on the guards.
@@ -149,5 +149,61 @@ describe('the pattern detector itself', () => {
   it('reports nothing for source that reaches for none of them', () => {
     const p = accessPatternsSeen('export const A = 1')
     expect(Object.values(p).every((v) => v === false)).toBe(true)
+  })
+})
+
+/**
+ * WRITING ABOUT A RULE MUST NOT BREAK IT.
+ *
+ * The detector was a bare identifier match over the whole file, comments
+ * included. On 2026-09-01 it flagged `apps/web/src/lib/brand/logo-facts.test.ts`
+ * for a doc comment whose whole purpose was to say the file calls none of those
+ * five functions, and the gate went red for a lane that had not touched it. The
+ * author reasoned correctly and was flagged for writing the reasoning down.
+ *
+ * These assert the DISTINCTION — a call versus a sentence about one — not the
+ * regex that draws it. Replace the mechanism freely; a file that only describes
+ * a reader is not a scanner, and a file that calls one always is.
+ *
+ * WHAT THESE CANNOT SEE — same rule as everything else here: whether a real
+ * scanner in the repository binds a reader to another name before calling it,
+ * which `readsSource` no longer follows. The case is asserted below as a KNOWN
+ * miss rather than left for someone to discover.
+ */
+describe('a file that only writes about a source reader', () => {
+  const PROSE =
+    '/**\n' +
+    ' * This file calls `readFileSync`, `readdirSync`, `globSync`, `execFileSync`\n' +
+    ' * or `execSync` nowhere at all, and says so on purpose.\n' +
+    ' */\n' +
+    'export const NOTHING = 1\n'
+
+  it('is not a scanner, however many of the names it prints', () => {
+    expect(readsSource(PROSE)).toBe(false)
+  })
+
+  it('is still not a scanner when the prose names every one of them', () => {
+    // The exact shape that went red: a comment enumerating the rule's own list.
+    expect(readsSource('// flags a test file that calls readFileSync, execSync')).toBe(false)
+  })
+
+  it('becomes one the moment a single call appears', () => {
+    expect(readsSource(`${PROSE}const s = readFileSync(p, 'utf8')\n`)).toBe(true)
+  })
+
+  it('is a scanner when the call is spaced, qualified, or awaited', () => {
+    expect(readsSource('readFileSync (p)')).toBe(true)
+    expect(readsSource('fs.readdirSync(dir)')).toBe(true)
+    expect(readsSource('const out = execFileSync("git", args)')).toBe(true)
+  })
+
+  it('is not confused by a longer name that merely ends in one of them', () => {
+    expect(readsSource('mySafeReadFileSyncWrapper(p)')).toBe(false)
+  })
+
+  it('MISSES a reader bound to another name first, which is the declared cost', () => {
+    // Not an aspiration. If someone makes this pass, the declaration in
+    // scanner-registry.mjs must move in the same commit.
+    expect(readsSource('const read = readFileSync\nread(p)\n')).toBe(false)
   })
 })

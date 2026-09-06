@@ -52,6 +52,7 @@ function Tab({ href, label, icon: Icon }: { href: Route; label: string; icon: ty
 
   return (
     <Link
+      prefetch={false}
       href={href}
       aria-current={active ? 'page' : undefined}
       className={cn(
@@ -105,9 +106,10 @@ export function BottomNav({ hasWorkspace = true }: { hasWorkspace?: boolean }) {
       <div className="relative flex w-[64px] shrink-0 justify-center">
         {hasWorkspace ? (
           <Link
+            prefetch={false}
             href="/posts/new"
             aria-label="Create a post"
-            className="absolute -top-[18px] grid size-[50px] place-items-center rounded-full bg-primary text-primary-foreground shadow-pop transition-micro active:translate-y-[0.5px]"
+            className="absolute -top-[18px] grid size-[50px] place-items-center rounded-pill bg-primary text-primary-foreground shadow-pop transition-micro active:translate-y-[0.5px]"
           >
             <Plus size={24} strokeWidth={2.2} aria-hidden />
           </Link>
@@ -140,6 +142,7 @@ export function MobileHeaderMark() {
        behind a probe that printed the number and asserted nothing. `justify-center`
        keeps the 26px glyph centred in the widened box. */
     <Link
+      prefetch={false}
       href="/home"
       aria-label="Sahoda, go to Home"
       className="hidden shrink-0 items-center justify-center rounded-sm max-narrow:flex max-narrow:min-h-[44px] max-narrow:min-w-[44px]"

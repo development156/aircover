@@ -16,7 +16,7 @@ is taken from a price list. Where a number could not be measured, it says so.
 | --- | --- | --- |
 | Their Instagram | Apify scraper | **$0.0026** — measured |
 | Their website & prices | Our own server fetches it | **$0.00** on 16 of 16 real checks |
-| A website that blocks us | Zyte, only then | ~$0.001 — **estimated, not measurable** |
+| A website that blocks us | TinyFish Fetch, only then | **free** per call (the key's 1,000 fetches a day are the budget); was Zyte at ~$0.001 estimated, until 2026-09-06 |
 | Their ads | **Not covered.** See §5 | — |
 
 A customer watching three competitors — one Instagram account each, plus their websites —
@@ -164,7 +164,7 @@ be one more kind.
 | Provider | What they do for us | What their rules say | If they change |
 | --- | --- | --- | --- |
 | **Apify** | Reads public Instagram profiles | A marketplace of community-maintained scrapers. Reading public pages is what the service is sold for. | Scrapers break when Instagram changes; actors are usually updated within days. Radar records a **gap**, never a zero. |
-| **Zyte** | Fetches websites that block our own server | A commercial scraping API. Only successful responses are billed. | It is only a fallback. If it vanished, we would lose the small number of sites that refuse us directly. |
+| **TinyFish** | Renders websites that block our own server, through a residential IP | A web-agent company's Fetch API, free per call and rate-limited (150 a minute, 1,000 a day). Replaced Zyte on 2026-09-06; the code still admits `zyte` rows as history. | It is only a fallback. If it vanished, we would lose the small number of sites that refuse a plain request; ordinary pages never reach it. It receives a competitor's URL and nothing else. |
 | **Our own server** | Fetches most websites | An ordinary web request, with an honest user-agent that identifies Sahoda and links to this page. | Nothing to change. |
 
 ### The uncomfortable part, stated plainly
@@ -235,7 +235,7 @@ Every figure above can be re-derived:
 - `scripts/radar/probe-keys.mjs` — do the provider keys authenticate at all
 - `scripts/radar/probe-cheap-check.mjs` — the two-pass hash-stability measurement
 - `scripts/radar/probe-apify.mjs` and `probe-apify-cost.mjs` — the real cost of one social check
-- `scripts/radar/probe-zyte-cost.mjs` — the demonstration that Zyte reports no cost anywhere
+- `scripts/radar/probe-zyte-cost.mjs` — deleted with Zyte on 2026-09-06; it demonstrated that Zyte reported no cost anywhere, which is why its rows say `estimated`
 - `scripts/radar/probe-meta-adlibrary.mjs` — the Ad Library check, currently blocked on a token
 - `packages/db/scripts/radar-rls-live-proof.mjs` — the 24 access-control checks against the
   live database

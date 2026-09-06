@@ -52,8 +52,8 @@
         "OPENROUTER_API_KEY_IMAGE",
         "OPENROUTER_API_KEY_RESEARCH",
         "OPENAI_API_KEY",
-        "FIRECRAWL_API_KEY",
-        "FIRECRAWL_API_URL",
+        "TINYFISH_API_KEY",
+        "TINYFISH_FETCH_URL",
         "GOOGLE_GEMINI_API_KEY",
         "STRIPE_SECRET_KEY",
         "STRIPE_STARTER_PRICE_ID",
@@ -77,6 +77,8 @@
         "CLOUDFLARE_ZONE_ID",
         "RESEND_API_KEY",
         "SENTRY_DSN",
+        "NEXT_PUBLIC_SENTRY_DSN",
+        "NEXT_PUBLIC_SENTRY_ENVIRONMENT",
         "SENTRY_ORG",
         "SENTRY_PROJECT",
         "SENTRY_AUTH_TOKEN",
@@ -104,7 +106,6 @@
         "ZERNIO_API_KEY",
         "NEXT_PUBLIC_APP_URL",
         "APIFY_TOKEN",
-        "ZYTE_API_KEY",
         "SAHODA_RADAR_SCAN_MODE"
       ]
     },

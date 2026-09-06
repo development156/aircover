@@ -14,8 +14,9 @@ import {
 import { duplicateMessage } from '@/lib/assets/duplicate-copy'
 import { kindForProvenMime } from '@/lib/assets/kind'
 import { assetTitle, MAX_ASSET_TITLE } from '@/lib/assets/title'
-import { readAsset, readTrashedAssets } from '@/lib/assets/read'
+import { readAsset, readTrashedBatch } from '@/lib/assets/read'
 import { offerForAsset } from '@/lib/media/offer-asset'
+import { mintThumbnail } from '@/lib/media/thumb'
 import type {
   AttachAssetState,
   DeleteAssetState,
@@ -23,16 +24,23 @@ import type {
   RestoreAssetState,
   TrashAssetState,
   TrashAssetsState,
+  TrashCursor,
   UpdateAssetState,
   UploadAssetState,
 } from '@/lib/assets/state'
+import { ATTACH_NEEDS_RESTORE, DELETE_NEEDS_TRASH } from '@/lib/assets/state'
 import { reportServerError } from '@/lib/observability/report'
 import { decideAttach, type ChannelRejection } from '@/lib/posts/attach-decision'
-import { MEDIA_BUCKET, MEDIA_UPLOAD_CAP_BYTES } from '@/lib/posts/media-constants'
+import {
+  MEDIA_BUCKET,
+  MEDIA_UPLOAD_CAP_BYTES,
+  MEDIA_UPLOAD_TOO_LARGE,
+} from '@/lib/posts/media-constants'
 import { assetObjectPath, derivativePrefix } from '@/lib/posts/media-path'
 import { mapPostError } from '@/lib/posts/post-error'
 import { getPost, readMedia, readVariantFormatsStrict } from '@/lib/posts/read'
 import { sniffImage } from '@/lib/posts/sniff-image'
+import { readStorageUsage, storageRefusal } from '@/lib/storage/usage'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { workspaceForWrite } from '@/lib/workspaces'
 
@@ -150,11 +158,18 @@ export async function uploadAsset(formData: FormData): Promise<UploadAssetState>
     }
 
     if (file.size > MEDIA_UPLOAD_CAP_BYTES) {
-      return {
-        ok: false,
-        message: `That file is larger than ${Math.floor(MEDIA_UPLOAD_CAP_BYTES / 1_000_000)} MB, which no channel accepts.`,
-      }
+      return { ok: false, message: MEDIA_UPLOAD_TOO_LARGE }
     }
+
+    // THE WORKSPACE ALLOWANCE, CHECKED BEFORE THE BYTES ARE READ.
+    //
+    // Above this line is the per-FILE ceiling; this is the per-WORKSPACE one, and
+    // they refuse for different reasons. Asked here rather than after the upload
+    // so that a full workspace costs the customer no wait and us no transfer, and
+    // leaves no object for the sweep to find. `storageRefusal` fails open when the
+    // figure cannot be read — see its own comment for why that is the safe way round.
+    const refusal = storageRefusal(await readStorageUsage(workspace.id), file.size)
+    if (refusal) return { ok: false, message: refusal }
 
     const bytes = new Uint8Array(await file.arrayBuffer())
 
@@ -269,6 +284,30 @@ export async function uploadAsset(formData: FormData): Promise<UploadAssetState>
     const parsed = AssetSchema.safeParse(data)
     if (!parsed.success) {
       return { ok: false, message: 'Added, but the response was unreadable. Reload to confirm.' }
+    }
+
+    // ── THE THUMBNAIL, AFTER THE ROW AND NEVER IN ITS WAY ──────────────────
+    // The file is stored and its row is written; from here the upload has
+    // succeeded whatever happens next. A thumbnail that fails to encode or to
+    // store costs the tile its small copy (it loads the original instead) and
+    // is reported so the waste is seen. It is never allowed to fail the upload.
+    try {
+      const thumb = await mintThumbnail(supabase, {
+        workspaceId: workspace.id,
+        assetId,
+        userId,
+        bytes,
+        width: candidate.width,
+        height: candidate.height,
+      })
+      if (!thumb.ok) {
+        reportServerError(new Error(`[assets] thumbnail not minted: ${thumb.message}`), {
+          action: 'mintThumbnail',
+          workspaceId,
+        })
+      }
+    } catch (error) {
+      reportServerError(error, { action: 'mintThumbnail', workspaceId })
     }
 
     revalidatePath('/assets')
@@ -440,7 +479,7 @@ export async function trashAssets(assetIds: readonly string[]): Promise<TrashAss
     workspaceId = ws.workspace.id
 
     const ids = [...new Set(assetIds)].filter((id) => typeof id === 'string' && id !== '')
-    if (ids.length === 0) return { ok: true, trashed: 0, alreadyTrashed: 0 }
+    if (ids.length === 0) return { ok: true, trashed: 0, alreadyTrashed: 0, ids: [] }
 
     const supabase = createServerSupabase()
     const { data, error } = await supabase
@@ -453,12 +492,17 @@ export async function trashAssets(assetIds: readonly string[]): Promise<TrashAss
 
     if (error) return { ok: false, message: mapPostError(error) }
 
-    const trashed = Array.isArray(data) ? data.length : 0
+    const moved = movedIds(data)
     revalidatePath('/assets')
     // `alreadyTrashed` is what was ASKED FOR minus what moved. It counts files
     // already in the trash, and it would also absorb a file deleted for good in
     // another tab — both are "not newly trashed", which is what the number says.
-    return { ok: true, trashed, alreadyTrashed: ids.length - trashed }
+    return {
+      ok: true,
+      trashed: moved.length,
+      alreadyTrashed: ids.length - moved.length,
+      ids: moved,
+    }
   } catch (error) {
     reportServerError(error, { action: 'trashAssets', workspaceId })
     return { ok: false, message: 'Could not move those files to the trash. Try again.' }
@@ -477,7 +521,7 @@ export async function restoreAssets(assetIds: readonly string[]): Promise<TrashA
     workspaceId = ws.workspace.id
 
     const ids = [...new Set(assetIds)].filter((id) => typeof id === 'string' && id !== '')
-    if (ids.length === 0) return { ok: true, trashed: 0, alreadyTrashed: 0 }
+    if (ids.length === 0) return { ok: true, trashed: 0, alreadyTrashed: 0, ids: [] }
 
     const supabase = createServerSupabase()
     const { data, error } = await supabase
@@ -490,12 +534,26 @@ export async function restoreAssets(assetIds: readonly string[]): Promise<TrashA
     if (error) return { ok: false, message: mapPostError(error) }
 
     revalidatePath('/assets')
-    const restored = Array.isArray(data) ? data.length : 0
-    return { ok: true, trashed: restored, alreadyTrashed: ids.length - restored }
+    const restored = movedIds(data)
+    return {
+      ok: true,
+      trashed: restored.length,
+      alreadyTrashed: ids.length - restored.length,
+      ids: restored,
+    }
   } catch (error) {
     reportServerError(error, { action: 'restoreAssets', workspaceId })
     return { ok: false, message: 'Could not restore those files. Try again.' }
   }
+}
+
+/** The ids an update actually touched, read from its `select('id')`. */
+function movedIds(data: unknown): string[] {
+  if (!Array.isArray(data)) return []
+  return data.flatMap((row) => {
+    const id = (row as { id?: unknown }).id
+    return typeof id === 'string' ? [id] : []
+  })
 }
 
 /**
@@ -517,9 +575,18 @@ export async function restoreAssets(assetIds: readonly string[]): Promise<TrashA
  * usage, deletes the row and hands back the storage path so the BYTES can be
  * removed after. None of that composes into a single statement, and a bulk
  * version would be a second copy of the most safety-critical path in this
- * module. The trash is capped by the same 200-row limit as the library.
+ * module.
+ *
+ * ── IN BATCHES OF `TRASH_BATCH`, WITH A CURSOR ───────────────────────────────
+ * One pass used to walk two hundred rows, each a locked transaction plus two
+ * storage sweeps, inside a single server action, and reported nothing until the
+ * end. A trash of a few hundred files sat at "Deleting…" with no number and ran
+ * into the function's time limit with no account of how far it got. Now a pass
+ * deletes twenty, says what it did, and hands back where it stopped; the client
+ * loops and shows the running count. `more` and `cursor` are the READ's answer,
+ * never a guess from the count.
  */
-export async function emptyTrash(): Promise<EmptyTrashState> {
+export async function emptyTrash(after: TrashCursor | null = null): Promise<EmptyTrashState> {
   let workspaceId: string | undefined
   try {
     const { userId } = await auth()
@@ -529,8 +596,8 @@ export async function emptyTrash(): Promise<EmptyTrashState> {
     if (!ws.ok) return { ok: false, message: ws.message }
     workspaceId = ws.workspace.id
 
-    const trash = await readTrashedAssets()
-    if (trash.status !== 'ok') {
+    const batch = await readTrashedBatch(after)
+    if (batch.status !== 'ok') {
       // NOT an empty trash. Deleting nothing and reporting success would tell a
       // person their trash is clear when it may be full.
       return {
@@ -541,8 +608,12 @@ export async function emptyTrash(): Promise<EmptyTrashState> {
 
     let deleted = 0
     let kept = 0
-    for (const entry of trash.assets) {
-      const result = await deleteAsset(entry.asset.id, false)
+    let cursor: TrashCursor | null = after
+    for (const row of batch.rows) {
+      const result = await deleteAsset(row.id, false)
+      // The cursor advances past a KEPT row too: it stays in the trash, before
+      // the cursor, so the next pass does not meet it and refuse it again.
+      cursor = { deletedAt: row.deletedAt, id: row.id }
       if (result.ok) deleted += 1
       else if (result.reason === 'refused' || result.reason === 'needs-confirm') kept += 1
       else {
@@ -557,7 +628,7 @@ export async function emptyTrash(): Promise<EmptyTrashState> {
     }
 
     revalidatePath('/assets')
-    return { ok: true, deleted, kept }
+    return { ok: true, deleted, kept, more: batch.more, cursor }
   } catch (error) {
     reportServerError(error, { action: 'emptyTrash', workspaceId })
     return { ok: false, message: 'Could not empty the trash. Try again.' }
@@ -588,6 +659,15 @@ export async function deleteAsset(assetId: string, confirmed = false): Promise<D
         reason: 'failed',
         message: 'Sahoda could not check where this file is used, so it was not deleted. Reload.',
       }
+    }
+
+    // ── ONLY FROM THE TRASH ─────────────────────────────────────────────────
+    // A live row is refused whatever `confirmed` says. `emptyTrash` and the
+    // trash view's "Delete for good" both arrive here with `deleted_at` set;
+    // anything else is a caller that skipped the recoverable step, and the
+    // person reading the answer needs the step named, not a generic failure.
+    if (read.asset.asset.deleted_at === null) {
+      return { ok: false, reason: 'refused', message: DELETE_NEEDS_TRASH, locked: [] }
     }
 
     const decision = decideAssetDelete(read.asset.usage)
@@ -762,6 +842,10 @@ export async function attachAssetToPost(
     }
     const asset = read.asset.asset
 
+    // In the trash means "stop using this". The picker never lists a trashed
+    // file, but the id reaches this action all the same.
+    if (asset.deleted_at !== null) return { ok: false, message: ATTACH_NEEDS_RESTORE }
+
     // A row whose facts were never established cannot be judged, and attaching
     // it would hand the engine nulls that slide under every limit.
     if (
@@ -791,8 +875,13 @@ export async function attachAssetToPost(
     //
     // The refusal already exists a few lines up, for a file whose dimensions are
     // missing; this is the same sentence for the same reason.
-    const existing = await readMedia(postId)
-    const formats = await readVariantFormatsStrict(postId)
+    // Both take only `postId` and neither reads the other, so they go together.
+    // Serially this cost the customer two database round trips before the first
+    // byte of their photo was judged.
+    const [existing, formats] = await Promise.all([
+      readMedia(postId),
+      readVariantFormatsStrict(postId),
+    ])
     if (existing === null || formats === null) {
       return {
         ok: false,

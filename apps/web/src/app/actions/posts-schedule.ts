@@ -1,11 +1,13 @@
 'use server'
 
 import { auth } from '@clerk/nextjs/server'
-import { revalidatePath } from 'next/cache'
 
 import { reportServerError } from '@/lib/observability/report'
+import { getPost } from '@/lib/posts/read'
+import { revalidatePostSurfaces } from '@/lib/posts/revalidate-surfaces'
+import { validateScheduleLead } from '@/lib/posts/schedule'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
+import { workspaceForWrite } from '@/lib/workspaces'
 
 /**
  * Arm, move and cancel a scheduled post.
@@ -73,6 +75,32 @@ export async function schedulePost(
       return { ok: false, message: 'Pick a real date and time.' }
     }
 
+    // ── NOTHING CAN GO OUT WITH NOWHERE TO GO ──────────────────────────────
+    // The RPCs check the role and whether anything has already published; they
+    // do not read `channels`. MEASURED 2026-09-06: an empty post with no
+    // channels was scheduled from the composer and the planner then promised
+    // "Goes out on its own at this time." The dispatcher would have found no
+    // variant to send. Refused here, before the status moves, and with the
+    // remedy in the sentence.
+    const post = await getPost(postId)
+    if (!post) return { ok: false, message: messageFor('INVALID_POST') }
+    if (post.channels.length === 0) {
+      return {
+        ok: false,
+        message: 'Pick at least one channel before scheduling. Nothing can go out without one.',
+      }
+    }
+
+    // ── THE LEAD, CHECKED WHERE IT CANNOT BE SKIPPED ───────────────────────
+    // `ScheduleField` refuses a past time and one inside a channel's lead, and
+    // that was the only check: a stale tab, a direct call, or a picker that
+    // sat open across the lead all booked a time already gone. The validator
+    // is the picker's own, so the sentence is the one the reader has seen.
+    const lead = validateScheduleLead(post.channels, when, new Date())
+    if (!lead.ok) {
+      return { ok: false, message: lead.message ?? 'Pick a time in the future.' }
+    }
+
     const supabase = createServerSupabase()
     const { data, error } = hasExistingSchedule
       ? await supabase.rpc('reschedule_post', { p_post_id: postId, p_when: when.toISOString() })
@@ -84,9 +112,7 @@ export async function schedulePost(
     if (error) return { ok: false, message: messageFor(error.message) }
 
     const scheduledAt = (data as { scheduled_at?: unknown } | null)?.scheduled_at
-    revalidatePath('/posts')
-    revalidatePath('/planner')
-    revalidatePath(`/posts/${postId}`)
+    revalidatePostSurfaces(postId)
     return { ok: true, scheduledAt: typeof scheduledAt === 'string' ? scheduledAt : null }
   } catch (error) {
     reportServerError(error, { action: 'schedulePost', workspaceId })
@@ -110,9 +136,7 @@ export async function cancelSchedule(postId: string): Promise<ScheduleState> {
     const { error } = await supabase.rpc('cancel_scheduled_post', { p_post_id: postId })
     if (error) return { ok: false, message: messageFor(error.message) }
 
-    revalidatePath('/posts')
-    revalidatePath('/planner')
-    revalidatePath(`/posts/${postId}`)
+    revalidatePostSurfaces(postId)
     return { ok: true, scheduledAt: null }
   } catch (error) {
     reportServerError(error, { action: 'cancelSchedule', workspaceId })

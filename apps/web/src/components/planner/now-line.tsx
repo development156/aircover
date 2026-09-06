@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 
+import { minutesIntoDay } from '@/lib/time/day-key'
+
 /**
  * The current-time rule.
  *
@@ -14,28 +16,21 @@ import { useEffect, useState } from 'react'
  *
  * It renders nothing at all until the first client tick, which means the server
  * HTML carries no time claim rather than a claim that is about to be wrong.
+ *
+ * ── THE INSTANT IS THE BROWSER'S; THE ROW IS THE WORKSPACE'S ─────────────────
+ * "Now" is an instant and every clock agrees on it. Which ROW that instant sits
+ * on depends on the zone the grid is drawn in, so the zone comes down as a prop
+ * from the page that resolved it, and the line lands on the same row a card
+ * scheduled for this minute would.
  */
-const IST = 'Asia/Kolkata'
-const HOUR_MIN = new Intl.DateTimeFormat('en-GB', {
-  timeZone: IST,
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: false,
-})
-
-function istMinutesNow(): number | null {
-  const [h, m] = HOUR_MIN.format(new Date()).split(':')
-  const hours = Number(h)
-  const mins = Number(m)
-  if (!Number.isFinite(hours) || !Number.isFinite(mins)) return null
-  return hours * 60 + mins
-}
-
 export function NowLine({
+  zone,
   fromHour,
   toHour,
   hourPx,
 }: {
+  /** The zone the grid is drawn in. */
+  zone: string
   fromHour: number
   toHour: number
   hourPx: number
@@ -43,11 +38,11 @@ export function NowLine({
   const [minutes, setMinutes] = useState<number | null>(null)
 
   useEffect(() => {
-    const tick = (): void => setMinutes(istMinutesNow())
+    const tick = (): void => setMinutes(minutesIntoDay(zone, new Date()))
     tick()
     const id = setInterval(tick, 60_000)
     return () => clearInterval(id)
-  }, [])
+  }, [zone])
 
   if (minutes === null) return null
   // Outside the drawn range there is no honest place to put it.
@@ -61,7 +56,7 @@ export function NowLine({
       className="pointer-events-none absolute inset-x-0 z-10 flex items-center"
       style={{ top }}
     >
-      <span className="size-2 shrink-0 rounded-full bg-brand" />
+      <span className="size-2 shrink-0 rounded-pill bg-brand" />
       <span className="h-px flex-1 bg-brand" />
     </div>
   )

@@ -280,6 +280,16 @@ const SHAPE_OVERRIDES: Readonly<Record<string, Readonly<Record<string, string>>>
   // Maharashtra — any two digits satisfy the CHECK, and a real one keeps the
   // fixture readable.
   billing_profiles: { tax_kind: "'unregistered'", gstin: 'null', state_code: "'27'" },
+  // `check (jsonb_typeof(starters) = 'array' and jsonb_array_length between 3
+  // and 8)`. The ladder's only jsonb guess is `'{}'::jsonb`, which is an object
+  // and fails on the first clause, so this table would never seed and the
+  // tenant proof would silently stop covering it. Three sentences is the
+  // floor the constraint names, and a floor value is the right fixture: it
+  // proves the bound is reachable rather than stepping past it.
+  brand_starters: {
+    starters: `'["A plate on a counter", "The shopfront at dusk", "Hands at work"]'::jsonb`,
+    brand_version: '1',
+  },
   // `check (storage_path like workspace_id::text || '/derivatives/%')` — the
   // storage key's first segment IS the tenant boundary, so the value depends on
   // the row's own workspace and no fixed literal can satisfy both rows.

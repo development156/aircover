@@ -60,13 +60,13 @@ export function NeedsAttention({ posts }: { posts: DisplayPost[] }) {
   // `intent` — NOT `status`. `DisplayPost` seals `status` behind an
   // uninhabitable type precisely so a summary screen cannot read it and claim
   // an outcome the variant rows never reported (see display-post.ts).
-  const waiting = posts.filter((post) => needsAPerson(post.intent))
+  const waiting = posts.filter((post) => needsAPerson(post))
   const shown = waiting.slice(0, 4)
 
   return (
     <HomeSection
       id="home-attention"
-      title="Needs your attention"
+      title="Needs your OK"
       count={waiting.length}
       guide="home.attention"
       /* /approvals, not /posts. This card is a preview of the QUEUE — same
@@ -80,8 +80,8 @@ export function NeedsAttention({ posts }: { posts: DisplayPost[] }) {
            is left-aligned in the body's own padding rather than centred in a
            box, which is the shape `ChartSparse` exists to stop. */
         <p className="max-w-[var(--measure-prose)] type-sm text-muted">
-          Nothing is waiting on you. Anything sent for review, or that fails to go out, shows up
-          here.
+          Nothing needs your OK right now. Posts that are ready to go out, posts waiting for a
+          check, and posts that could not go out will show up here.
         </p>
       ) : (
         /* See COLUMNS above. Its ancestor was a `wide:grid-cols-2` that put a
@@ -112,7 +112,7 @@ export function NeedsAttention({ posts }: { posts: DisplayPost[] }) {
                 ) : (
                   // R7: an empty body is an empty body. No lorem, no preview
                   // stitched from the title.
-                  <p className="mt-1 type-meta text-muted">No content written yet.</p>
+                  <p className="mt-1 type-meta text-muted">Nothing written yet.</p>
                 )}
                 {post.channels.length > 0 ? (
                   <p className="mt-2 type-meta text-muted">

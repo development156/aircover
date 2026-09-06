@@ -115,12 +115,6 @@ export async function readBalance(): Promise<BalanceRead> {
  */
 
 /**
- * Ledger history, newest first. Sorted by `seq` (the int8 identity) rather than
- * `created_at`, which can invert for entries written inside one transaction.
- * Rows are parsed individually: `model_tier` has no DB CHECK backing it, so a
- * single junk row must not take down the page.
- */
-/**
  * How many ledger entries this workspace has, in total.
  *
  * ── WHY A SECOND READ RATHER THAN COUNTING WHAT WE LOADED ───────────────────
@@ -158,10 +152,39 @@ export async function countLedger(): Promise<number | null> {
   }
 }
 
-export async function readLedger(limit = HISTORY_LIMIT): Promise<ParsedLedger> {
+/**
+ * A ledger read, and whether it is an ANSWER or a failure to get one.
+ *
+ * ── WHY THE FLAG EXISTS, AND WHY IT IS NOT OPTIONAL ──────────────────────────
+ * `readBalance` twelve lines above already splits these, and `readSpend` over
+ * this same table carries the rule word for word: "`unreadable` is NOT the same
+ * claim and must never render as an empty chart, which would tell the user they
+ * spent nothing when we simply could not look."
+ *
+ * `readLedger` was never brought along. Every failure came back as
+ * `{ entries: [] }`, and both callers had nothing to branch on but
+ * `entries.length === 0` — so a dropped connection printed "No credit activity
+ * yet" on the wallet and "Nothing has happened yet" on Home. Both are confident
+ * statements about somebody's money, made from a question that got no answer.
+ *
+ * A required field rather than an optional one: an optional flag would let the
+ * next screen read the list and never learn that the list means nothing.
+ */
+export type LedgerRead = ParsedLedger & { unreadable: boolean }
+
+/**
+ * Ledger history, newest first. Sorted by `seq` (the int8 identity) rather than
+ * `created_at`, which can invert for entries written inside one transaction.
+ * Rows are parsed individually: `model_tier` has no DB CHECK backing it, so a
+ * single junk row must not take down the page.
+ */
+export async function readLedger(limit = HISTORY_LIMIT): Promise<LedgerRead> {
   try {
     const workspaceId = await activeWorkspaceId()
-    if (workspaceId === null) return { entries: [], skipped: 0 }
+    // NOT unreadable. There is no workspace to hold a ledger, which the screens
+    // above have already answered with First-run; offering a reload here would
+    // be a remedy that cannot work, since no reload creates a workspace.
+    if (workspaceId === null) return { entries: [], skipped: 0, unreadable: false }
 
     const supabase = createServerSupabase()
     const { data, error } = await supabase
@@ -173,12 +196,12 @@ export async function readLedger(limit = HISTORY_LIMIT): Promise<ParsedLedger> {
 
     if (error || !data) {
       if (error) console.error('[wallet] ledger read failed', error.code, error.message)
-      return { entries: [], skipped: 0 }
+      return { entries: [], skipped: 0, unreadable: true }
     }
-    return parseEntries(data)
+    return { ...parseEntries(data), unreadable: false }
   } catch (error) {
     console.error('[wallet] ledger read threw', error instanceof Error ? error.message : 'unknown')
-    return { entries: [], skipped: 0 }
+    return { entries: [], skipped: 0, unreadable: true }
   }
 }
 

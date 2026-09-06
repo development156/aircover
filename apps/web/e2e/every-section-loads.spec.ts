@@ -1,5 +1,6 @@
 import { expect, test } from './fixtures/seeded-user'
 import { bootstrapWorkspace, leaveOnboarding } from './fixtures/compose'
+import { RADAR_H1 } from './helpers/headings'
 
 /**
  * EVERY SECTION IN THE MENU OPENS, AND SAYS ITS OWN NAME.
@@ -42,6 +43,13 @@ import { bootstrapWorkspace, leaveOnboarding } from './fixtures/compose'
  * name: /home leads with a GREETING (`greeting-banner.tsx` — deliberately an
  * `<h1>`, because the banner replaced Home's PageTitle and left the app's
  * most-visited screen with no h1 at all), and the greeting changes with the hour.
+ *
+ * /radar is the second, and it is the reason `helpers/headings.ts` exists. Its
+ * heading became the sentence "Stay ahead of what matters." while this row and
+ * three more in two other specs still pinned the noun "Radar". The section name
+ * is still on the screen as the eyebrow above the heading; it is no longer the
+ * `h1`. The pattern lives in that helper rather than here so the NEXT rename
+ * cannot break the two radar specs without breaking this one in the same run.
  */
 const SECTIONS: ReadonlyArray<readonly [string, RegExp]> = [
   ['/home', /good (morning|afternoon|evening)/i],
@@ -59,7 +67,7 @@ const SECTIONS: ReadonlyArray<readonly [string, RegExp]> = [
   ['/leads', /^Leads$/],
   ['/analytics', /^Analytics$/],
   ['/report', /^CMO Report$/],
-  ['/radar', /^Radar$/],
+  ['/radar', RADAR_H1],
   ['/loop', /^The Loop$/],
   ['/playbooks', /^Playbooks$/],
   ['/connections', /^Connections$/],
@@ -92,7 +100,13 @@ const BRAIN_TABS: ReadonlyArray<readonly [string, RegExp]> = [
   // The subtitle is chosen because `Shell` renders it in EVERY state the page
   // has — no workspace, empty, populated, and unreadable — so it identifies the
   // tab without pinning any one state's copy.
-  ['/brain/knowledge', /documents Sahoda has read/i],
+  // WAS `/documents Sahoda has read/i`, the subtitle before the 2026-08-29 Tone
+  // Setup rewrote it as a capability. Stale for the same reason as the two above,
+  // and MEASURED failing on the first CI smoke run to reach it (2026-09-05, run
+  // 33985674352). The new subtitle's promise, "the documents that hold your real
+  // prices", is rendered by `Shell` in every state, so it identifies the tab
+  // without pinning one state's copy.
+  ['/brain/knowledge', /documents that hold your real prices/i],
 ]
 
 test.describe('every section loads @smoke', () => {
@@ -138,6 +152,7 @@ test.describe('every section loads @smoke', () => {
     test.setTimeout(120_000)
 
     await page.goto('/home')
+
     await page
       .locator('#main')
       .getByRole('button', { name: /create workspace/i })
@@ -173,6 +188,6 @@ test.describe('every section loads @smoke', () => {
     await bootstrapWorkspace(page)
     await page.goto('/brain/competitors')
     await page.waitForURL(/\/radar/, { timeout: 30_000 })
-    await expect(page.getByRole('heading', { name: 'Radar', level: 1 })).toBeVisible()
+    await expect(page.getByRole('heading', { name: RADAR_H1, level: 1 })).toBeVisible()
   })
 })

@@ -459,15 +459,29 @@ export const READINESS_CLASS: Readonly<Record<Readiness, string>> = {
  * The words on the chip. Short, because the tile header is narrow, and each one is
  * a claim someone could check.
  *
- * "Not proven live" rather than "Not verified live": nobody verifies anything here.
- * The claim is that no publish has ever been proven to reach the platform.
+ * ── REWRITTEN AS CAPABILITIES, 2026-09-06, WITH THE CLAIMS HELD FIXED ────────
+ * "Publishes today" and "Not proven live" were the words an engineer uses about a
+ * release, read by a shop owner deciding where to post. Each is now the thing the
+ * customer can do, and each claim is exactly as narrow as it was (CLAUDE.md, copy
+ * rule 1). The detail row in `details.ts` carries the full sentence beneath it.
+ *
+ * "Not yet confirmed live" rather than "Not verified live": nobody verifies
+ * anything here. The claim is that no post has ever been confirmed to reach the
+ * platform, which `post_publish_logs.mode = 'live'` is the only evidence for.
  */
 export const READINESS_LABEL: Readonly<Record<Readiness, string>> = {
-  'publishes-today': 'Publishes today',
-  'built-not-proven': 'Not proven live',
+  'publishes-today': 'Ready to publish',
+  'built-not-proven': 'Not yet confirmed live',
   // Says what IS true rather than what is missing. "No posting yet" describes a
   // hole; "Connect only" describes the thing the customer can actually do today,
   // and the tile's own line carries the limit underneath it.
+  //
+  // KEPT on evidence when the two above were rewritten. The proposed "Read-only
+  // for now" would claim Sahoda READS these accounts, and `InboxPlatformSchema`
+  // names only two of the eight (whatsapp, reddit); nothing in this codebase
+  // reads TikTok, Threads, YouTube, Pinterest, Discord or Slack. A warmer label
+  // that is true in two cases out of eight is the defect rule 1 forbids. And
+  // "Connect" is already this screen's own verb, on every button under it.
   'connect-only': 'Connect only',
   'not-built': 'Coming soon',
 }

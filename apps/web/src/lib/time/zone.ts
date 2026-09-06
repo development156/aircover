@@ -34,8 +34,12 @@ export interface WallClock {
 /**
  * The zone every workspace without one of its own is rendered in — the zone
  * those 32 workspaces see today, so adopting this module moves nobody's times.
+ *
+ * THE ONE PLACE THE NAME IS WRITTEN. It was a literal in 48 files; every other
+ * reader imports this, so the fallback can be counted, found and one day
+ * changed without a repository-wide search.
  */
-export const DEFAULT_DISPLAY_ZONE = 'Asia/Kolkata'
+export const DEFAULT_ZONE = 'Asia/Kolkata'
 
 /**
  * Whether the runtime knows this zone.
@@ -63,6 +67,29 @@ export function isKnownZone(zone: string | null | undefined): boolean {
 }
 
 /**
+ * WHY a zone was refused, in the reader's terms.
+ *
+ * `isKnownZone` says no for three different reasons and they are not the same
+ * sentence. "Sahoda does not recognise the time zone IST" is false: `Intl`
+ * recognises it perfectly well, and telling somebody their input is unknown when
+ * the real objection is that it is ambiguous sends them looking for a typo that
+ * is not there.
+ */
+export function describeZoneRefusal(zone: string): string {
+  const trimmed = zone.trim()
+
+  if (/^[+-]/.test(trimmed)) {
+    return `${trimmed} is an offset rather than a place, so it cannot know when your clocks change. Name a city instead, like ${DEFAULT_ZONE}.`
+  }
+
+  if (trimmed !== 'UTC' && !trimmed.includes('/')) {
+    return `${trimmed} is a clock abbreviation, and the same letters name different clocks in different countries. Name a city instead, like ${DEFAULT_ZONE}.`
+  }
+
+  return `Sahoda does not recognise the time zone ${trimmed}.`
+}
+
+/**
  * The zone to render a workspace's times in, and whether the workspace chose it.
  *
  * A stored value the runtime cannot use falls back rather than throwing: a
@@ -75,7 +102,7 @@ export function resolveDisplayZone(stored: string | null | undefined): {
 } {
   return isKnownZone(stored)
     ? { zone: stored as string, fromWorkspace: true }
-    : { zone: DEFAULT_DISPLAY_ZONE, fromWorkspace: false }
+    : { zone: DEFAULT_ZONE, fromWorkspace: false }
 }
 
 /**
@@ -92,11 +119,23 @@ export function zoneLabel(zone: string, at: Date): string {
   // actually ships to, and the one whose readers would find `GMT+5:30` odd — and
   // falls back to an offset elsewhere, which is still a fact a reader can act
   // on. It is also the locale every other formatter here already uses.
-  const parts = new Intl.DateTimeFormat('en-IN', {
-    timeZone: zone,
-    timeZoneName: 'short',
-  }).formatToParts(at)
+  // Cached per zone, like `partsFormatter` below. This built a fresh
+  // `Intl.DateTimeFormat` on EVERY call, in a file whose own comment says these
+  // are costly to build and repeat per row — so a fifty-post list paid for fifty
+  // formatters to print the same three letters fifty times.
+  const parts = labelFormatter(zone).formatToParts(at)
   return parts.find((p) => p.type === 'timeZoneName')?.value ?? zone
+}
+
+const LABEL_CACHE = new Map<string, Intl.DateTimeFormat>()
+
+function labelFormatter(zone: string): Intl.DateTimeFormat {
+  let f = LABEL_CACHE.get(zone)
+  if (!f) {
+    f = new Intl.DateTimeFormat('en-IN', { timeZone: zone, timeZoneName: 'short' })
+    LABEL_CACHE.set(zone, f)
+  }
+  return f
 }
 
 const PARTS_CACHE = new Map<string, Intl.DateTimeFormat>()

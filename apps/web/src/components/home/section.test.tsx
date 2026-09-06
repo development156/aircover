@@ -107,6 +107,7 @@ describe('the four numbers, as one board', () => {
   function board() {
     const { container } = render(
       <AtAGlance
+        zone="Asia/Kolkata"
         posts={NO_POSTS}
         buckets={NO_WEEK}
         publish={{ status: 'ok', live: 0 } as never}

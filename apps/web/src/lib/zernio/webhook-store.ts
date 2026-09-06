@@ -43,34 +43,25 @@ export type ProjectionOutcome =
   /**
    * Stored, attributable, and the platform it names has no representation here.
    * Zernio's comment events span seven platforms and its DM events five; this
-   * product models four channels. A Reddit comment is a real event we genuinely
-   * cannot file, and saying so is the honest answer — inventing a channel would put
-   * a Reddit thread in the Instagram tab.
+   * product models the channels in `ChannelSchema` and no others. A Reddit
+   * comment is a real event we genuinely cannot file, and saying so is the honest
+   * answer — inventing a channel would put a Reddit thread in the Instagram tab.
    */
   | { kind: 'channel_not_representable'; platform: string }
   /** Stored, attributable, and the row it refers to is not in this database. */
   | { kind: 'referent_absent'; what: string }
 
 /**
- * Zernio's platform names → this product's four channels.
+ * Zernio's platform names → this product's channels.
  *
- * NOT a lookup with a fallback. A fallback is how a Reddit comment becomes an
- * Instagram row. An unmapped platform returns undefined and the caller reports
- * `channel_not_representable`, which is a fact rather than a guess.
- *
- * `twitter` is Zernio's spelling and `x` is ours. Both are listed because Zernio
- * uses BOTH depending on the endpoint — its own publish, validate, edit and
- * unpublish surfaces disagree about the name of the same platform, and this map is
- * the one place that has to survive all four.
+ * Re-exported rather than defined here. The same two spellings were written out in
+ * three files (this one, `lib/inbox/conversations.ts` and `lib/inbox/store-read.ts`)
+ * and all three had to agree for a stored DM to render on the row it came from;
+ * `lib/inbox/platform-spelling.ts` is now the only copy, and it proves the two
+ * directions are inverses. Kept exported from here because the projections and the
+ * publish projector already import it by this name.
  */
-export const CHANNEL: Readonly<Record<string, 'x' | 'gbp' | 'linkedin' | 'instagram'>> = {
-  instagram: 'instagram',
-  twitter: 'x',
-  x: 'x',
-  linkedin: 'linkedin',
-  googlebusiness: 'gbp',
-  gbp: 'gbp',
-}
+export { CHANNEL } from '@/lib/inbox/platform-spelling'
 
 /** Read a nested string. Returns null for absent, non-string, or blank. */
 export function str(o: unknown, ...path: string[]): string | null {
@@ -206,16 +197,39 @@ export async function insertMessage(
     body: string
     platformMessageId: string
     sentAt: string | null
+    /**
+     * The Clerk subject who composed this, for a reply a PERSON sent from Sahoda.
+     *
+     * Absent on every webhook message and that is the measurement, not a gap: an
+     * inbound message has no author here, and an outbound one the platform told us
+     * about was authored somewhere we cannot see. The column's own comment says
+     * "a Clerk subject for an outbound reply a person composed", and only the send
+     * path can name one.
+     */
+    authorUserId?: string | null
+    /** What came attached, as Zernio described it. `[]`, never null — the column is NOT NULL. */
+    attachments?: readonly unknown[]
   },
 ): Promise<number> {
   const r = await db.query<{ id: string }>(
     `insert into inbox_messages
-       (workspace_id, thread_id, direction, body, platform_message_id, sent_at)
-     values ($1::uuid, $2::uuid, $3, $4, $5, coalesce($6::timestamptz, now()))
+       (workspace_id, thread_id, direction, body, platform_message_id, sent_at,
+        author_user_id, attachments)
+     values ($1::uuid, $2::uuid, $3, $4, $5, coalesce($6::timestamptz, now()),
+             $7, coalesce($8::jsonb, '[]'::jsonb))
      on conflict (workspace_id, platform_message_id) where platform_message_id is not null
        do nothing
      returning id`,
-    [m.workspaceId, m.threadId, m.direction, m.body, m.platformMessageId, m.sentAt],
+    [
+      m.workspaceId,
+      m.threadId,
+      m.direction,
+      m.body,
+      m.platformMessageId,
+      m.sentAt,
+      m.authorUserId ?? null,
+      JSON.stringify(m.attachments ?? []),
+    ],
   )
   return r.rows.length
 }

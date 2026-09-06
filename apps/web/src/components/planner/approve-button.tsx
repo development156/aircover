@@ -6,6 +6,7 @@ import type { PostStatus } from '@sahoda/shared'
 
 import { approvePost } from '@/app/actions/planner'
 import { Button } from '@/components/ui/button'
+import { approveMessage } from '@/lib/approvals/state'
 import { canApprove } from '@/lib/planner/transitions'
 
 export interface ApproveButtonProps {
@@ -40,7 +41,10 @@ export function ApproveButton({ postId, status }: ApproveButtonProps) {
   function run() {
     startTransition(async () => {
       const result = await approvePost(postId)
-      if (result.ok) toast.success('Post approved')
+      // The status the RPC handed back decides the sentence: a dated post comes
+      // back `scheduled` and the toast must say so, because "Post approved" over
+      // a post that will now go out on its own under-claims what just happened.
+      if (result.ok) toast.success(approveMessage(result.status))
       else toast.error(result.message)
     })
   }

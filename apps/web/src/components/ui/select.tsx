@@ -29,21 +29,38 @@ export function Select({
    * the constraint being overridden is on the span around it.
    */
   wrapperClassName,
+  error,
   children,
   ...props
-}: React.ComponentPropsWithoutRef<'select'> & { wrapperClassName?: string }) {
+}: React.ComponentPropsWithoutRef<'select'> & {
+  wrapperClassName?: string
+  /** Error state: the same ring-weight change `Input` makes, for the same reason. */
+  error?: boolean
+}) {
   return (
     <span
       className={cn('relative inline-flex w-full max-w-[280px] items-center', wrapperClassName)}
     >
+      {/* ── THE SAME EDGE AND THE SAME FOCUS AS `Input`, WHICH IT WAS NOT ──────
+          Until 2026-08-31 this shipped `border border-line` and left focus to the
+          global outline, beside an Input that ships an INSET RING and paints its
+          own two-part focus ring. A form holding one of each showed two edge
+          weights at rest and two focus treatments while tabbing through it. Same
+          recipe now, and `error` for parity, so a field and a select in the same
+          row cannot disagree about what "invalid" looks like. */}
       <select
+        aria-invalid={error || undefined}
         className={cn(
-          'h-input w-full appearance-none rounded-sm border border-line bg-surface pr-8 pl-3 text-[13px]',
-          'transition-micro hover:border-line-firm',
+          'h-input w-full appearance-none rounded-sm border-none bg-surface pr-8 pl-3 type-sm text-ink',
+          'transition-micro hover:shadow-[inset_0_0_0_1px_var(--line-firm)]',
+          'focus:shadow-[inset_0_0_0_1px_var(--brand),0_0_0_3px_var(--t50)] focus:outline-none',
           // The touch floor. A select is the control people most often miss on
           // a phone, because its hit area is exactly its box.
           'max-narrow:min-h-[44px]',
           'disabled:cursor-not-allowed disabled:bg-s2 disabled:text-muted',
+          error
+            ? 'shadow-[inset_0_0_0_1.5px_var(--danger)]'
+            : 'shadow-[inset_0_0_0_1px_var(--line)]',
           className,
         )}
         {...props}

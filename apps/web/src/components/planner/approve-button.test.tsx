@@ -40,7 +40,18 @@ describe('ApproveButton', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Approve' }))
 
     expect(state.calls).toEqual([POST_ID])
-    expect(state.toasts.success).toHaveLength(1)
+    expect(state.toasts.success).toEqual(['Approved. Give it a time and it goes out.'])
+  })
+
+  test('a post that came back scheduled says so, not merely "approved"', async () => {
+    // `approve_posts` books a dated post in the same statement. The toast reads
+    // the returned status rather than assuming the transition it asked for.
+    state.result = { ok: true, status: 'scheduled' }
+
+    render(<ApproveButton postId={POST_ID} status="draft" />)
+    await userEvent.click(screen.getByRole('button', { name: 'Approve' }))
+
+    expect(state.toasts.success).toEqual(['Approved and scheduled.'])
   })
 
   test('an approved post offers no control at all, not a disabled one', () => {

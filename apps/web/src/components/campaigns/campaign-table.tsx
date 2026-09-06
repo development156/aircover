@@ -70,7 +70,7 @@ export function CampaignTable({ rollups }: { rollups: readonly CampaignRollup[] 
                 {channels.map((channel) => (
                   <span
                     key={channel}
-                    className="type-sm rounded-pill px-2 py-[1px] text-muted shadow-[inset_0_0_0_1px_var(--line)]"
+                    className="type-sm rounded-pill px-2 py-[1px] text-muted surface-ring-firm"
                   >
                     {CHANNEL_SHORT[channel]}
                   </span>

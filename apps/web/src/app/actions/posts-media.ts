@@ -6,16 +6,24 @@ import { revalidatePath } from 'next/cache'
 import { PostMediaSchema } from '@sahoda/shared'
 
 import { reportServerError } from '@/lib/observability/report'
+import { planAutoConvert, autoConvertNote } from '@/lib/media/auto-convert'
+import { orientedSize, renderDerivative } from '@/lib/media/derive'
 import { offerFor } from '@/lib/media/offer'
+import { targetsFor } from '@/lib/media/targets'
 import { decideAttach } from '@/lib/posts/attach-decision'
-import { MEDIA_BUCKET, MEDIA_UPLOAD_CAP_BYTES } from '@/lib/posts/media-constants'
+import {
+  MEDIA_BUCKET,
+  MEDIA_UPLOAD_CAP_BYTES,
+  MEDIA_UPLOAD_TOO_LARGE,
+} from '@/lib/posts/media-constants'
 import { mediaObjectPath } from '@/lib/posts/media-path'
 import { mapPostError } from '@/lib/posts/post-error'
 import { getPost, readMedia, readVariantFormatsStrict } from '@/lib/posts/read'
 import { sniffImage } from '@/lib/posts/sniff-image'
 import type { AttachMediaState, DetachMediaState } from '@/lib/posts/media-state'
+import { readStorageUsage, storageRefusal } from '@/lib/storage/usage'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
+import { workspaceForWrite } from '@/lib/workspaces'
 
 /**
  * Attach a file to a post.
@@ -60,9 +68,16 @@ export async function attachMedia(postId: string, formData: FormData): Promise<A
     if (file.size > MEDIA_UPLOAD_CAP_BYTES) {
       return {
         ok: false,
-        message: `That file is larger than ${Math.floor(MEDIA_UPLOAD_CAP_BYTES / 1_000_000)} MB, which no channel accepts.`,
+        message: MEDIA_UPLOAD_TOO_LARGE,
       }
     }
+
+    // The per-WORKSPACE allowance, asked before the bytes are read. The ceiling
+    // above is per file; this one is the 1 GB the whole workspace shares, and a
+    // full workspace is refused here rather than after we have paid to move the
+    // file. Fails CLOSED on an unreadable figure (DB-20) — `storageRefusal` says why.
+    const overAllowance = storageRefusal(await readStorageUsage(ws.workspace.id), file.size)
+    if (overAllowance) return { ok: false, message: overAllowance }
 
     const bytes = new Uint8Array(await file.arrayBuffer())
 
@@ -74,8 +89,13 @@ export async function attachMedia(postId: string, formData: FormData): Promise<A
     // numbers below are gates, and a read that returned `[]` / `{}` because it
     // FAILED switches them off rather than tightening them. Nothing is uploaded
     // against limits we could not check.
-    const existing = await readMedia(postId)
-    const formats = await readVariantFormatsStrict(postId)
+    // Both take only `postId` and neither reads the other, so they go together.
+    // Serially this cost the customer two database round trips before the first
+    // byte of their photo was judged.
+    const [existing, formats] = await Promise.all([
+      readMedia(postId),
+      readVariantFormatsStrict(postId),
+    ])
     if (existing === null || formats === null) {
       return {
         ok: false,
@@ -83,19 +103,96 @@ export async function attachMedia(postId: string, formData: FormData): Promise<A
       }
     }
 
-    const decision = decideAttach(
+    // `let`, because a pure change of container may replace them below. Every
+    // read after this point — the decision, the path, the row — must see the bytes
+    // that are actually going to be stored, never the ones that arrived.
+    let attachBytes: Uint8Array<ArrayBufferLike> = bytes
+    let attachImage = sniffed.image
+    let convertedFrom: string | null = null
+
+    const candidateFor = (image: typeof sniffed.image, size: number) => ({
+      mime: image.mime,
+      bytes: size,
+      width: image.width,
+      height: image.height,
+    })
+
+    let decision = decideAttach(
       post.channels,
-      {
-        mime: sniffed.image.mime,
-        bytes: bytes.byteLength,
-        width: sniffed.image.width,
-        height: sniffed.image.height,
-      },
+      candidateFor(attachImage, attachBytes.byteLength),
       existing.length,
       // Per-channel, from `post_variants.format`. A story will not take a
       // landscape photo and a version that says one photo will not take a second.
       formats,
     )
+
+    // ── IS A CHANGE OF CONTAINER THE WHOLE PROBLEM? ────────────────────────────
+    //
+    // A WebP bound for Instagram is refused for its FORMAT and nothing else, and
+    // this product ships the encoder that fixes it. Sending somebody away to
+    // convert a file is a question with one sensible answer, which is a chore
+    // rather than a choice.
+    //
+    // Only when the geometry is fine: `planAutoConvert` is told that through the
+    // engine's OWN rejection codes rather than measuring anything again, so it
+    // cannot disagree with the refusal it is reacting to. A crop still needs a
+    // person — which part of a photo survives a story is their judgement.
+    //
+    // Converting in memory here is right for THIS path specifically. A direct
+    // attach has no library copy, so there is no original to preserve; the library
+    // path keeps the original and mints a derivative instead.
+    if (!decision.ok) {
+      // Every objection that is NOT about the container. If any exists, the file
+      // needs a crop or a smaller encode and re-encoding alone would leave it just
+      // as refused — the work done, the answer unchanged.
+      const hasNonFormatObjection = decision.rejections.some((rejection) =>
+        rejection.violations.some((violation) => violation.code !== 'MEDIA_TYPE'),
+      )
+
+      const plan = planAutoConvert({
+        originalMime: attachImage.mime,
+        targets: targetsFor(post.channels, formats),
+        hasNonFormatObjection,
+      })
+
+      if (plan.kind === 'transcode') {
+        const oriented = await orientedSize(attachBytes)
+        const rendered = oriented
+          ? await renderDerivative(
+              attachBytes,
+              // The WHOLE oriented image. A rect covering everything makes
+              // `renderDerivative` a pure re-encode: same pixels, new container,
+              // and the quality ladder still keeps it under the byte ceiling.
+              { x: 0, y: 0, width: oriented.width, height: oriented.height },
+              plan.mime,
+              MEDIA_UPLOAD_CAP_BYTES,
+            )
+          : null
+
+        if (rendered?.ok) {
+          // Sniff the OUTPUT. `renderDerivative` already does, and this reads its
+          // verified result rather than the encoder's claim — the same discipline
+          // the upload path applies to the customer's own file.
+          convertedFrom = attachImage.mime
+          attachBytes = rendered.derivative.bytes
+          attachImage = {
+            ...attachImage,
+            mime: rendered.derivative.mime,
+            width: rendered.derivative.width,
+            height: rendered.derivative.height,
+          }
+          decision = decideAttach(
+            post.channels,
+            candidateFor(attachImage, attachBytes.byteLength),
+            existing.length,
+            formats,
+          )
+        }
+        // A failed or unreadable render falls through to the refusal below with
+        // the ORIGINAL bytes. Nothing was stored, nothing was charged, and the
+        // person gets the same offer they would have got before this existed.
+      }
+    }
     if (!decision.ok) {
       // ── THE REFUSAL IS UNCHANGED. AN OFFER TRAVELS WITH IT ─────────────────
       // Same `ok: false`, same sentence, and still nothing written to storage or
@@ -146,11 +243,13 @@ export async function attachMedia(postId: string, formData: FormData): Promise<A
       workspaceId: workspace.id,
       postId,
       objectId: randomUUID(),
-      mime: sniffed.image.mime,
+      // `attachImage`, not `sniffed.image`: after a container change these differ,
+      // and a `.webp` key holding JPEG bytes is a file whose own name lies.
+      mime: attachImage.mime,
     })
 
-    const upload = await supabase.storage.from(MEDIA_BUCKET).upload(objectPath, bytes, {
-      contentType: sniffed.image.mime,
+    const upload = await supabase.storage.from(MEDIA_BUCKET).upload(objectPath, attachBytes, {
+      contentType: attachImage.mime,
       upsert: false,
     })
     if (upload.error) {
@@ -165,10 +264,14 @@ export async function attachMedia(postId: string, formData: FormData): Promise<A
         workspace_id: workspace.id,
         post_id: postId,
         storage_path: objectPath,
-        mime: sniffed.image.mime,
-        bytes: bytes.byteLength,
-        width: sniffed.image.width,
-        height: sniffed.image.height,
+        // The row describes the STORED file. The publish job reads `mime` and
+        // `bytes` from here and hands them to the platform gate, so a row that
+        // described the upload rather than the object would refuse a file that is
+        // perfectly good — or pass one that is not.
+        mime: attachImage.mime,
+        bytes: attachBytes.byteLength,
+        width: attachImage.width,
+        height: attachImage.height,
       })
       .select('*')
       .single()
@@ -190,7 +293,15 @@ export async function attachMedia(postId: string, formData: FormData): Promise<A
     }
 
     revalidatePath('/posts')
-    return { ok: true, media: parsed.data, warnings: decision.warnings }
+    return {
+      ok: true,
+      media: parsed.data,
+      warnings: decision.warnings,
+      // Said, never hidden. A photo that arrives as one format and publishes as
+      // another is a fact about the customer's own picture, and learning it later
+      // from a platform is worse than being told now.
+      ...(convertedFrom ? { converted: autoConvertNote(convertedFrom, attachImage.mime) } : {}),
+    }
   } catch (error) {
     console.error('[media] attach threw', error instanceof Error ? error.message : 'unknown')
     reportServerError(error, { action: 'attachMedia', workspaceId })

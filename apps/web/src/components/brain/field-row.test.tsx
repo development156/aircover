@@ -183,7 +183,9 @@ describe('confirming without editing', () => {
 
     // The path and the STORED value: sending anything else would confirm a
     // wording the reader did not agree to.
-    expect(confirmBrainField).toHaveBeenCalledWith('hook.primary_emotion', 'Relief')
+    expect(confirmBrainField).toHaveBeenCalledWith('hook.primary_emotion', 'Relief', {
+      asSeen: true,
+    })
     expect(confirmBrainField).toHaveBeenCalledTimes(1)
   })
 
@@ -198,8 +200,12 @@ describe('confirming without editing', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /Confirm/ }))
 
-    expect(confirmBrainField).toHaveBeenCalledWith('hook.primary_emotion', 'Reassurance')
-    expect(confirmBrainField).not.toHaveBeenCalledWith('hook.primary_emotion', 'Relief')
+    expect(confirmBrainField).toHaveBeenCalledWith('hook.primary_emotion', 'Reassurance', {
+      asSeen: true,
+    })
+    expect(confirmBrainField).not.toHaveBeenCalledWith('hook.primary_emotion', 'Relief', {
+      asSeen: true,
+    })
   })
 
   test('does not open the editor to do it', async () => {
@@ -251,5 +257,105 @@ describe('confirming without editing', () => {
     await userEvent.click(screen.getByRole('button', { name: /Confirm/ }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Sahoda could not save that.')
+  })
+})
+
+/**
+ * MEASURED 2026-09-06 on the wt-core preview, /brain/resolve, network set to
+ * Offline, one "Confirm · free" pressed: the WHOLE console was replaced by the
+ * route error boundary ("Something broke on our side, not yours") — the
+ * transport rejection left `startTransition` unhandled and React unmounted the
+ * tree, taking every ticked checkbox and open editor with it. The failure was
+ * the person's own connection and the sentence blamed us.
+ */
+describe('FieldRow when the action cannot be reached', () => {
+  test('a rejected confirm becomes an inline message, not a thrown render', async () => {
+    confirmBrainField.mockRejectedValue(new TypeError('Failed to fetch'))
+    const user = userEvent.setup()
+    render(<FieldRow field={TEXT_FIELD} value="Relief" state="guessed" />)
+
+    await user.click(screen.getByRole('button', { name: /confirm · free/i }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/connection|reach/i)
+    // Still a guess, still here, still pressable.
+    expect(screen.getByText('Guess')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /confirm · free/i })).toBeEnabled()
+  })
+
+  test('a rejected save keeps the editor open with the typing intact', async () => {
+    confirmBrainField.mockRejectedValue(new TypeError('Failed to fetch'))
+    const user = userEvent.setup()
+    render(<FieldRow field={TEXT_FIELD} value="Relief" state="guessed" />)
+
+    await user.click(screen.getByRole('button', { name: /edit/i }))
+    const input = screen.getByLabelText(TEXT_FIELD.label)
+    await user.clear(input)
+    await user.type(input, 'Confidence')
+    await user.click(screen.getByRole('button', { name: /save/i }))
+
+    await screen.findByRole('alert')
+    expect(screen.getByLabelText(TEXT_FIELD.label)).toHaveValue('Confidence')
+  })
+})
+
+/**
+ * MEASURED 2026-09-06: a single space saved as the third core value and marked
+ * Confirmed (production version 8 of the QA workspace). The editor offered
+ * "Save · free" on a blank exactly as it does on words.
+ */
+describe('FieldRow refuses to save a blank', () => {
+  test('the commit button is disabled while the draft is blank, and says why', async () => {
+    const user = userEvent.setup()
+    render(<FieldRow field={TEXT_FIELD} value="Relief" state="guessed" />)
+
+    await user.click(screen.getByRole('button', { name: /edit/i }))
+    await user.clear(screen.getByLabelText(TEXT_FIELD.label))
+
+    expect(screen.getByRole('button', { name: /save|confirm/i })).toBeDisabled()
+    expect(screen.getByText(/blank/i)).toBeInTheDocument()
+    expect(confirmBrainField).not.toHaveBeenCalled()
+  })
+
+  test('opening the editor moves focus into it', async () => {
+    const user = userEvent.setup()
+    render(<FieldRow field={TEXT_FIELD} value="Relief" state="guessed" />)
+
+    await user.click(screen.getByRole('button', { name: /edit/i }))
+
+    expect(screen.getByLabelText(TEXT_FIELD.label)).toHaveFocus()
+  })
+})
+
+describe('FieldRow — a field seeded from a setup answer', () => {
+  test('is labelled as theirs-reworded, not as a guess, and still offers Confirm', () => {
+    render(<FieldRow field={LIST_FIELD} value={['guilt-free']} state="intake" />)
+    expect(screen.getByText('From your answer')).toHaveAttribute('data-certainty', 'proposed')
+    expect(screen.queryByText('Guess')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /confirm · free/i })).toBeInTheDocument()
+  })
+})
+
+describe('FieldRow — the inline confirm agrees to what was SEEN', () => {
+  test('passes asSeen so a wording that moved underneath is refused, not overwritten', async () => {
+    const user = userEvent.setup()
+    render(<FieldRow field={TEXT_FIELD} value="Relief" state="guessed" />)
+    await user.click(screen.getByRole('button', { name: /confirm · free/i }))
+    expect(confirmBrainField).toHaveBeenCalledWith(TEXT_FIELD.path, 'Relief', { asSeen: true })
+  })
+})
+
+describe('FieldRow — approval is a visible event', () => {
+  test('the chip pops when the state turns confirmed under it, and not on first render', () => {
+    const { rerender } = render(<FieldRow field={TEXT_FIELD} value="Relief" state="guessed" />)
+    expect(screen.getByText('Guess')).not.toHaveAttribute('data-just')
+
+    rerender(<FieldRow field={TEXT_FIELD} value="Relief" state="confirmed" />)
+    expect(screen.getByText('Confirmed')).toHaveAttribute('data-just', 'true')
+  })
+
+  test('a row that arrives already confirmed does not pop', () => {
+    render(<FieldRow field={TEXT_FIELD} value="Relief" state="confirmed" />)
+    expect(screen.getByText('Confirmed')).not.toHaveAttribute('data-just')
   })
 })

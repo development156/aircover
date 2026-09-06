@@ -9,6 +9,7 @@ import type {
   ParsedWebhookEvent,
   PaymentMode,
   PaymentProvider,
+  ProviderOrder,
   WebhookVerifyMeta,
 } from '../types'
 import { CASHFREE_API_VERSION, modeForEnv, type CashfreeEnv } from './env'
@@ -28,11 +29,12 @@ const CreateOrderResponseSchema = z.object({
   order_status: z.string().optional(),
 })
 
-/** Get Order response — used by the order_tags fallback. */
+/** Get Order response — the order_tags fallback and the checkout bridge both read it. */
 const GetOrderResponseSchema = z.object({
   order_id: z.string().min(1),
   order_status: z.string().optional(),
   order_tags: z.record(z.string(), z.string()).nullish(),
+  payment_session_id: z.string().min(1).nullish(),
 })
 
 /** Cashfree's documented error envelope. */
@@ -63,10 +65,11 @@ export interface CashfreeProviderOptions {
 
 /** The provider plus the Cashfree-specific escape hatches the seam cannot express. */
 export type CashfreeProvider = PaymentProvider & {
-  /** `GET /orders/{id}` — reconciliation, and the source of the order_tags fallback. */
-  fetchOrder(
-    orderId: string,
-  ): Promise<{ orderId: string; status: string | null; tags: Record<string, string> | null }>
+  /**
+   * `GET /orders/{id}` — reconciliation, the source of the order_tags fallback, and what the
+   * bridge page reads to hand `payment_session_id` to the browser SDK.
+   */
+  fetchOrder(orderId: string): Promise<ProviderOrder>
   /**
    * Parse a verified webhook, falling back to `GET /orders/{id}` when the delivery carried no
    * order_tags. Async, so it cannot live on the synchronous seam.
@@ -166,9 +169,7 @@ export function createCashfreeProvider(opts: CashfreeProviderOptions): CashfreeP
     }
   }
 
-  async function fetchOrder(
-    orderId: string,
-  ): Promise<{ orderId: string; status: string | null; tags: Record<string, string> | null }> {
+  async function fetchOrder(orderId: string): Promise<ProviderOrder> {
     const res = await transport({
       method: 'GET',
       url: `${env.baseUrl}/orders/${encodeURIComponent(orderId)}`,
@@ -184,6 +185,7 @@ export function createCashfreeProvider(opts: CashfreeProviderOptions): CashfreeP
       orderId: body.order_id,
       status: body.order_status ?? null,
       tags: body.order_tags ?? null,
+      paymentSessionId: body.payment_session_id ?? null,
     }
   }
 

@@ -119,6 +119,7 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 const { saveWorkspaceTheme } = await import('./theme')
+const { revalidatePath } = await import('next/cache')
 
 /**
  * Two colors is enough for brandSkinVars to derive a full token set. These are
@@ -137,6 +138,7 @@ beforeEach(() => {
   state.workspace = { id: WS_ID }
   state.userId = 'user_abc'
   state.calls = { inserted: [], updates: [], selects: [] }
+  vi.mocked(revalidatePath).mockClear()
 })
 
 describe('saveWorkspaceTheme', () => {
@@ -261,8 +263,14 @@ describe('saveWorkspaceTheme', () => {
 
     const result = await saveWorkspaceTheme(COLORS)
 
+    // RETARGETED: `message.length > 0` is true for almost any string,
+    // including a stray Postgres error or a stack trace — it does not pin
+    // the sentence the caller actually sees, or prove the DB write it must
+    // not be credited with. Assert the exact refusal copy and that nothing
+    // downstream treated this as a successful save.
     expect(result.ok).toBe(false)
-    if (!result.ok) expect(result.message.length).toBeGreaterThan(0)
+    if (!result.ok) expect(result.message).toBe('Could not save your theme. Try again.')
+    expect(revalidatePath).not.toHaveBeenCalled()
   })
 
   test('never leaks a raw postgres message to the caller', async () => {

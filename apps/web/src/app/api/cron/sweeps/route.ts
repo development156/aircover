@@ -6,6 +6,7 @@ import {
   sweepExpiredHolds,
 } from '@sahoda/jobs/sweeps'
 import {
+  PUBLISH_LEASE_SECONDS,
   publishPostDeps,
   reconcileSweepDeps,
   runClaimedPublish,
@@ -18,6 +19,8 @@ import { isAuthorizedCronRequest } from '@/lib/cron/authorize'
 import { recordCronRun } from '@/lib/cron/heartbeat-store'
 import { publishFromCronEnabled } from '@/lib/cron/publish-enabled'
 import { runCronSweeps } from '@/lib/cron/run-sweeps'
+import { loopSweepDeps } from '@/lib/loop/store'
+import { runLoopSweep } from '@/lib/loop/sweep'
 import { reportServerError } from '@/lib/observability/report'
 
 /**
@@ -62,14 +65,22 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 /**
- * The platform ceiling (300s on both Hobby and Pro with Fluid compute), and still inside
- * the five-minute cron interval so a tick cannot straddle the next one.
+ * Strictly inside the five-minute cron interval, so a tick cannot straddle the next one.
+ *
+ * ── THIS WAS 300, AND THE SENTENCE ABOVE WAS FALSE AT 300 ────────────────────
+ * 300s is the platform ceiling (Hobby and Pro with Fluid compute), and it is also
+ * EXACTLY the five-minute interval in vercel.json. A tick that ran to its ceiling would
+ * still be publishing when the next one was dispatched, which is precisely the
+ * overlap the claim on post_variants exists to survive and the comment here
+ * promised could not happen. Sixty seconds of headroom makes the promise true:
+ * the next tick fires only after this one has been torn down. `wiring.test.ts`
+ * reads both files and refuses a maxDuration that is not below the interval.
  *
  * Raised from 60 because this route publishes now. One Instagram publish is ~50s of
  * container polling and media upload; 60s could not fit a single one alongside the
  * sweeps. See PUBLISH_BATCH for how the number of publishes is bounded to match.
  */
-export const maxDuration = 300
+export const maxDuration = 240
 
 /**
  * How much work one tick takes on. Both candidate queries are oldest-first, so a backlog
@@ -85,8 +96,11 @@ const HOLD_BATCH = 50
  *
  * The binding constraint is wall-clock, not database work: an Instagram publish spends
  * ~36s polling for its live URL plus the media upload, so each one is ~50s. Four of them
- * is ~200s, which leaves room inside `maxDuration` for the classification pass and the
- * hold sweep with margin for a slow cold start.
+ * is ~200s, which leaves ~40s inside `maxDuration` for the classification pass, the
+ * hold sweep and the reconcile pass. That margin was ~100s when `maxDuration` was 300;
+ * it narrowed when the ceiling was brought under the cron interval, and the batch was
+ * left at four rather than cut to three because nothing has yet MEASURED a tick that
+ * publishes four and overruns. The day one does, this number is the knob.
  *
  * A backlog is not lost, it is DEFERRED: the claim is released or the variant is left
  * pending, `posts.scheduled_at` has not moved, and the next tick five minutes later
@@ -101,6 +115,14 @@ const PUBLISH_BATCH = 4
  * first, so a backlog drains across ticks rather than being attempted at once.
  */
 const RECONCILE_BATCH = 15
+
+/**
+ * How many live Loop cycles the stale-cycle reaper examines per tick. A cycle is
+ * three cheap statements (one guarded UPDATE plus a hold read, and a hold release
+ * only in the rare mid-flight case), and stranded cycles are a slow trickle, so
+ * this is generous. Oldest-first, so a backlog drains across ticks.
+ */
+const LOOP_SWEEP_BATCH = 50
 
 export async function GET(request: Request): Promise<Response> {
   // FIRST STATEMENT IN THE HANDLER, AND IT MUST STAY FIRST. This route is excluded from
@@ -153,6 +175,15 @@ export async function GET(request: Request): Promise<Response> {
 
         const report = await runDispatchSweep({
           ...dispatchSweepDeps({ limit: DISPATCH_BATCH }),
+          // The number `claimVariant` enforces, passed explicitly: the classifier
+          // hands a `publishing` variant older than this back to the claim, and the
+          // two must agree or a dead publisher's row is either held for ever or
+          // offered to a statement that refuses it.
+          leaseSeconds: PUBLISH_LEASE_SECONDS,
+          // The real cause goes to Sentry (apps/jobs/CLAUDE.md rule 5). The report
+          // that crosses the wire carries counts only, so without this a settle that
+          // throws on every post is `failed: 25` and nothing else, every five minutes.
+          onFailure: (e) => reportServerError(e.error, { action: `cron:dispatch:${e.stage}` }),
           enqueuePublish: async (intent) => {
             if (!canPublish || deps === null) {
               // Exactly the pre-release behaviour: classified, counted under
@@ -182,8 +213,26 @@ export async function GET(request: Request): Promise<Response> {
     // anyone who guesses the URL mark another customer's post published.
     runReconcile: () =>
       runReconcileSweep(
-        reconcileSweepDeps({ mode: loadJobsEnv().reconcileMode, limit: RECONCILE_BATCH }),
+        reconcileSweepDeps({
+          mode: loadJobsEnv().reconcileMode,
+          limit: RECONCILE_BATCH,
+          // `failures.ts` calls this hook "the only place the real error survives",
+          // and until it was wired here it was never reached: every per-connection and
+          // per-publish cause was classified to a code and then dropped.
+          onFailure: (e) =>
+            reportServerError(e.error, { action: `cron:reconcile:${e.scope}-${e.stage}` }),
+        }),
       ),
+    // The stale-Loop-cycle reaper: age out cycles stuck in a live status so the
+    // week's one-live-per-week slot is freed and any hold they took is released.
+    // Independent of the other sweeps, and counts-only on the wire like the rest.
+    runLoop: () =>
+      runLoopSweep({
+        ...loopSweepDeps(LOOP_SWEEP_BATCH),
+        // Per-cycle faults do not abort the sweep; this is the only place the real
+        // cause survives. The response body still carries counts only.
+        onError: (_cycleId, error) => reportServerError(error, { action: 'cron:loop-sweep-row' }),
+      }),
     // The real error goes to Sentry; the response says only which sweep failed, because
     // a database error message can carry a connection string, a host or a query.
     onError: (scope, error) => reportServerError(error, { action: `cron:${scope}-sweep` }),

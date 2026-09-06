@@ -90,20 +90,32 @@ export function KillSwitch() {
         </p>
       ) : null}
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Stop the Loop?">
+      {/* The actions ride in the modal's FOOTER slot, dismiss first and the
+          commitment last, on the trailing edge — the order every other footer
+          in the product uses. They sat in the body before, primary on the left,
+          so this one dialog read backwards against its neighbours and, on a
+          short phone viewport, its buttons scrolled away with the text. */}
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        busy={pending}
+        title="Stop the Loop?"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setOpen(false)} disabled={pending}>
+              Leave it running
+            </Button>
+            <Button onClick={stop} loading={pending}>
+              Stop the Loop
+            </Button>
+          </>
+        }
+      >
         <p className="type-body text-muted">
           Every post the Loop scheduled comes off the calendar and goes back to being a draft.
           Nothing is deleted and nothing is published. The Loop stops planning until you turn it
           back on.
         </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button onClick={stop} loading={pending}>
-            Stop the Loop
-          </Button>
-          <Button variant="ghost" onClick={() => setOpen(false)} disabled={pending}>
-            Leave it running
-          </Button>
-        </div>
       </Modal>
     </section>
   )

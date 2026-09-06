@@ -25,6 +25,9 @@ vi.mock('@/lib/inbox/read', () => ({
 }))
 vi.mock('@/lib/inbox/store-read', () => ({
   readStoredThreads: (surface: string, options: unknown) => readStoredThreads(surface, options),
+  // Nothing in these fixtures is waiting on the shop; the "Needs a reply"
+  // mark has its own test in conversation-list.test.tsx.
+  threadsNeedingReply: async () => new Set<string>(),
 }))
 
 const { default: InboxMessagesPage } = await import('./page')

@@ -88,7 +88,7 @@ export function monotoneTangents(xs: readonly number[], ys: readonly number[]): 
 }
 
 /** One run of adjacent points, as a bezier path through them. */
-function runPath(pts: readonly { x: number; y: number }[]): string {
+export function curvePath(pts: readonly { x: number; y: number }[]): string {
   if (pts.length === 0) return ''
   if (pts.length === 1) {
     // A single point has no curve. Drawn as a hairline tick so the reader can
@@ -185,7 +185,7 @@ export function TrendArea({
           </linearGradient>
         </defs>
         {runs.map((run, i) => {
-          const d = runPath(run)
+          const d = curvePath(run)
           if (!d) return null
           const startX = run[0]!.x
           const endX = run[run.length - 1]!.x

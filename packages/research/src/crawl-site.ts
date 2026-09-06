@@ -1,4 +1,4 @@
-import { FirecrawlError } from './firecrawl'
+import { isVendorRefusal } from './vendor-error'
 import { isNearDuplicate, shingles } from './similarity'
 import {
   MAX_PAGES,
@@ -50,7 +50,7 @@ function hostOf(url: string): string {
  * pages they may not own, and worse, files the result under a `source_url` that
  * reads as their own word. `source_url` is required precisely so a founder can
  * check a claim we made about their business; a claim sourced to somebody
- * else's domain quietly breaks that. Firecrawl's `includeSubdomains` is also
+ * else's domain quietly breaks that. A vendor's subdomain default is also
  * pinned to false at the client, so this is the second of two guards.
  */
 /** First path segment — `/products/x` and `/products/y` are one family. */
@@ -187,8 +187,8 @@ export async function crawlSite(rawUrl: string, opts: CrawlSiteOptions): Promise
     creditsUsed += perCall
   } catch (error) {
     // A map failure is not proof the site is unreadable — fall through and try
-    // the home page directly. Only a Firecrawl-side refusal (402/429) stops us.
-    if (error instanceof FirecrawlError && (error.status === 402 || error.status === 429)) {
+    // the home page directly. Only a vendor refusal (402/403/429) stops us.
+    if (isVendorRefusal(error)) {
       return {
         ok: false,
         reason: 'crawler_error',
@@ -229,7 +229,7 @@ export async function crawlSite(rawUrl: string, opts: CrawlSiteOptions): Promise
         }
       }
     } catch (error) {
-      if (error instanceof FirecrawlError && (error.status === 402 || error.status === 429)) {
+      if (isVendorRefusal(error)) {
         crawlerRefused = true
         break
       }

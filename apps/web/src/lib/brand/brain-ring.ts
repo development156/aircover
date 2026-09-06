@@ -21,6 +21,8 @@ import { stateOf, type Provenance } from './provenance'
  */
 export interface BrainRing {
   confirmed: number
+  /** Seeded from setup answers and reworded by Sahoda; unconfirmed, but not a guess. */
+  intake: number
   /** Editable fields only. Derived fields are excluded by construction. */
   total: number
   /** 0-100, rounded. */
@@ -33,10 +35,12 @@ export function brainRing(provenance: Provenance): BrainRing {
   const confirmed = BRAIN_FIELDS.filter(
     (field) => stateOf(provenance, field.path) === 'confirmed',
   ).length
+  const intake = BRAIN_FIELDS.filter((field) => stateOf(provenance, field.path) === 'intake').length
   const next = BRAIN_FIELDS.find((field) => stateOf(provenance, field.path) !== 'confirmed') ?? null
 
   return {
     confirmed,
+    intake,
     total: RING_DENOMINATOR,
     percent: Math.round((confirmed / RING_DENOMINATOR) * 100),
     next,

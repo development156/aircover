@@ -1,7 +1,7 @@
 import Link from 'next/link'
 
 import { brainRing } from '@/lib/brand/brain-ring'
-import type { Provenance } from '@/lib/brand/provenance'
+import { stateOf, type Provenance } from '@/lib/brand/provenance'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -21,7 +21,21 @@ import { cn } from '@/lib/utils'
  */
 const NOTE_ID = 'brain-reresolve-note'
 
-export function BrainHeader({ provenance, version }: { provenance: Provenance; version: number }) {
+export function BrainHeader({
+  provenance,
+  version,
+  recordsAuthorship = false,
+}: {
+  provenance: Provenance
+  version: number
+  /**
+   * True when this brain carries `field_meta` at all. The zero-explanation
+   * below is for brains written BEFORE authorship was recorded; MEASURED
+   * 2026-09-06, it also showed on a brand-new version 1 with nothing to
+   * explain, reading as an apology for corrections that never happened.
+   */
+  recordsAuthorship?: boolean
+}) {
   const ring = brainRing(provenance)
 
   /**
@@ -44,10 +58,10 @@ export function BrainHeader({ provenance, version }: { provenance: Provenance; v
    * therefore written to be true of both: it states the rule going forward and
    * never asserts that earlier edits happened.
    */
-  const explainsZero = ring.confirmed === 0
+  const explainsZero = ring.confirmed === 0 && !recordsAuthorship
 
   return (
-    <section className="flex flex-col gap-4 rounded-card border border-line bg-bg p-5 shadow-card">
+    <section className="surface-ring-lift flex flex-col gap-4 rounded-card bg-surface p-5">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="type-eyebrow text-muted">Confirmed fields</p>
@@ -58,18 +72,29 @@ export function BrainHeader({ provenance, version }: { provenance: Provenance; v
             <span className="num text-[15px] text-muted">of {ring.total}</span>
           </p>
         </div>
+        {/* "Version 3", and nothing after it. The tail read "every edit writes
+            a new one", which explains the versioning MODEL to somebody who is
+            looking at a number. Founder's ruling, 2026-09-03: short labels. The
+            fact it stated is not lost — the paid/free note below still says an
+            edit writes one. */}
         <p className="text-[12.5px] text-muted">
-          Version <span className="num">{version}</span> &middot; every edit writes a new one
+          Version <span className="num">{version}</span>
         </p>
       </div>
 
       {ring.next ? (
         <div className="rounded-input border border-tint-300 bg-tint-50 px-3 py-2.5 dark:bg-s2">
-          <p className="type-eyebrow text-accent">Worth answering next</p>
+          <p className="type-eyebrow text-accent">Answer this next</p>
           <p className="mt-1 text-[13.5px] text-ink">{ring.next.question}</p>
+          {/* The guess STAYS — it is the answer being offered and a real value
+              from the brain — and "Editing it costs nothing" goes, because the
+              note below already says editing is free and saying it twice on one
+              card is the noise this pass exists to remove. */}
           <p className="mt-1 text-[12.5px] text-muted">
-            Sahoda guessed <span className="font-semibold">{ring.next.label}</span> for you. Editing
-            it costs nothing.
+            {stateOf(provenance, ring.next.path) === 'intake'
+              ? 'Sahoda rewrote your answer for'
+              : 'Sahoda guessed'}{' '}
+            <span className="font-semibold">{ring.next.label}</span>
           </p>
         </div>
       ) : (
@@ -81,10 +106,16 @@ export function BrainHeader({ provenance, version }: { provenance: Provenance; v
       )}
 
       {explainsZero ? (
-        <p role="status" className="text-[12.5px] text-muted">
-          Nothing is confirmed yet. Sahoda only started recording who wrote each field in this
-          version of the app, so any corrections you made during setup are not counted here. Edit a
-          field below and it becomes yours.
+        /* SHORTENED, NOT DROPPED. `page.test.tsx` pins this on `role="status"`
+           matching /only started recording who wrote each field/, and the test's
+           own header says why: a workspace whose owner corrected a dozen cards
+           during setup opens at 0 of 15, and an unexplained zero beside "editing
+           is free" reads as "your corrections were discarded". The brief asks
+           for less copy; it does not ask for a zero that looks like lost work.
+           Two sentences instead of three, same claim. */
+        <p role="status" className="type-meta text-muted">
+          Sahoda only started keeping track of who wrote each field in this version, so changes you
+          made during setup are not counted. Edit a field and it becomes yours.
         </p>
       ) : null}
 
@@ -112,11 +143,6 @@ export function BrainHeader({ provenance, version }: { provenance: Provenance; v
         is true in every case, and /onboarding puts the real amount in the
         button that actually spends it.
       */}
-      <p id={NOTE_ID} className="text-[12.5px] text-muted">
-        Editing a field here is free and marks it confirmed. Re-running the whole resolve is a
-        separate, paid action that rewrites every field, including the ones you have already
-        confirmed.
-      </p>
 
       {/* A link wearing the button's clothes. `<Button asChild>` is not the
           route for this: Button always renders a loading slot beside its
@@ -130,8 +156,18 @@ export function BrainHeader({ provenance, version }: { provenance: Provenance; v
         aria-describedby={NOTE_ID}
         className={cn(buttonVariants({ variant: 'secondary' }), 'self-start')}
       >
-        Re-run the whole resolve
+        Rebuild Brand Brain
       </Link>
+      {/* SHORTENED, NOT DROPPED, and it is the note the button is described by.
+          `page.test.tsx` pins /Editing a field here is free/ under the name "the
+          free edit and the paid resolve are told apart in words, and in shape".
+          This is a spend warning: the sentence is what tells somebody that the
+          button beneath rewrites fields they already confirmed, and it is the
+          only place a screen reader hears it. */}
+      <p id={NOTE_ID} className="type-meta text-muted">
+        Editing a field here is free. Rebuilding costs credits and replaces every field, including
+        the ones you confirmed.
+      </p>
     </section>
   )
 }

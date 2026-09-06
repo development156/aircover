@@ -1,4 +1,11 @@
-import type { GenerationMode } from '@sahoda/shared'
+import type {
+  GenerationMode,
+  StampAnchor,
+  StampAnchorMoveReason,
+  StampOutcome,
+} from '@sahoda/shared'
+
+import { relativeAge } from '@/lib/ops/session-pulse'
 
 import type { GenerationCard, GenerationPicture } from './read'
 
@@ -47,6 +54,46 @@ export type CanvasPicture = {
    */
   mode: GenerationMode
   referenceAssetIds: string[]
+  /**
+   * The logo-stamped copy's link, when one exists and signed. The picture keeps
+   * BOTH versions: `url` is always the model's own output, untouched, and this
+   * is the additional one. Nothing here ever replaces `url` — a screen that
+   * swapped them would make the unstamped picture unreachable, which is the
+   * thing `stamped_asset_id` exists to prevent.
+   */
+  stampedUrl: string | null
+  /**
+   * WHY this picture does or does not carry the logo. Null means stamping was
+   * never attempted; `lib/studio/stamp-copy.ts` turns each answer into the one
+   * sentence that is true for it, and refuses to share sentences between them.
+   */
+  stampOutcome: StampOutcome | null
+  /**
+   * The corner the mark actually landed in, and why it moved when it did. Both
+   * null when nothing was recorded. `lib/studio/anchor-note.ts` turns the pair
+   * into the sentence the customer reads about a logo that is not in the corner
+   * they chose; null stays silent rather than claiming "stamped where asked".
+   *
+   * Optional so a fixture, and a component built before the result screen was
+   * wired to read these, need not carry them; `canvasPictures` always sets both,
+   * to a value or to null. An absent field reads exactly like null: not recorded.
+   */
+  stampAnchor?: StampAnchor | null
+  stampAnchorMovedReason?: StampAnchorMoveReason | null
+  /**
+   * How long ago it was made, ALREADY RENDERED, and that is the point.
+   *
+   * A relative age computed in the browser is computed at hydration, against a
+   * clock the server never saw, so React re-renders it and the console fills
+   * with a mismatch on a string nobody can read differently. It is resolved
+   * once here, on the server, against one `now` shared by every picture in the
+   * batch — which also stops two tiles a second apart reading "3 h" and "4 h"
+   * because they were formatted a tick either side of a boundary.
+   *
+   * Null when the row's timestamp will not parse; the caption then carries the
+   * shape alone rather than inventing a time.
+   */
+  madeAgo: string | null
 }
 
 /**
@@ -58,7 +105,15 @@ export type CanvasPicture = {
  * shows position zero, which is the picture that was just paid for. No effect,
  * no id to track, no chance of showing yesterday's.
  */
-export function canvasPictures(cards: readonly GenerationCard[]): CanvasPicture[] {
+export function canvasPictures(
+  cards: readonly GenerationCard[],
+  /**
+   * One clock for the whole batch, injectable so the tests are not racing it.
+   * Defaulted rather than required: every caller wants "now", and a required
+   * argument would only invite each of them to call `new Date()` separately.
+   */
+  now: Date = new Date(),
+): CanvasPicture[] {
   const out: CanvasPicture[] = []
   for (const card of cards) {
     if (card.generation.status !== 'ready') continue
@@ -78,6 +133,11 @@ export function canvasPictures(cards: readonly GenerationCard[]): CanvasPicture[
         mime: picture.mime,
         mode: card.generation.mode,
         referenceAssetIds: [...card.generation.reference_asset_ids],
+        stampedUrl: picture.stampedUrl,
+        stampOutcome: picture.stampOutcome,
+        stampAnchor: picture.stampAnchor ?? null,
+        stampAnchorMovedReason: picture.stampAnchorMovedReason ?? null,
+        madeAgo: relativeAge(card.generation.created_at, now),
       })
     }
   }

@@ -1,6 +1,8 @@
+import { isDispatchable } from '@sahoda/shared'
+
 import type { DisplayPost } from '@/lib/posts/display-post'
 import { needsAPerson } from '@/lib/approvals/queue'
-import { istDayKey } from '@/lib/planner/week-window'
+import { dayKey } from '@/lib/time/day-key'
 
 /**
  * What the planner's toolbar filters, decided ONCE and in a file the tests can
@@ -46,6 +48,15 @@ export function parseDate(raw: string | undefined): string | null {
   return Number.isNaN(at.getTime()) ? null : raw
 }
 
+/**
+ * `?month=YYYY-MM`, or null for "this month". Parsed the way `parseDate` is: a
+ * value that is not a month falls back to now rather than to a grid of nothing.
+ */
+export function parseMonth(raw: string | undefined): string | null {
+  if (raw === undefined || !/^\d{4}-(0[1-9]|1[0-2])$/.test(raw)) return null
+  return raw
+}
+
 /** Trimmed, and capped so a pathological URL cannot become a pathological regex. */
 export function parseQuery(raw: string | undefined): string {
   return (raw ?? '').trim().slice(0, 120)
@@ -58,7 +69,7 @@ export function matchesTab(post: DisplayPost, tab: PlannerTab): boolean {
     case 'scheduled':
       return post.intent === 'scheduled'
     case 'needs-approval':
-      return needsAPerson(post.intent)
+      return needsAPerson(post)
     case 'all':
       return true
   }
@@ -74,11 +85,16 @@ function matchesQuery(post: DisplayPost, query: string): boolean {
   return (post.title ?? '').toLowerCase().includes(query.toLowerCase())
 }
 
-function matchesDate(post: DisplayPost, dateKey: string | null): boolean {
+/**
+ * A `?date=` key matches a post on the calendar day the WORKSPACE keeps. The
+ * mini calendar that writes the key and this reader of it share one zone, or a
+ * picked cell narrows the list to posts that are not in that cell.
+ */
+function matchesDate(post: DisplayPost, dateKey: string | null, zone: string): boolean {
   if (dateKey === null) return true
   if (post.scheduled_at === null) return false
   const at = new Date(post.scheduled_at)
-  return !Number.isNaN(at.getTime()) && istDayKey(at) === dateKey
+  return !Number.isNaN(at.getTime()) && dayKey(zone, at) === dateKey
 }
 
 export interface PlannerFilter {
@@ -87,13 +103,18 @@ export interface PlannerFilter {
   dateKey: string | null
 }
 
-/** All three narrowings, applied together, in the order the toolbar reads. */
+/**
+ * All three narrowings, applied together, in the order the toolbar reads.
+ * `zone` is the workspace's: it decides which day a post's instant falls on.
+ */
 export function applyFilter(
   posts: readonly DisplayPost[],
   { tab, query, dateKey }: PlannerFilter,
+  zone: string,
 ): DisplayPost[] {
   return posts.filter(
-    (post) => matchesTab(post, tab) && matchesQuery(post, query) && matchesDate(post, dateKey),
+    (post) =>
+      matchesTab(post, tab) && matchesQuery(post, query) && matchesDate(post, dateKey, zone),
   )
 }
 
@@ -103,13 +124,29 @@ export function isFiltered({ tab, query, dateKey }: PlannerFilter): boolean {
 }
 
 /**
- * The next few scheduled posts, soonest first. Future only: an "Upcoming" list
- * that includes this morning is not upcoming, and the reader cannot act on it.
+ * Whether the dispatcher will actually send this post: `approved` or
+ * `scheduled`, with a real time. `isDispatchable` in `@sahoda/shared` is the
+ * one definition, shared with the dispatcher's own candidate query.
+ *
+ * ── WHY EVERY "WILL GO OUT" FIGURE READS THIS ────────────────────────────────
+ * "Going out today", "Next up" and "Upcoming" all filtered on `scheduled_at`
+ * alone. A dated DRAFT (every "Plan my week" output) therefore counted as
+ * something that would go out, and the dispatcher never looks at a draft.
+ * MEASURED 2026-09-06: three figures promising posts nothing would send.
+ */
+export function willGoOut(post: DisplayPost): boolean {
+  return isDispatchable(post.intent, post.scheduled_at)
+}
+
+/**
+ * The next few posts that will go out, soonest first. Future only: an
+ * "Upcoming" list that includes this morning is not upcoming, and the reader
+ * cannot act on it. Dispatchable only: see `willGoOut`.
  */
 export function upcoming(posts: readonly DisplayPost[], now: Date, limit: number): DisplayPost[] {
   const at = now.getTime()
   return posts
-    .filter((p) => p.scheduled_at !== null && new Date(p.scheduled_at).getTime() > at)
+    .filter((p) => willGoOut(p) && new Date(p.scheduled_at!).getTime() > at)
     .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime())
     .slice(0, limit)
 }

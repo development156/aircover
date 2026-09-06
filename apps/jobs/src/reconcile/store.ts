@@ -1,6 +1,8 @@
 import type { Pool } from 'pg'
 import { assertPlatformPostId, type Channel } from '@sahoda/shared'
 
+import { withTransaction } from '../db/transaction'
+
 import type { AccountFacts, ConnectionToCheck, PublishResolution, UnresolvedPublish } from './sweep'
 
 /**
@@ -97,6 +99,14 @@ export function createReconcileStore(opts: ReconcileStoreOptions) {
    * Excludes anything already settled with a permalink — that one is done.
    */
   async function listUnresolvedPublishes(): Promise<UnresolvedPublish[]> {
+    // ── DRIVEN FROM THE VARIANTS, NOT FROM THE LOG ─────────────────────────
+    // The old shape scanned `post_publish_logs` (which only ever grows) for every
+    // row carrying a provider id, then took the newest per variant. This one
+    // starts from the variants that are still unresolved — a bounded set — and
+    // asks each for its newest addressable log with ONE probe of
+    // `post_publish_logs_variant_created_idx (variant_id, created_at desc)`.
+    // Same answer, same "newest per variant" rule; the cost is per open variant
+    // rather than per row ever written.
     const r = await pool.query<{
       variant_id: string
       workspace_id: string
@@ -104,18 +114,23 @@ export function createReconcileStore(opts: ReconcileStoreOptions) {
       channel: string
       platform_post_id: string
     }>(
-      `select distinct on (l.variant_id)
-              l.variant_id, l.workspace_id, l.post_id, l.channel, l.platform_post_id
-         from post_publish_logs l
-         join post_variants v on v.id = l.variant_id
+      `select v.id as variant_id, l.workspace_id, l.post_id, l.channel, l.platform_post_id
+         from post_variants v
+         join lateral (
+              select pl.workspace_id, pl.post_id, pl.channel, pl.platform_post_id, pl.created_at
+                from post_publish_logs pl
+               where pl.variant_id = v.id
+                 and pl.platform_post_id is not null
+               order by pl.created_at desc
+               limit 1
+            ) l on true
         -- Every channel on the rail. The two-phase wait is instagram's most
         -- visible symptom but the others go through the same Zernio post object,
         -- so the same "accepted, never resolved" gap exists for all of them.
-        where l.platform_post_id is not null
-          and l.created_at < now() - make_interval(secs => $2::int)
-          and v.permalink is null
+        where v.permalink is null
           and v.publish_status <> 'published'
-        order by l.variant_id, l.created_at desc
+          and l.created_at < now() - make_interval(secs => $2::int)
+        order by l.created_at
         limit $1`,
       [limit, RESOLVE_AFTER_SECONDS],
     )
@@ -187,51 +202,64 @@ export function createReconcileStore(opts: ReconcileStoreOptions) {
     if (resolution.kind === 'pending') return
 
     const succeeded = resolution.kind === 'published'
-    await pool.query(
-      `insert into post_publish_logs
+    // The same pair the publisher writes, and for the same reason it is ONE
+    // transaction there (F-33): a succeeded row committed with the variant left
+    // unmarked is the state `claimVariant` refuses and `listUnresolvedPublishes`
+    // would otherwise keep re-asking Zernio about.
+    //
+    // `idempotency_key` is NULL on this row on purpose. The partial unique index
+    // covers succeeded rows WITH a key, and the publisher's own succeeded row for
+    // this send (if one ever lands) carries it; a reconcile trail that copied the
+    // key would collide with that row instead of sitting beside it as the record
+    // of how we found out.
+    await withTransaction(pool, async (tx) => {
+      await tx.query(
+        `insert into post_publish_logs
          (workspace_id, post_id, variant_id, connection_id, channel, attempt,
-          status, mode, platform_post_id, permalink, error, job_run_id, published_at)
-       values ($1,$2,$3,null,$4,0,$5,'live',$6,$7,$8,$9,$10)`,
-      [
-        item.workspaceId,
-        item.postId,
-        item.variantId,
-        item.channel,
-        succeeded ? 'succeeded' : 'failed',
-        // The log keeps ZERNIO's id: this row is the reconcile trail, and the handle
-        // has to stay addressable. Only post_variants gets the platform id.
-        item.providerPostId,
-        succeeded ? resolution.permalink : null,
-        succeeded
-          ? null
-          : JSON.stringify({
-              code: 'PLATFORM_REJECTED',
-              classification: 'permanent',
-              message: resolution.reason ?? 'The platform refused this post.',
-            }),
-        `reconcile:${item.variantId}`,
-        succeeded ? new Date().toISOString() : null,
-      ],
-    )
+          status, mode, platform_post_id, permalink, error, job_run_id, published_at,
+          idempotency_key)
+       values ($1,$2,$3,null,$4,0,$5,'live',$6,$7,$8,$9,$10,null)`,
+        [
+          item.workspaceId,
+          item.postId,
+          item.variantId,
+          item.channel,
+          succeeded ? 'succeeded' : 'failed',
+          // The log keeps ZERNIO's id: this row is the reconcile trail, and the handle
+          // has to stay addressable. Only post_variants gets the platform id.
+          item.providerPostId,
+          succeeded ? resolution.permalink : null,
+          succeeded
+            ? null
+            : JSON.stringify({
+                code: 'PLATFORM_REJECTED',
+                classification: 'permanent',
+                message: resolution.reason ?? 'The platform refused this post.',
+              }),
+          `reconcile:${item.variantId}`,
+          succeeded ? new Date().toISOString() : null,
+        ],
+      )
 
-    await pool.query(
-      `update post_variants
+      await tx.query(
+        `update post_variants
           set publish_status = $3,
               platform_post_id = coalesce($4, platform_post_id),
               permalink = coalesce($5, permalink),
               publish_claimed_at = null
         where id = $1 and workspace_id = $2`,
-      [
-        item.variantId,
-        item.workspaceId,
-        succeeded ? 'published' : 'failed',
-        // The PLATFORM's id, taken from the leg we just re-read — never
-        // `item.providerPostId`, which is Zernio's `_id`. `coalesce` above means a
-        // null leaves whatever is already there rather than clearing it.
-        resolution.kind === 'published' ? assertPlatformPostId(resolution.platformPostId) : null,
-        succeeded ? resolution.permalink : null,
-      ],
-    )
+        [
+          item.variantId,
+          item.workspaceId,
+          succeeded ? 'published' : 'failed',
+          // The PLATFORM's id, taken from the leg we just re-read — never
+          // `item.providerPostId`, which is Zernio's `_id`. `coalesce` above means a
+          // null leaves whatever is already there rather than clearing it.
+          resolution.kind === 'published' ? assertPlatformPostId(resolution.platformPostId) : null,
+          succeeded ? resolution.permalink : null,
+        ],
+      )
+    })
   }
 
   return { listConnectionsToCheck, listUnresolvedPublishes, applyAccountFacts, applyResolution }
