@@ -62,7 +62,7 @@ const ROUTES: ReadonlyArray<{ path: string; slug: string; archetype: string }> =
   // wt-radar's lane and the `competitors` table is not in this branch. The
   // populated states are shot separately, off the fixture store, since a route
   // that needs a competitor id would 404 here.
-  { path: '/radar', slug: 'radar', archetype: 'change feed · collector absent' },
+  { path: '/radar', slug: 'radar', archetype: 'watch list · collector absent' },
   { path: '/report', slug: 'report', archetype: 'roadmap · document' },
   // No longer a roadmap screen: both doors into `leads` are open, so this is a
   // real pipeline over real rows. Kept in the camera because a pipeline is a

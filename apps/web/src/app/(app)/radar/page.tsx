@@ -2,15 +2,16 @@ import Link from 'next/link'
 import { Activity, Radar as RadarIcon, Timer } from 'lucide-react'
 import { creditCost } from '@sahoda/shared'
 
-import { EmptyState } from '@/components/empty-state'
 import { PageTitle } from '@/components/page-title'
 import { creditWord } from '@/lib/credit-words'
 import { ChangeFeed } from '@/components/radar/change-feed'
 import { RadarScope } from '@/components/radar/radar-scope'
-import { WatchForm, WatchRows } from '@/components/radar/watch-list'
-import { WatchSummary } from '@/components/radar/watch-summary'
+import { WatchBoard } from '@/components/radar/watch-board'
 import { connectedChannels } from '@/app/actions/radar'
+import { radarScanEnabled } from '@/lib/cron/radar-enabled'
+import { watchCards } from '@/lib/radar/cards'
 import { radarStore } from '@/lib/radar/read'
+import { nextScanDate } from '@/lib/radar/schedule'
 import { getActiveWorkspace } from '@/lib/workspaces'
 
 export const metadata = { title: 'Radar' }
@@ -44,16 +45,20 @@ export const metadata = { title: 'Radar' }
  * product that distinguishes "their page did not load" from "their week was
  * quiet" and then blurs its own three states has not understood its own point.
  *
- * ── THE 2026-08-29 REDESIGN, AND THE ONE THING IT WAS NOT ALLOWED TO DO ─────
- * The founder asked for a hero, a live radar and a two-column grid. All three
- * are here. What they also asked for, and what is deliberately absent, is a
- * radar full of pretty data points on a screen where nobody is being watched.
+ * ── THE 2026-09-06 REDESIGN: THE RADAR ARRIVES WITH THE FIRST WATCH ─────────
+ * The instrument used to be drawn beside the headline on every visit, with an
+ * empty sky when nobody was watched. `RadarScope` was already honest about the
+ * marks; what it could not fix is that a radar face is the most confident object
+ * on the screen, and it was at its largest on the visit where Sahoda knew the
+ * least. So the first screen is now the introduction and the form and nothing
+ * else, the radar appears when there is something on it, and the moment between
+ * the two is a real transition rather than a page that silently reflows.
  *
- * `RadarScope` takes the REAL number of watches and draws that many marks, so a
- * first-time reader sees an empty sky rather than a picture of somebody else's
- * competitors. And the sweep only turns when `collector !== 'absent'` — an
- * animated scan over a collector that is not built is an animation claiming
- * work nobody is doing, which is the same defect as a fabricated number, moving.
+ * The `h1` is unchanged, and deliberately: it is pinned in `e2e/helpers/headings.ts`
+ * and asserted by a smoke spec whose fixture is a brand-new workspace — that is,
+ * by the empty state below. `PageTitle` is still not used here, for the reason it
+ * was never used here: a feature that has to explain itself to a first-time
+ * reader needs a headline that is a sentence, and `PageTitle` renders a noun.
  */
 export default async function RadarPage() {
   const workspace = await getActiveWorkspace()
@@ -78,39 +83,42 @@ export default async function RadarPage() {
   ])
 
   const scanning = snapshot.collector !== 'absent'
+  const cards = watchCards(snapshot)
+  const watching = cards.length > 0
 
   return (
     <div className="space-y-grid">
       {/* ── THE HERO ────────────────────────────────────────────────────────
-          The eyebrow, the headline and the radar, in one band. `PageTitle` is
-          NOT used here and this is the second screen to make that call
-          deliberately (see `greeting-banner.tsx` on /home): a product feature
-          that has to explain itself to a first-time reader needs a headline
-          that is a sentence, and `PageTitle` renders a noun.
-
-          THE DOCUMENT OUTLINE IS UNCHANGED. THE TESTS WERE NOT, and the comment
-          here used to claim both. Four assertions in three specs matched on the
-          heading's accessible NAME, not merely its presence, so changing the
-          words broke `every-section-loads.spec.ts` (twice), `radar-certainty`
-          and `radar-to-draft`. None of them could say so: the smoke leg has no
-          working environment in this repository, so it would have failed on the
-          way to production instead. The pattern now lives once, in
-          `e2e/helpers/headings.ts`, and the section name stays on the screen as
-          the eyebrow below. */}
-      <section className="grid items-center gap-6 wide:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
+          Two shapes, one band. With nobody watched it is a single column at
+          reading width and there is no instrument in it; with a watch list it
+          narrows and the radar takes the right-hand cell, drawing exactly as
+          many marks as there are businesses. */}
+      <section
+        className={
+          watching
+            ? 'grid items-center gap-6 wide:grid-cols-[minmax(0,1fr)_minmax(0,340px)]'
+            : 'mx-auto w-full max-w-[720px]'
+        }
+      >
         <div className="min-w-0">
           <p className="type-eyebrow flex items-center gap-2 text-accent">
             <RadarIcon size={15} strokeWidth={1.9} aria-hidden />
             Radar
           </p>
-          <h1 className="mt-2 type-display max-w-[24ch] text-ink">Stay ahead of what matters.</h1>
+          <h1 className={`mt-2 max-w-[24ch] text-ink ${watching ? 'type-h1' : 'type-display'}`}>
+            Stay ahead of what matters.
+          </h1>
           <p className="type-body mt-2 max-w-[52ch] text-muted">
-            What the businesses beside you are doing, and what your brand would say about it.
+            Track the businesses, websites and listings that matter to your brand. Sahoda reads them
+            once a week and tells you what actually moved.
           </p>
         </div>
-        <div className="mx-auto w-full max-w-[420px] max-narrow:max-w-[300px]">
-          <RadarScope marks={snapshot.competitors.length} scanning={scanning} />
-        </div>
+
+        {watching ? (
+          <div className="mx-auto w-full max-w-[340px] max-narrow:max-w-[240px]">
+            <RadarScope marks={cards.length} scanning={scanning} />
+          </div>
+        ) : null}
       </section>
 
       {snapshot.collector === 'absent' ? (
@@ -152,16 +160,22 @@ export default async function RadarPage() {
         </section>
       ) : (
         <>
-          {/* Twelve columns of intent, in two: the summary and the form on the
-              left, the feed on the right. `items-start` rather than `stretch`
-              so the feed does not grow to match a short left column, which is
-              what turns a grid into two boxes of empty space. */}
-          <div className="grid items-start gap-4 wide:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
-            <div className="flex flex-col gap-4">
-              <WatchSummary competitors={snapshot.competitors} />
-              <WatchForm />
-            </div>
+          <WatchBoard
+            cards={cards}
+            nextScan={nextScanDate(new Date())}
+            scanArmed={radarScanEnabled()}
+            perScan={perScan}
+            scanning={scanning}
+          />
 
+          {/* ── WHAT CHANGED, UNDER THE LIST RATHER THAN BESIDE IT ──────────
+              It stays on THIS route, and that is not a layout preference: the
+              certainty marks and the draft-a-reply control are asserted here by
+              two specs, and moving the feed to the detail page would leave both
+              with nothing to measure. It renders only when there is genuinely
+              something in it, so the watch list is the whole screen until Radar
+              has read something. */}
+          {snapshot.days.length > 0 ? (
             <section
               aria-labelledby="radar-changes"
               className="surface-ring flex flex-col gap-3 rounded-card bg-surface p-5"
@@ -176,45 +190,13 @@ export default async function RadarPage() {
                 </p>
               </div>
 
-              {snapshot.competitors.length === 0 ? (
-                /* WATCHING NOBODY — and the empty state teaches rather than
-                 reports. "No competitors yet" tells a reader something they can
-                 already see; what they cannot see is what naming one would get
-                 them. */
-                <EmptyState
-                  icon={RadarIcon}
-                  title="You are not watching anyone yet"
-                  body="Name a business above and Radar reads its public pages once a week, then tells you what moved (a new offer, a price that changed, a posting rhythm that shifted) and what your own brand would say back."
-                  tip="Watch the shop your customers compare you against, not the biggest name in your category."
-                />
-              ) : snapshot.collector === 'watch-list-only' ? (
-                /* WATCHING, BUT THIS SCREEN CANNOT READ THE READINGS.
-                 An empty feed here would be a CLAIM — "nothing changed" — and
-                 this binding has not earned it. See lib/radar/store.ts. */
-                <p className="surface-ring rounded-card bg-surface p-4 type-body text-muted">
-                  Your watch list is stored, and the weekly readings are not wired into this screen
-                  yet. This is not &ldquo;nothing changed&rdquo; &mdash; it is Radar not being able
-                  to tell you either way, and those are different things.
-                </p>
-              ) : snapshot.days.length === 0 ? (
-                <p className="surface-ring rounded-card bg-surface p-4 type-body text-muted">
-                  Nothing has been read yet. The first scan runs within the week, and what it finds
-                  appears here newest first.
-                </p>
-              ) : (
-                <ChangeFeed
-                  days={snapshot.days}
-                  competitors={snapshot.competitors}
-                  channels={channels}
-                />
-              )}
+              <ChangeFeed
+                days={snapshot.days}
+                competitors={snapshot.competitors}
+                channels={channels}
+              />
             </section>
-          </div>
-
-          {/* The list itself, full width under the two columns. It is what
-              "View all watches" in the summary anchors to, and it renders
-              nothing at all when there is nobody on it. */}
-          <WatchRows competitors={snapshot.competitors} />
+          ) : null}
         </>
       )}
     </div>

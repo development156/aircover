@@ -1,14 +1,15 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { ArrowRight, AtSign, Building2, MapPin, ShieldCheck, Target, Trash2 } from 'lucide-react'
-import { addCompetitor, removeCompetitor } from '@/app/actions/radar'
+import { ArrowRight, ShieldCheck, Target } from 'lucide-react'
+import { addCompetitor } from '@/app/actions/radar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { InlineError } from '@/components/posts/inline-error'
-import { COMPETITOR_KIND_LABELS, type Competitor, type CompetitorKind } from '@/lib/radar/types'
+import { creditWord } from '@/lib/credit-words'
+import { COMPETITOR_KIND_LABELS, type CompetitorKind } from '@/lib/radar/types'
 
 /**
  * THE WATCH LIST — who is being read, and what that costs.
@@ -33,29 +34,19 @@ import { COMPETITOR_KIND_LABELS, type Competitor, type CompetitorKind } from '@/
  */
 
 /**
- * One mark per kind of page. `AtSign` for Instagram rather than a brand glyph:
- * this lucide build ships no brand icons, and a handle is what the reader
- * actually typed in.
- */
-const KIND_ICON: Record<CompetitorKind, typeof Building2> = {
-  website: Building2,
-  instagram: AtSign,
-  google_business: MapPin,
-}
-
-/**
- * ── ONE COMPONENT BECAME TWO, AND THE SPLIT IS THE LAYOUT'S ────────────────
- * `WatchList` was a heading, an explanatory paragraph, the list and the form in
- * one column. The redesign puts the explanation and the counts beside the radar
- * (`watch-summary.tsx`) and the form a row below it, so the two halves now sit
- * in different grid cells and cannot be one component.
+ * ── THIS FILE IS THE FORM AND NOTHING ELSE NOW ─────────────────────────────
+ * It used to carry the rows as well, and a summary card sat beside them holding
+ * three counts and the price. The 2026-09-06 redesign gives the rows to
+ * `watch-board.tsx`, which is the only component that knows which of the three
+ * screen states is showing, and moves the price onto this form, which is the
+ * control that actually commits the charge.
  *
- * They keep separate error state on purpose. A refused delete and a refused add
- * are different sentences about different rows, and sharing one string meant
- * removing a competitor could clear the message explaining why the last add
- * failed — with the half-filled form still on screen.
+ * The form keeps its OWN error and does not share one with the rows. A refused
+ * delete and a refused add are different sentences about different things, and
+ * sharing one string meant removing a business could clear the message
+ * explaining why the last add failed, with the half-filled form still on screen.
  */
-export function WatchForm() {
+export function WatchForm({ onAdded, perScan }: { onAdded?: () => void; perScan: number }) {
   const [name, setName] = useState('')
   const [url, setUrl] = useState('')
   const [kind, setKind] = useState<CompetitorKind>('website')
@@ -73,6 +64,10 @@ export function WatchForm() {
       }
       setName('')
       setUrl('')
+      // The board owns what happens next: it holds the reveal open until the
+      // refreshed list actually carries the new row, so the form does not get to
+      // decide the screen has moved on.
+      onAdded?.()
     })
   }
 
@@ -136,92 +131,23 @@ export function WatchForm() {
         {/* The reassurance says the CADENCE and the CHARGE, because those are
             the two things a person hesitates over before naming somebody else's
             business. "We'll alert you to meaningful changes" on its own is a
-            promise about judgement; this is a statement about a schedule. */}
+            promise about judgement; this is a statement about a schedule.
+
+            THE PRICE LIVES HERE NOW, and `data-credit-price` with it. It used to
+            sit in a summary card beside the list, which meant it was on the
+            screen only once somebody was already watching somebody — after the
+            spend rather than before it. This is the control that commits the
+            charge, so this is where the charge is stated. */}
         <p className="type-meta flex items-start gap-1.5 text-muted">
           <ShieldCheck size={13} strokeWidth={1.8} aria-hidden className="mt-icon-nudge shrink-0" />
-          Read once a week. You will see what moved, and a page that will not load is skipped and
-          not charged.
+          Read once a week, at{' '}
+          <span data-credit-price="radar_scan" className="num">
+            {perScan}
+          </span>{' '}
+          {creditWord(perScan)} a scan. You will see what moved, and a page that will not load is
+          skipped and not charged.
         </p>
       </form>
-    </section>
-  )
-}
-
-/**
- * The businesses already on the list. Its own component and its own error, so a
- * refused removal is reported next to the rows rather than under the add form.
- */
-export function WatchRows({ competitors }: { competitors: readonly Competitor[] }) {
-  const [error, setError] = useState<string | null>(null)
-  const [pending, startTransition] = useTransition()
-
-  function drop(id: string) {
-    setError(null)
-    startTransition(async () => {
-      // The result is READ. Discarding it left a refused delete looking like a
-      // successful one: the row stayed on screen, nothing was said, and the
-      // obvious next move for the reader is to press it again.
-      const result = await removeCompetitor(id)
-      if (!result.ok) setError(result.message)
-    })
-  }
-
-  if (competitors.length === 0) return null
-
-  return (
-    <section
-      id="radar-watch-list"
-      aria-label="Businesses you are watching"
-      className="flex flex-col gap-2"
-    >
-      {error ? <InlineError>{error}</InlineError> : null}
-      <ul className="grid gap-2 wide:grid-cols-2">
-        {competitors.map((competitor) => {
-          const Icon = KIND_ICON[competitor.kind]
-          return (
-            <li
-              key={competitor.id}
-              // `min-w-0` IS LOAD-BEARING, not tidying. These are GRID items,
-              // and a grid item's default `min-width: auto` refuses to shrink
-              // below its content's min-content width — so the `truncate` on
-              // the name never got a chance to act and the row pushed the
-              // whole page to 464px at a 390 viewport. MEASURED, not guessed:
-              // the three offenders in the overflow probe were all this `li`.
-              className="surface-ring flex min-w-0 items-center gap-3 rounded-card bg-surface px-3 py-3"
-            >
-              <Icon size={15} strokeWidth={1.8} aria-hidden className="shrink-0 text-muted" />
-              <span className="min-w-0 flex-1">
-                <span className="type-sm block truncate text-ink">{competitor.name}</span>
-                <span className="type-eyebrow block truncate text-muted">
-                  {COMPETITOR_KIND_LABELS[competitor.kind]}
-                  {competitor.lastObservedAt ? (
-                    <>
-                      {' · read '}
-                      <span className="num">{competitor.lastObservedAt.slice(0, 10)}</span>
-                    </>
-                  ) : (
-                    // NOT a dash. "Never read" is a fact about our collector,
-                    // and a dash here would read as "nothing has happened at
-                    // that business" — the exact confusion this screen exists
-                    // to prevent, one component down.
-                    ' · not read yet'
-                  )}
-                </span>
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => drop(competitor.id)}
-                disabled={pending}
-              >
-                <Trash2 size={14} aria-hidden />
-                <span className="sr-only">Stop watching {competitor.name}</span>
-                <span aria-hidden>Remove</span>
-              </Button>
-            </li>
-          )
-        })}
-      </ul>
     </section>
   )
 }
