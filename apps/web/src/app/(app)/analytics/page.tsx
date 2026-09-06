@@ -13,6 +13,8 @@ import type { Headline } from '@/lib/analytics/headline'
 import { HeadlineStrip } from '@/components/analytics/headline-strip'
 import { KpiStrip } from '@/components/analytics/kpi-strip'
 import { PostsOverTime, PostsPerPlatform } from '@/components/analytics/posts-per-platform'
+import { PlatformTable } from '@/components/analytics/platform-table'
+import { platformRows } from '@/lib/analytics/platform-breakdown'
 import { postsPerChannel, postsPerWeek } from '@/lib/analytics/distribution'
 import { analyticsKpis, followersFromAccount } from '@/lib/analytics/kpi'
 import { ACCOUNT_READ_TTL_MINUTES } from '@/lib/analytics/account-insights'
@@ -313,6 +315,11 @@ export default async function AnalyticsPage({
    * summed off Zernio's days. A total assembled from the wrong source would be
    * a number the chart under it could not reproduce.
    */
+  /**
+   * Every metric, every platform. Derived from the SAME live read the chart
+   * legend uses, so the table and the chart can never disagree about a total.
+   */
+  const breakdown = daily.kind === 'ready' ? platformRows(daily.platforms) : []
   const live = daily.kind === 'ready' ? dailyTotals(daily.days) : null
   const metricLabel = (key: AnalyticsMetric): string =>
     isStoredMetric(key) ? METRIC_LABELS[key] : LIVE_METRIC_LABELS[key as LiveMetric]
@@ -428,6 +435,12 @@ export default async function AnalyticsPage({
         ageDays={window.ageDays}
         timezone={window.timezone}
       />
+
+      {/* ── EVERY METRIC AS ITSELF ────────────────────────────────────────
+          The one place likes, comments, shares and saves are not folded into a
+          single `engagement` figure, because this is the only source that
+          keeps them apart. */}
+      <PlatformTable read={daily} rows={breakdown} windowLabel={label} />
 
       <ChannelCards rows={window.rows} ageDays={window.ageDays} />
 
