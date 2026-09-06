@@ -141,6 +141,13 @@ export {
   type ZernioDailyMetricValues,
   type ZernioDailyMetricsFilter,
   type ZernioDailyPlatformRow,
+  type ZernioFollowerAccount,
+  type ZernioFollowerPoint,
+  type ZernioFollowerStats,
+  type ZernioFollowerStatsFilter,
+  type ZernioFrequencyRow,
+  type ZernioDecayBucket,
+  type ZernioPostingAnalyticsFilter,
 } from './zernio/reads'
 
 // ── What an audience read is ALLOWED to claim ────────────────────────────────

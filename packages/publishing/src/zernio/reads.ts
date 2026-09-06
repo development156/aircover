@@ -594,6 +594,100 @@ export interface ZernioDailyMetricsFilter {
   source?: 'all' | 'late' | 'external'
 }
 
+/**
+ * `GET /v1/accounts/follower-stats` — follower history for EVERY connected
+ * account, per platform.
+ *
+ * ── WHY THIS EXISTS BESIDE `instagramFollowerHistory` ────────────────────────
+ * That one is account-scoped, Instagram-only, and is what the Account health
+ * panel reads. This one is profile-scoped and answers for every platform at
+ * once, which is the only way to draw one chart per channel. Two endpoints, two
+ * shapes, and they are not interchangeable: this one keys its series by
+ * Zernio's account `_id` and the other returns Meta's own metric bag.
+ *
+ * Counts are refreshed once a day on Zernio's side, so a series is at most one
+ * point per day however often it is asked. Requires the Analytics add-on: a
+ * legacy plan answers 403 `requiresAddon`, which throws and MUST NOT be read as
+ * "nothing is connected".
+ */
+export interface ZernioFollowerAccount {
+  /** Zernio's account id. The key into `stats`. */
+  id: string
+  platform: string
+  username: string | null
+  /** Nullable throughout: a figure that did not arrive is not a zero. */
+  currentFollowers: number | null
+  growth: number | null
+  growthPercentage: number | null
+  dataPoints: number
+}
+
+export interface ZernioFollowerPoint {
+  /** `YYYY-MM-DD`. */
+  date: string
+  followers: number
+}
+
+export interface ZernioFollowerStats {
+  accounts: ZernioFollowerAccount[]
+  /** Account id to its series, oldest first. Absent accounts have no entry. */
+  stats: Record<string, ZernioFollowerPoint[]>
+  granularity: string | null
+}
+
+export interface ZernioFollowerStatsFilter {
+  /** `YYYY-MM-DD`. Zernio defaults to 30 days ago. */
+  fromDate?: string
+  toDate?: string
+  granularity?: 'daily' | 'weekly' | 'monthly'
+}
+
+/**
+ * `GET /v1/analytics/posting-frequency` — cadence against engagement.
+ *
+ * One row per (platform, posts_per_week) pair, with the average engagement rate
+ * observed across the weeks that matched that frequency. `weeksCount` is the
+ * sample behind each row and is the reason it is carried rather than dropped: a
+ * rate from one week is not a finding, and a chart that plotted it beside a rate
+ * from eighteen weeks would give them the same weight.
+ *
+ * `[DOC]`, not `[LIVE]`. The shape comes from the OpenAPI spec; no workspace
+ * with a connected account was reachable from the sandbox this was written in,
+ * so nothing here has been seen on the wire. Requires the Analytics add-on.
+ */
+export interface ZernioFrequencyRow {
+  platform: string
+  postsPerWeek: number
+  /** A PERCENTAGE, 0-100, as Zernio sends it. Not a fraction. */
+  avgEngagementRate: number | null
+  avgEngagement: number | null
+  weeksCount: number
+}
+
+/**
+ * `GET /v1/analytics/content-decay` — how engagement accumulates after a post.
+ *
+ * Seven buckets from "0-6h" to "30d+", each carrying the average share of a
+ * post's FINAL engagement that had arrived by then, and the number of posts
+ * behind that average. The bucket labels are Zernio's own strings and are shown
+ * as they arrive rather than re-derived, because a label this product invented
+ * would eventually disagree with the window it names.
+ *
+ * `[DOC]`, not `[LIVE]`. Same reason as above.
+ */
+export interface ZernioDecayBucket {
+  order: number
+  label: string
+  /** A PERCENTAGE, 0-100. Null when it did not arrive. */
+  avgPctOfFinal: number | null
+  postCount: number
+}
+
+export interface ZernioPostingAnalyticsFilter {
+  platform?: string
+  source?: 'all' | 'late' | 'external'
+}
+
 export interface ZernioReads {
   // ── analytics, profile-scoped ──────────────────────────────────────────────
   /**
@@ -769,6 +863,39 @@ export interface ZernioReads {
     profile: ScopedProfileId,
     filter: ZernioDailyMetricsFilter,
   ): Promise<ZernioDailyMetrics>
+
+  /**
+   * Follower history for every connected account, per platform.
+   *
+   * The profile-scoped sibling of `instagramFollowerHistory`, which answers for
+   * one Instagram account and returns a different shape entirely. This is the
+   * only source that can draw a follower line per channel.
+   */
+  followerStats(
+    profile: ScopedProfileId,
+    filter?: ZernioFollowerStatsFilter,
+  ): Promise<ZernioFollowerStats>
+
+  /**
+   * Posting cadence against engagement, per platform. `[DOC]` shape.
+   *
+   * Answers "does posting four times a week do better than two?" from this
+   * workspace's own history. Never a recommendation on its own: a row backed by
+   * one week is not evidence, which is why `weeksCount` is required here.
+   */
+  postingFrequency(
+    profile: ScopedProfileId,
+    filter?: ZernioPostingAnalyticsFilter,
+  ): Promise<{ frequency: ZernioFrequencyRow[] }>
+  /**
+   * How quickly a post's engagement arrives after it goes out. `[DOC]` shape.
+   *
+   * Requires the Analytics add-on, and answers 403 `requiresAddon` without it.
+   */
+  contentDecay(
+    profile: ScopedProfileId,
+    filter?: ZernioPostingAnalyticsFilter,
+  ): Promise<{ buckets: ZernioDecayBucket[] }>
 }
 
 export function createZernioReads(deps: ZernioClientDeps): ZernioReads {
@@ -1147,6 +1274,128 @@ export function createZernioReads(deps: ZernioClientDeps): ZernioReads {
         platformBreakdown: (Array.isArray(data.platformBreakdown) ? data.platformBreakdown : [])
           .map(dailyPlatform)
           .filter((row): row is ZernioDailyPlatformRow => row !== null),
+      }
+    },
+    async followerStats(profile, filter) {
+      const { data } = await json<{
+        accounts?: unknown[]
+        stats?: Record<string, unknown>
+        granularity?: unknown
+      }>(
+        'GET',
+        `/accounts/follower-stats${qs({
+          profileId: profile,
+          fromDate: filter?.fromDate,
+          toDate: filter?.toDate,
+          granularity: filter?.granularity,
+        })}`,
+        'followerStats',
+      )
+
+      const stats: Record<string, ZernioFollowerPoint[]> = {}
+      for (const [id, series] of Object.entries(data.stats ?? {})) {
+        if (!Array.isArray(series)) continue
+        const points: ZernioFollowerPoint[] = []
+        for (const raw of series) {
+          if (typeof raw !== 'object' || raw === null) continue
+          const row = raw as Record<string, unknown>
+          const date = typeof row.date === 'string' ? row.date.slice(0, 10) : null
+          const followers = dailyNum(row.followers)
+          // A point missing either half is DROPPED. A date with no count is not
+          // a day of zero followers, and a count with no date cannot be plotted.
+          if (date === null || !/^\d{4}-\d{2}-\d{2}$/.test(date) || followers === null) continue
+          points.push({ date, followers })
+        }
+        stats[id] = points.sort((a, b) => a.date.localeCompare(b.date))
+      }
+
+      return {
+        accounts: (Array.isArray(data.accounts) ? data.accounts : []).flatMap((raw) => {
+          if (typeof raw !== 'object' || raw === null) return []
+          const row = raw as Record<string, unknown>
+          const id = typeof row._id === 'string' ? row._id : null
+          const platform = typeof row.platform === 'string' ? row.platform : null
+          // An account with no id cannot be joined to its series, and one with
+          // no platform cannot be labelled. Neither is guessed at.
+          if (id === null || platform === null) return []
+          return [
+            {
+              id,
+              platform,
+              username: typeof row.username === 'string' ? row.username : null,
+              currentFollowers: dailyNum(row.currentFollowers),
+              growth: dailyNum(row.growth),
+              growthPercentage: dailyNum(row.growthPercentage),
+              dataPoints: dailyNum(row.dataPoints) ?? 0,
+            },
+          ]
+        }),
+        stats,
+        granularity: typeof data.granularity === 'string' ? data.granularity : null,
+      }
+    },
+    async postingFrequency(profile, filter) {
+      const { data } = await json<{ frequency?: unknown[] }>(
+        'GET',
+        `/analytics/posting-frequency${qs({
+          profileId: profile,
+          platform: filter?.platform,
+          source: filter?.source,
+        })}`,
+        'postingFrequency',
+      )
+      return {
+        frequency: (Array.isArray(data.frequency) ? data.frequency : []).flatMap((raw) => {
+          if (typeof raw !== 'object' || raw === null) return []
+          const row = raw as Record<string, unknown>
+          const platform = typeof row.platform === 'string' ? row.platform : null
+          const postsPerWeek = dailyNum(row.posts_per_week)
+          // Both halves name the row. Without either there is nothing to plot
+          // it against, and a default would be a cadence nobody observed.
+          if (platform === null || postsPerWeek === null) return []
+          return [
+            {
+              platform,
+              postsPerWeek,
+              avgEngagementRate: dailyNum(row.avg_engagement_rate),
+              avgEngagement: dailyNum(row.avg_engagement),
+              weeksCount: dailyNum(row.weeks_count) ?? 0,
+            },
+          ]
+        }),
+      }
+    },
+
+    async contentDecay(profile, filter) {
+      const { data } = await json<{ buckets?: unknown[] }>(
+        'GET',
+        `/analytics/content-decay${qs({
+          profileId: profile,
+          platform: filter?.platform,
+          source: filter?.source,
+        })}`,
+        'contentDecay',
+      )
+      return {
+        buckets: (Array.isArray(data.buckets) ? data.buckets : [])
+          .flatMap((raw) => {
+            if (typeof raw !== 'object' || raw === null) return []
+            const row = raw as Record<string, unknown>
+            const label = typeof row.bucket_label === 'string' ? row.bucket_label : null
+            const order = dailyNum(row.bucket_order)
+            // An unlabelled or unordered bucket cannot be placed on an axis
+            // whose whole meaning is the order of its buckets.
+            if (label === null || order === null) return []
+            return [
+              {
+                order,
+                label,
+                avgPctOfFinal: dailyNum(row.avg_pct_of_final),
+                postCount: dailyNum(row.post_count) ?? 0,
+              },
+            ]
+          })
+          .sort((a, b) => a.order - b.order),
       }
     },
   }

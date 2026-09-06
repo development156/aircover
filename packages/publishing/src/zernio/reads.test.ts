@@ -102,6 +102,9 @@ describe('every profile-scoped read puts profileId on the wire', () => {
       (r: ReturnType<typeof readsWith>['reads']) =>
         r.inboxTopAccounts(profile, { fromDate: '2026-08-01' }),
     ],
+    ['followerStats', (r: ReturnType<typeof readsWith>['reads']) => r.followerStats(profile)],
+    ['postingFrequency', (r: ReturnType<typeof readsWith>['reads']) => r.postingFrequency(profile)],
+    ['contentDecay', (r: ReturnType<typeof readsWith>['reads']) => r.contentDecay(profile)],
   ])('%s sends profileId', async (_name, call) => {
     const { reads, cap } = readsWith()
     await call(reads)
@@ -509,5 +512,111 @@ describe('inbox analytics reads', () => {
     const result = await reads.inboxTopAccounts(profile, { fromDate: '2026-08-01', limit: 5 })
     expect(result.accounts[0]?.repliedCount).toBe(0)
     expect(cap.last().url).toContain('limit=5')
+  })
+})
+
+describe('followerStats', () => {
+  it('joins each account to its own series and keeps the platform', async () => {
+    const { reads, cap } = readsWith({
+      accounts: [
+        {
+          _id: 'acc_a',
+          platform: 'twitter',
+          username: '@acme',
+          currentFollowers: 1250,
+          growth: 50,
+          growthPercentage: 4.17,
+          dataPoints: 30,
+        },
+      ],
+      stats: {
+        acc_a: [
+          { date: '2026-08-02', followers: 1250 },
+          { date: '2026-08-01', followers: 1200 },
+        ],
+      },
+      granularity: 'daily',
+    })
+    const result = await reads.followerStats(profile, { fromDate: '2026-08-01' })
+
+    expect(result.accounts[0]?.platform).toBe('twitter')
+    expect(result.accounts[0]?.currentFollowers).toBe(1250)
+    // Oldest first, whatever order it arrived in: a chart plots left to right.
+    expect(result.stats.acc_a?.map((point) => point.date)).toEqual(['2026-08-01', '2026-08-02'])
+    expect(cap.last().url).toContain('/accounts/follower-stats?')
+    expect(cap.last().url).toContain('fromDate=2026-08-01')
+  })
+
+  it('drops a point missing either half rather than plotting half of it', async () => {
+    // A date with no count is not a day of zero followers, and a count with no
+    // date cannot be placed on an axis.
+    const { reads } = readsWith({
+      accounts: [],
+      stats: { acc_a: [{ date: '2026-08-01' }, { followers: 10 }, { date: 'soon', followers: 1 }] },
+    })
+    expect((await reads.followerStats(profile)).stats.acc_a).toEqual([])
+  })
+
+  it('drops an account with no id, which could never be joined to a series', async () => {
+    const { reads } = readsWith({ accounts: [{ platform: 'instagram' }, { _id: 'x' }] })
+    expect((await reads.followerStats(profile)).accounts).toEqual([])
+  })
+
+  it('answers empty rather than throwing on a response with neither key', async () => {
+    const { reads: r } = readsWith({})
+    expect(await r.followerStats(profile)).toEqual({
+      accounts: [],
+      stats: {},
+      granularity: null,
+    })
+  })
+})
+
+describe('postingFrequency and contentDecay — [DOC] shapes, never seen on the wire', () => {
+  it('carries the cadence rows with the sample behind each', async () => {
+    const { reads } = readsWith({
+      frequency: [
+        {
+          platform: 'instagram',
+          posts_per_week: 2,
+          avg_engagement_rate: 44.4,
+          avg_engagement: 512,
+          weeks_count: 18,
+        },
+      ],
+    })
+    const result = await reads.postingFrequency(profile)
+    expect(result.frequency[0]?.postsPerWeek).toBe(2)
+    // The sample. A rate from one week is not a finding, and this is what lets
+    // the screen refuse to draw one as though it were.
+    expect(result.frequency[0]?.weeksCount).toBe(18)
+  })
+
+  it('drops a cadence row that names neither a platform nor a frequency', async () => {
+    const { reads } = readsWith({ frequency: [{ avg_engagement_rate: 9 }] })
+    expect((await reads.postingFrequency(profile)).frequency).toEqual([])
+  })
+
+  it('orders the decay buckets by their own order, not by arrival', async () => {
+    const { reads } = readsWith({
+      buckets: [
+        { bucket_order: 2, bucket_label: '12-24h', avg_pct_of_final: 14.1, post_count: 85 },
+        { bucket_order: 0, bucket_label: '0-6h', avg_pct_of_final: 45.2, post_count: 89 },
+      ],
+    })
+    const result = await reads.contentDecay(profile)
+    expect(result.buckets.map((bucket) => bucket.label)).toEqual(['0-6h', '12-24h'])
+  })
+
+  it('drops an unlabelled bucket rather than placing it on the axis', async () => {
+    const { reads } = readsWith({ buckets: [{ bucket_order: 1 }, { bucket_label: 'later' }] })
+    expect((await reads.contentDecay(profile)).buckets).toEqual([])
+  })
+
+  it('never reads a missing percentage as a zero share', async () => {
+    const { reads } = readsWith({
+      buckets: [{ bucket_order: 0, bucket_label: '0-6h', post_count: 3 }],
+    })
+    expect((await reads.contentDecay(profile)).buckets[0]?.avgPctOfFinal).toBeNull()
   })
 })
