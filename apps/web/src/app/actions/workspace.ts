@@ -19,6 +19,12 @@ import {
   type CreateWorkspaceState,
   type RpcEnvelope,
 } from '@/lib/workspace-bootstrap'
+import {
+  WORKSPACE_ROLE_REFUSAL,
+  WORKSPACE_ROLE_UNKNOWN,
+  canManageWorkspace,
+  getWorkspaceRole,
+} from '@/lib/workspace-role'
 import { ACTIVE_WORKSPACE_COOKIE } from '@/lib/workspaces'
 
 // NOTE: a `'use server'` module may only export async functions. Do NOT re-export
@@ -207,6 +213,14 @@ export async function setWorkspaceTimezone(
       return { ok: false, message: describeZoneRefusal(next) }
     }
 
+    // A viewer may read the workspace but not move its clock. RLS does not
+    // close this (`ws_update` has no role predicate), so it is checked here,
+    // before the write.
+    const role = await getWorkspaceRole(id.data)
+    if (!canManageWorkspace(role)) {
+      return { ok: false, message: role === null ? WORKSPACE_ROLE_UNKNOWN : WORKSPACE_ROLE_REFUSAL }
+    }
+
     const supabase = createServerSupabase()
     // `.select()` for the reason `renameWorkspace` gives: PostgREST returns a
     // null error for an UPDATE that matched no rows, so an update RLS refused
@@ -236,6 +250,12 @@ export async function setWorkspaceTimezone(
      */
     if (!data) return { ok: false, message: 'That workspace could not be found.' }
 
+    // The same set the auto-detect write refreshes. Until 2026-09-07 a zone set
+    // by hand refreshed only /settings, so the Planner kept showing the old
+    // hours the settings copy had just promised it would not.
+    revalidatePath('/posts')
+    revalidatePath('/planner')
+    revalidatePath('/home')
     revalidatePath('/settings')
     return { ok: true, timezone: (data as { timezone: string | null }).timezone }
   } catch {
@@ -321,6 +341,11 @@ export async function renameWorkspace(
 
     const id = z.uuid().safeParse(workspaceId)
     if (!id.success) return { ok: false, message: 'That workspace could not be found.' }
+
+    const role = await getWorkspaceRole(id.data)
+    if (!canManageWorkspace(role)) {
+      return { ok: false, message: role === null ? WORKSPACE_ROLE_UNKNOWN : WORKSPACE_ROLE_REFUSAL }
+    }
 
     const supabase = createServerSupabase()
     // `.select()` is not decorative: PostgREST returns a null error for an

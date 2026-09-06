@@ -262,9 +262,12 @@ function EntryRow({
           over a WINDOW of the history would be wrong for everyone whose ledger
           is longer than the window, and wrong about their money.
 
-          A HOLD's `balance_after` is the spendable total, which a hold does not
-          move — so the column repeats the row above it on a reservation, which
-          is correct and is what the ledger says. */}
+          `balance_after` is AVAILABLE credits (`v_total - v_held`, see
+          `apply_ledger_entry`), not the wallet total. So a HOLD row does move
+          it: the column drops by the reserved amount and comes back on the
+          settling DEBIT or RELEASE. MEASURED 2026-09-07 on the QA workspace:
+          Welcome +100 → 100, HOLD 3 → 97, DEBIT -3 → 97. The sentence above
+          the table says the same thing in the customer's words. */}
       {showBalance ? (
         /* ── HIDDEN ON A PHONE, AND THE CHOICE OF WHICH COLUMN GOES MATTERS ──
            MEASURED at 400px: with five columns the table needed 560px inside a

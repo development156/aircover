@@ -117,3 +117,32 @@ export const LOOP_ROLE_REFUSAL = 'Only an owner, editor or approver can change t
 /** Refused because the role could not be established, which is a different claim. */
 export const LOOP_ROLE_UNKNOWN =
   'Sahoda could not confirm your role in this workspace, so nothing changed. Try again in a moment.'
+
+/**
+ * Who may change the workspace itself: its name and its time zone on /settings.
+ *
+ * A VIEWER COULD RENAME THE WORKSPACE. Measured in the 2026-09-07 settings audit:
+ * `workspaces` UPDATE is `ws_update`, open to every member with no role predicate,
+ * and neither `renameWorkspace` nor `setWorkspaceTimezone` read a role. The time zone
+ * moves every hour the Planner shows, so the one member who may only read could shift
+ * the whole schedule. Same trio as the Loop, for the same reason: viewer is the one
+ * read-only role. The durable wall is a role-aware policy on `workspaces`; this is the
+ * application half, checked before the write is issued.
+ */
+const MAY_MANAGE_WORKSPACE: ReadonlySet<WorkspaceRole> = new Set<WorkspaceRole>([
+  'owner',
+  'editor',
+  'approver',
+])
+
+export function canManageWorkspace(role: WorkspaceRole | null): boolean {
+  return role !== null && MAY_MANAGE_WORKSPACE.has(role)
+}
+
+/** Refused because the role is known and not allowed. */
+export const WORKSPACE_ROLE_REFUSAL =
+  'Only an owner, editor or approver can change workspace settings.'
+
+/** Refused because the role could not be established, which is a different claim. */
+export const WORKSPACE_ROLE_UNKNOWN =
+  'Sahoda could not confirm your role in this workspace, so nothing changed. Try again in a moment.'

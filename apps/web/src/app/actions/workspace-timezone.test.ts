@@ -33,6 +33,17 @@ vi.mock('@/lib/supabase/server', () => ({ createServerSupabase: () => ({ from })
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('next/headers', () => ({ cookies: vi.fn() }))
 vi.mock('next/navigation', () => ({ redirect: vi.fn() }))
+// The role gate. A viewer may read the workspace but not change its settings;
+// null means the role could not be established, which denies too.
+const { getWorkspaceRole } = vi.hoisted(() => ({
+  getWorkspaceRole: vi.fn(async (): Promise<string | null> => 'owner'),
+}))
+vi.mock('@/lib/workspace-role', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/workspace-role')>()
+  return { ...actual, getWorkspaceRole }
+})
+
+import { revalidatePath } from 'next/cache'
 
 import { autoDetectWorkspaceTimezone, setWorkspaceTimezone } from './workspace'
 
@@ -51,6 +62,31 @@ describe('setWorkspaceTimezone', () => {
 
     expect(result).toEqual({ ok: true, timezone: 'Europe/London' })
     expect(update).toHaveBeenCalledWith({ timezone: 'Europe/London' })
+  })
+
+  it('refreshes every screen the settings copy says the zone reaches, not only /settings', async () => {
+    vi.mocked(revalidatePath).mockClear()
+    await setWorkspaceTimezone(WS, 'Europe/London')
+
+    const paths = vi.mocked(revalidatePath).mock.calls.map((c) => c[0])
+    expect(paths).toEqual(expect.arrayContaining(['/settings', '/posts', '/planner', '/home']))
+  })
+
+  it('REFUSES a viewer before any write is issued, and says so', async () => {
+    getWorkspaceRole.mockResolvedValueOnce('viewer')
+    const result = await setWorkspaceTimezone(WS, 'Europe/London')
+
+    expect(result).toEqual({ ok: false, message: expect.stringMatching(/owner|editor/i) })
+    expect(update).not.toHaveBeenCalled()
+  })
+
+  it('REFUSES when the role cannot be established, with a different sentence', async () => {
+    getWorkspaceRole.mockResolvedValueOnce(null)
+    const result = await setWorkspaceTimezone(WS, 'Europe/London')
+
+    expect(result.ok).toBe(false)
+    expect(result).toEqual({ ok: false, message: expect.stringMatching(/could not confirm/i) })
+    expect(update).not.toHaveBeenCalled()
   })
 
   it('REFUSES a plausible typo, and writes nothing at all', async () => {

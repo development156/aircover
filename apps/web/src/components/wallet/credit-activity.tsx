@@ -215,7 +215,9 @@ export function CreditActivity({
             ) : (
               scope
             )}
-            . Holds and returns count as nothing, because neither moves your balance.
+            . Holds and returns count as nothing here, because neither changes your total. The
+            balance column shows what was spendable after each entry, so a hold lowers it until the
+            action settles or returns.
             {!filtering && windowed ? ' Older activity is not counted here.' : ''}
           </p>
         </>
