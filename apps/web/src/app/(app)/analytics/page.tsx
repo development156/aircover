@@ -12,6 +12,8 @@ import { ViewControls } from '@/components/analytics/view-controls'
 import type { Headline } from '@/lib/analytics/headline'
 import { HeadlineStrip } from '@/components/analytics/headline-strip'
 import { KpiStrip } from '@/components/analytics/kpi-strip'
+import { PostsOverTime, PostsPerPlatform } from '@/components/analytics/posts-per-platform'
+import { postsPerChannel, postsPerWeek } from '@/lib/analytics/distribution'
 import { analyticsKpis, followersFromAccount } from '@/lib/analytics/kpi'
 import { ACCOUNT_READ_TTL_MINUTES } from '@/lib/analytics/account-insights'
 import { analyticsReadiness } from '@/lib/analytics/readiness'
@@ -239,6 +241,15 @@ export default async function AnalyticsPage({
     )
   }
 
+  /**
+   * ── HOW MUCH WENT OUT, AND WHERE ──────────────────────────────────────────
+   * Derived from rows already read, so neither chart costs a round trip. Both
+   * count DISTINCT posts, the same rule the strip above uses, so a reader who
+   * adds up the weekly columns gets the number on the "Posts this period" card.
+   */
+  const perChannel = postsPerChannel(window.rows)
+  const perWeek = postsPerWeek(window.rows, view, window.timezone)
+
   const rowHref = (change: { sort?: string; dir?: string; page?: string }): Route => {
     const base = hrefFor(view, {})
     const query = new URLSearchParams(base.includes('?') ? base.slice(base.indexOf('?') + 1) : '')
@@ -280,6 +291,11 @@ export default async function AnalyticsPage({
       ) : null}
 
       <HeadlineStrip headlines={headlines} windowLabel={label} />
+
+      <div className="grid grid-cols-2 gap-grid max-wide:grid-cols-1">
+        <PostsPerPlatform counts={perChannel} />
+        <PostsOverTime weeks={perWeek} />
+      </div>
 
       <PerformanceOverTime series={series} />
 
