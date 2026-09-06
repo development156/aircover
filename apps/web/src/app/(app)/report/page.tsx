@@ -233,7 +233,7 @@ export default async function ReportPage() {
     // the reader back to The Loop where the state lives and the action is.
     return (
       <div className="space-y-6">
-        <ReportHeader week={`Week ${cycle.isoWeek}, ${cycle.isoYear}`} />
+        <ReportHeader week={`Week ${cycle.isoWeek}, ${cycle.isoYear}`} measured={measured} />
         <section className="surface-ring rounded-card bg-surface p-5 shadow-card">
           <h2 className="type-h2">This week has not been reported yet</h2>
           <p className="type-body mt-1 max-w-[68ch] text-muted">
