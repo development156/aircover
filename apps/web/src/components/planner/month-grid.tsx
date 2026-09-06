@@ -2,14 +2,9 @@ import type { Route } from 'next'
 import Link from 'next/link'
 
 import { CHANNEL_SHORT } from '@/components/posts/channel-label'
-import {
-  firstGridDay,
-  MONTH_GRID_DAYS,
-  istMonthLabel,
-  istDayOfMonth,
-  isSameIstMonth,
-} from '@/lib/planner/month'
 import type { WeekBuckets } from '@/lib/planner/week'
+import { dayOfMonth, isSameMonth, monthLabel } from '@/lib/time/day-key'
+import { zoneLabel } from '@/lib/time/zone'
 import { cn } from '@/lib/utils'
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const
@@ -22,18 +17,27 @@ const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const
  * than as a ragged grid that starts partway through a row.
  *
  * ── WHY IT REUSES `bucketWeek` ───────────────────────────────────────────────
- * `bucketWeek(posts, start, dayCount)` already buckets any run of consecutive
- * IST days from any start, and it already carries the two honest overflow
- * buckets (`unscheduled`, `outside`). A month is 42 of those days beginning on
- * the Monday on or before the 1st — so this needed no new bucketing logic and
- * no second date implementation to drift from the first.
+ * `bucketWeek(zone, posts, start, dayCount)` already buckets any run of
+ * consecutive days of the workspace's zone from any start, and it already
+ * carries the honest `unscheduled` bucket. A month is 42 of those days
+ * beginning on the Monday on or before the 1st — so this needed no new
+ * bucketing logic and no second date implementation to drift from the first.
  *
  * Days outside the displayed month are dimmed but still show their posts: a
  * post scheduled for the 31st of last month is a real commitment, and hiding it
  * because the header says a different month would be the calendar lying by
  * omission.
  */
-export function MonthGrid({ buckets, monthAnchor }: { buckets: WeekBuckets; monthAnchor: Date }) {
+export function MonthGrid({
+  buckets,
+  monthAnchor,
+  zone,
+}: {
+  buckets: WeekBuckets
+  monthAnchor: Date
+  /** The workspace's zone: the one `buckets` were keyed in, and the one the caption names. */
+  zone: string
+}) {
   return (
     <section className="surface-ring overflow-hidden rounded-card bg-surface">
       <header className="flex min-h-[46px] items-center gap-3 px-5 pt-5 pb-3 max-narrow:px-4">
@@ -42,17 +46,17 @@ export function MonthGrid({ buckets, monthAnchor }: { buckets: WeekBuckets; mont
             it squeezed the label into two lines reading "August" / "2026". A month
             and its year are one token. Same failure the topbar chips had. */}
         <h2 className="type-h3 shrink-0 whitespace-nowrap text-ink">
-          {istMonthLabel(monthAnchor)}
+          {monthLabel(zone, monthAnchor)}
         </h2>
-        {/* THE SENTENCE IS NOT SHORTENED TO "Times in IST". The brief asks for
-            less text and this is the one line that keeps every word, because the
-            clause carries a claim the short form does not: these times are the
-            zone the schedule is STORED in, not a conversion into the reader's
-            own. A workspace in Dubai reads GST in the rail beside this grid and
-            IST inside it, and this clause is the only thing on screen that
-            explains why. Quieter, yes. Vaguer, no. */}
+        {/* The zone the grid is keyed in, named. This line used to name IST
+            and then claim IST was the zone the schedule was STORED in, which
+            was false: `scheduled_at` is a timestamptz, an instant, and belongs
+            to no zone. The grid now follows the workspace's zone, the same one
+            the rail beside it uses, so the sentence names that and claims
+            nothing about storage. `setting-reach.test.ts` refuses the old
+            clause by its exact words. */}
         <p className="ml-auto type-meta text-muted">
-          Times are shown in IST, the zone every schedule is stored in.
+          Times are shown in {zoneLabel(zone, monthAnchor)}.
         </p>
       </header>
 
@@ -63,8 +67,8 @@ export function MonthGrid({ buckets, monthAnchor }: { buckets: WeekBuckets; mont
           workspace with one dated post. It stopped being a calendar, which is the
           one thing this component's 6×7 shape exists to be.
 
-          WeekGrid already solved this: keep the seven columns, force a min-width,
-          let the container scroll. Same 840px here (120px per day). The weekday
+          The old week grid solved this first: keep the seven columns, force a
+          min-width, let the container scroll. Same 840px here (120px per day). The weekday
           header and the day grid share ONE scroller so the labels cannot drift out
           of register with the columns they name. */}
       <div className="overflow-x-auto">
@@ -81,7 +85,7 @@ export function MonthGrid({ buckets, monthAnchor }: { buckets: WeekBuckets; mont
 
         <div className="grid min-w-[840px] grid-cols-7">
           {buckets.days.map((bucket) => {
-            const inMonth = isSameIstMonth(bucket.date, monthAnchor)
+            const inMonth = isSameMonth(zone, bucket.date, monthAnchor)
             return (
               <div
                 key={bucket.key}
@@ -107,7 +111,7 @@ export function MonthGrid({ buckets, monthAnchor }: { buckets: WeekBuckets; mont
                     inMonth ? 'text-ink' : 'text-ink-mute',
                   )}
                 >
-                  {istDayOfMonth(bucket.date)}
+                  {dayOfMonth(zone, bucket.date)}
                 </p>
 
                 <ul className="mt-1 flex flex-col gap-1">
@@ -176,5 +180,3 @@ export function MonthGrid({ buckets, monthAnchor }: { buckets: WeekBuckets; mont
     </section>
   )
 }
-
-export { firstGridDay, MONTH_GRID_DAYS }

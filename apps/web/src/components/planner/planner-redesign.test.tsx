@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { toChannelSet } from '@sahoda/shared'
 import type { PostStatus } from '@sahoda/shared'
 
@@ -41,12 +41,15 @@ function post(over: Partial<DisplayPost> & { id: string }): DisplayPost {
   } as DisplayPost
 }
 
+const IST = 'Asia/Kolkata'
+const NY = 'America/New_York'
 const NOW = new Date('2026-08-28T06:00:00.000Z') // 11:30 IST, 28 August
 
 describe('the picked day is a mark, never a second primary action', () => {
   function mini(selected: string | null) {
     return render(
       <PlannerMiniCalendar
+        zone={IST}
         posts={[]}
         now={NOW}
         selected={selected}
@@ -119,7 +122,7 @@ describe('the figures say each thing once', () => {
      * label and a number and there is no third line, whatever a later reader
      * might choose to put there.
      */
-    render(<PlannerSummary posts={rows} now={NOW} />)
+    render(<PlannerSummary posts={rows} now={NOW} zone={IST} />)
     for (const [name, expected] of [
       [/needs approval/i, 'Needs approval1'],
       [/drafts/i, 'Drafts1'],
@@ -148,13 +151,14 @@ describe('the figures say each thing once', () => {
           }),
         ]}
         now={NOW}
+        zone={IST}
       />,
     )
     expect(screen.getByText(/1 scheduled in all/i)).toBeTruthy()
   })
 
   it('still states the absence when nothing is scheduled ahead', () => {
-    render(<PlannerSummary posts={rows} now={NOW} />)
+    render(<PlannerSummary posts={rows} now={NOW} zone={IST} />)
     // The mark is a glyph and says nothing on its own, so its sentence stays.
     expect(screen.getByText(/nothing scheduled ahead/i)).toBeTruthy()
   })
@@ -179,8 +183,9 @@ describe('the calendar marks scheduled work in orange', () => {
   function grid() {
     return render(
       <MonthGrid
-        buckets={bucketWeek(rows, firstGridDay(NOW), MONTH_GRID_DAYS)}
+        buckets={bucketWeek(IST, rows, firstGridDay(IST, NOW), MONTH_GRID_DAYS)}
         monthAnchor={NOW}
+        zone={IST}
       />,
     )
   }
@@ -204,16 +209,53 @@ describe('the calendar marks scheduled work in orange', () => {
     }
   })
 
-  it('keeps the whole IST sentence, not a shortened label', () => {
+  it('names the zone the grid is keyed in, and claims nothing about storage', () => {
     /**
-     * THE MUTATION THIS EXISTS FOR: trimmed to "Times in IST" to satisfy the
-     * brief's "less text". The dropped clause is the only thing on the screen
-     * that says these times are the zone the schedule is STORED in rather than
-     * a conversion into the reader's own — and the rail beside this grid shows
-     * the workspace's zone, so a Dubai workspace reads two different clocks on
-     * one screen. Shorter, here, is a vaguer claim.
+     * THE MUTATION THIS EXISTS FOR, IN BOTH DIRECTIONS. The caption used to read
+     * "Times are shown in IST, the zone every schedule is stored in", and the
+     * second clause was false: `scheduled_at` is an instant and belongs to no
+     * zone. The grid now draws in the workspace's zone, the same one the rail
+     * beside it uses, so the caption must name THAT zone — and must not be
+     * restored to the storage claim, which a later reader "fixing" the text
+     * back to the old sentence would do.
      */
     grid()
-    expect(screen.getByText(/the zone every schedule is stored in/i)).toBeTruthy()
+    expect(screen.getByText(/times are shown in ist/i)).toBeTruthy()
+    expect(screen.queryByText(/stored in/i)).toBeNull()
+  })
+
+  it('draws the audit’s post on 2 September for New York and 3 September for Kolkata', () => {
+    /**
+     * One instant, 2026-09-02T20:00-04:00. The cell it lands in is the whole
+     * founder ruling in one assertion: a New York workspace must see it on the
+     * 2nd, a Kolkata one on the 3rd, and the caption must name the zone that
+     * decided it.
+     */
+    const late = [
+      post({
+        id: 'ny',
+        title: 'Evening special',
+        intent: 'scheduled' as PostStatus,
+        scheduled_at: '2026-09-02T20:00:00-04:00',
+      }),
+    ]
+    const anchor = new Date('2026-09-01T12:00:00Z')
+    const cellOf = (zone: string) => {
+      const view = render(
+        <MonthGrid
+          buckets={bucketWeek(zone, late, firstGridDay(zone, anchor), MONTH_GRID_DAYS)}
+          monthAnchor={anchor}
+          zone={zone}
+        />,
+      )
+      const link = within(view.container).getByRole('link', { name: /evening special/i })
+      // The cell is the nearest ancestor that carries the day numeral.
+      const cell = link.closest('.group\\/day') as HTMLElement
+      const numeral = cell.querySelector('p.num')?.textContent
+      view.unmount()
+      return numeral
+    }
+    expect(cellOf(NY)).toBe('2')
+    expect(cellOf(IST)).toBe('3')
   })
 })

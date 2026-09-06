@@ -391,7 +391,7 @@ export default async function HomePage() {
   // display posts, and calling `forDisplay` twice would be two chances to leak
   // a raw `post.status` into a component.
   const displayPosts = posts.map(forDisplay)
-  const buckets = bucketWeek(displayPosts, now)
+  const buckets = bucketWeek(zone, displayPosts, now)
 
   const weekIds = new Set(buckets.days.flatMap((day) => day.posts.map((post) => post.id)))
   const draftedThisWeek = posts.filter(
@@ -438,6 +438,7 @@ export default async function HomePage() {
           is most of what made this screen read as assembled parts. */}
       <StaggerItem i={0}>
         <AtAGlance
+          zone={zone}
           posts={displayPosts}
           buckets={buckets}
           publish={publish}
@@ -499,7 +500,7 @@ export default async function HomePage() {
           </StaggerItem>
 
           <StaggerItem i={5}>
-            <WeekStrip buckets={buckets} variantStates={variantStates} />
+            <WeekStrip buckets={buckets} variantStates={variantStates} zone={zone} />
           </StaggerItem>
         </div>
 

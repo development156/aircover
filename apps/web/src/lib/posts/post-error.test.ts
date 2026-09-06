@@ -20,6 +20,24 @@ describe('mapPostError', () => {
     expect(copy).not.toMatch(/constraint|posts_status_check|23514/i)
   })
 
+  test('a lifecycle refusal names who can act and what they can change', () => {
+    // The trigger raises P0001 with this token as its whole message, so the
+    // code carries nothing and the token must be matched from the message.
+    const copy = mapPostError({ code: 'P0001', message: 'POST_LIFECYCLE_ROLE' })
+    expect(copy).toBe(
+      'Only an owner or editor can change when this goes out, or move it along. Ask one of them.',
+    )
+    expect(copy).not.toMatch(/POST_LIFECYCLE_ROLE|P0001/)
+  })
+
+  test('a P0001 raise WITHOUT the lifecycle token stays generic', () => {
+    // The guard on the token, not on the code: any other RAISE from any other
+    // function must not be told it is a role problem.
+    expect(mapPostError({ code: 'P0001', message: 'SOMETHING_ELSE' })).toBe(
+      'Could not save this post. Try again.',
+    )
+  })
+
   test('falls back to generic copy for an unrecognised error', () => {
     expect(mapPostError({ code: 'XX000', message: 'internal error' })).toMatch(
       /could not|try again/i,

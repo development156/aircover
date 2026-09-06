@@ -1,17 +1,10 @@
 import Link from 'next/link'
 
-import {
-  firstGridDay,
-  isSameIstMonth,
-  istDayKey,
-  istDayOfMonth,
-  istFullDate,
-  istMonthLabel,
-  MONTH_GRID_DAYS,
-} from '@/lib/planner/month'
+import { firstGridDay, MONTH_GRID_DAYS } from '@/lib/planner/month'
 import { needsAPerson } from '@/lib/approvals/queue'
 import { bucketWeek } from '@/lib/planner/week'
 import type { DisplayPost } from '@/lib/posts/display-post'
+import { dayKey, dayOfMonth, fullDateLabel, isSameMonth, monthLabel } from '@/lib/time/day-key'
 import { cn } from '@/lib/utils'
 
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const
@@ -20,8 +13,9 @@ const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const
  * The compact month beside the plan. Pick a day, the list narrows to it.
  *
  * ── IT REUSES `bucketWeek`, LIKE `MonthGrid` DOES ────────────────────────────
- * `MonthGrid`'s header states the rule: a month is 42 consecutive IST days from
- * the Monday on or before the 1st, `bucketWeek` already buckets any such run,
+ * `MonthGrid`'s header states the rule: a month is 42 consecutive days of the
+ * workspace's zone from the Monday on or before the 1st, `bucketWeek` already
+ * buckets any such run,
  * "so this needed no new bucketing logic and no second date implementation to
  * drift from the first". A third date implementation living in the rail beside
  * the second would be exactly that drift, one panel further along.
@@ -47,9 +41,12 @@ export function PlannerMiniCalendar({
   tab,
   query,
   week,
+  zone,
 }: {
   posts: readonly DisplayPost[]
   now: Date
+  /** The workspace's zone, resolved by the page. Decides which cell a post sits in. */
+  zone: string
   selected: string | null
   view: string
   tab: string | null
@@ -57,8 +54,8 @@ export function PlannerMiniCalendar({
   /** The week offset, or null for this week. Carried, never reset silently. */
   week: string | null
 }) {
-  const buckets = bucketWeek([...posts], firstGridDay(now), MONTH_GRID_DAYS)
-  const todayKey = istDayKey(now)
+  const buckets = bucketWeek(zone, [...posts], firstGridDay(zone, now), MONTH_GRID_DAYS)
+  const todayKey = dayKey(zone, now)
 
   /* Carried on every cell link so picking a day does not silently discard the
      tab and the search the reader already chose. */
@@ -72,7 +69,7 @@ export function PlannerMiniCalendar({
   return (
     <section aria-label="Month" className="surface-ring rounded-card bg-surface p-4">
       <header className="flex items-baseline justify-between gap-2">
-        <h2 className="type-h3 whitespace-nowrap text-ink">{istMonthLabel(now)}</h2>
+        <h2 className="type-h3 whitespace-nowrap text-ink">{monthLabel(zone, now)}</h2>
         {selected !== null ? (
           <Link
             href={{ pathname: '/planner', query: carry }}
@@ -93,7 +90,7 @@ export function PlannerMiniCalendar({
 
       <div className="mt-1 grid grid-cols-7 gap-1">
         {buckets.days.map((bucket) => {
-          const inMonth = isSameIstMonth(bucket.date, now)
+          const inMonth = isSameMonth(zone, bucket.date, now)
           const isToday = bucket.key === todayKey
           const isSelected = bucket.key === selected
           const scheduled = bucket.posts.filter((p) => p.intent === 'scheduled').length
@@ -111,8 +108,8 @@ export function PlannerMiniCalendar({
               }}
               aria-current={isSelected ? 'date' : undefined}
               /* The numeral alone is NOT a name: a 42-cell grid spans three
-                 months and repeats it. See `istFullDate`. */
-              aria-label={istFullDate(bucket.date)}
+                 months and repeats it. See `fullDateLabel`. */
+              aria-label={fullDateLabel(zone, bucket.date)}
               title={
                 bucket.posts.length === 0
                   ? undefined
@@ -156,7 +153,7 @@ export function PlannerMiniCalendar({
                         : 'text-ink-mute',
                 )}
               >
-                {istDayOfMonth(bucket.date)}
+                {dayOfMonth(zone, bucket.date)}
               </span>
 
               {/* The marks sit BELOW the numeral inside the cell, never over it:

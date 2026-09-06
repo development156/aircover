@@ -31,6 +31,8 @@ const FinishPublish = dynamic(() => import('./finish-publish'), { ssr: false })
 
 export interface FinishPanelProps {
   postId: string | null
+  /** The workspace's zone, read on the server, for the schedule picker. */
+  zone: string
   channels: ChannelSet
   scheduledAt: string | null
   onScheduleChange: (iso: string | null) => void
@@ -143,6 +145,7 @@ function RouteTile({ icon, title, detail, on, onClick }: RouteTileProps) {
  */
 export function FinishPanel({
   postId,
+  zone,
   channels,
   scheduledAt,
   onScheduleChange,
@@ -197,6 +200,7 @@ export function FinishPanel({
 
       {route === 'schedule' ? (
         <FinishSchedule
+          zone={zone}
           channels={channels}
           scheduledAt={scheduledAt}
           onScheduleChange={onScheduleChange}

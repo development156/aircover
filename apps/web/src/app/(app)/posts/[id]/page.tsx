@@ -10,7 +10,8 @@ import { PostMetricsPanel } from '@/components/posts/post-metrics-panel'
 import { PublishStateProvider } from '@/components/posts/live/publish-state-provider'
 import { assembleSnapshot } from '@/lib/posts/live-state'
 import { autoPublishEnabled } from '@/lib/posts/auto-publish-server'
-import { readActiveWorkspace } from '@/lib/workspaces'
+import { getActiveWorkspace, readActiveWorkspace } from '@/lib/workspaces'
+import { resolveDisplayZone } from '@/lib/time/zone'
 import { readConnectedChannels } from '@/lib/connections/read'
 import { readPostMetrics } from '@/lib/analytics/post-metrics'
 import { readTemplates } from '@/lib/templates/read'
@@ -82,7 +83,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
   // state the composer renders on its own.
   if (!isNew && post === null) notFound()
 
-  const [variants, versions, media, connected, templates] = await Promise.all([
+  const [variants, versions, media, connected, templates, workspace] = await Promise.all([
     post ? listVariants(post.id) : Promise.resolve([]),
     // With a post, the versions come out of rows already read. WITHOUT one, the
     // question is asked of the table itself — skipping that would put the very
@@ -94,7 +95,14 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
     // written, instead of at the moment Publish fails with the work already done.
     readConnectedChannels(),
     readTemplates(),
+    // The workspace row, for its timezone: the schedule picker builds its
+    // instants in it. In the batch, not on its own line — `read-waterfall.test.ts`
+    // counts a bare await here as a sequential round trip and refuses it.
+    getActiveWorkspace(),
   ])
+  // The clock the picker speaks in: the workspace's own when it has one, the
+  // shipped default when it does not. Same resolution the planner makes.
+  const zone = resolveDisplayZone(workspace?.timezone).zone
 
   // Free alongside the reads above: the same memoised rows. Salvages the column
   // the frozen row schema strips, so a reload does not lose the chosen format.
@@ -131,6 +139,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
   const composer = (
     <Composer
       post={post}
+      zone={zone}
       variants={variants}
       versions={versions}
       formats={formats}

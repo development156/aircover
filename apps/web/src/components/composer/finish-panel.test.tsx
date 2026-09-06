@@ -34,6 +34,7 @@ function panel(overrides: Partial<Parameters<typeof FinishPanel>[0]> = {}) {
   return render(
     <FinishPanel
       postId="p1"
+      zone="Asia/Kolkata"
       channels={CHANNELS}
       scheduledAt={null}
       onScheduleChange={vi.fn()}
@@ -82,6 +83,7 @@ async function afterChunksArrive() {
   const probe = render(
     <FinishPanel
       postId="p1"
+      zone="Asia/Kolkata"
       channels={CHANNELS}
       scheduledAt={null}
       onScheduleChange={vi.fn()}

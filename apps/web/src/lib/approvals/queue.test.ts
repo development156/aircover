@@ -135,34 +135,47 @@ describe('splitQueue', () => {
 
 describe('the sentence a bulk approve produces', () => {
   test('a clean run says only what happened', () => {
-    expect(bulkApproveMessage({ ok: true, approved: 4, moved: 0, failed: 0 })).toBe('4 approved')
+    expect(bulkApproveMessage({ ok: true, approved: 4, scheduled: 0, moved: 0, failed: 0 })).toBe(
+      'Approved 4.',
+    )
+  })
+
+  test('dated posts are counted as approved AND named as scheduled', () => {
+    // `approve_posts` books a post that already carries a time. "Approved 4"
+    // is true of all four; the reader also needs to know which of them will
+    // now go out on their own.
+    expect(bulkApproveMessage({ ok: true, approved: 2, scheduled: 2, moved: 0, failed: 0 })).toBe(
+      'Approved 4. 2 are now scheduled.',
+    )
+    expect(bulkApproveMessage({ ok: true, approved: 0, scheduled: 1, moved: 0, failed: 0 })).toBe(
+      'Approved 1. 1 is now scheduled.',
+    )
   })
 
   test('a stale list reports BOTH halves — never just the approvals', () => {
     // The defect this whole type exists for: four succeeded and one did not, and
     // a boolean would force "Approved" over a post that never moved.
-    const message = bulkApproveMessage({ ok: true, approved: 4, moved: 1, failed: 0 })
-    expect(message).toContain('4 approved')
-    expect(message).toContain('1 had already moved on')
+    const message = bulkApproveMessage({ ok: true, approved: 4, scheduled: 0, moved: 1, failed: 0 })
+    expect(message).toBe('Approved 4. 1 had already moved on.')
   })
 
   test('a row that had already moved is never called a failure', () => {
     // Different remedies: "moved on" means reload, "could not be saved" means
     // retry. Collapsing them sends people to do the wrong one.
-    const message = bulkApproveMessage({ ok: true, approved: 0, moved: 3, failed: 0 })
+    const message = bulkApproveMessage({ ok: true, approved: 0, scheduled: 0, moved: 3, failed: 0 })
     expect(message).toContain('had already moved on')
-    expect(message).not.toMatch(/could not be saved|failed/i)
+    expect(message).not.toMatch(/could not be saved|failed|approved/i)
   })
 
   test('a write error is reported as a retryable failure, distinctly', () => {
-    expect(bulkApproveMessage({ ok: true, approved: 0, moved: 0, failed: 2 })).toContain(
-      'could not be saved',
-    )
+    expect(
+      bulkApproveMessage({ ok: true, approved: 0, scheduled: 0, moved: 0, failed: 2 }),
+    ).toContain('could not be saved')
   })
 
   test('approving nothing does not claim a success', () => {
-    expect(bulkApproveMessage({ ok: true, approved: 0, moved: 0, failed: 0 })).not.toMatch(
-      /approved/,
-    )
+    expect(
+      bulkApproveMessage({ ok: true, approved: 0, scheduled: 0, moved: 0, failed: 0 }),
+    ).not.toMatch(/approved/)
   })
 })

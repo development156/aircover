@@ -33,12 +33,11 @@ const post = {
 const buckets: WeekBuckets = {
   days: [{ key: '2026-09-07', date: new Date('2026-09-07T04:30:00.000Z'), posts: [post] }],
   unscheduled: [],
-  outside: [],
 }
 
 describe('a week entry keeps its whole title reachable', () => {
   test('the truncated entry carries the full title as its tooltip', () => {
-    render(<WeekStrip buckets={buckets} variantStates={new Map()} />)
+    render(<WeekStrip zone="Asia/Kolkata" buckets={buckets} variantStates={new Map()} />)
     const entry = screen.getByRole('link', { name: new RegExp(LONG_TITLE.slice(0, 20)) })
     expect(entry).toHaveAttribute('title', LONG_TITLE)
   })
@@ -47,6 +46,7 @@ describe('a week entry keeps its whole title reachable', () => {
     const untitled = { ...post, id: 'p2', title: '   ' } as unknown as DisplayPost
     render(
       <WeekStrip
+        zone="Asia/Kolkata"
         buckets={{ ...buckets, days: [{ ...buckets.days[0]!, posts: [untitled] }] }}
         variantStates={new Map()}
       />,

@@ -43,8 +43,10 @@ Membership (QA user → demo ws), 2 competitor subscriptions, 1 competitor + 1 s
 - Vercel runtime logs for the cron routes: BLOCKED (query timed out twice); DB timestamps used.
 - Playwright smoke leg: not run here (cannot run locally; CI only).
 
-## Needs a decision
+## Decisions executed (founder delegated all three, 19:32 IST)
 
-- IL-07: default workspace rule when no cookie (user's own vs oldest membership).
-- IL-24: should "Draft a post" from Radar require a connected channel?
-- IL-14: reseed the demo workspace's "learned" row (the current one is test-shaped copy the founder shows).
+- IL-07 → **the workspace you created wins when no cookie is set**, then the first membership; cookie still wins. `lib/workspaces.ts` reads `created_by` on the same memoised select; `topbar.tsx` and `rail-foot.tsx` resolve with the same user id. `workspaces.resolve.test.ts` pins it.
+- IL-24 → **a Radar draft keeps requiring a channel.** The credit buys per-channel versions; a channel-less idea has the composer's own door. No code change.
+- IL-14 → **the demo workspace's three "learned" rows were reworded in production** ("Your Instagram posts reached 1.6× what your LinkedIn posts reached."). They were leftovers of `lib/loop/cycle.live.test.ts`, whose `WORKSPACE` constant IS the demo workspace, so the next run of that test writes the test sentence again. Owed: point that test at a throwaway workspace.
+
+Nothing else needs a decision.

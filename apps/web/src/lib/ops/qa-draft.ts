@@ -1,4 +1,5 @@
 import type { OpsQaStatus } from '@sahoda/shared'
+import { DEFAULT_ZONE } from '@/lib/time/zone'
 
 /**
  * The QA composer's decisions, with no React around them (doc 13 §11).
@@ -104,7 +105,7 @@ const TIME = new Intl.DateTimeFormat('en-GB', {
   minute: '2-digit',
   second: '2-digit',
   hour12: false,
-  timeZone: 'Asia/Kolkata',
+  timeZone: DEFAULT_ZONE,
 })
 
 /**

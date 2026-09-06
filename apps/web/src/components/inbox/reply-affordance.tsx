@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { ReplyComposer } from './reply-composer'
 
 import { platformLabel } from './platform-label'
+import { DEFAULT_ZONE } from '@/lib/time/zone'
 
 /**
  * The reply affordance — a send window explained BEFORE the compose box, never after
@@ -60,7 +61,7 @@ const WHEN = new Intl.DateTimeFormat('en-IN', {
   hour: '2-digit',
   minute: '2-digit',
   hour12: true,
-  timeZone: 'Asia/Kolkata',
+  timeZone: DEFAULT_ZONE,
 })
 
 /** An unparseable instant renders nothing rather than "Invalid Date". */

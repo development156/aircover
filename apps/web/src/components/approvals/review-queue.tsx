@@ -11,7 +11,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { CHANNEL_SHORT } from '@/components/posts/channel-label'
 import { bulkApproveMessage } from '@/lib/approvals/state'
-import { STATUS_WORD } from '@/lib/posts/status-word'
 import type { DisplayPost } from '@/lib/posts/display-post'
 import { cn } from '@/lib/utils'
 
@@ -67,8 +66,9 @@ export function ReviewQueue({ posts }: { posts: readonly DisplayPost[] }) {
       // The three counts decide the tone, not the absence of an error. A run
       // that approved nothing is not a success message.
       const message = bulkApproveMessage(result)
-      if (result.approved > 0 && result.moved === 0 && result.failed === 0) toast.success(message)
-      else if (result.approved > 0) toast.warning(message)
+      const cleared = result.approved + result.scheduled
+      if (cleared > 0 && result.moved === 0 && result.failed === 0) toast.success(message)
+      else if (cleared > 0) toast.warning(message)
       else toast.error(message)
       setSelected(new Set())
     })
@@ -139,7 +139,10 @@ export function ReviewQueue({ posts }: { posts: readonly DisplayPost[] }) {
                 </span>
               ) : null}
             </Link>
-            <Badge rung="urgent">{STATUS_WORD[post.intent]}</Badge>
+            {/* The REASON it is here, not its status word. A dated draft is in
+                this queue because it cannot go out until someone approves it;
+                "Draft" says what it is and not why it is waiting. */}
+            <Badge rung="urgent">{post.intent === 'review' ? 'In review' : 'Needs approval'}</Badge>
           </li>
         ))}
       </ul>

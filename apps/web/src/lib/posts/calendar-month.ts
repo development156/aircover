@@ -1,115 +1,132 @@
+import { firstGridDay, MONTH_GRID_DAYS } from '@/lib/planner/month'
+import {
+  addDaysInZone,
+  dayOfMonth,
+  isSameDay,
+  isSameMonth,
+  monthLabel,
+  startOfDayInZone,
+} from '@/lib/time/day-key'
+import { instantAtWallClock, partsInZone } from '@/lib/time/zone'
+
 /**
- * A MONTH GRID IN THE READER'S OWN ZONE.
+ * A MONTH GRID IN THE WORKSPACE'S ZONE.
  *
- * ── WHY THIS DOES NOT REUSE `lib/planner/month.ts` ───────────────────────────
- * That file is the planner's, and every one of its formatters is pinned to
- * `Asia/Kolkata` on purpose: the planner buckets posts by IST day, and labelling
- * those buckets in any other zone would put a post scheduled for 00:30 IST on
- * the previous day's cell. It is correct there and it must stay pinned.
+ * ── WHAT CHANGED, AND WHY THE OLD HEADER IS GONE ─────────────────────────────
+ * This file used to say, at length, why it could not reuse `lib/planner/month.ts`:
+ * that file was pinned to IST and this one worked in the BROWSER'S local clock,
+ * because the native control behind it was `<input type="datetime-local">`. Both
+ * halves of that are over. The planner takes its zone as an argument now, and
+ * the picker builds its instants with `instantAtWallClock` in the same zone the
+ * planner draws in — the workspace's — so a customer in Dubai who picks
+ * "tomorrow morning" is confirmed 9:00 am GST and the posts list calls the same
+ * post 9:00 am GST. One post, one time. Founder's ruling, 2026-09-06.
  *
- * The composer's schedule field has always worked in LOCAL wall-clock, and it
- * has to: the native control behind it is `<input type="datetime-local">`, which
- * is local by definition, and `toLocalInput` has always fed it `getFullYear()`
- * and friends. A calendar that highlighted IST days while the field beside it
- * accepted local ones would disagree with itself for every reader outside India
- * — the same off-by-one, one layer up.
+ * So the grid's start and its 42-day run come from the planner's own module,
+ * and the calendar arithmetic that MEASURED wrong under `America/New_York`
+ * (a 24-hour step across the autumn transition repeating a date) lives once, in
+ * `lib/time/day-key.ts`, with the transition weeks pinned there.
  *
- * So this is a second implementation, deliberately, and the comment above is the
- * reason. It is small, pure, and takes its clock as an argument so nothing here
- * can drift from what the caller validated.
+ * Every function takes the zone FIRST and explicitly. No default: a call site
+ * that forgets it should fail to compile rather than quietly build a time on
+ * somebody else's clock.
  */
 
-/** A 6x7 grid — the most any month needs, and a constant height as months change. */
-export const MONTH_GRID_DAYS = 42
+export { MONTH_GRID_DAYS, firstGridDay }
+export { dayOfMonth, isSameDay, isSameMonth, monthLabel }
 
 /** Monday-first, which is what the planner's grid is and what this matches. */
 export const WEEKDAY_INITIALS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const
 
-const MONTH_YEAR = new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric' })
-const FULL_DAY = new Intl.DateTimeFormat('en-GB', {
-  weekday: 'long',
-  day: 'numeric',
-  month: 'long',
-})
-const TIME = new Intl.DateTimeFormat('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true })
+const CACHE = new Map<string, Intl.DateTimeFormat>()
 
-/** Midnight local on the same day as `at`. Never mutates the input. */
-export function startOfDay(at: Date): Date {
-  return new Date(at.getFullYear(), at.getMonth(), at.getDate())
+function formatter(zone: string, shape: string, options: Intl.DateTimeFormatOptions) {
+  const key = `${zone}|${shape}`
+  let f = CACHE.get(key)
+  if (!f) {
+    f = new Intl.DateTimeFormat('en-GB', { ...options, timeZone: zone })
+    CACHE.set(key, f)
+  }
+  return f
 }
 
-/**
- * The Monday on or before the 1st of `anchor`'s month.
- *
- * `getDay()` is Sunday-first (0 = Sunday), and this grid is Monday-first, so
- * Sunday has to become 6 rather than 0. Getting that wrong shifts the entire
- * grid by a day for one seventh of all months, which is exactly the kind of
- * defect that survives review and is caught by a test.
- */
-export function firstGridDay(anchor: Date): Date {
-  const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1)
-  const mondayFirst = (first.getDay() + 6) % 7
-  return new Date(first.getFullYear(), first.getMonth(), 1 - mondayFirst)
+/** Midnight in `zone` on the same day as `at`. Never mutates the input. */
+export function startOfDay(zone: string, at: Date): Date {
+  return startOfDayInZone(zone, at)
 }
 
 /**
  * The 42 days the grid shows, including the trailing days of the previous month
- * and the leading days of the next.
- *
- * ── CALENDAR ARITHMETIC, NOT MILLISECOND ARITHMETIC ──────────────────────────
- * `new Date(y, m, d + index)` asks the constructor to normalise a day number
- * that runs past the end of the month, which is exactly the question being
- * asked. Adding `index * 86_400_000` to a timestamp is a different question and
- * it gets a different answer twice a year.
- *
- * MEASURED under `TZ=America/New_York`, which is why this is not a matter of
- * taste. Stepping by milliseconds and re-normalising through the constructor —
- * the obvious fix, and the one written here first — is right across the spring
- * transition and WRONG across the autumn one: adding 24h to midnight on the
- * fall-back day lands on 23:00 of the SAME day, so the grid repeats a date and
- * skips the next. The test caught it; the reasoning had not.
+ * and the leading days of the next — each one that day's midnight in `zone`.
  */
-export function monthGridDays(anchor: Date): Date[] {
-  const start = firstGridDay(anchor)
-  return Array.from(
-    { length: MONTH_GRID_DAYS },
-    (_, index) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + index),
-  )
+export function monthGridDays(zone: string, anchor: Date): Date[] {
+  const start = firstGridDay(zone, anchor)
+  return Array.from({ length: MONTH_GRID_DAYS }, (_, index) => addDaysInZone(zone, start, index))
 }
 
-/** Same calendar month AND year — used to dim the adjacent-month cells. */
-export function isSameMonth(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth()
-}
-
-/** Same calendar day — used to mark today and the chosen cell. */
-export function isSameDay(a: Date, b: Date): boolean {
-  return isSameMonth(a, b) && a.getDate() === b.getDate()
-}
-
-/** Step the anchor a whole month, clamped so 31 March back one does not land on 3 March. */
-export function shiftMonth(anchor: Date, months: number): Date {
-  return new Date(anchor.getFullYear(), anchor.getMonth() + months, 1)
-}
-
-/** "August 2026" — the grid's heading. */
-export function monthLabel(at: Date): string {
-  return MONTH_YEAR.format(at)
+/** Step the anchor a whole month, to the 1st, so 31 March back one does not land on 3 March. */
+export function shiftMonth(zone: string, anchor: Date, months: number): Date {
+  const p = partsInZone(zone, anchor)
+  // `Date.UTC` normalises a month outside 0–11 into the right year.
+  const moved = new Date(Date.UTC(p.year, p.month - 1 + months, 1))
+  return instantAtWallClock(zone, {
+    year: moved.getUTCFullYear(),
+    month: moved.getUTCMonth() + 1,
+    day: 1,
+    hour: 0,
+    minute: 0,
+  })
 }
 
 /** "Thursday, 27 August" — the confirmation line's date half. */
-export function longDay(at: Date): string {
-  return FULL_DAY.format(at)
+export function longDay(zone: string, at: Date): string {
+  return formatter(zone, 'long-day', { weekday: 'long', day: 'numeric', month: 'long' }).format(at)
+}
+
+/** "Thursday, 27 August 2026" — a cell's accessible name, which a grid spanning December needs. */
+export function longLabel(zone: string, at: Date): string {
+  return formatter(zone, 'long-label', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(at)
 }
 
 /** "9:00 am" — the confirmation line's time half. */
-export function clockTime(at: Date): string {
-  return TIME.format(at)
+export function clockTime(zone: string, at: Date): string {
+  return formatter(zone, 'clock', { hour: 'numeric', minute: '2-digit', hour12: true }).format(at)
 }
 
-/** Put `time`'s hours and minutes onto `day`'s date, in local zone. */
-export function combine(day: Date, hours: number, minutes: number): Date {
-  return new Date(day.getFullYear(), day.getMonth(), day.getDate(), hours, minutes, 0, 0)
+const pad = (value: number): string => String(value).padStart(2, '0')
+
+/** `HH:mm` in `zone`, which is what both time controls speak. */
+export function timeValue(zone: string, at: Date): string {
+  const p = partsInZone(zone, at)
+  return `${pad(p.hour)}:${pad(p.minute)}`
+}
+
+/**
+ * The instant a reader in `zone` means by `hours:minutes` on `day`'s date.
+ *
+ * Seconds and milliseconds are zero by construction, so a stored schedule
+ * round-trips through the minute-precision field without drifting.
+ */
+export function combine(zone: string, day: Date, hours: number, minutes: number): Date {
+  const p = partsInZone(zone, day)
+  return instantAtWallClock(zone, {
+    year: p.year,
+    month: p.month,
+    day: p.day,
+    hour: hours,
+    minute: minutes,
+  })
+}
+
+/** "4:45 pm" for an `HH:mm` value. Zone-free: it labels a wall clock, not an instant. */
+export function slotLabel(value: string): string {
+  const [hours, minutes] = value.split(':').map(Number)
+  return clockTime('UTC', new Date(Date.UTC(2000, 0, 1, hours ?? 9, minutes ?? 0)))
 }
 
 /**
@@ -124,8 +141,8 @@ export function timeSlots(): { value: string; label: string }[] {
   for (let minutes = 6 * 60; minutes <= 21 * 60 + 30; minutes += 30) {
     const hours = Math.floor(minutes / 60)
     const rest = minutes % 60
-    const value = `${String(hours).padStart(2, '0')}:${String(rest).padStart(2, '0')}`
-    slots.push({ value, label: clockTime(new Date(2000, 0, 1, hours, rest)) })
+    const value = `${pad(hours)}:${pad(rest)}`
+    slots.push({ value, label: slotLabel(value) })
   }
   return slots
 }

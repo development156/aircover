@@ -62,8 +62,17 @@ const COMMITTED: ReadonlySet<PostStatus> = new Set<PostStatus>([
  * place to go and it is the place that number came from, so the whole card is
  * the target rather than a "View all" link beside it competing for the eye.
  */
-/** "Mon 7", for the bars' accessible sentence. */
-const DAY = new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short' })
+/** "Mon 7", for the bars' accessible sentence. Read in the zone the buckets were keyed in. */
+const DAY_CACHE = new Map<string, Intl.DateTimeFormat>()
+
+function dayLabel(zone: string, at: Date): string {
+  let f = DAY_CACHE.get(zone)
+  if (!f) {
+    f = new Intl.DateTimeFormat('en-IN', { timeZone: zone, weekday: 'short' })
+    DAY_CACHE.set(zone, f)
+  }
+  return f.format(at)
+}
 
 export function AtAGlance({
   posts,
@@ -71,9 +80,12 @@ export function AtAGlance({
   publish,
   balance,
   history = [],
+  zone,
 }: {
   posts: readonly DisplayPost[]
   buckets: WeekBuckets
+  /** The workspace's zone: the one `buckets` were keyed in. */
+  zone: string
   publish: PublishSummary
   balance: BalanceRead
   /**
@@ -121,7 +133,7 @@ export function AtAGlance({
           scheduled === 0
             ? 'Nothing ready to go in the next 7 days.'
             : `Posts ready to go, by day: ${buckets.days
-                .map((day, i) => `${DAY.format(day.date)} ${perDay[i]}`)
+                .map((day, i) => `${dayLabel(zone, day.date)} ${perDay[i]}`)
                 .join(', ')}.`
         }
       />

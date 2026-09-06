@@ -34,8 +34,12 @@ export interface WallClock {
 /**
  * The zone every workspace without one of its own is rendered in — the zone
  * those 32 workspaces see today, so adopting this module moves nobody's times.
+ *
+ * THE ONE PLACE THE NAME IS WRITTEN. It was a literal in 48 files; every other
+ * reader imports this, so the fallback can be counted, found and one day
+ * changed without a repository-wide search.
  */
-export const DEFAULT_DISPLAY_ZONE = 'Asia/Kolkata'
+export const DEFAULT_ZONE = 'Asia/Kolkata'
 
 /**
  * Whether the runtime knows this zone.
@@ -75,11 +79,11 @@ export function describeZoneRefusal(zone: string): string {
   const trimmed = zone.trim()
 
   if (/^[+-]/.test(trimmed)) {
-    return `${trimmed} is an offset rather than a place, so it cannot know when your clocks change. Name a city instead, like Asia/Kolkata.`
+    return `${trimmed} is an offset rather than a place, so it cannot know when your clocks change. Name a city instead, like ${DEFAULT_ZONE}.`
   }
 
   if (trimmed !== 'UTC' && !trimmed.includes('/')) {
-    return `${trimmed} is a clock abbreviation, and the same letters name different clocks in different countries. Name a city instead, like Asia/Kolkata.`
+    return `${trimmed} is a clock abbreviation, and the same letters name different clocks in different countries. Name a city instead, like ${DEFAULT_ZONE}.`
   }
 
   return `Sahoda does not recognise the time zone ${trimmed}.`
@@ -98,7 +102,7 @@ export function resolveDisplayZone(stored: string | null | undefined): {
 } {
   return isKnownZone(stored)
     ? { zone: stored as string, fromWorkspace: true }
-    : { zone: DEFAULT_DISPLAY_ZONE, fromWorkspace: false }
+    : { zone: DEFAULT_ZONE, fromWorkspace: false }
 }
 
 /**

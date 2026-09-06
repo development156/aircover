@@ -2,7 +2,7 @@ import { isDispatchable } from '@sahoda/shared'
 
 import type { DisplayPost } from '@/lib/posts/display-post'
 import { needsAPerson } from '@/lib/approvals/queue'
-import { istDayKey } from '@/lib/planner/week-window'
+import { dayKey } from '@/lib/time/day-key'
 
 /**
  * What the planner's toolbar filters, decided ONCE and in a file the tests can
@@ -76,11 +76,16 @@ function matchesQuery(post: DisplayPost, query: string): boolean {
   return (post.title ?? '').toLowerCase().includes(query.toLowerCase())
 }
 
-function matchesDate(post: DisplayPost, dateKey: string | null): boolean {
+/**
+ * A `?date=` key matches a post on the calendar day the WORKSPACE keeps. The
+ * mini calendar that writes the key and this reader of it share one zone, or a
+ * picked cell narrows the list to posts that are not in that cell.
+ */
+function matchesDate(post: DisplayPost, dateKey: string | null, zone: string): boolean {
   if (dateKey === null) return true
   if (post.scheduled_at === null) return false
   const at = new Date(post.scheduled_at)
-  return !Number.isNaN(at.getTime()) && istDayKey(at) === dateKey
+  return !Number.isNaN(at.getTime()) && dayKey(zone, at) === dateKey
 }
 
 export interface PlannerFilter {
@@ -89,13 +94,18 @@ export interface PlannerFilter {
   dateKey: string | null
 }
 
-/** All three narrowings, applied together, in the order the toolbar reads. */
+/**
+ * All three narrowings, applied together, in the order the toolbar reads.
+ * `zone` is the workspace's: it decides which day a post's instant falls on.
+ */
 export function applyFilter(
   posts: readonly DisplayPost[],
   { tab, query, dateKey }: PlannerFilter,
+  zone: string,
 ): DisplayPost[] {
   return posts.filter(
-    (post) => matchesTab(post, tab) && matchesQuery(post, query) && matchesDate(post, dateKey),
+    (post) =>
+      matchesTab(post, tab) && matchesQuery(post, query) && matchesDate(post, dateKey, zone),
   )
 }
 

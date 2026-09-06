@@ -8,6 +8,7 @@ import { groupCorrections, type LedgerRow } from '@/lib/wallet/group-entries'
 import { cogsUsd } from '@/lib/wallet/parse-entries'
 import { cn } from '@/lib/utils'
 import { creditWord } from '@/lib/credit-words'
+import { DEFAULT_ZONE } from '@/lib/time/zone'
 
 export interface LedgerTableProps {
   entries: readonly LedgerEntry[]
@@ -76,7 +77,7 @@ const WHEN = new Intl.DateTimeFormat('en-IN', {
   year: 'numeric',
   hour: '2-digit',
   minute: '2-digit',
-  timeZone: 'Asia/Kolkata',
+  timeZone: DEFAULT_ZONE,
 })
 
 /**
@@ -92,7 +93,7 @@ const WHEN = new Intl.DateTimeFormat('en-IN', {
 const WHEN_SHORT = new Intl.DateTimeFormat('en-IN', {
   day: '2-digit',
   month: 'short',
-  timeZone: 'Asia/Kolkata',
+  timeZone: DEFAULT_ZONE,
 })
 
 function formatWhen(iso: string): string | null {

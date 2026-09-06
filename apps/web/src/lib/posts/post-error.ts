@@ -10,9 +10,22 @@
  */
 const GENERIC = 'Could not save this post. Try again.'
 
+/**
+ * The lifecycle trigger on `posts` raises this exact token when a PostgREST
+ * role tries to move `status` past idea/draft/review, change `scheduled_at`
+ * without being an owner or editor, or write `approved_by` / `approved_at`
+ * by hand. It arrives as a P0001 raise, so the CODE says nothing; the token
+ * is matched by substring and never echoed.
+ */
+const LIFECYCLE_ROLE_TOKEN = 'POST_LIFECYCLE_ROLE'
+export const LIFECYCLE_ROLE_COPY =
+  'Only an owner or editor can change when this goes out, or move it along. Ask one of them.'
+
 export function mapPostError(
   error: { message?: string | null; code?: string | null } | null | undefined,
 ): string {
+  if (error?.message?.includes(LIFECYCLE_ROLE_TOKEN)) return LIFECYCLE_ROLE_COPY
+
   switch (error?.code) {
     // 23514 check_violation — the only user-fixable one we raise: posts.status
     // and post_variants.publish_status both carry CHECK constraints.

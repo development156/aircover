@@ -69,7 +69,7 @@ describe('a repeated channel on a posts row', () => {
     const post = forDisplay(PostSchema.parse(rowWithRepeatedChannel))
 
     // Act
-    render(<PlannerRow post={post} now={NOW} variantStates={[]} />)
+    render(<PlannerRow zone="Asia/Kolkata" post={post} now={NOW} variantStates={[]} />)
 
     // Assert
     expect(screen.getAllByText('LinkedIn')).toHaveLength(1)

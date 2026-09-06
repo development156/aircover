@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 
 import { platformLabel } from './platform-label'
+import { DEFAULT_ZONE } from '@/lib/time/zone'
 
 const WHEN = new Intl.DateTimeFormat('en-IN', {
   day: '2-digit',
@@ -13,7 +14,7 @@ const WHEN = new Intl.DateTimeFormat('en-IN', {
   hour: '2-digit',
   minute: '2-digit',
   hour12: true,
-  timeZone: 'Asia/Kolkata',
+  timeZone: DEFAULT_ZONE,
 })
 
 function formatWhen(value: string | undefined): string | null {

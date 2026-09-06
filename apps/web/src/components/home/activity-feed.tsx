@@ -2,6 +2,7 @@ import { Check, Minus, Sparkles } from 'lucide-react'
 import type { LedgerEntry } from '@sahoda/shared'
 
 import { describeEntry } from '@/lib/wallet/entry-copy'
+import { DEFAULT_ZONE } from '@/lib/time/zone'
 
 /**
  * The activity feed (reference `.act`), for the right rail.
@@ -42,19 +43,19 @@ import { describeEntry } from '@/lib/wallet/entry-copy'
 
 /** IST, the zone every other date on this product is rendered in. */
 const TIME = new Intl.DateTimeFormat('en-IN', {
-  timeZone: 'Asia/Kolkata',
+  timeZone: DEFAULT_ZONE,
   hour: '2-digit',
   minute: '2-digit',
   hour12: true,
 })
 const DAY = new Intl.DateTimeFormat('en-IN', {
-  timeZone: 'Asia/Kolkata',
+  timeZone: DEFAULT_ZONE,
   day: 'numeric',
   month: 'short',
 })
 /** The calendar day in IST, so "Today" means today where the reader is. */
 const DAY_KEY = new Intl.DateTimeFormat('en-IN', {
-  timeZone: 'Asia/Kolkata',
+  timeZone: DEFAULT_ZONE,
   year: 'numeric',
   month: '2-digit',
   day: '2-digit',

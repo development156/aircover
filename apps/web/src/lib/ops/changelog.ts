@@ -1,6 +1,7 @@
 import type { OpsChangelogEntry } from '@sahoda/shared'
 
 import { formatIst } from './session-pulse'
+import { DEFAULT_ZONE } from '@/lib/time/zone'
 
 /**
  * Changelog formatting and grouping (doc 13 §8). Pure — no clipboard, no clock.
@@ -16,7 +17,7 @@ export function istDayKey(at: string): string {
   if (Number.isNaN(date.getTime())) return 'unknown'
 
   // en-CA gives ISO-shaped `YYYY-MM-DD`, which sorts lexicographically.
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(date)
+  return new Intl.DateTimeFormat('en-CA', { timeZone: DEFAULT_ZONE }).format(date)
 }
 
 /** `Saturday, 25 July 2026` — the heading above a day's entries. */
@@ -25,7 +26,7 @@ export function istDayLabel(at: string): string {
   if (Number.isNaN(date.getTime())) return 'Unknown date'
 
   return new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Kolkata',
+    timeZone: DEFAULT_ZONE,
     weekday: 'long',
     day: 'numeric',
     month: 'long',

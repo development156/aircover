@@ -9,6 +9,8 @@ import { ScheduleField } from '@/components/posts/schedule-field'
 import { cn } from '@/lib/utils'
 
 export interface FinishScheduleProps {
+  /** The workspace's zone, read on the server. The picker builds and labels its times in it. */
+  zone: string
   channels: ChannelSet
   scheduledAt: string | null
   onScheduleChange: (iso: string | null) => void
@@ -28,6 +30,7 @@ export interface FinishScheduleProps {
  * against a 937.2 kB budget with 8 kB of slack, which fails. See `finish-panel.tsx`.
  */
 export default function FinishSchedule({
+  zone,
   channels,
   scheduledAt,
   onScheduleChange,
@@ -61,6 +64,7 @@ export default function FinishSchedule({
       </div>
 
       <ScheduleField
+        zone={zone}
         channels={channels}
         value={scheduledAt}
         onChange={onScheduleChange}

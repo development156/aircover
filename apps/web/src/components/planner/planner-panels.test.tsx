@@ -40,6 +40,8 @@ function post(over: Partial<DisplayPost> & { id: string }): DisplayPost {
   } as DisplayPost
 }
 
+const IST = 'Asia/Kolkata'
+const NY = 'America/New_York'
 const NOW = new Date('2026-08-28T06:00:00.000Z') // 11:30 IST, 28 August
 
 describe('the figures above the plan', () => {
@@ -56,7 +58,7 @@ describe('the figures above the plan', () => {
   ]
 
   it('sends each figure to the screen that owns it', () => {
-    render(<PlannerSummary posts={rows} now={NOW} />)
+    render(<PlannerSummary posts={rows} now={NOW} zone={IST} />)
     expect(screen.getByRole('link', { name: /needs approval/i })).toHaveAttribute(
       'href',
       '/approvals',
@@ -65,7 +67,7 @@ describe('the figures above the plan', () => {
   })
 
   it('counts drafts and approvals from the intents, not from the row order', () => {
-    render(<PlannerSummary posts={rows} now={NOW} />)
+    render(<PlannerSummary posts={rows} now={NOW} zone={IST} />)
     expect(
       within(screen.getByRole('link', { name: /needs approval/i })).getByText('1'),
     ).toBeTruthy()
@@ -81,7 +83,7 @@ describe('the figures above the plan', () => {
         scheduled_at: '2026-08-29T13:00:00.000Z',
       }),
     ]
-    render(<PlannerSummary posts={withTomorrow} now={NOW} />)
+    render(<PlannerSummary posts={withTomorrow} now={NOW} zone={IST} />)
     // Two are scheduled; only one of them is today.
     const today = screen.getByRole('link', { name: /going out today/i })
     expect(within(today).getByText('1')).toBeTruthy()
@@ -97,7 +99,7 @@ describe('the figures above the plan', () => {
         scheduled_at: '2026-08-28T10:00:00.000Z', // 15:30 IST, today — and a draft
       }),
     ]
-    render(<PlannerSummary posts={withDatedDraft} now={NOW} />)
+    render(<PlannerSummary posts={withDatedDraft} now={NOW} zone={IST} />)
     const today = screen.getByRole('link', { name: /going out today/i })
     expect(within(today).getByText('1')).toBeTruthy()
   })
@@ -112,7 +114,7 @@ describe('the figures above the plan', () => {
         scheduled_at: '2026-08-28T07:00:00.000Z', // before Cardamom chai
       }),
     ]
-    render(<PlannerSummary posts={withSoonerDraft} now={NOW} />)
+    render(<PlannerSummary posts={withSoonerDraft} now={NOW} zone={IST} />)
     expect(screen.queryByRole('link', { name: /plan my week output/i })).toBeNull()
     expect(screen.getByRole('link', { name: /cardamom chai/i })).toHaveAttribute('href', '/posts/d')
   })
@@ -126,7 +128,7 @@ describe('the figures above the plan', () => {
         scheduled_at: '2026-08-28T09:00:00.000Z',
       }),
     ]
-    render(<PlannerSummary posts={approved} now={NOW} />)
+    render(<PlannerSummary posts={approved} now={NOW} zone={IST} />)
     const today = screen.getByRole('link', { name: /going out today/i })
     expect(within(today).getByText('1')).toBeTruthy()
     expect(screen.getByRole('link', { name: /approved and dated/i })).toHaveAttribute(
@@ -136,7 +138,7 @@ describe('the figures above the plan', () => {
   })
 
   it('names the next future post, never a past one', () => {
-    render(<PlannerSummary posts={rows} now={NOW} />)
+    render(<PlannerSummary posts={rows} now={NOW} zone={IST} />)
     expect(screen.getByRole('link', { name: /cardamom chai/i })).toHaveAttribute('href', '/posts/d')
   })
 
@@ -149,13 +151,39 @@ describe('the figures above the plan', () => {
         scheduled_at: '2026-08-20T13:00:00.000Z',
       }),
     ]
-    render(<PlannerSummary posts={past} now={NOW} />)
+    render(<PlannerSummary posts={past} now={NOW} zone={IST} />)
     expect(screen.queryByRole('link', { name: /yesterday/i })).toBeNull()
     expect(screen.getByText(/nothing scheduled ahead/i)).toBeTruthy()
   })
 
+  it('counts "going out today" on the workspace’s calendar, not on Kolkata’s', () => {
+    // The audit's instant, 2026-09-02T20:00-04:00, is Wednesday evening in New
+    // York and 05:30 Thursday in Kolkata. Asked at 22:00 New York time on the
+    // 2nd, a New York workspace counts it today; a Kolkata workspace, where it
+    // is already the 3rd, does not — and asked from the 3rd it does.
+    const late = [
+      post({
+        id: 'ny',
+        intent: 'scheduled' as PostStatus,
+        scheduled_at: '2026-09-02T20:00:00-04:00',
+      }),
+    ]
+    const nowNy = new Date('2026-09-02T18:00:00-04:00') // 22:00 EDT on the 2nd; 03:30 IST on the 3rd
+    const count = (zone: string, now: Date) => {
+      const view = render(<PlannerSummary posts={late} now={now} zone={zone} />)
+      const tile = within(view.container).getByRole('link', { name: /going out today/i })
+      const value = within(tile).getByText(/^\d+$/).textContent
+      view.unmount()
+      return value
+    }
+    expect(count(NY, nowNy)).toBe('1')
+    expect(count(IST, nowNy)).toBe('1')
+    expect(count(NY, new Date('2026-09-02T12:00:00-04:00'))).toBe('1')
+    expect(count(IST, new Date('2026-09-02T12:00:00-04:00'))).toBe('0')
+  })
+
   it('sets exactly one heading rung for a figure, so none of them outranks the page title', () => {
-    const { container } = render(<PlannerSummary posts={rows} now={NOW} />)
+    const { container } = render(<PlannerSummary posts={rows} now={NOW} zone={IST} />)
     // docs/37 §16: exactly one type-h1 per view, and the page heading owns it.
     expect(container.querySelectorAll('.type-h1')).toHaveLength(0)
   })
@@ -296,6 +324,7 @@ describe('the mini calendar', () => {
   it('names each cell with its full date — a 42-cell grid repeats the numeral', () => {
     render(
       <PlannerMiniCalendar
+        zone={IST}
         posts={[]}
         now={NOW}
         selected={null}
@@ -314,6 +343,7 @@ describe('the mini calendar', () => {
   it('picking a day adds it to the URL', () => {
     render(
       <PlannerMiniCalendar
+        zone={IST}
         posts={rows}
         now={NOW}
         selected={null}
@@ -330,6 +360,7 @@ describe('the mini calendar', () => {
   it('clicking the picked day again clears it — a filter with no way out is a trap', () => {
     render(
       <PlannerMiniCalendar
+        zone={IST}
         posts={rows}
         now={NOW}
         selected="2026-08-28"
@@ -347,6 +378,7 @@ describe('the mini calendar', () => {
   it('carries the tab and the search forward, so picking a day discards neither', () => {
     render(
       <PlannerMiniCalendar
+        zone={IST}
         posts={rows}
         now={NOW}
         selected={null}
@@ -365,6 +397,7 @@ describe('the mini calendar', () => {
   it('carries the week offset too, so a picked day does not jump the reader to this week', () => {
     render(
       <PlannerMiniCalendar
+        zone={IST}
         posts={[]}
         now={NOW}
         selected={null}
@@ -379,9 +412,45 @@ describe('the mini calendar', () => {
     )
   })
 
+  it('dots the audit’s post on 2 September for New York and 3 September for Kolkata', () => {
+    // 2026-09-02T20:00-04:00. The filled dot must sit in the cell the
+    // workspace's own calendar puts that evening in, and the cell's link must
+    // carry that day's key so picking it narrows the list to this post.
+    const late = [
+      post({
+        id: 'ny',
+        intent: 'scheduled' as PostStatus,
+        scheduled_at: '2026-09-02T20:00:00-04:00',
+      }),
+    ]
+    const now = new Date('2026-09-01T12:00:00Z')
+    const dotted = (zone: string) => {
+      const view = render(
+        <PlannerMiniCalendar
+          zone={zone}
+          posts={late}
+          now={now}
+          selected={null}
+          view="list"
+          tab={null}
+          query=""
+          week={null}
+        />,
+      )
+      const cells = Array.from(view.container.querySelectorAll('a[href*="/planner"]'))
+      const withDot = cells.filter((cell) => cell.querySelector('.bg-brand') !== null)
+      const found = withDot.map((cell) => cell.getAttribute('aria-label'))
+      view.unmount()
+      return found
+    }
+    expect(dotted(NY)).toEqual(['2 September 2026'])
+    expect(dotted(IST)).toEqual(['3 September 2026'])
+  })
+
   it('renders a full 6x7 month, so the grid height does not jump between months', () => {
     const { container } = render(
       <PlannerMiniCalendar
+        zone={IST}
         posts={[]}
         now={NOW}
         selected={null}

@@ -48,18 +48,26 @@ function board(posts: DisplayPost[]) {
   const buckets: WeekBuckets = {
     days: [{ key: '2026-09-07', date: new Date('2026-09-07T04:30:00.000Z'), posts }],
     unscheduled: [],
-    outside: [],
   }
-  render(<AtAGlance posts={posts} buckets={buckets} publish={PUBLISH} balance={BALANCE} />)
+  render(
+    <AtAGlance
+      zone="Asia/Kolkata"
+      posts={posts}
+      buckets={buckets}
+      publish={PUBLISH}
+      balance={BALANCE}
+    />,
+  )
 }
 
 const cell = (label: RegExp) => screen.getByRole('link', { name: label }).textContent ?? ''
 
 describe('the board draws only what it can prove', () => {
   test('the credits cell carries the ledger line once two days are known', () => {
-    const buckets: WeekBuckets = { days: [], unscheduled: [], outside: [] }
+    const buckets: WeekBuckets = { days: [], unscheduled: [] }
     render(
       <AtAGlance
+        zone="Asia/Kolkata"
         posts={[]}
         buckets={buckets}
         publish={PUBLISH}
@@ -77,9 +85,10 @@ describe('the board draws only what it can prove', () => {
   })
 
   test('no line is drawn from an empty or one-day history', () => {
-    const buckets: WeekBuckets = { days: [], unscheduled: [], outside: [] }
+    const buckets: WeekBuckets = { days: [], unscheduled: [] }
     render(
       <AtAGlance
+        zone="Asia/Kolkata"
         posts={[]}
         buckets={buckets}
         publish={PUBLISH}

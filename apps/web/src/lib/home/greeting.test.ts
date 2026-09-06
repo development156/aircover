@@ -71,7 +71,7 @@ describe('the greeting sentence agrees with the queue beneath it', () => {
       publish(4),
     )
     expect(sentence).toBe(
-      '2 drafts you are still writing, 1 post waiting for your OK, 3 posts ready to go, 4 posts went out, 1 post could not go out.',
+      '2 drafts you are still writing, 1 post waiting for your OK, 3 posts approved and waiting for a time, 4 posts went out, 1 post could not go out.',
     )
   })
 
@@ -81,7 +81,7 @@ describe('the greeting sentence agrees with the queue beneath it', () => {
     // said "Nothing in flight yet" directly above it.
     expect(greetingState(counts({ scheduled: 1 }), publish())).toBe('1 post set to go out.')
     expect(greetingState(counts({ scheduled: 2, approved: 1 }), publish())).toBe(
-      '1 post ready to go, 2 posts set to go out.',
+      '1 post approved and waiting for a time, 2 posts set to go out.',
     )
   })
 

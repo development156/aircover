@@ -26,6 +26,12 @@ import { VersionsPane } from './versions-pane'
 export interface ComposerProps {
   /** The row, or null when this post does not exist yet. */
   post: Post | null
+  /**
+   * The workspace's zone, resolved on the server. The schedule picker builds
+   * its instants in it and names it beside every time, so the composer and the
+   * planner call one post one time.
+   */
+  zone: string
   variants: PostVariant[]
   versions?: VariantVersions
   formats?: Partial<Record<Channel, PostFormat>>
@@ -66,6 +72,7 @@ export interface ComposerProps {
  */
 export function Composer({
   post,
+  zone,
   variants,
   versions = VERSIONS_UNSUPPORTED,
   formats: initialFormats = {},
@@ -294,6 +301,7 @@ export function Composer({
 
       <FinishPanel
         postId={postId}
+        zone={zone}
         channels={draft.channels}
         scheduledAt={draft.scheduledAt}
         onScheduleChange={actions.changeSchedule}

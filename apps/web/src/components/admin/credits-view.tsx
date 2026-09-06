@@ -13,6 +13,7 @@ import {
 import type { WorkspaceHit } from '@/lib/ops/credit-state'
 import { cn } from '@/lib/utils'
 import { credits } from '@/lib/credit-words'
+import { DEFAULT_ZONE } from '@/lib/time/zone'
 
 /**
  * A3 · Credit allocation, maker-checker (doc 13 §6).
@@ -36,7 +37,7 @@ const WHEN = new Intl.DateTimeFormat('en-IN', {
   month: 'short',
   hour: '2-digit',
   minute: '2-digit',
-  timeZone: 'Asia/Kolkata',
+  timeZone: DEFAULT_ZONE,
 })
 
 const STATUS_STYLE: Record<string, string> = {

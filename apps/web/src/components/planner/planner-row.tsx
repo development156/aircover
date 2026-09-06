@@ -13,9 +13,16 @@ import { LiveStatusBadge } from '@/components/posts/live/live-status-badge'
 import type { DisplayPost } from '@/lib/posts/display-post'
 import { formatScheduledAt } from '@/lib/posts/schedule-format'
 import { needsAPerson } from '@/lib/approvals/queue'
+import { canApprove } from '@/lib/planner/transitions'
 import { cn } from '@/lib/utils'
 
 export interface PlannerRowProps {
+  /**
+   * The workspace's zone, resolved by the page. It names the row's time and it
+   * is the zone the reschedule picker builds in, so the two cannot disagree.
+   * Required: a row that defaulted to IST for a Dubai workspace was the defect.
+   */
+  zone: string
   /**
    * Whether the scheduled dispatcher is on in this environment (server fact from
    * `autoPublishEnabled()`). Defaults false so a forgotten call site under-promises
@@ -88,7 +95,7 @@ export function PlannerRow({
   now,
   connected,
   campaigns,
-}: PlannerRowProps & { zone?: string | null }) {
+}: PlannerRowProps) {
   const title = post.title?.trim()
   const scheduledAt = formatScheduledAt(post.scheduled_at, zone)
   // Distinct at the row boundary — see `post-card.tsx`. This row had the same
@@ -156,17 +163,26 @@ export function PlannerRow({
         {/* Always rendered, never revealed on hover. A control that appears on
             hover is a control a touch screen cannot find, and `Approve` is the
             seeded tour's anchor — a tour cannot point at something not there. */}
-        <div className="flex shrink-0 items-start gap-2">
-          {/* Intent, legitimately: approving is a decision about the post, not a
-              claim about what it did. */}
-          <ApproveButton postId={post.id} status={post.intent} />
-          <PlannerReschedule
-            postId={post.id}
-            channels={post.channels}
-            value={post.scheduled_at}
-            connected={connected}
-            autoPublish={autoPublish}
-          />
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <div className="flex items-start gap-2">
+            {/* Intent, legitimately: approving is a decision about the post, not a
+                claim about what it did. */}
+            <ApproveButton postId={post.id} status={post.intent} />
+            <PlannerReschedule
+              postId={post.id}
+              zone={zone}
+              channels={post.channels}
+              value={post.scheduled_at}
+              connected={connected}
+              autoPublish={autoPublish}
+            />
+          </div>
+          {/* Approving a post with nowhere to go and no time clears the content
+              and nothing else. Said beside the control, only when both are
+              missing, so the reader knows what to add before they click. */}
+          {canApprove(post.intent) && channels.length === 0 && post.scheduled_at === null ? (
+            <span className="type-meta text-muted">Give it a channel and a time first</span>
+          ) : null}
         </div>
 
         {/* Full width under the row: this qualifies the badge and the time above

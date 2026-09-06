@@ -1,4 +1,5 @@
 import type { OpsQaRun, OpsSession } from '@sahoda/shared'
+import { DEFAULT_ZONE } from '@/lib/time/zone'
 
 /**
  * The header strips' arithmetic (doc 13 §12). Pure — `now` is always passed in.
@@ -119,7 +120,7 @@ export function formatIst(at: string | null): string | null {
   if (Number.isNaN(date.getTime())) return null
 
   const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Kolkata',
+    timeZone: DEFAULT_ZONE,
     day: '2-digit',
     month: 'short',
     year: 'numeric',

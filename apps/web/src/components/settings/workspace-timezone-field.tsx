@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from 'react'
 import { setWorkspaceTimezone } from '@/app/actions/workspace'
 import { Button } from '@/components/ui/button'
 import { InlineError } from '@/components/posts/inline-error'
+import { DEFAULT_ZONE } from '@/lib/time/zone'
 
 /**
  * Where this business is, recorded rather than guessed.
@@ -95,7 +96,7 @@ export function WorkspaceTimezoneField({
             id="workspace-timezone"
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder="Asia/Kolkata"
+            placeholder={DEFAULT_ZONE}
             aria-label="Time zone"
             className="min-w-0 flex-1 rounded-input border border-line bg-bg px-3 py-2 type-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring max-narrow:min-h-[44px]"
           />

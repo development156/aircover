@@ -1,4 +1,4 @@
-import { DEFAULT_DISPLAY_ZONE } from '@/lib/time/zone'
+import { DEFAULT_ZONE } from '@/lib/time/zone'
 
 import type { PostCounts } from './posts'
 import type { PublishSummary } from './publishing'
@@ -40,7 +40,12 @@ export function greetingState(counts: PostCounts, publish: PublishSummary): stri
   // "Waiting on you", and a draft with no date is not waiting on anyone.
   if (drafts > 0) clauses.push(`${plural(drafts, 'draft', 'drafts')} you are still writing`)
   if (review > 0) clauses.push(`${plural(review, 'post', 'posts')} waiting for your OK`)
-  if (approved > 0) clauses.push(`${plural(approved, 'post', 'posts')} ready to go`)
+  // Not "ready to go": since `approve_posts` books a dated post as `scheduled`,
+  // an `approved` row never carries a time, so nothing about it goes out until
+  // someone gives it one. The clause says that instead of implying it will.
+  if (approved > 0) {
+    clauses.push(`${plural(approved, 'post', 'posts')} approved and waiting for a time`)
+  }
   // The composer's Confirm schedule writes `scheduled` (MEASURED 2026-09-06),
   // and the board counts it as committed; this sentence must not say "nothing
   // in flight" over a "Scheduled · 1 post" cell.
@@ -69,7 +74,7 @@ export function greetingState(counts: PostCounts, publish: PublishSummary): stri
  * "Good morning" at 11pm is a small lie, and it was the first sentence on the
  * screen for any workspace that had set a timezone other than Asia/Kolkata.
  */
-export function greetingFor(now: Date, zone: string = DEFAULT_DISPLAY_ZONE): string {
+export function greetingFor(now: Date, zone: string = DEFAULT_ZONE): string {
   const hour = Number(
     new Intl.DateTimeFormat('en-IN', {
       timeZone: zone,

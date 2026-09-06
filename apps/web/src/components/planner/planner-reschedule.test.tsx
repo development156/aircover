@@ -32,6 +32,7 @@ const renderRow = (value: string | null = null) =>
   render(
     <PlannerReschedule
       postId="p1"
+      zone="Asia/Kolkata"
       channels={toChannelSet(['linkedin'])}
       value={value}
       autoPublish
@@ -52,7 +53,12 @@ const renderRow = (value: string | null = null) =>
  */
 async function afterChunkArrives(): Promise<void> {
   const clock = render(
-    <PlannerReschedule postId="clock" channels={toChannelSet(['linkedin'])} value={null} />,
+    <PlannerReschedule
+      postId="clock"
+      zone="Asia/Kolkata"
+      channels={toChannelSet(['linkedin'])}
+      value={null}
+    />,
   )
   // Scoped to the clock's own container: `render` binds its queries to
   // document.body, so a bare getByRole would also match the row under test.

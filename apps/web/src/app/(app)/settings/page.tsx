@@ -79,26 +79,25 @@ export default async function SettingsPage() {
           >
             {/*
               THE HONEST DISCLOSURE, AND WHY IT IS NOT OPTIONAL.
-              This setting now reaches two screens and not the rest: Posts and
-              the Planner render scheduled times in it, the picker still builds
-              times on the reader's own device clock, and the other files that
-              name a zone still name IST. A setting that silently does less than
-              a reader would assume is the same defect as one that does nothing,
-              so the row states its reach rather than implying all of it. Narrow
-              this line as the remaining screens are moved, never widen it first.
+              This setting reaches Posts, the whole Planner (every view, the
+              mini calendar, the today count) and the schedule picker, which
+              builds "tomorrow morning" in this zone and says so beside the
+              time. It does NOT reach the other timestamps in Sahoda (the inbox,
+              the wallet, the asset library, the admin screens), which still
+              read IST. A setting that silently does less than a reader would
+              assume is the same defect as one that does nothing, so the row
+              states its reach rather than implying all of it. Narrow this line
+              as the remaining screens are moved, never widen it first.
 
-              THE WEEK GRID IS NAMED SEPARATELY because it is the one part of the
-              Planner this does not reach. `week-window.ts` places every card by
-              `PLANNER_GRID_ZONE`, so a card's column and row are IST facts; its
-              caption was briefly rendered in the workspace zone instead, which
-              drew a New York post in the wrong column under the right time. The
-              caption now matches the grid, and this sentence says so rather than
-              letting "the Planner" imply the grid moved too.
+              The week grid used to be named separately here as the one part of
+              the Planner this did not reach. Founder's ruling, 2026-09-06: the
+              planner renders in the workspace zone everywhere, and the picker
+              builds in it too, so that carve-out is gone, and `setting-reach.test.ts`
+              now guards the opposite claim.
             */}
             <p className="type-meta text-muted">
-              Posts and Planner show your scheduled times in this zone. The Planner's week grid is
-              still laid out in IST, choosing a time still follows your own device clock, and other
-              timestamps in Sahoda are shown in IST.
+              Posts, the Planner and the schedule picker use this zone for every time they show or
+              set. Other timestamps in Sahoda are shown in IST.
             </p>
           </SettingRow>
         </SettingCard>

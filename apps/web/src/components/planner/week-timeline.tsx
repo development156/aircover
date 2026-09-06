@@ -1,12 +1,13 @@
 import Link from 'next/link'
 
 import { ChannelMark } from '@/components/posts/channel-mark'
-import { certaintyFor } from '@/lib/posts/certainty'
+import { CERTAINTY_CLASS, certaintyFor } from '@/lib/posts/certainty'
 import type { DisplayPost } from '@/lib/posts/display-post'
 import { outcomeOf } from '@/lib/posts/publish-evidence'
 import type { VariantStatusRow } from '@/lib/posts/variant-status'
 import { formatScheduledClock } from '@/lib/posts/schedule-format'
-import { PLANNER_GRID_ZONE, hourRange, istDayKey, placeDay } from '@/lib/planner/week-window'
+import { hourRange, placeDay } from '@/lib/planner/week-window'
+import { dayKey } from '@/lib/time/day-key'
 import { zoneLabel } from '@/lib/time/zone'
 import { cn } from '@/lib/utils'
 
@@ -15,9 +16,17 @@ import { NowLine } from './now-line'
 /**
  * The week, on a clock.
  *
- * The existing `WeekGrid` is seven columns of stacked chips: it answers "what is
- * on Wednesday" and cannot answer "what goes out before lunch", because nothing
- * in it is positioned by time. This one places every post at its own IST minute.
+ * The `WeekGrid` this replaced was seven columns of stacked chips: it answered
+ * "what is on Wednesday" and could not answer "what goes out before lunch",
+ * because nothing in it was positioned by time. This one places every post at
+ * its own minute, in the WORKSPACE'S zone.
+ *
+ * ── THE COLUMN AND THE ROW ARE FACTS ABOUT ONE ZONE ──────────────────────────
+ * The zone comes down from the page, which resolved the workspace's. Every
+ * placement, every column header, the now-line and the caption on the hour
+ * rail all read it. When the caption alone moved to the workspace zone and the
+ * placement stayed in IST, a New York post was drawn in the wrong column under
+ * the right time; both now read the same value, so they cannot disagree.
  *
  * ── THE STATUS ON A CARD IS THE CERTAINTY RUNG, NOT A NEW VOCABULARY ─────────
  * The reference codes three badges — Pending amber, Scheduled blue, Approved
@@ -46,23 +55,17 @@ const SLOT_MINUTES = 60
 /** How far each overlapping card is pushed right of the one before it. */
 const STAGGER_PX = 14
 
-const CERTAINTY_CLASS: Record<string, string> = {
-  real: 'is-real',
-  committed: 'is-committed',
-  proposed: 'is-proposed',
-  simulated: 'is-simulated',
-  failed: 'border border-danger bg-transparent text-danger',
-  neutral: 'border border-line bg-transparent text-muted',
-}
+/** "Wed 2" — a column header, in the grid's zone. Cached per zone like every other formatter. */
+const COL_CACHE = new Map<string, Intl.DateTimeFormat>()
 
-const COL_LABEL = new Intl.DateTimeFormat('en-IN', {
-  timeZone: 'Asia/Kolkata',
-  weekday: 'short',
-})
-const COL_DATE = new Intl.DateTimeFormat('en-IN', {
-  timeZone: 'Asia/Kolkata',
-  day: 'numeric',
-})
+function columnLabel(zone: string, day: Date): string {
+  let f = COL_CACHE.get(zone)
+  if (!f) {
+    f = new Intl.DateTimeFormat('en-IN', { timeZone: zone, weekday: 'short', day: 'numeric' })
+    COL_CACHE.set(zone, f)
+  }
+  return f.format(day)
+}
 
 function hourLabel(hour: number): string {
   const suffix = hour < 12 ? 'am' : 'pm'
@@ -74,27 +77,35 @@ export interface WeekTimelineProps {
   days: Date[]
   posts: DisplayPost[]
   variantStates: ReadonlyMap<string, readonly VariantStatusRow[]>
-  /** Today, for highlighting the column. Server time is fine: it is a DATE. */
+  /** Today, for highlighting the column. Server time is fine: it is an instant. */
   today: Date
+  /** The workspace's zone, resolved by the page. Every column and row is read in it. */
+  zone: string
 }
 
-export function WeekTimeline({ days, posts, variantStates, today }: WeekTimelineProps) {
-  const { from, to } = hourRange(posts)
+export function WeekTimeline({ days, posts, variantStates, today, zone }: WeekTimelineProps) {
+  const { from, to } = hourRange(zone, posts)
   const hours = Array.from({ length: to - from + 1 }, (_, i) => from + i)
   const bodyHeight = (to - from + 1) * HOUR_PX
-  const todayKey = istDayKey(today)
+  const todayKey = dayKey(zone, today)
 
   const byDay = new Map<string, DisplayPost[]>()
   for (const post of posts) {
     if (post.scheduled_at === null) continue
-    const key = istDayKey(new Date(post.scheduled_at))
+    const key = dayKey(zone, new Date(post.scheduled_at))
     const bucket = byDay.get(key)
     if (bucket) bucket.push(post)
     else byDay.set(key, [post])
   }
 
   return (
-    <div className="overflow-x-auto rounded-card border border-line-soft bg-surface">
+    /* `planner.week` is the seeded tour's anchor for this view. It lived on the
+       retired `WeekGrid`, which no route rendered, so the step auto-skipped in
+       silence; it sits on the surface the reader actually sees now. */
+    <div
+      className="overflow-x-auto rounded-card border border-line-soft bg-surface"
+      data-guide="planner.week"
+    >
       {/* min-width keeps seven readable columns on a phone and lets the
           container scroll, rather than crushing them to 40px each. */}
       <div className="min-w-[760px]">
@@ -104,12 +115,10 @@ export function WeekTimeline({ days, posts, variantStates, today }: WeekTimeline
               carry the clock alone so the certainty word beside it survives a
               100px column. */}
           <div className="flex items-end justify-end px-2 py-2.5">
-            <span className="type-eyebrow text-ink-mute">
-              {zoneLabel(PLANNER_GRID_ZONE, today)}
-            </span>
+            <span className="type-eyebrow text-ink-mute">{zoneLabel(zone, today)}</span>
           </div>
           {days.map((day) => {
-            const isToday = istDayKey(day) === todayKey
+            const isToday = dayKey(zone, day) === todayKey
             return (
               <div
                 key={day.toISOString()}
@@ -119,7 +128,7 @@ export function WeekTimeline({ days, posts, variantStates, today }: WeekTimeline
                 )}
               >
                 <p className={cn('type-eyebrow', isToday ? 'text-brand-text' : 'text-ink-mute')}>
-                  {COL_LABEL.format(day)} {COL_DATE.format(day)}
+                  {columnLabel(zone, day)}
                 </p>
               </div>
             )
@@ -144,9 +153,9 @@ export function WeekTimeline({ days, posts, variantStates, today }: WeekTimeline
           </div>
 
           {days.map((day) => {
-            const key = istDayKey(day)
+            const key = dayKey(zone, day)
             const isToday = key === todayKey
-            const placed = placeDay(byDay.get(key) ?? [], SLOT_MINUTES)
+            const placed = placeDay(zone, byDay.get(key) ?? [], SLOT_MINUTES)
 
             return (
               <div
@@ -163,7 +172,9 @@ export function WeekTimeline({ days, posts, variantStates, today }: WeekTimeline
                   />
                 ))}
 
-                {isToday ? <NowLine fromHour={from} toHour={to} hourPx={HOUR_PX} /> : null}
+                {isToday ? (
+                  <NowLine zone={zone} fromHour={from} toHour={to} hourPx={HOUR_PX} />
+                ) : null}
 
                 {placed.map(({ post, minutes, lane }) => {
                   const certainty = certaintyFor(
@@ -204,10 +215,10 @@ export function WeekTimeline({ days, posts, variantStates, today }: WeekTimeline
                       <span className="truncate type-eyebrow text-ink-mute">
                         {/* The clock alone. The zone is stated ONCE, on the
                             hour rail's header, because every card here is placed
-                            by PLANNER_GRID_ZONE — so it is a fact about the grid
+                            in the same `zone` — so it is a fact about the grid
                             and not about each card. Repeating it truncated the
                             certainty word out of a 100px column. */}
-                        {formatScheduledClock(post.scheduled_at, PLANNER_GRID_ZONE)}
+                        {formatScheduledClock(post.scheduled_at, zone)}
                         {certainty.label !== null ? ` · ${certainty.label}` : null}
                       </span>
                     </Link>

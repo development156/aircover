@@ -11,6 +11,7 @@ import {
   revokeApplicationInvite,
 } from '@/app/actions/ops-applications'
 import { cn } from '@/lib/utils'
+import { DEFAULT_ZONE } from '@/lib/time/zone'
 
 /**
  * A2 · The applications inbox (doc 13 §4).
@@ -28,7 +29,7 @@ const WHEN = new Intl.DateTimeFormat('en-IN', {
   month: 'short',
   hour: '2-digit',
   minute: '2-digit',
-  timeZone: 'Asia/Kolkata',
+  timeZone: DEFAULT_ZONE,
 })
 
 const STATUS_STYLE: Record<OpsApplicationStatus, string> = {

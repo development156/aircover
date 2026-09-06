@@ -96,7 +96,8 @@ export default async function ApprovalsPage() {
         <Link href="/loop" className="font-[550] text-accent underline underline-offset-2">
           autonomy setting
         </Link>
-        . It is not built yet, so a post with a date and a channel waits here until you approve it.
+        . It is not built yet, so a post with a date and a channel waits here, and approving it
+        books it for that time.
       </p>
     </div>
   )

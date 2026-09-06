@@ -1,7 +1,7 @@
 import Link from 'next/link'
 
 import { AgencyBlade } from '@/components/posts/agency-blade'
-import { certaintyFor } from '@/lib/posts/certainty'
+import { CERTAINTY_CLASS, certaintyFor } from '@/lib/posts/certainty'
 import type { DisplayPost } from '@/lib/posts/display-post'
 import { outcomeOf } from '@/lib/posts/publish-evidence'
 import type { VariantStatusRow } from '@/lib/posts/variant-status'
@@ -33,19 +33,23 @@ import { cn } from '@/lib/utils'
  * shape that fits the hand.
  */
 
-const DAY_LABEL = new Intl.DateTimeFormat('en-IN', {
-  timeZone: 'Asia/Kolkata',
-  weekday: 'short',
-})
-const DATE_LABEL = new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric' })
+/**
+ * The day labels are read in the WORKSPACE'S zone — the same one `bucketWeek`
+ * keyed the days by — so a label and the posts under it cannot disagree. Built
+ * per zone and cached, because the zone is a per-workspace fact.
+ */
+const LABEL_CACHE = new Map<string, { day: Intl.DateTimeFormat; date: Intl.DateTimeFormat }>()
 
-const CERTAINTY_CLASS: Record<string, string> = {
-  real: 'is-real',
-  committed: 'is-committed',
-  proposed: 'is-proposed',
-  simulated: 'is-simulated',
-  failed: 'border border-danger bg-transparent text-danger',
-  neutral: 'border border-line bg-transparent text-muted',
+function labels(zone: string) {
+  let f = LABEL_CACHE.get(zone)
+  if (!f) {
+    f = {
+      day: new Intl.DateTimeFormat('en-IN', { timeZone: zone, weekday: 'short' }),
+      date: new Intl.DateTimeFormat('en-IN', { timeZone: zone, day: 'numeric' }),
+    }
+    LABEL_CACHE.set(zone, f)
+  }
+  return f
 }
 
 function Entry({ post, variants }: { post: DisplayPost; variants: readonly VariantStatusRow[] }) {
@@ -105,6 +109,8 @@ function Entry({ post, variants }: { post: DisplayPost; variants: readonly Varia
 
 export interface WeekStripProps {
   buckets: WeekBuckets
+  /** The workspace's zone: the one `buckets` were keyed in. */
+  zone: string
   /**
    * post id → per-channel publish state. Required in position; an ABSENT entry
    * for one post means unknown, which under-claims rather than denying a
@@ -113,7 +119,8 @@ export interface WeekStripProps {
   variantStates: ReadonlyMap<string, readonly VariantStatusRow[]>
 }
 
-export function WeekStrip({ buckets, variantStates }: WeekStripProps) {
+export function WeekStrip({ buckets, variantStates, zone }: WeekStripProps) {
+  const { day: dayLabel, date: dateLabel } = labels(zone)
   const total = buckets.days.reduce((sum, day) => sum + day.posts.length, 0)
 
   return (
@@ -165,8 +172,8 @@ export function WeekStrip({ buckets, variantStates }: WeekStripProps) {
                 index === 0 ? 'text-ink' : 'text-ink-mute',
               )}
             >
-              <span>{DAY_LABEL.format(day.date)}</span>
-              <span className="num">{DATE_LABEL.format(day.date)}</span>
+              <span>{dayLabel.format(day.date)}</span>
+              <span className="num">{dateLabel.format(day.date)}</span>
             </p>
             <div className="space-y-1.5 max-narrow:min-w-0 max-narrow:flex-1">
               {day.posts.length === 0 ? (

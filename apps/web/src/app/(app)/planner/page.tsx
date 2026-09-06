@@ -27,10 +27,12 @@ import { ViewToggle, type PlannerView } from '@/components/planner/view-toggle'
 import { WeekTimeline } from '@/components/planner/week-timeline'
 import { PlannerSummary } from '@/components/planner/planner-summary'
 import { WeekNav } from '@/components/planner/week-nav'
-import { dayColumn, istDayKey, weekWindow } from '@/lib/planner/week-window'
+import { dayColumn, weekWindow } from '@/lib/planner/week-window'
 import { MonthGrid } from '@/components/planner/month-grid'
-import { firstGridDay, MONTH_GRID_DAYS } from '@/lib/planner/month'
+import { firstGridDay, monthGridKeys, MONTH_GRID_DAYS } from '@/lib/planner/month'
 import { bucketWeek } from '@/lib/planner/week'
+import { dayKey } from '@/lib/time/day-key'
+import { resolveDisplayZone } from '@/lib/time/zone'
 import { forDisplay } from '@/lib/posts/display-post'
 import { readPosts, listVariantStates, LIST_LIMIT } from '@/lib/posts/read'
 import { assembleSnapshot } from '@/lib/posts/live-state'
@@ -106,14 +108,18 @@ export default async function PlannerPage({
   const autoPublish = autoPublishEnabled()
   const now = new Date()
   // The clock every time on this page is rendered in: the workspace's own when
-  // it has one, the shipped default when it does not.
-  const zone = workspace?.timezone ?? null
+  // it has one, the shipped default when it does not. Founder's ruling,
+  // 2026-09-06: EVERYWHERE on this page, so the column a card sits in, the cell
+  // the mini calendar dots, the "Going out today" count and the row's own label
+  // are one zone and cannot disagree. `resolveDisplayZone` also refuses a stored
+  // zone the runtime cannot use, so nothing below can throw on a bad value.
+  const zone = resolveDisplayZone(workspace?.timezone).zone
 
   // The Monday-anchored window this view is looking at. `bucketWeek` starts at
   // TODAY, which cannot be navigated: "previous week" would move by a
   // different amount depending on the weekday you asked on.
-  const window = weekWindow(now, weekOffset)
-  const windowKeys = new Set(window.days.map(istDayKey))
+  const window = weekWindow(zone, now, weekOffset)
+  const windowKeys = new Set(window.days.map((d) => dayKey(zone, d)))
 
   // The provider's seed, assembled from reads this page has ALREADY done —
   // `listPosts` returns `status` and `scheduled_at`, and the two maps are right
@@ -173,7 +179,7 @@ export default async function PlannerPage({
     ...(filter.query === '' ? {} : { q: filter.query }),
     ...(filter.dateKey === null ? {} : { date: filter.dateKey }),
   }
-  const visible = applyFilter(shown, filter)
+  const visible = applyFilter(shown, filter, zone)
 
   /**
    * The days the grid draws, computed ONCE.
@@ -185,7 +191,7 @@ export default async function PlannerPage({
    * with the blank grid instead of exposing it. `dayColumn` selects exactly one
    * day, on every offset, and both call sites now read the same value.
    */
-  const drawnDays = view === 'day' ? [dayColumn(window, filter.dateKey, now)] : window.days
+  const drawnDays = view === 'day' ? [dayColumn(zone, window, filter.dateKey, now)] : window.days
 
   // ── EACH COUNT IS WHAT THAT TAB WOULD SHOW, GIVEN THE OTHER TWO FILTERS ────
   // Not the count of the whole page, and not the count of what is already
@@ -196,7 +202,7 @@ export default async function PlannerPage({
   //
   // So: apply the search and the picked date, then count each tab within that.
   // Stand on any tab and its own number is exactly the number of rows beneath it.
-  const beforeTab = applyFilter(shown, { ...filter, tab: 'all' })
+  const beforeTab = applyFilter(shown, { ...filter, tab: 'all' }, zone)
   const tabCounts = Object.fromEntries(
     PLANNER_TABS.map((tab) => [tab, beforeTab.filter((p) => matchesTab(p, tab)).length]),
   ) as Record<PlannerTab, number>
@@ -214,19 +220,15 @@ export default async function PlannerPage({
   // the failure `no-impossible-remedy.spec.ts` exists to catch, one state along.
   const drawnKeys =
     view === 'month'
-      ? new Set(
-          Array.from({ length: MONTH_GRID_DAYS }, (_, i) =>
-            istDayKey(new Date(firstGridDay(now).getTime() + i * 86_400_000)),
-          ),
-        )
+      ? new Set(monthGridKeys(zone, now))
       : view === 'day'
-        ? new Set(drawnDays.map(istDayKey))
+        ? new Set(drawnDays.map((d) => dayKey(zone, d)))
         : windowKeys
 
   const offGrid = visible.filter((p) => {
     if (p.scheduled_at === null) return true
     const at = new Date(p.scheduled_at)
-    return Number.isNaN(at.getTime()) || !drawnKeys.has(istDayKey(at))
+    return Number.isNaN(at.getTime()) || !drawnKeys.has(dayKey(zone, at))
   }).length
 
   return (
@@ -353,13 +355,15 @@ export default async function PlannerPage({
                     </Link>
                   </p>
                 ) : view === 'month' ? (
-                  // 42 IST days from the Monday on or before the 1st — `bucketWeek`
-                  // already buckets any run of consecutive days, so the calendar needed
-                  // no second date implementation to drift from the first.
+                  // 42 days of the workspace's zone from the Monday on or before the
+                  // 1st — `bucketWeek` already buckets any run of consecutive days, so
+                  // the calendar needed no second date implementation to drift from
+                  // the first.
                   <div className="space-y-3">
                     <MonthGrid
-                      buckets={bucketWeek(visible, firstGridDay(now), MONTH_GRID_DAYS)}
+                      buckets={bucketWeek(zone, visible, firstGridDay(zone, now), MONTH_GRID_DAYS)}
                       monthAnchor={now}
+                      zone={zone}
                     />
                     {/* The month grid had no such note at all, so a picked date
                         outside its 42 days rendered a calendar with nothing on it
@@ -375,21 +379,23 @@ export default async function PlannerPage({
                       days={window.days}
                       offset={weekOffset}
                       view={view}
+                      zone={zone}
                       filters={{
                         ...(filter.tab === 'all' ? {} : { tab: filter.tab }),
                         ...(filter.query === '' ? {} : { q: filter.query }),
                         ...(filter.dateKey === null ? {} : { date: filter.dateKey }),
                       }}
                     />
-                    {/* No `zone`: the grid places every card by
-                        PLANNER_GRID_ZONE, and its caption reads the same zone.
-                        Passing the workspace's would only let the two drift
-                        apart again. */}
+                    {/* The same `zone` the window above was built in, so the
+                        columns, the rows, the now-line and the caption are one
+                        fact. This prop was withheld while the grid was pinned to
+                        IST; it is REQUIRED now, so it cannot be withheld again. */}
                     <WeekTimeline
                       days={drawnDays}
                       posts={visible}
                       variantStates={variantStates}
                       today={now}
+                      zone={zone}
                     />
                     {/* WHAT THE VIEW STRUCTURALLY CANNOT SHOW, SAID RATHER THAN
                         DROPPED. A post with no `scheduled_at` has no minute to sit
@@ -453,6 +459,7 @@ export default async function PlannerPage({
               <PlannerMiniCalendar
                 posts={shown}
                 now={now}
+                zone={zone}
                 selected={filter.dateKey}
                 view={view}
                 tab={filter.tab === 'all' ? null : filter.tab}

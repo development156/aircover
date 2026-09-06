@@ -20,6 +20,7 @@ import { StaggerItem } from '@/components/motion/stagger'
 import type { CheckoutState } from '@/lib/wallet/checkout-state'
 import { cn } from '@/lib/utils'
 import { creditWord } from '@/lib/credit-words'
+import { DEFAULT_ZONE } from '@/lib/time/zone'
 
 /**
  * Only priced plans are offered. `free` is in `PlanIdSchema` but there is nothing
@@ -70,7 +71,7 @@ const asOf = (iso: string): string =>
   new Intl.DateTimeFormat('en-IN', {
     day: 'numeric',
     month: 'short',
-    timeZone: 'Asia/Kolkata',
+    timeZone: DEFAULT_ZONE,
   }).format(new Date(iso))
 
 export function TopUpPanel({ currency = null, fx = null }: TopUpPanelProps) {

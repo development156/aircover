@@ -6,6 +6,7 @@ import type { OpsAdmin, OpsRole } from '@sahoda/shared'
 
 import { inviteAdmin, revokeAdmin, setAdminRole } from '@/app/actions/ops-team'
 import { cn } from '@/lib/utils'
+import { DEFAULT_ZONE } from '@/lib/time/zone'
 
 /**
  * A4 · Team and roles (doc 13 §13).
@@ -29,7 +30,7 @@ const ROLE_NOTE: Record<OpsRole, string> = {
 const WHEN = new Intl.DateTimeFormat('en-IN', {
   day: '2-digit',
   month: 'short',
-  timeZone: 'Asia/Kolkata',
+  timeZone: DEFAULT_ZONE,
 })
 
 export function TeamView({

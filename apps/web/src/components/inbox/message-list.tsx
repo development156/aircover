@@ -1,6 +1,7 @@
 import { messageDirection, type ZernioMessage } from '@sahoda/publishing'
 
 import { cn } from '@/lib/utils'
+import { DEFAULT_ZONE } from '@/lib/time/zone'
 
 const WHEN = new Intl.DateTimeFormat('en-IN', {
   day: '2-digit',
@@ -8,7 +9,7 @@ const WHEN = new Intl.DateTimeFormat('en-IN', {
   hour: '2-digit',
   minute: '2-digit',
   hour12: true,
-  timeZone: 'Asia/Kolkata',
+  timeZone: DEFAULT_ZONE,
 })
 
 function formatWhen(value: string | undefined): string | null {

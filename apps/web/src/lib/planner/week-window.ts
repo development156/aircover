@@ -1,4 +1,11 @@
 import type { DisplayPost } from '@/lib/posts/display-post'
+import {
+  addDaysInZone,
+  dayKey,
+  minutesIntoDay,
+  startOfDayInZone,
+  weekdayOffset,
+} from '@/lib/time/day-key'
 
 /**
  * A MONDAY-ANCHORED WEEK, so the planner can be navigated.
@@ -8,87 +15,46 @@ import type { DisplayPost } from '@/lib/posts/display-post'
  * back and forward through has to have fixed edges, or "previous week" moves by
  * a different amount depending on the day you ask.
  *
- * Everything here is IST, the zone every schedule in this product is stored and
- * rendered in, and the zone the planner header already names out loud.
+ * ── THE ZONE IS THE WORKSPACE'S, PASSED IN, NEVER ASSUMED ────────────────────
+ * This file used to export `PLANNER_GRID_ZONE = 'Asia/Kolkata'` and build every
+ * column and row from it. When the chip's LABEL was moved to the workspace zone
+ * and the placement was not, the two disagreed: an America/New_York workspace
+ * with a post at 2026-09-02T20:00-04:00 got a card drawn in the Sept 3 column at
+ * the 5 am row, captioned "08:00 pm EDT". Every part of that is a real number
+ * and the card is nonsense.
+ *
+ * Founder's ruling, 2026-09-06: the planner renders in the workspace's zone
+ * everywhere, falling back to `DEFAULT_ZONE` when the workspace has none. So
+ * every function here takes `zone` first, from the page, and the day arithmetic
+ * goes through `lib/time/day-key.ts`, which steps by calendar date rather than
+ * by 86,400,000 ms and so survives a daylight-saving week.
  */
 
-/**
- * THE ZONE THE WEEK GRID IS BUILT IN, exported because the label must match it.
- *
- * `istDayKey`, `istMinutes` and `hourRange` all place a card with this, so the
- * column a card lands in and the row it sits on are IST facts. When the chip's
- * LABEL was moved to the workspace zone and the placement was not, the two
- * disagreed: a America/New_York workspace with a post at 2026-09-02T20:00-04:00
- * got a card drawn in the Sept 3 column at the 5 am row, captioned "08:00 pm
- * EDT". Every part of that is a real number and the card is nonsense.
- *
- * Exported so the caption asks the grid what zone it is in rather than assuming.
- * Moving the planner to the workspace zone means changing THIS, and the caption
- * follows for free.
- */
-export const PLANNER_GRID_ZONE = 'Asia/Kolkata'
-
-const IST = PLANNER_GRID_ZONE
-const DAY_MS = 86_400_000
-
-/** `en-GB` is Monday-first, which is what the grid is. Same source as `month.ts`. */
-const WEEKDAY = new Intl.DateTimeFormat('en-GB', { timeZone: IST, weekday: 'short' })
-const DAY_KEY = new Intl.DateTimeFormat('en-CA', {
-  timeZone: IST,
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-})
-const HOUR_MIN = new Intl.DateTimeFormat('en-GB', {
-  timeZone: IST,
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: false,
-})
-
-const MONDAY_FIRST = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-
-function istWeekdayOffset(at: Date): number {
-  const index = MONDAY_FIRST.indexOf(WEEKDAY.format(at))
-  // An unrecognised weekday would silently shift the whole grid, so fail to 0
-  // rather than to a wrong offset. Same guard as `month.ts`.
-  return index < 0 ? 0 : index
-}
-
-/** The IST date key (YYYY-MM-DD), matching `bucketWeek`'s own keys. */
-export function istDayKey(at: Date): string {
-  return DAY_KEY.format(at)
-}
-
-/** Minutes past IST midnight, or null when the stamp is absent or unparseable. */
-export function istMinutes(iso: string | null): number | null {
+/** Minutes past midnight in `zone`, or null when the stamp is absent or unparseable. */
+export function scheduledMinutes(zone: string, iso: string | null): number | null {
   if (iso === null) return null
   const at = new Date(iso)
   if (Number.isNaN(at.getTime())) return null
-  const [h, m] = HOUR_MIN.format(at).split(':')
-  const hours = Number(h)
-  const mins = Number(m)
-  if (!Number.isFinite(hours) || !Number.isFinite(mins)) return null
-  return hours * 60 + mins
+  return minutesIntoDay(zone, at)
 }
 
-/** The Monday on or before `at`, in IST, at the same wall clock. */
-export function mondayOf(at: Date): Date {
-  return new Date(at.getTime() - istWeekdayOffset(at) * DAY_MS)
+/** Midnight in `zone` of the Monday on or before `at`. */
+export function mondayOf(zone: string, at: Date): Date {
+  return startOfDayInZone(zone, addDaysInZone(zone, at, -weekdayOffset(zone, at)))
 }
 
 export interface WeekWindow {
-  /** Seven instants, one inside each IST day, Monday first. */
+  /** Seven instants, midnight in the zone of each day, Monday first. */
   days: Date[]
   /** `offset` weeks from the week containing `now`. 0 is this week. */
   offset: number
 }
 
-/** The week `offset` weeks from the one containing `now`. */
-export function weekWindow(now: Date, offset: number): WeekWindow {
-  const monday = mondayOf(new Date(now.getTime() + offset * 7 * DAY_MS))
+/** The week `offset` weeks from the one containing `now`, in `zone`. */
+export function weekWindow(zone: string, now: Date, offset: number): WeekWindow {
+  const monday = mondayOf(zone, addDaysInZone(zone, now, offset * 7))
   return {
-    days: Array.from({ length: 7 }, (_, i) => new Date(monday.getTime() + i * DAY_MS)),
+    days: Array.from({ length: 7 }, (_, i) => addDaysInZone(zone, monday, i)),
     offset,
   }
 }
@@ -108,9 +74,12 @@ export function weekWindow(now: Date, offset: number): WeekWindow {
 export const DEFAULT_FROM_HOUR = 8
 export const DEFAULT_TO_HOUR = 19
 
-export function hourRange(posts: readonly DisplayPost[]): { from: number; to: number } {
+export function hourRange(
+  zone: string,
+  posts: readonly DisplayPost[],
+): { from: number; to: number } {
   const minutes = posts
-    .map((post) => istMinutes(post.scheduled_at))
+    .map((post) => scheduledMinutes(zone, post.scheduled_at))
     .filter((m): m is number => m !== null)
 
   if (minutes.length === 0) return { from: DEFAULT_FROM_HOUR, to: DEFAULT_TO_HOUR }
@@ -141,9 +110,13 @@ export interface Placed {
   lanes: number
 }
 
-export function placeDay(posts: readonly DisplayPost[], slotMinutes: number): Placed[] {
+export function placeDay(
+  zone: string,
+  posts: readonly DisplayPost[],
+  slotMinutes: number,
+): Placed[] {
   const timed = posts
-    .map((post) => ({ post, minutes: istMinutes(post.scheduled_at) }))
+    .map((post) => ({ post, minutes: scheduledMinutes(zone, post.scheduled_at) }))
     .filter((p): p is { post: DisplayPost; minutes: number } => p.minutes !== null)
     .sort((a, b) => a.minutes - b.minutes)
 
@@ -195,8 +168,14 @@ export function placeDay(posts: readonly DisplayPost[], slotMinutes: number): Pl
  * elsewhere and offers the list, whereas a blank grid under a labelled week says
  * nothing whatever.
  */
-export function dayColumn(window: WeekWindow, dateKey: string | null, now: Date): Date {
-  const picked = dateKey === null ? undefined : window.days.find((d) => istDayKey(d) === dateKey)
-  const today = window.days.find((d) => istDayKey(d) === istDayKey(now))
+export function dayColumn(
+  zone: string,
+  window: WeekWindow,
+  dateKey: string | null,
+  now: Date,
+): Date {
+  const picked = dateKey === null ? undefined : window.days.find((d) => dayKey(zone, d) === dateKey)
+  const todayKey = dayKey(zone, now)
+  const today = window.days.find((d) => dayKey(zone, d) === todayKey)
   return picked ?? today ?? window.days[0]!
 }

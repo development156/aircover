@@ -28,6 +28,8 @@ const ScheduleField = dynamic(
 
 export interface PlannerRescheduleProps {
   postId: string
+  /** The workspace's zone, from the row. The picker builds and labels its times in it. */
+  zone: string
   channels: ChannelSet
   /** ISO string from `posts.scheduled_at`, or null. */
   value: string | null
@@ -61,6 +63,7 @@ export interface PlannerRescheduleProps {
  */
 export function PlannerReschedule({
   postId,
+  zone,
   channels,
   value,
   connected,
@@ -111,6 +114,7 @@ export function PlannerReschedule({
       {open ? (
         <div className="w-80" aria-busy={pending}>
           <ScheduleField
+            zone={zone}
             channels={channels}
             value={current}
             onChange={save}

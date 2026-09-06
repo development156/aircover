@@ -127,32 +127,40 @@ export const NO_CHANNEL_COPY: AutoPublishCopy = {
 const isValidDate = (date: Date): boolean => !Number.isNaN(date.getTime())
 
 /**
- * What a scheduled post looks like HERE, which is not what the name suggests.
+ * What a scheduled post looks like HERE, and how it gets that way.
  *
- * This gate read `status === 'scheduled'` until it was found to be dead code:
- * apps/web has never written that status. `approvePost` is the one sanctioned
- * status write and it writes `approved`; inserts write `draft`; `savePost`
- * refuses `status` outright. The labelling was therefore unreachable — it
- * rendered for nobody while every unit test passed, because each one handed the
- * function a status by hand that no code path could produce.
+ * This gate read `status === 'scheduled'` while it was dead code: for months
+ * apps/web never wrote that status, because the only status write was a direct
+ * `update({ status: 'approved' })`. The labelling rendered for nobody while
+ * every unit test passed, because each one handed the function a status by
+ * hand that no code path could produce.
  *
- * So a committed post is `approved` (or `scheduled`, kept for the day a real
- * schedule action lands) and the promise is made by the DATE: `post-card` and
- * `planner-row` render the time whenever `scheduled_at` is set, and a time
- * beside a post reads as "this goes out then". An approved post with no date
- * commits to the content only and has nothing to correct.
+ * That is no longer the shape. apps/web writes `scheduled` through FOUR
+ * Postgres functions and never through an update: `approve_posts` (a dated
+ * post approved comes back `scheduled`; an undated one `approved`),
+ * `release_post_for_publish` and `reschedule_post` (both write `scheduled`),
+ * and `cancel_scheduled_post` (back to `draft`). Inserts still write `draft`
+ * directly, `savePost` still refuses `status` outright, and a lifecycle trigger
+ * now refuses any other direct status write from this role.
  *
- * `scheduled` is the exception that needs no date, because `status-badge`
- * renders the literal word "Scheduled" — that badge makes the promise on its
- * own, with or without a time.
+ * So the promise is made twice over: by the STATUS, since `scheduled` is what
+ * the RPCs write for a booked post; and by the DATE, since `post-card` and
+ * `planner-row` render the time whenever `scheduled_at` is set. `approved`
+ * with a date is kept accepted for rows older than the backfill and for the
+ * legacy path; since the RPC landed, an `approved` row never carries a time.
+ *
+ * `scheduled` needs no date here, because `status-badge` renders the literal
+ * word "Scheduled" — that badge makes the promise on its own, with or without
+ * a time.
  *
  * A dated DRAFT is still silent: a plan, not a commitment. Labelling every
  * dated post would train users to ignore the label, which costs us the past-due
  * case that actually matters. `publishing` is absent for the original reason —
  * apps/web cannot write it, so a branch for it would guard nothing.
  *
- * `schedule-status-reachability.test.ts` reads the statuses this app writes out
- * of the source and fails if this gate stops matching any of them.
+ * `schedule-status-reachability.test.ts` reads the RPC names this app calls out
+ * of the source, maps each to the statuses it writes, and fails if this gate or
+ * the reader vocabulary stops covering any of them.
  *
  * ── WHY THE VARIANT ROWS ARE AN ARGUMENT AND NOT AN OPTION ───────────────────
  * `posts.status` plus a date cannot answer "did this go out" — see

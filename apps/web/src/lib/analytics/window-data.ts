@@ -10,6 +10,7 @@ import type { AnalyticsView } from '@/lib/analytics/view-params'
 import { previousWindow } from '@/lib/analytics/view-params'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { activeWorkspaceRead } from '@/lib/workspaces'
+import { DEFAULT_ZONE } from '@/lib/time/zone'
 
 /**
  * EVERYTHING /analytics READS FOR ONE CHOSEN WINDOW.
@@ -55,7 +56,7 @@ export const SNAPSHOT_ROW_CAP = ROW_CAP * SNAPSHOT_METRICS.length
  * "Tuesday morning" is a claim about the reader's clock and a reader in another
  * zone deserves to see which clock we used.
  */
-export const FALLBACK_TIMEZONE = 'Asia/Kolkata'
+export const FALLBACK_TIMEZONE = DEFAULT_ZONE
 
 export interface PublishedRow {
   postId: string

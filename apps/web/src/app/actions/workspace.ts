@@ -183,10 +183,10 @@ export async function setActiveWorkspace(formData: FormData): Promise<void> {
  * the same change; this comment was not, so the stale claim sat directly above
  * the action the change had just made meaningful.
  *
- * What is still true: the Planner is NOT fully on it. `PlannerUpcoming` has its
- * own hardcoded `Asia/Kolkata` formatter, and the week timeline places cards by
- * IST while labelling them in the workspace zone. Those are tracked separately;
- * the settings copy no longer promises them.
+ * Since 2026-09-06 the Planner is fully on it (every view, the mini calendar,
+ * the today count) and so is the schedule picker. What is still NOT on it: the
+ * inbox, the wallet, the asset library and the admin screens, which render in
+ * `DEFAULT_ZONE`; the settings copy says exactly that.
  */
 export async function setWorkspaceTimezone(
   workspaceId: string,

@@ -5,7 +5,7 @@ import { needsAPerson } from '@/lib/approvals/queue'
 import type { DisplayPost } from '@/lib/posts/display-post'
 import { formatScheduledAt } from '@/lib/posts/schedule-format'
 import { willGoOut } from '@/lib/planner/filters'
-import { istDayKey } from '@/lib/planner/week-window'
+import { dayKey } from '@/lib/time/day-key'
 import { cn } from '@/lib/utils'
 
 /**
@@ -38,10 +38,10 @@ import { cn } from '@/lib/utils'
  * The founder asked for a TODAY group. The temptation was to file the existing
  * "Needs approval" under it, and that would have been a false claim: an approval
  * has no date, so nothing about it is today-scoped. What IS today-scoped is how
- * many posts that will go out fall inside today's IST day, so that is what the
- * tile counts — keyed with `istDayKey`, the same function the week window and
- * the month grid bucket by, so this number can never disagree with the grid
- * below.
+ * many posts that will go out fall inside today's day IN THE WORKSPACE'S ZONE,
+ * so that is what the tile counts — keyed with `dayKey`, the same function the
+ * week window and the month grid bucket by, so this number can never disagree
+ * with the grid below.
  *
  * ── "WILL GO OUT" MEANS THE DISPATCHER WILL SEND IT ──────────────────────────
  * "Going out today", its "scheduled in all" note and "Next up" all read
@@ -119,17 +119,18 @@ export function PlannerSummary({
 }: {
   posts: readonly DisplayPost[]
   now: Date
-  zone?: string | null
+  /** The workspace's zone, resolved by the page. Required: a forgotten zone is a wrong count. */
+  zone: string
 }) {
   // Only what the dispatcher will send. `willGoOut` also proves the time
-  // parses, which is what keeps `istDayKey` below from throwing on a bad row.
+  // parses, which is what keeps `dayKey` below from throwing on a bad row.
   const goingOut = posts.filter(willGoOut)
   const scheduled = goingOut.length
   const awaiting = posts.filter((p) => needsAPerson(p)).length
   const drafts = posts.filter((p) => p.intent === 'draft').length
 
-  const todayKey = istDayKey(now)
-  const today = goingOut.filter((p) => istDayKey(new Date(p.scheduled_at!)) === todayKey).length
+  const todayKey = dayKey(zone, now)
+  const today = goingOut.filter((p) => dayKey(zone, new Date(p.scheduled_at!)) === todayKey).length
 
   const at = now.getTime()
   const next = goingOut
@@ -154,7 +155,7 @@ export function PlannerSummary({
         value={String(today)}
         label="Going out today"
         /* The ONE note that survives, because it is a different measurement:
-           this tile counts today's IST day and this line counts the whole
+           this tile counts today's day and this line counts the whole
            plan. Removing it would leave "0" beside a week that has eleven
            posts in it and no way to tell the two apart. */
         note={`${scheduled} scheduled in all`}

@@ -31,7 +31,10 @@ import { bootFullSchema, asMember, probe } from './helpers/pglite-tenant'
  * `current_user not in ('anon', 'authenticated')` with
  * `current_user not in ('nobody')` in EITHER function. The refusal tests for
  * that table go red. MEASURED 2026-09-03: 12 red for post_variants, 6 red for
- * posts; see the report for the exact counts.
+ * posts; see the report for the exact counts. SINCE 20260906190000 the posts
+ * half of that mutation no longer goes red on its own: `posts_lifecycle_role_guard`
+ * fires first and refuses the same writes. The variant half is unchanged. See
+ * the note above the posts tests, and posts_lifecycle_role_guard.pglite.test.ts.
  */
 
 const WS_A = '11111111-1111-4111-8111-111111111111'
@@ -195,6 +198,19 @@ describe('posts / post_variants: a publish outcome is service-only', () => {
 
   // ── posts: 'publishing' and 'published' are refused, for every role ───────
 
+  // Since 20260906190000 a second BEFORE trigger, `posts_lifecycle_role_guard`,
+  // sits on `posts` and fires FIRST (triggers run in name order, and
+  // `posts_lifecycle…` < `posts_publish…`). It refuses every status move out of
+  // idea/draft/review, so a member's fake publish now reads POST_LIFECYCLE_ROLE
+  // and this trigger is never reached. The CLAIM these tests pin is unchanged:
+  // refused, row byte-identical. Either sentence is that claim; the exact one
+  // is a fact about trigger order, not about the guarantee. The consequence
+  // for the mutation in this file's header: the posts-half of it no longer goes
+  // red on its own, because the newer guard catches what the mutated one lets
+  // through. posts_lifecycle_role_guard.pglite.test.ts owns that proof now; the
+  // post_variants half of the mutation is unaffected.
+  const REFUSED = /PUBLISH_STATE_SERVICE_ONLY|POST_LIFECYCLE_ROLE/
+
   for (const [role, user] of ROLES) {
     for (const status of ['published', 'publishing'] as const) {
       it(`REFUSES the ${role} moving posts.status to ${status}`, async () => {
@@ -202,7 +218,7 @@ describe('posts / post_variants: a publish outcome is service-only', () => {
         const got = await asMember(db, user, (tx) =>
           probe(tx, `update posts set status = $2 where id = $1`, [POST_A, status]),
         )
-        expect(sentence(got)).toContain('PUBLISH_STATE_SERVICE_ONLY')
+        expect(sentence(got)).toMatch(REFUSED)
         expect(await post()).toEqual(before)
       })
     }
@@ -217,15 +233,17 @@ describe('posts / post_variants: a publish outcome is service-only', () => {
         [WS_A],
       ),
     )
-    expect(sentence(got)).toContain('PUBLISH_STATE_SERVICE_ONLY')
+    expect(sentence(got)).toMatch(REFUSED)
   })
 
   // ── THE GUARD IS NARROW: what a member legitimately does still works ──────
 
-  it('savePost’s shape still works: title, body, status draft→review→approved, channels, scheduled_at', async () => {
+  it('savePost’s shape still works: title, body, status draft→review, channels, scheduled_at', async () => {
     // PostUpdateSchema is exactly these five keys; `status` is sent by the
-    // editor only for the pre-publish moves.
-    for (const status of ['review', 'approved']) {
+    // editor only for the pre-publish moves. Since 20260906190000 (R2) the
+    // move INTO `approved` is approve_posts' alone, so the direct shape is
+    // proven on a draft moving to review; POST_SCHED is the seeded draft.
+    for (const status of ['review', 'draft']) {
       const got = await asMember(db, EDITOR_A, (tx) =>
         probe<{ status: string }>(
           tx,
@@ -234,12 +252,22 @@ describe('posts / post_variants: a publish outcome is service-only', () => {
                   channels = '{instagram,facebook}', scheduled_at = now() + interval '1 day'
             where id = $1
             returning status`,
-          [POST_A, status],
+          [POST_SCHED, status],
         ),
       )
       expect(sentence(got)).toBe('ACCEPTED')
       expect('rows' in got && got.rows[0]?.status).toBe(status)
     }
+  })
+
+  it('and the VIEWER writing status = approved directly is the lifecycle guard’s to refuse', async () => {
+    // An owner/editor/approver may still write it directly: that is the
+    // temporary wt-web compatibility path in 20260906190000's header, pinned
+    // in posts_lifecycle_role_guard.pglite.test.ts. The viewer never could.
+    const got = await asMember(db, VIEWER_A, (tx) =>
+      probe(tx, `update posts set status = 'approved' where id = $1`, [POST_SCHED]),
+    )
+    expect(sentence(got)).toContain('POST_LIFECYCLE_ROLE')
   })
 
   it('saveVariant’s shape still works: body, extras, is_linked, char_count', async () => {
@@ -258,17 +286,25 @@ describe('posts / post_variants: a publish outcome is service-only', () => {
     expect('rows' in got && got.rows[0]?.body).toBe('rewritten')
   })
 
-  it('a member can still re-draft a FAILED post and reset its failed variant', async () => {
-    // `failed` and `expired` are deliberately not locked: they are not a
-    // success state, and re-drafting is how a person recovers from one.
-    const p = await asMember(db, OWNER_A, (tx) =>
-      probe<{ status: string }>(
-        tx,
-        `update posts set status = 'draft' where id = $1 returning status`,
-        [POST_FAILED],
-      ),
+  it('a member re-drafts a FAILED post through cancel_scheduled_post, and resets its failed variant', async () => {
+    // This migration left `failed` and `expired` open to a direct re-draft.
+    // 20260906190000 (R1) closed that: leaving `failed` is a lifecycle move and
+    // is refused from PostgREST. The recovery a person needs still exists, one
+    // door over: cancel_scheduled_post (owner, editor) returns the post to
+    // draft from inside a definer body. Both halves are pinned here.
+    const direct = await asMember(db, OWNER_A, (tx) =>
+      probe(tx, `update posts set status = 'draft' where id = $1`, [POST_FAILED]),
     )
-    expect(sentence(p)).toBe('ACCEPTED')
+    expect(sentence(direct)).toContain('POST_LIFECYCLE_ROLE')
+    const p = await asMember(db, OWNER_A, async (tx) => {
+      const rpc = await probe(tx, `select public.cancel_scheduled_post($1)`, [POST_FAILED])
+      const after = await tx.query<{ status: string }>(`select status from posts where id = $1`, [
+        POST_FAILED,
+      ])
+      return { rpc, status: after.rows[0]?.status }
+    })
+    expect(sentence(p.rpc)).toBe('ACCEPTED')
+    expect(p.status).toBe('draft')
     const v = await asMember(db, OWNER_A, (tx) =>
       probe<{ publish_status: string }>(
         tx,

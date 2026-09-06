@@ -12,11 +12,19 @@ import { clockTime, longDay, startOfDay } from '@/lib/posts/calendar-month'
 import { earliestScheduleAt, validateScheduleLead } from '@/lib/posts/schedule'
 import { deliveryRangeNote, formatChoiceTime, scheduleChoices } from '@/lib/posts/schedule-choices'
 import { scheduleFieldNote } from '@/lib/posts/schedule-status'
+import { zoneLabel } from '@/lib/time/zone'
 
 import { ChannelReadout } from './channel-readout'
 import { ScheduleCalendar } from './schedule-calendar'
 
 export interface ScheduleFieldProps {
+  /**
+   * The workspace's zone, resolved on the server. REQUIRED, and there is no
+   * default on purpose: this field built its instants on the reader's device
+   * clock for as long as it existed, while every screen read them back in the
+   * workspace's zone, and a default here would be that defect with a nicer name.
+   */
+  zone: string
   channels: ChannelSet
   /** ISO string from `posts.scheduled_at`, or null for "no schedule". */
   value: string | null
@@ -55,8 +63,15 @@ function parsed(iso: string | null): Date | null {
  * A scheduled post shows what it is committed to, in words, with the two things
  * a person then wants: change it, or take it back. That state used to be a
  * populated date mask, which is a form, not an answer.
+ *
+ * ── THE CLOCK IS THE WORKSPACE'S, AND IT IS NAMED ────────────────────────────
+ * "Thursday, 27 August at 9:00 am IST": the day, the clock and the zone, so
+ * the sentence a person agrees to is the sentence the planner will show them.
+ * `now` is still the browser's instant (every clock agrees on an instant); what
+ * that instant is CALLED, and which day "tomorrow" is, come from `zone`.
  */
 export function ScheduleField({
+  zone,
   channels,
   value,
   onChange,
@@ -100,7 +115,7 @@ export function ScheduleField({
   }
 
   const earliest = earliestScheduleAt(channels, now)
-  const choices = scheduleChoices(channels, now)
+  const choices = scheduleChoices(zone, channels, now)
   const check = pending === null ? null : validateScheduleLead(channels, pending, now)
   const unconnectedLabels = unconnectedFrom(channels, connected).map(
     (channel) => CHANNEL_LABELS[channel],
@@ -130,11 +145,15 @@ export function ScheduleField({
    * product declining to say a number it had.
    */
   const promise = (at: Date): string =>
-    gap ?? (autoPublish ? deliveryRangeNote(at) : scheduleFieldNote(autoPublish))
+    gap ?? (autoPublish ? deliveryRangeNote(zone, at) : scheduleFieldNote(autoPublish))
+
+  /** "Thursday, 27 August at 9:00 am IST" — the commitment, with its clock named once. */
+  const sentence = (at: Date): string =>
+    `${longDay(zone, at)} at ${clockTime(zone, at)} ${zoneLabel(zone, at)}`
 
   function choose(at: Date) {
     setPending(at)
-    setAnchor(startOfDay(at))
+    setAnchor(startOfDay(zone, at))
   }
 
   // ── ALREADY SCHEDULED, AND NOT BEING CHANGED ──────────────────────────────
@@ -157,9 +176,7 @@ export function ScheduleField({
           />
           <div className="min-w-0 space-y-0.5">
             <p className="type-eyebrow text-ok">Scheduled</p>
-            <p className="type-h3 text-ink">
-              {longDay(committed)} at {clockTime(committed)}
-            </p>
+            <p className="type-h3 text-ink">{sentence(committed)}</p>
             <p className="type-meta text-muted">{promise(committed)}</p>
           </div>
         </div>
@@ -172,7 +189,7 @@ export function ScheduleField({
             onClick={() => {
               setEditing(true)
               setPending(committed)
-              setAnchor(startOfDay(committed))
+              setAnchor(startOfDay(zone, committed))
             }}
           >
             <Pencil aria-hidden />
@@ -218,7 +235,7 @@ export function ScheduleField({
                   as six unreadable pieces at 390px. */}
               <span className="type-chip">{choice.label}</span>
               <span className={cn('type-meta tabular-nums', on ? 'opacity-75' : 'text-muted')}>
-                {formatChoiceTime(choice.when)}
+                {formatChoiceTime(zone, choice.when)}
               </span>
             </button>
           )
@@ -226,7 +243,8 @@ export function ScheduleField({
       </div>
 
       <ScheduleCalendar
-        anchor={anchor ?? startOfDay(now)}
+        zone={zone}
+        anchor={anchor ?? startOfDay(zone, now)}
         onAnchorChange={setAnchor}
         value={pending}
         onChange={choose}
@@ -236,16 +254,14 @@ export function ScheduleField({
 
       {/* THE SENTENCE THE READER IS ABOUT TO AGREE TO. Written out in full,
           because "27/08/2026, 09:00" is a value and "Thursday, 27 August at
-          9:00 am" is a commitment. */}
+          9:00 am IST" is a commitment. */}
       <div className="surface-ring space-y-1 rounded-sm bg-s2 p-3" data-schedule-summary>
         {pending === null ? (
           <p className="type-sm text-muted">Pick a day and a time, then confirm it below.</p>
         ) : (
           <>
             <p className="type-eyebrow text-muted">Going out</p>
-            <p className="type-h3 text-ink">
-              {longDay(pending)} at {clockTime(pending)}
-            </p>
+            <p className="type-h3 text-ink">{sentence(pending)}</p>
           </>
         )}
       </div>

@@ -5,8 +5,8 @@ import type { Channel, Post, VariantPublishStatus } from '@sahoda/shared'
 import { AutoPublishNote } from '@/components/posts/auto-publish-note'
 import { PostCard } from '@/components/posts/post-card'
 import { PlannerRow } from '@/components/planner/planner-row'
-import { WeekGrid } from '@/components/planner/week-grid'
-import { bucketWeek } from '@/lib/planner/week'
+import { WeekTimeline } from '@/components/planner/week-timeline'
+import { weekWindow } from '@/lib/planner/week-window'
 import { forDisplay, type DisplayPost } from '@/lib/posts/display-post'
 import type { VariantStatusRow } from '@/lib/posts/variant-status'
 import { toChannelSet } from '@sahoda/shared'
@@ -38,6 +38,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
 const NOW = new Date('2026-07-25T12:00:00.000Z')
 const PAST = '2026-07-24T12:00:00.000Z'
 const FUTURE = '2026-07-26T12:00:00.000Z'
+const ZONE = 'Asia/Kolkata'
 
 const post = (overrides: Partial<Post> = {}): DisplayPost =>
   forDisplay({
@@ -285,7 +286,14 @@ describe('the posts list', () => {
 
 describe('the planner list', () => {
   test('labels a past-due scheduled post', () => {
-    render(<PlannerRow post={post({ scheduled_at: PAST })} now={NOW} variantStates={WAITING} />)
+    render(
+      <PlannerRow
+        zone={ZONE}
+        post={post({ scheduled_at: PAST })}
+        now={NOW}
+        variantStates={WAITING}
+      />,
+    )
 
     expect(screen.getByText(NOTHING_PUBLISHED)).toBeInTheDocument()
   })
@@ -293,6 +301,7 @@ describe('the planner list', () => {
   test('leaves a dated draft alone', () => {
     render(
       <PlannerRow
+        zone={ZONE}
         post={post({ status: 'draft', scheduled_at: PAST })}
         now={NOW}
         variantStates={WAITING}
@@ -303,47 +312,71 @@ describe('the planner list', () => {
   })
 
   test('passes the variant rows down, so a published post is not told to publish', () => {
-    render(<PlannerRow post={post({ scheduled_at: PAST })} now={NOW} variantStates={PUBLISHED} />)
+    render(
+      <PlannerRow
+        zone={ZONE}
+        post={post({ scheduled_at: PAST })}
+        now={NOW}
+        variantStates={PUBLISHED}
+      />,
+    )
 
     expect(screen.queryByText(NOTHING_PUBLISHED)).not.toBeInTheDocument()
   })
 })
 
-describe('the planner week grid', () => {
-  /** Today's column, earlier in the day — the cell that reads as "this went out this morning". */
+/**
+ * ── THE WEEK VIEW IS `WeekTimeline` NOW ──────────────────────────────────────
+ * `WeekGrid`, which these used to render, was imported by this file and by
+ * nothing else: no route drew it. The claims below are retargeted at the
+ * surface `/planner?view=week` actually renders. A timeline card has no room
+ * for the auto-publish sentence, so what it owes instead is the CERTAINTY rung:
+ * a past-due post nothing sent is drawn as committed and never as real, and the
+ * variant rows are what decide that — the wiring the third case pins.
+ */
+describe('the planner week timeline', () => {
+  /** Today's column, earlier in the day — the card that reads as "this went out this morning". */
   const EARLIER_TODAY = '2026-07-25T03:00:00.000Z'
-  /** Outside the 7-day window, so it falls through to a PlannerRow instead of a cell. */
-  const LAST_MONTH = '2026-06-01T12:00:00.000Z'
 
   const statesFor = (rows: readonly VariantStatusRow[]) =>
     new Map([['11111111-1111-4111-8111-111111111111', rows]])
 
-  test('marks a past-due scheduled post inside its day cell', () => {
-    const buckets = bucketWeek([post({ scheduled_at: EARLIER_TODAY })], NOW)
+  const timeline = (rows: ReadonlyMap<string, readonly VariantStatusRow[]>) =>
+    render(
+      <WeekTimeline
+        days={weekWindow(ZONE, NOW, 0).days}
+        posts={[post({ scheduled_at: EARLIER_TODAY })]}
+        variantStates={rows}
+        today={NOW}
+        zone={ZONE}
+      />,
+    )
 
-    render(<WeekGrid buckets={buckets} now={NOW} variantStates={statesFor(WAITING)} />)
+  const card = () => screen.getByRole('link', { name: /diwali teaser/i })
 
-    expect(screen.getByText(NOTHING_PUBLISHED)).toBeInTheDocument()
+  test('draws a past-due post nothing sent as committed, never as real', () => {
+    timeline(statesFor(WAITING))
+
+    expect(card().getAttribute('data-certainty')).toBe('committed')
   })
 
-  test('carries the note into its overflow rows as well', () => {
-    // Posts outside the 7-day window fall through to PlannerRow. A post that
-    // was due last month is the most misleading one on the screen.
-    const buckets = bucketWeek([post({ scheduled_at: LAST_MONTH })], NOW)
+  test('draws a post that is out on the platform as real', () => {
+    timeline(statesFor(PUBLISHED))
 
-    render(<WeekGrid buckets={buckets} now={NOW} variantStates={statesFor(WAITING)} />)
-
-    expect(screen.getByText(NOTHING_PUBLISHED)).toBeInTheDocument()
+    expect(card().getAttribute('data-certainty')).toBe('real')
   })
 
-  test('reaches the day cell with the variant rows, not just the overflow rows', () => {
-    // The grid already forwarded `variantStates` to its overflow PlannerRows and
-    // NOT to its own day cells — so the cell kept making the claim the rows
-    // disprove. This is the assertion that was missing.
-    const buckets = bucketWeek([post({ scheduled_at: EARLIER_TODAY })], NOW)
+  test('reaches the card with the variant rows — a missing entry under-claims', () => {
+    // The evidence is the rows, not the post's own status. With no rows read
+    // for this post the card must fall to the weaker claim, not the stronger.
+    timeline(new Map())
 
-    render(<WeekGrid buckets={buckets} now={NOW} variantStates={statesFor(PUBLISHED)} />)
+    expect(card().getAttribute('data-certainty')).toBe('committed')
+  })
 
-    expect(screen.queryByText(NOTHING_PUBLISHED)).not.toBeInTheDocument()
+  test('carries the seeded tour anchor the retired grid held and no route rendered', () => {
+    const { container } = timeline(statesFor(WAITING))
+
+    expect(container.querySelector('[data-guide="planner.week"]')).not.toBeNull()
   })
 })

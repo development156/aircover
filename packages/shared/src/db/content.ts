@@ -34,6 +34,14 @@ export const PostSchema = z.object({
   scheduled_at: z.string().nullable(),
   origin: PostOriginSchema,
   created_by: z.string().nullable(),
+  // Who cleared the post and when (20260906190000). Nullable because most
+  // rows were never approved; optional because every select written before
+  // the columns existed must still parse, the same reasoning as generated_body.
+  // Written only by approve_posts / release_post_for_publish / reschedule_post;
+  // the lifecycle guard refuses a direct write, so they are absent from the
+  // Insert and Update schemas on purpose.
+  approved_by: z.string().nullable().optional(),
+  approved_at: z.string().nullable().optional(),
   created_at: z.string(),
   updated_at: z.string(),
 })
