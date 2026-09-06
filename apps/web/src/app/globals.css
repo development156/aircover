@@ -1007,3 +1007,97 @@
   stroke-dashoffset: 0;
   animation: spark-draw var(--dur-count, 560ms) cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+/* ── THE BRAND BRAIN LIGHTING UP ─────────────────────────────────────────────
+   `components/brain/brain-map.tsx`. A node is a field; it lights when a person
+   confirms it. Everything here is transform or opacity, nothing runs longer
+   than --dur-slow, and every keyframe is one-shot: a map that keeps moving is
+   a map nobody reads. The global reduced-motion block in tokens.css collapses
+   all of it, delays included. */
+@keyframes brain-lit {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.5);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes brain-halo {
+  0% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(3.2);
+  }
+}
+@keyframes certainty-pop {
+  0% {
+    transform: scale(0.9);
+  }
+  55% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes num-pop {
+  0% {
+    transform: translateY(0);
+  }
+  35% {
+    transform: translateY(-3px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+@keyframes value-lit {
+  0% {
+    box-shadow: 0 0 0 0 var(--brand-wash);
+  }
+  100% {
+    box-shadow: 0 0 0 10px transparent;
+  }
+}
+.brain-node,
+.brain-halo,
+.brain-core {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.brain-node {
+  transition:
+    fill var(--dur-base) var(--ease),
+    stroke var(--dur-base) var(--ease);
+}
+.brain-node[data-lit='true'] {
+  animation: brain-lit var(--dur-slow) var(--ease) both;
+}
+.brain-halo {
+  animation: brain-halo var(--dur-slow) var(--ease) both;
+  pointer-events: none;
+}
+.brain-core[data-lit='true'] {
+  animation: certainty-pop var(--dur-slow) var(--ease) both;
+}
+.brain-edge {
+  transition:
+    stroke var(--dur-slow) var(--ease),
+    stroke-opacity var(--dur-slow) var(--ease);
+}
+.certainty-pop {
+  animation: certainty-pop var(--dur-base) var(--ease) both;
+}
+.num-pop {
+  display: inline-block;
+  animation: num-pop var(--dur-base) var(--ease) both;
+}
+.value-lit {
+  animation: value-lit var(--dur-slow) var(--ease) both;
+}

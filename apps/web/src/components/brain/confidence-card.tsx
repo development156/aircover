@@ -1,7 +1,11 @@
 import { Check, MessageSquareQuote, Sparkles } from 'lucide-react'
 
 import { brainRing } from '@/lib/brand/brain-ring'
+import { statesOf } from '@/lib/brand/brain-map'
 import type { Provenance } from '@/lib/brand/provenance'
+
+import { BrainMap } from './brain-map'
+import { PopNumber } from './pop-number'
 
 /**
  * The Overview's lead card — the reference's "Brand completeness", replaced.
@@ -34,11 +38,17 @@ export function ConfidenceCard({ provenance }: { provenance: Provenance }) {
           Brand confidence
         </h2>
         <span className="ml-auto text-[13px] font-[650] tabular-nums">
-          {ring.confirmed}/{ring.total}
+          <PopNumber value={ring.confirmed} />/{ring.total}
         </span>
       </header>
 
       <div className="px-4 py-4">
+        {/* THE PICTURE. Fifteen nodes, five clusters, one core carrying the same
+            count as the bar below it. It lights node by node as answers land;
+            the bar says how much, the map says which. */}
+        <div className="mx-auto mb-4 max-w-[560px]">
+          <BrainMap states={statesOf(provenance)} />
+        </div>
         {/* The split bar. Two segments, each with its own texture, so the ratio
             is readable before any label is. */}
         <div

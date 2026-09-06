@@ -60,13 +60,24 @@ const MARKS: Record<
   },
 }
 
-export function CertaintyMark({ state, className }: { state: FieldState; className?: string }) {
+export function CertaintyMark({
+  state,
+  className,
+  justChanged = false,
+}: {
+  state: FieldState
+  className?: string
+  /** True for a beat after the state changed under it: the chip pops once. Approval is a visible event (docs/37 §9). */
+  justChanged?: boolean
+}) {
   const mark = MARKS[state]
   return (
     <span
       data-certainty={state === 'confirmed' ? 'real' : 'proposed'}
+      data-just={justChanged ? 'true' : undefined}
       title={mark.title}
       className={cn(
+        justChanged && 'certainty-pop',
         'inline-flex shrink-0 items-center gap-1 rounded-sm px-[7px] py-[2px] text-[11px] leading-[16px] font-semibold',
         mark.className,
         className,

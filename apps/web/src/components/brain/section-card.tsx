@@ -7,6 +7,7 @@ import { readLeaf } from '@/lib/brand/leaf'
 import { stateOf, type Provenance } from '@/lib/brand/provenance'
 
 import { ConfirmAll, type ConfirmAllTarget } from './confirm-all'
+import { PopNumber } from './pop-number'
 import { FieldRow } from './field-row'
 
 /**
@@ -46,7 +47,7 @@ export function SectionCard({
           <CardLabel className="mb-0">{section.title}</CardLabel>
           <span className="type-eyebrow shrink-0 text-muted">
             <span className="num">
-              {tally.confirmed}/{tally.total}
+              <PopNumber value={tally.confirmed} />/{tally.total}
             </span>{' '}
             confirmed
           </span>

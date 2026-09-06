@@ -344,3 +344,18 @@ describe('FieldRow — the inline confirm agrees to what was SEEN', () => {
     expect(confirmBrainField).toHaveBeenCalledWith(TEXT_FIELD.path, 'Relief', { asSeen: true })
   })
 })
+
+describe('FieldRow — approval is a visible event', () => {
+  test('the chip pops when the state turns confirmed under it, and not on first render', () => {
+    const { rerender } = render(<FieldRow field={TEXT_FIELD} value="Relief" state="guessed" />)
+    expect(screen.getByText('Guess')).not.toHaveAttribute('data-just')
+
+    rerender(<FieldRow field={TEXT_FIELD} value="Relief" state="confirmed" />)
+    expect(screen.getByText('Confirmed')).toHaveAttribute('data-just', 'true')
+  })
+
+  test('a row that arrives already confirmed does not pop', () => {
+    render(<FieldRow field={TEXT_FIELD} value="Relief" state="confirmed" />)
+    expect(screen.getByText('Confirmed')).not.toHaveAttribute('data-just')
+  })
+})

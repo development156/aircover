@@ -5,6 +5,8 @@ import { Check, Pencil } from 'lucide-react'
 
 import { confirmBrainField } from '@/app/actions/brand-field'
 import { blankReason } from '@/lib/brand/blank'
+
+import { useJustChanged } from './use-just-changed'
 import { Button } from '@/components/ui/button'
 import type { BrainField } from '@/lib/brand/fields'
 import { leavesEqual, type BrainLeaf } from '@/lib/brand/leaf'
@@ -110,6 +112,10 @@ export function FieldRow({ field, value, state }: FieldRowProps) {
     })
   }
 
+  // The server re-renders this row with the new state after a write; the change
+  // in the PROP is the beat the chip pops on. First render never pops.
+  const justConfirmed = useJustChanged(state) && state === 'confirmed'
+
   const unchanged = leavesEqual(draft, value)
   // Refused BEFORE the press, in the same words the server would refuse it in.
   const blank = blankReason(field, draft)
@@ -121,7 +127,7 @@ export function FieldRow({ field, value, state }: FieldRowProps) {
     <div data-guide={`brain.field.${field.path}`} className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[13px] font-semibold text-ink">{field.label}</span>
-        <CertaintyMark state={state} />
+        <CertaintyMark state={state} justChanged={justConfirmed} />
         {!editing ? (
           <div className="ml-auto flex items-center gap-1">
             {/* Only while it is still a guess. On a confirmed field this would
@@ -214,7 +220,7 @@ export function FieldRow({ field, value, state }: FieldRowProps) {
         </div>
       ) : (
         <>
-          <FieldValue field={field} value={value} state={state} />
+          <FieldValue field={field} value={value} state={state} lit={justConfirmed} />
           {/* The editor renders its own error. This one belongs to the inline
               confirm, which has no editor open to put it in — without this the
               press would fail silently and the mark would simply not change. */}
