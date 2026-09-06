@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Check, Coins, Radio, Sparkles, UserRound } from 'lucide-react'
+import { useEffect, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import { ArrowRight, Check, Coins, Radio, Sparkles, UserRound } from 'lucide-react'
 
-import { pollLiveFeed } from '@/app/actions/home-live'
+import { askSahoda, pollLiveFeed } from '@/app/actions/home-live'
 import { HomeSection } from '@/components/home/section'
 import { agoWords } from '@/lib/home/ago'
 import type { LiveKind, LiveLine } from '@/lib/home/live-types'
@@ -40,6 +41,27 @@ export function LiveConsole({ initial, readAt }: { initial: LiveLine[]; readAt: 
   const [freshAt, setFreshAt] = useState(readAt)
   const [stale, setStale] = useState(false)
   const [now, setNow] = useState(() => new Date(readAt))
+  const [asked, setAsked] = useState('')
+  const [reply, setReply] = useState<string | null>(null)
+  const [busy, startAsking] = useTransition()
+  const router = useRouter()
+
+  function ask(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const text = asked.trim()
+    if (!text || busy) return
+    startAsking(async () => {
+      try {
+        const result = await askSahoda(text)
+        setReply(result.said)
+        // The sentence is on screen before the move, so nothing happens unsaid.
+        if (result.href) router.push(result.href as Parameters<typeof router.push>[0])
+        if (result.did !== 'nothing') setAsked('')
+      } catch {
+        setReply('Sahoda could not do that just now. Try again.')
+      }
+    })
+  }
 
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | null = null
@@ -118,6 +140,41 @@ export function LiveConsole({ initial, readAt }: { initial: LiveLine[]; readAt: 
         })}
       </ol>
       <p className="mt-3 type-meta text-ink-mute">Last looked {agoWords(freshAt, now)}</p>
+
+      {/* ── THE LISTENING HALF ───────────────────────────────────────────────
+          One box, three things it can do, and it says what it is doing before
+          it moves you. It does only what a click already can (see
+          `lib/home/instruct.ts`): a draft through the composer's own action,
+          or the screen that owns what was asked. It never spends credits. */}
+      <form onSubmit={ask} className="mt-4 border-t border-line-soft pt-4">
+        <label htmlFor="home-ask" className="block type-meta font-[550] text-ink">
+          Ask Sahoda to do something
+        </label>
+        <div className="mt-2 flex items-center gap-2">
+          <input
+            id="home-ask"
+            value={asked}
+            onChange={(event) => setAsked(event.target.value)}
+            placeholder="Write a post about the weekend menu"
+            maxLength={500}
+            disabled={busy}
+            className="h-control min-w-0 flex-1 rounded-input border border-line bg-surface px-3 type-sm text-ink placeholder:text-ink-mute focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none max-narrow:h-11"
+          />
+          <button
+            type="submit"
+            disabled={busy || asked.trim() === ''}
+            aria-label="Ask Sahoda"
+            className="grid size-control flex-none place-items-center rounded-input border border-line bg-surface text-ink transition-micro hover:bg-surface-2 disabled:opacity-50 max-narrow:size-11"
+          >
+            <ArrowRight size={16} aria-hidden />
+          </button>
+        </div>
+        <p className="mt-2 type-meta text-muted" aria-live="polite">
+          {busy
+            ? 'Sahoda is on it.'
+            : (reply ?? 'It can write a post, open your week, or open your accounts.')}
+        </p>
+      </form>
     </HomeSection>
   )
 }
