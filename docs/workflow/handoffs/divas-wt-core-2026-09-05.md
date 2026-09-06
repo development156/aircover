@@ -146,7 +146,11 @@ after one seam fix, root vitest 266/266, prettier clean.
 | Q-07 / Q-12 / Q-20 / Q-21 / Q-24 | three unwired actions deleted; Telegram note follows the picker; "Ready to publish" / "Not yet confirmed live"; sweeps maxDuration 240 with a schedule-aware test; old onboarding tree (21 files) deleted | tests, mutations red |
 | Q-18 / Q-23 | 24 bare refusal tests retargeted to sentences and side effects; DPDP export-drift guard now runs without a database | 3 + 1 mutations red |
 
-**Two new migrations are WRITTEN and NOT applied:** `20260906033000_remix_create_batch.sql`, `20260906033100_ledger_expire_available_guard.sql`. The remix store now calls the RPC, so `/remix` batch creation will fail on any database where the first is not applied. Apply both to staging and production before promoting.
+**Both new migrations are APPLIED to staging and production** (09:05 IST,
+Supabase MCP, verified: `remix_create_batch` present, one `apply_ledger_entry`
+definition with the EXPIRE guard). Before applying the ledger one, production's
+live function was read back and matched the July definition exactly, so the
+replacement changed only the EXPIRE branch.
 
 **Not fixed, with reasons:** `/analytics` accent ceiling (a design ruling, ceilings are never raised); the composer and palette timeouts from the smoke run (no cause in the traces yet); `wallet.ts startCheckout` carries the same unguarded order id Q-06 closed for plans; negative `ADJUST` left because billing's reversal path relies on the raw error; `knowledge` count past 200 under-reports (needs its own query). The "first navigation after Create workspace shows first-run" was a harness race, not a product one: with the action allowed to settle (945 ms) every route renders its own heading.
 
