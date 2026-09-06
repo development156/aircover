@@ -1,6 +1,4 @@
 import { CardEmpty } from '@/components/empty-state'
-import { ArrowLeft } from 'lucide-react'
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import { ConversationRow } from '@/components/inbox/conversation-row'
@@ -8,6 +6,7 @@ import { InboxShell } from '@/components/inbox/inbox-shell'
 import { PaneHeader, PaneScroll } from '@/components/inbox/inbox-panes'
 import { MessageList } from '@/components/inbox/message-list'
 import { ReplyAffordanceCard } from '@/components/inbox/reply-affordance'
+import { ThreadHeader } from '@/components/inbox/thread-header'
 import { SurfaceList, SurfaceRow } from '@/components/inbox/surface-list'
 import { accountIdsByChannel, readConversationsList } from '@/lib/inbox/conversations'
 import { newestInboundAt, threadPlatform } from '@/lib/inbox/messages'
@@ -98,18 +97,14 @@ export default async function StoredThreadPage({
       thread={
         <>
           <PaneHeader>
-            <div className="flex items-center gap-2">
-              <Link
-                href="/inbox"
-                aria-label="Back to messages"
-                className="surface-ring grid size-8 shrink-0 place-items-center rounded-sm text-muted transition-micro hover:text-ink wide:hidden"
-              >
-                <ArrowLeft size={15} aria-hidden />
-              </Link>
-              <h2 className="type-body font-semibold tracking-[-0.01em]">
-                {detail.thread.authorName ?? 'Conversation'}
-              </h2>
-            </div>
+            {/* `conversation={null}`: this route has no live `ZernioConversation` to
+                match against, so the header falls back to the stored thread's own
+                author name and to the platform found on its messages. */}
+            <ThreadHeader
+              fallbackTitle={detail.thread.authorName ?? 'Conversation'}
+              conversation={null}
+              messages={messages}
+            />
           </PaneHeader>
 
           <PaneScroll className="p-4">

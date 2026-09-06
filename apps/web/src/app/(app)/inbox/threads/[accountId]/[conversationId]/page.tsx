@@ -1,6 +1,4 @@
 import { CardEmpty } from '@/components/empty-state'
-import { ArrowLeft } from 'lucide-react'
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import { ConversationRow } from '@/components/inbox/conversation-row'
@@ -8,6 +6,7 @@ import { InboxShell } from '@/components/inbox/inbox-shell'
 import { PaneHeader, PaneScroll } from '@/components/inbox/inbox-panes'
 import { MessageList } from '@/components/inbox/message-list'
 import { ReplyAffordanceCard } from '@/components/inbox/reply-affordance'
+import { ThreadHeader } from '@/components/inbox/thread-header'
 import { SaveAsLead } from '@/components/leads/save-as-lead'
 import { SurfaceBanner } from '@/components/inbox/surface-notice'
 import { SurfaceList, SurfaceRow } from '@/components/inbox/surface-list'
@@ -69,6 +68,12 @@ export default async function ThreadPage({
   // navigating away from it — which is the reference's whole point. It is read
   // above, in the same wait as the thread.
 
+  // The header wants the live `ZernioConversation` fields `readThread` does not
+  // carry (accountUsername, url) — they are on the row the sibling list already
+  // fetched, when this thread happens to be in it.
+  const conversationRow =
+    siblings.find((c) => c.accountId === accountId && c.id === conversationId) ?? null
+
   return (
     <InboxShell
       emptiness={thread.decision.state}
@@ -91,18 +96,11 @@ export default async function ThreadPage({
       thread={
         <>
           <PaneHeader>
-            <div className="flex items-center gap-2">
-              {/* Back is the mobile affordance: above 700px the list is right
-                  there and a back button would point at a visible pane. */}
-              <Link
-                href="/inbox"
-                aria-label="Back to messages"
-                className="surface-ring grid size-8 shrink-0 place-items-center rounded-sm text-muted transition-micro hover:text-ink wide:hidden"
-              >
-                <ArrowLeft size={15} aria-hidden />
-              </Link>
-              <h2 className="text-[14px] font-semibold tracking-[-0.01em]">Conversation</h2>
-            </div>
+            <ThreadHeader
+              fallbackTitle="Conversation"
+              conversation={conversationRow}
+              messages={thread.messages}
+            />
           </PaneHeader>
 
           <PaneScroll className="p-4">
