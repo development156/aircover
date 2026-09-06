@@ -24,13 +24,7 @@ export const metadata = { title: 'Studio' }
  * Brand Brain feeds this screen will never go and fill it in, and will get
  * ordinary pictures forever while believing that is all Sahoda can do.
  */
-export default async function StudioPage({
-  searchParams,
-}: {
-  /** `describe` is handed over by the Studio box on /home. */
-  searchParams: Promise<{ describe?: string }>
-}) {
-  const { describe: rawDescribe } = await searchParams
+export default async function StudioPage() {
   // In parallel, deliberately. Sequentially the picker would wait on the
   // gallery and the screen would take twice as long to draw for no reason.
   /**
@@ -92,10 +86,6 @@ export default async function StudioPage({
       </PageTitle>
 
       <StudioWorkbench
-        /* Trimmed and capped at the same 1000 the field itself enforces: a query
-           string is user input and the ceiling has to hold on the way in, not
-           only on the way through the keyboard. */
-        initialWanted={(rawDescribe ?? '').trim().slice(0, 1000)}
         formats={formats}
         library={library}
         pictures={pictures}
