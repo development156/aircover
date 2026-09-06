@@ -182,9 +182,20 @@ jobs:
   # away, and a ref cannot be typed without naming the destination. The input is
   # not defaulted, so nobody can run this by clicking through.
   smoke:
-    name: Playwright @smoke (writes to the named database)
+    name: Playwright @smoke ${{ matrix.shard }}/3 (writes to the named database)
     if: github.event_name == 'workflow_dispatch' && inputs.ack_target != ''
     runs-on: ubuntu-latest
+    # THREE SHARDS, because one runner cannot finish. MEASURED 2026-09-06: two
+    # healthy runs (33985674352, 34009643341) each used the whole 60-minute
+    # limit on a 2-vCPU runner and were cancelled before the last specs ran, so
+    # no run has ever produced a total. Locally the same 118 tests take 16
+    # minutes. Playwright's own `--shard` splits the files deterministically;
+    # each shard builds the app itself, which costs two minutes and keeps the
+    # shards independent.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     # 60, not 45. MEASURED 2026-09-05, run 33965242498: the first run that ever
     # reached the suite was killed by the 45-minute limit with no verdict and no
     # output flushed, on a dev server compiling every route on first request.
@@ -392,7 +403,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_DB_URL: ${{ secrets.E2E_SUPABASE_DB_URL }}
-        run: pnpm turbo run test:smoke --concurrency=1
+        run: pnpm turbo run test:smoke --concurrency=1 -- --shard=${{ matrix.shard }}/3
 
       # A skipped @smoke test with the service key present is a guard that did
       # not run. Eleven specs skip on `adminClient() === null`, which is right on
@@ -411,7 +422,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: |
             apps/web/playwright-report
             apps/web/test-results
