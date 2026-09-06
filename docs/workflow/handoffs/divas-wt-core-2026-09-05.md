@@ -122,3 +122,32 @@ did not cover at phone width. Test users purged; staging and production 0 rows.
 Next for the smoke leg: fix the topbar (two causes, 14 tests), retarget the
 two stale guards, then re-dispatch; consider `--shard` or a 90-minute limit so a
 2-vCPU runner can finish 118 tests.
+
+## Session 5 (6 September, 03:30–09:00 IST): the audit's open findings, executed
+
+Founder: "start fixing problems and apply solutions from the audit results".
+Four agents in worktrees cut from `wt-core` (the harness cuts its own from
+`main`, which is a 2-route skeleton here; two agents had to be stopped and
+relaunched for that), plus my own pass on the smoke failures. Everything below
+is merged and pushed; trunk `c3590871`. Unit gate on the merge: turbo 27/27
+after one seam fix, root vitest 266/266, prettier clean.
+
+| Finding | What landed | Proof |
+| --- | --- | --- |
+| Smoke: topbar 1 px overlap ×4 | ring moved to a wrapper around the split control; no `-ml-px` | MEASURED 0 overlaps at 390/430/700/1440 on a production build |
+| Smoke: 390 overflow ×10 (no workspace) | topbar "Create workspace" hidden on phones; the first-run card keeps it | MEASURED scrollWidth = clientWidth at 390/430 |
+| Smoke: campaigns / composer overflow at 360–390 (workspace, no brain) | "credits" word sr-only on phones; single-workspace switcher hidden on phones | MEASURED 0 px over at 360/390 on /campaigns and /posts/new |
+| Smoke: 3 stale guards | connections tile count read from `CATALOGUE`; Knowledge tab pattern; "What Sahoda noticed" | retargeted, never deleted |
+| Q-02 tag | "Free builds used up for today" after a limit refusal | test pins `failure.kind` |
+| Q-17 loud skips | `scripts/smoke-skips.mjs` + json reporter + gate step; missing report is refused | 4 tests |
+| Q-06 | deterministic Cashfree order id, `fetchOrder` before `createCheckout`, 409 recovery | 5 tests, 5 mutations red |
+| Q-08 / Q-03 / Q-10 | 44 px hit areas at phone width; focus to the new step's h2; skip link first in the shell | tests, mutations red |
+| Q-15 / Q-16 / Q-22 | `remix_create_batch` RPC (migration, NOT applied); knowledge LIST_LIMIT + `truncated`; ledger EXPIRE guard (migration, NOT applied) | PGlite tests, mutations red |
+| Q-07 / Q-12 / Q-20 / Q-21 / Q-24 | three unwired actions deleted; Telegram note follows the picker; "Ready to publish" / "Not yet confirmed live"; sweeps maxDuration 240 with a schedule-aware test; old onboarding tree (21 files) deleted | tests, mutations red |
+| Q-18 / Q-23 | 24 bare refusal tests retargeted to sentences and side effects; DPDP export-drift guard now runs without a database | 3 + 1 mutations red |
+
+**Two new migrations are WRITTEN and NOT applied:** `20260906033000_remix_create_batch.sql`, `20260906033100_ledger_expire_available_guard.sql`. The remix store now calls the RPC, so `/remix` batch creation will fail on any database where the first is not applied. Apply both to staging and production before promoting.
+
+**Not fixed, with reasons:** `/analytics` accent ceiling (a design ruling, ceilings are never raised); the composer and palette timeouts from the smoke run (no cause in the traces yet); `wallet.ts startCheckout` carries the same unguarded order id Q-06 closed for plans; negative `ADJUST` left because billing's reversal path relies on the raw error; `knowledge` count past 200 under-reports (needs its own query). The "first navigation after Create workspace shows first-run" was a harness race, not a product one: with the action allowed to settle (945 ms) every route renders its own heading.
+
+Smoke run 34008428577 on `08a15f97` was dispatched to measure the trunk against the earlier 24 failures; result in the next section or in the remember file.
