@@ -4,9 +4,9 @@ import { render, screen } from '@testing-library/react'
 import { CycleStrip } from './cycle-strip'
 
 /**
- * THE MARKER ON THE SEVEN-STEP RAIL IS A CLAIM ABOUT THE READER'S WEEK.
+ * THE MARKER ON THE SIX-STEP RAIL IS A CLAIM ABOUT THE READER'S WEEK.
  *
- * The rail is the page's hero, and the one thing it says beyond the fixed seven
+ * The rail is the page's hero, and the one thing it says beyond the fixed six
  * names is WHERE THE CYCLE IS. That is read from `loop_cycles.status`, so every
  * way of getting it wrong is a screen telling somebody their week is at a stage
  * it is not:
@@ -17,13 +17,16 @@ import { CycleStrip } from './cycle-strip'
  *   · putting the halt on its own stage rather than on Plan, which would make
  *     the rail disagree with the state machine the FSD describes
  *
- * None of those is visible to a test that only checks the seven names render,
+ * There is no Test stage: nothing here ever ran a draft past an Audience Twin,
+ * so the strip no longer claims one does.
+ *
+ * None of those is visible to a test that only checks the six names render,
  * and the names are the part that cannot change.
  */
 
 function marked(): string | null {
   const node = document.querySelector('[aria-current="step"]')
-  return node?.textContent?.match(/Collect|Reflect|Plan|Create|Test|Stage|Report/)?.[0] ?? null
+  return node?.textContent?.match(/Collect|Reflect|Plan|Create|Stage|Report/)?.[0] ?? null
 }
 
 describe('where the rail says the cycle is', () => {
@@ -60,9 +63,9 @@ describe('where the rail says the cycle is', () => {
   it('counts the steps for a reader who cannot see the rail', () => {
     render(<CycleStrip status="staging" />)
     // Position and state both reach a screen reader, not colour alone.
-    expect(screen.getByText(/Step 6 of 7, running now/)).toBeTruthy()
-    expect(screen.getByText(/Step 1 of 7, done/)).toBeTruthy()
-    expect(screen.getByText('Step 7 of 7')).toBeTruthy()
+    expect(screen.getByText(/Step 5 of 6, running now/)).toBeTruthy()
+    expect(screen.getByText(/Step 1 of 6, done/)).toBeTruthy()
+    expect(screen.getByText('Step 6 of 6')).toBeTruthy()
   })
 
   /**
@@ -114,16 +117,16 @@ describe('where the rail says the cycle is', () => {
    * further along than it is — the same lie the tick-instead-of-a-number
    * mutation tells, in the other direction.
    *
-   * Counted rather than located: at step 4 of 7 the travelled halves are the
+   * Counted rather than located: at step 4 of 6 the travelled halves are the
    * three entering steps 2, 3 and 4, plus the three leaving steps 1, 2 and 3.
    * Six. Seven means the line left the running step.
    */
   it('does not run the line out of the step that is still working', () => {
     const { container } = render(<CycleStrip status="creating" />)
     const rails = [...container.querySelectorAll('span.h-px')]
-    // Fourteen halves: two per step, the outer two drawn transparent so every
+    // Twelve halves: two per step, the outer two drawn transparent so every
     // column measures the same.
-    expect(rails).toHaveLength(14)
+    expect(rails).toHaveLength(12)
     const travelled = rails.filter((r) => r.className.includes('bg-accent'))
     expect(travelled).toHaveLength(6)
   })
@@ -145,7 +148,7 @@ describe('where the rail says the cycle is', () => {
   it('draws the two outer halves rather than removing them', () => {
     const { container } = render(<CycleStrip status="creating" />)
     const rails = [...container.querySelectorAll('span.h-px')]
-    expect(rails).toHaveLength(14)
+    expect(rails).toHaveLength(12)
     // Transparent, never `hidden`: a removed box is a narrower column.
     expect(rails.filter((r) => r.className.split(/\s+/).includes('hidden'))).toHaveLength(0)
     expect(rails.filter((r) => r.className.includes('bg-transparent'))).toHaveLength(2)
@@ -157,9 +160,9 @@ describe('where the rail says the cycle is', () => {
     expect(rails.filter((r) => r.className.includes('bg-accent'))).toHaveLength(0)
   })
 
-  it('still names all seven steps in order, whatever the status', () => {
+  it('still names all six steps in order, whatever the status', () => {
     render(<CycleStrip status="reported" />)
-    const names = ['Collect', 'Reflect', 'Plan', 'Create', 'Test', 'Stage', 'Report']
+    const names = ['Collect', 'Reflect', 'Plan', 'Create', 'Stage', 'Report']
     for (const name of names) expect(screen.getByText(name)).toBeTruthy()
   })
 })

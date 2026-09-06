@@ -39,12 +39,16 @@ import type { MetricObservation } from './reflect'
  */
 let portSingleton: PgLedgerPort | undefined
 
-function getPool(): PgLedgerPort['pool'] {
+function getPort(): PgLedgerPort {
   if (!portSingleton) {
     const { databaseUrl } = loadBillingEnv()
     portSingleton = createPgLedgerPort({ connectionString: databaseUrl })
   }
-  return portSingleton.pool
+  return portSingleton
+}
+
+function getPool(): PgLedgerPort['pool'] {
+  return getPort().pool
 }
 
 export interface CycleRow {
@@ -477,4 +481,87 @@ export async function readRecentCycles(workspaceId: string, limit = 5): Promise<
     [workspaceId, limit],
   )
   return r.rows
+}
+
+/**
+ * Concrete deps for the stale-cycle sweep (`lib/loop/sweep.ts`), on the shared
+ * service-role pool. Workspace-agnostic: it reads and writes across every
+ * workspace, exactly like the expired-HOLD and dispatch sweeps, and carries
+ * `workspace_id` in every WHERE clause because this module runs as the table
+ * owner and bypasses RLS (see the header).
+ *
+ * `limit` bounds the work per tick so a large backlog drains across ticks,
+ * oldest first, rather than being attempted in one request.
+ */
+export function loopSweepDeps(limit = 50): import('./sweep').LoopSweepDeps {
+  return {
+    async listLiveCycles() {
+      const r = await getPool().query<{
+        id: string
+        workspace_id: string
+        status: string
+        started_at: string
+      }>(
+        `select id, workspace_id, status, started_at
+           from loop_cycles
+          where status not in ('reported', 'cancelled', 'failed')
+          order by started_at asc
+          limit $1`,
+        [limit],
+      )
+      return r.rows.map((row) => ({
+        id: row.id,
+        workspaceId: row.workspace_id,
+        status: row.status,
+        startedAt: row.started_at,
+      }))
+    },
+
+    async expireCycle({ cycleId, workspaceId }) {
+      // Guarded by the same NOT_TERMINAL clause every writer here carries, so a
+      // cycle that finished between the list and now is left alone.
+      const moved = await getPool().query(
+        `update loop_cycles
+            set status = 'cancelled',
+                failure_reason = coalesce(failure_reason, 'STALE_SWEEP')
+          where id = $1 and workspace_id = $2 and ${NOT_TERMINAL}
+          returning id`,
+        [cycleId, workspaceId],
+      )
+      if ((moved.rowCount ?? 0) === 0) return { expired: false, holds: [] }
+
+      // Outstanding HOLDs for THIS cycle's orchestration charge — `newLoopCycleRef`
+      // writes `loop:cycle:<cycleId>:<uuid>`, so the pattern catches the cycle's
+      // own stranded hold without reaching a brief hold or another cycle's. A
+      // HOLD with nothing settling it is credit reserved and not spent.
+      const holds = await getPool().query<{ id: string; amount: number }>(
+        `select h.id, h.amount
+           from credit_ledger h
+          where h.workspace_id = $1
+            and h.entry_type = 'HOLD'
+            and h.object_ref like $2
+            and not exists (
+              select 1 from credit_ledger s where s.settles_entry_id = h.id
+            )`,
+        [workspaceId, `loop:cycle:${cycleId}:%`],
+      )
+      return {
+        expired: true,
+        holds: holds.rows.map((row) => ({ entryId: row.id, amount: row.amount })),
+      }
+    },
+
+    async releaseHold({ workspaceId, hold }) {
+      // The only ledger write path. A RELEASE keyed on the hold it settles is
+      // idempotent, so a second tick cannot refund the same hold twice.
+      await getPort().apply({
+        workspaceId,
+        entryType: 'RELEASE',
+        amount: hold.amount,
+        idempotencyKey: `loop-sweep:release:${hold.entryId}`,
+        settlesEntryId: hold.entryId,
+        actor: 'job:loop_sweep',
+      })
+    },
+  }
 }
