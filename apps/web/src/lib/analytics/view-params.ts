@@ -165,3 +165,71 @@ export function previousWindow(view: AnalyticsView): { from: string; to: string 
   const start = new Date(from - view.days * DAY_MS)
   return { from: dayOf(start), to: dayOf(to) }
 }
+
+/**
+ * ── THE METRIC THE BIG CHART IS DRAWING, ALSO IN THE URL ─────────────────────
+ * Same argument as the range and the channel above it: a link to "the evidence
+ * for that claim" has to be able to name the metric, and a reader who narrowed
+ * to saves and refreshed should still be looking at saves.
+ *
+ * Nine of them, from two different sources, and `daily-metrics.ts` explains why
+ * that matters. Three come from `post_metric_snapshots` and six from Zernio,
+ * which is invisible in a query string and is why the chart states its basis.
+ */
+export const METRIC_KEYS = [
+  'reach',
+  'impressions',
+  'engagement',
+  'likes',
+  'comments',
+  'shares',
+  'saves',
+  'views',
+  'clicks',
+] as const
+
+export type AnalyticsMetric = (typeof METRIC_KEYS)[number]
+
+/** The three `post_metric_snapshots` keeps. Everything else is a live read. */
+export const STORED_METRICS = ['impressions', 'reach', 'engagement'] as const
+
+export type StoredMetric = (typeof STORED_METRICS)[number]
+
+export const DEFAULT_METRIC: AnalyticsMetric = 'reach'
+
+export function isStoredMetric(metric: AnalyticsMetric): metric is StoredMetric {
+  return (STORED_METRICS as readonly string[]).includes(metric)
+}
+
+/**
+ * An unrecognised metric is the default, silently.
+ *
+ * The same rule the range follows: a mangled query string is not a reason to
+ * refuse somebody their numbers. What it must never do is show one metric under
+ * another one's name, which is why the resolved metric is on the screen as the
+ * selected toggle and in the chart's own caption.
+ */
+export function resolveMetric(raw: string | undefined): AnalyticsMetric {
+  return (METRIC_KEYS as readonly string[]).includes(raw ?? '')
+    ? (raw as AnalyticsMetric)
+    : DEFAULT_METRIC
+}
+
+/**
+ * The link that switches the metric and keeps every other filter.
+ *
+ * Built on `hrefFor`, so changing the metric cannot silently reset the range or
+ * the channel — the defect that makes a filtered view unshareable, described at
+ * the top of this file.
+ */
+export function metricHref(view: AnalyticsView, metric: AnalyticsMetric): Route {
+  const base = hrefFor(view, {})
+  const query = new URLSearchParams(base.includes('?') ? base.slice(base.indexOf('?') + 1) : '')
+  // The default is not written into the URL, for the same reason the default
+  // range is not: a link that carries every default pins today's default into a
+  // link that will outlive it.
+  if (metric === DEFAULT_METRIC) query.delete('metric')
+  else query.set('metric', metric)
+  const text = query.toString()
+  return (text ? `/analytics?${text}` : '/analytics') as Route
+}

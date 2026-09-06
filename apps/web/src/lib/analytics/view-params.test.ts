@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest'
 
 import {
+  DEFAULT_METRIC,
+  METRIC_KEYS,
+  isStoredMetric,
+  metricHref,
+  resolveMetric,
   resolveView,
   hrefFor,
   previousWindow,
@@ -172,5 +177,36 @@ describe('withinView — inclusive at both ends', () => {
     expect(withinView('2026-08-10', v)).toBe(true)
     expect(withinView('2026-07-31', v)).toBe(false)
     expect(withinView('2026-08-11', v)).toBe(false)
+  })
+})
+
+describe('the metric, and the two sources behind it', () => {
+  const view = resolveView({ range: '7', channel: 'instagram' }, new Date('2026-08-30T10:00:00Z'))
+
+  it('falls back to the default rather than refusing an unknown metric', () => {
+    expect(resolveMetric('saves')).toBe('saves')
+    expect(resolveMetric('unicorns')).toBe(DEFAULT_METRIC)
+    expect(resolveMetric(undefined)).toBe(DEFAULT_METRIC)
+  })
+
+  it('keeps the range and the channel when the metric changes', () => {
+    // A control that silently resets its neighbour is how a filtered view stops
+    // being shareable. Stated at the top of `view-params.ts`, pinned here.
+    const href = metricHref(view, 'likes')
+    expect(href).toContain('metric=likes')
+    expect(href).toContain('range=7')
+    expect(href).toContain('channel=instagram')
+  })
+
+  it('does not write the default metric into the URL', () => {
+    expect(metricHref(view, DEFAULT_METRIC)).not.toContain('metric=')
+  })
+
+  it('knows which metrics this database keeps and which need a live read', () => {
+    // Three stored, six live. Getting this wrong reads a live metric out of an
+    // empty snapshot table and calls the answer "nothing measured".
+    const stored = METRIC_KEYS.filter(isStoredMetric)
+    expect([...stored].sort()).toEqual(['engagement', 'impressions', 'reach'])
+    expect(METRIC_KEYS.filter((metric) => !isStoredMetric(metric))).toHaveLength(6)
   })
 })

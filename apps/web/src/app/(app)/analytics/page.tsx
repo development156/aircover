@@ -4,7 +4,7 @@ import { PageTitle } from '@/components/page-title'
 import { AccountPanel } from '@/components/analytics/account-panel'
 import { ReadinessLine } from '@/components/analytics/readiness-line'
 import { ChannelCards } from '@/components/analytics/channel-cards'
-import { PerformanceOverTime } from '@/components/analytics/performance-over-time'
+import { MetricOverTime, type MetricLegendEntry } from '@/components/analytics/metric-over-time'
 import { PostRows } from '@/components/analytics/post-rows'
 import { ReportExample } from '@/components/analytics/report-example'
 import { TimingHeatmap } from '@/components/analytics/timing-heatmap'
@@ -25,11 +25,32 @@ import {
   type SortDirection,
 } from '@/lib/analytics/rows'
 import { readMetricSeries } from '@/lib/analytics/series'
-import { hrefFor, resolveView, windowLabel } from '@/lib/analytics/view-params'
+import {
+  LIVE_METRIC_LABELS,
+  dailyPoints,
+  dailyTotals,
+  readDailyMetrics,
+  type LiveMetric,
+} from '@/lib/analytics/daily-metrics'
+import { METRIC_LABELS } from '@/lib/analytics/compare'
+import { sumAt } from '@/lib/analytics/kpi'
+import {
+  METRIC_KEYS,
+  hrefFor,
+  isStoredMetric,
+  metricHref,
+  resolveMetric,
+  resolveView,
+  windowLabel,
+  type AnalyticsMetric,
+} from '@/lib/analytics/view-params'
 import { readWindow } from '@/lib/analytics/window-data'
 import { measureLine } from '@/lib/analytics/measure-line'
 import { MeasureNow } from '@/components/analytics/measure-now'
 import { formatScheduledAt } from '@/lib/posts/schedule-format'
+import { InboxAnalytics } from '@/components/analytics/inbox/inbox-analytics'
+import { resolveInboxView } from '@/lib/analytics/inbox-view-params'
+import Link from 'next/link'
 
 export const metadata = { title: 'Analytics' }
 
@@ -66,17 +87,48 @@ export default async function AnalyticsPage({
   searchParams,
 }: {
   searchParams: Promise<{
+    tab?: string
     range?: string
     from?: string
     to?: string
     channel?: string
+    metric?: string
     sort?: string
     dir?: string
     page?: string
+    window?: string
+    platform?: string
+    account?: string
   }>
 }) {
   const params = await searchParams
   const view = resolveView(params)
+  /**
+   * Which of the nine metrics the big chart draws, from the URL.
+   *
+   * Three of them this database keeps (`post_metric_snapshots`). The other six
+   * exist nowhere in it and are read live from the platforms; `daily-metrics.ts`
+   * carries the argument, and the chart prints which source it is drawing so the
+   * two are never mistaken for each other.
+   */
+  const metric = resolveMetric(params.metric)
+
+  /**
+   * ── THE TAB IS RESOLVED BEFORE ANY READ ───────────────────────────────────
+   * `tab=inbox` renders an entirely different body, so nothing on the posting
+   * side may be awaited first: the read-waterfall ratchet counts every await
+   * on this route, and a posting read the inbox tab never uses would grow it
+   * for a body that never renders.
+   */
+  if (params.tab === 'inbox') {
+    const inboxView = resolveInboxView(params)
+    return (
+      <div className="space-y-grid">
+        <TabHeader active="inbox" />
+        <InboxAnalytics view={inboxView} />
+      </div>
+    )
+  }
 
   /**
    * ── FOUR INDEPENDENT READS ───────────────────────────────────────────────
@@ -84,11 +136,17 @@ export default async function AnalyticsPage({
    * hiccup in any one costs its own section and nothing else: every read below
    * returns its own absence rather than rejecting.
    */
-  const [window, { account, hasPublished }, series, measured] = await Promise.all([
+  const [window, { account, hasPublished }, series, measured, daily] = await Promise.all([
     readWindow(view),
     readAnalyticsPage(),
-    readMetricSeries('reach'),
+    // The stored history for whichever stored metric was asked for. A live
+    // metric leaves this on reach, which costs nothing extra: the read happens
+    // either way and the legend needs its total.
+    readMetricSeries(isStoredMetric(metric) ? metric : 'reach'),
     measureLine(),
+    // Always, whatever metric is selected: the legend prints every metric's
+    // total beside its name, and six of the nine can only come from here.
+    readDailyMetrics(view),
   ])
 
   const sort = isSortKey(params.sort) ? params.sort : DEFAULT_SORT
@@ -247,6 +305,33 @@ export default async function AnalyticsPage({
    * count DISTINCT posts, the same rule the strip above uses, so a reader who
    * adds up the weekly columns gets the number on the "Posts this period" card.
    */
+  /**
+   * ── THE LEGEND IS THE SWITCH, SO IT NEEDS EVERY METRIC'S TOTAL ────────────
+   * Each total comes from the source that metric is drawn from, never from the
+   * other one: the three stored metrics are summed off the window's own rows,
+   * so the legend agrees with the KPI strip above it, and the six live ones are
+   * summed off Zernio's days. A total assembled from the wrong source would be
+   * a number the chart under it could not reproduce.
+   */
+  const live = daily.kind === 'ready' ? dailyTotals(daily.days) : null
+  const metricLabel = (key: AnalyticsMetric): string =>
+    isStoredMetric(key) ? METRIC_LABELS[key] : LIVE_METRIC_LABELS[key as LiveMetric]
+  const legend: MetricLegendEntry[] = METRIC_KEYS.map((key) => ({
+    metric: key,
+    label: metricLabel(key),
+    total: isStoredMetric(key)
+      ? sumAt(
+          window.rows,
+          key === 'reach'
+            ? 'reachAtAge'
+            : key === 'impressions'
+              ? 'impressionsAtAge'
+              : 'engagementAtAge',
+        ).total
+      : (live?.[key as LiveMetric].total ?? null),
+    href: metricHref(view, key),
+  }))
+
   const perChannel = postsPerChannel(window.rows)
   const perWeek = postsPerWeek(window.rows, view, window.timezone)
 
@@ -297,7 +382,20 @@ export default async function AnalyticsPage({
         <PostsOverTime weeks={perWeek} />
       </div>
 
-      <PerformanceOverTime series={series} />
+      <MetricOverTime
+        metric={metric}
+        label={metricLabel(metric)}
+        legend={legend}
+        stored={isStoredMetric(metric) ? series : undefined}
+        live={
+          isStoredMetric(metric)
+            ? undefined
+            : {
+                read: daily,
+                points: daily.kind === 'ready' ? dailyPoints(daily.days, metric as LiveMetric) : [],
+              }
+        }
+      />
 
       {/* ── WHAT YOUR WEEK LOOKS LIKE ───────────────────────────────────────
           The most actionable view on the page, and the one the CMO Report's
@@ -384,19 +482,55 @@ function Header({
   measured: string
 }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-      <div className="min-w-0">
-        <PageTitle>Analytics</PageTitle>
-        <p className="mt-1 type-sm text-muted">
-          The numbers behind your CMO report.
-          {timezone ? ` Dates and times are shown in ${timezone}.` : ''}
-        </p>
-        <p className="sr-only">Showing {label}.</p>
-      </div>
-      <div className="flex flex-col items-end gap-2">
-        <ViewControls view={view} channels={channels} />
-        <MeasureNow lastLine={measured} />
+    <div className="space-y-3">
+      <TabHeader active="posting" />
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+        <div className="min-w-0">
+          <PageTitle>Analytics</PageTitle>
+          <p className="mt-1 type-sm text-muted">
+            The numbers behind your CMO report.
+            {timezone ? ` Dates and times are shown in ${timezone}.` : ''}
+          </p>
+          <p className="sr-only">Showing {label}.</p>
+        </div>
+        <div className="flex flex-col items-end gap-2">
+          <ViewControls view={view} channels={channels} />
+          <MeasureNow lastLine={measured} />
+        </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * "Posting analytics" | "Inbox analytics", driven by `?tab=inbox`.
+ *
+ * A plain `<Link>`, not client state: the tab IS the URL, same reasoning as
+ * `ViewControls` and `InboxFilters`. Switching costs zero new client JS.
+ */
+function TabHeader({ active }: { active: 'posting' | 'inbox' }) {
+  const tabClass = (current: boolean) =>
+    `rounded-sm px-3 py-1.5 type-meta font-[550] transition-micro ${
+      current ? 'surface-ring bg-tint-50 text-accent dark:bg-s2' : 'text-muted hover:text-ink'
+    }`
+  return (
+    <nav aria-label="Analytics view" className="flex flex-wrap items-center gap-2">
+      <Link
+        href="/analytics"
+        aria-current={active === 'posting' ? 'page' : undefined}
+        className={tabClass(active === 'posting')}
+        data-guide="analytics-tab-posting"
+      >
+        Posting analytics
+      </Link>
+      <Link
+        href={'/analytics?tab=inbox' as Route}
+        aria-current={active === 'inbox' ? 'page' : undefined}
+        className={tabClass(active === 'inbox')}
+        data-guide="analytics-tab-inbox"
+      >
+        Inbox analytics
+      </Link>
+    </nav>
   )
 }
