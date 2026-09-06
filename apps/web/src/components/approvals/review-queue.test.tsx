@@ -69,10 +69,18 @@ describe('ReviewQueue · who may decide', () => {
     expect(screen.getByText(/only an owner, editor or approver/i)).toBeInTheDocument()
   })
 
-  test('a decider gets Approve and Send back on every row', () => {
-    render(<ReviewQueue posts={[post({ id: 'a', intent: 'draft' })]} {...BARE} />)
-
+  test('a decider gets Approve on every row, and Send back only where the database would accept it', () => {
+    const { unmount } = render(
+      <ReviewQueue posts={[post({ id: 'a', intent: 'review' })]} {...BARE} />,
+    )
     expect(screen.getByRole('button', { name: /^Approve$/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Send back/ })).toBeInTheDocument()
+    unmount()
+
+    // A dated draft is in the queue to be approved, not returned: `return_post_to_draft`
+    // refuses it, so the control is not offered.
+    render(<ReviewQueue posts={[post({ id: 'b', intent: 'draft' })]} {...BARE} />)
+    expect(screen.getByRole('button', { name: /^Approve$/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Send back/ })).toBeNull()
   })
 })

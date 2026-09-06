@@ -29,6 +29,9 @@ export interface ReviewRowProps {
   onSendBack: (reason: string) => Promise<string | null>
 }
 
+/** Send back walks a post out of review, approval or a booking. A dated draft is none of those. */
+const RETURNABLE = new Set(['review', 'approved', 'scheduled'])
+
 const READINESS_WORD = { live: 'Connected', off: 'Not connected', unknown: 'Not checked' } as const
 
 /**
@@ -184,16 +187,18 @@ export function ReviewRow({
           </Link>
           {decides ? (
             <>
-              <Button
-                ref={sendBackButton}
-                size="sm"
-                variant="secondary"
-                onClick={() => setReturning(true)}
-                disabled={busy}
-              >
-                <Undo2 size={13} strokeWidth={2} aria-hidden />
-                Send back
-              </Button>
+              {RETURNABLE.has(post.intent) ? (
+                <Button
+                  ref={sendBackButton}
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setReturning(true)}
+                  disabled={busy}
+                >
+                  <Undo2 size={13} strokeWidth={2} aria-hidden />
+                  Send back
+                </Button>
+              ) : null}
               <span className="flex items-center gap-2">
                 {own ? (
                   <span className="type-meta text-muted" data-queue-own>
