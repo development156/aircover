@@ -65,6 +65,18 @@ export interface SentReply {
   sentAt: string
   /** The Clerk subject who wrote it. */
   authorUserId: string
+  /**
+   * What went out attached, in the SAME shape the webhook projector files.
+   *
+   * `inbox_messages.attachments` is one column read by one renderer, and that
+   * renderer switches on `type` using Zernio's own vocabulary. So an outbound
+   * photo is stored `{ type: 'image', url }` exactly as an inbound one is, and
+   * the thread draws the reply the customer just sent without a second branch.
+   *
+   * Absent, not `[]`, when nothing was attached: the insert already writes `[]`
+   * for the empty case and the column is NOT NULL.
+   */
+  attachments?: readonly { type: string; url: string }[]
 }
 
 /**
@@ -131,6 +143,11 @@ export async function recordSentReply(reply: SentReply): Promise<RecordOutcome> 
         platformMessageId: reply.platformMessageId,
         sentAt: reply.sentAt,
         authorUserId: reply.authorUserId,
+        // The url stored here is the short-lived signed link the send used, and it
+        // dies within the hour. That is the same bargain every Meta attachment in
+        // this table already makes (`store-read.ts` says so at length): the renderer
+        // treats a dead image as a dead image rather than pretending.
+        attachments: reply.attachments ?? [],
       })
 
       // Zero rows is the unique index refusing a receipt id already filed — a

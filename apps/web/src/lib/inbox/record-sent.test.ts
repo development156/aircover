@@ -126,6 +126,28 @@ describe('a confirmed reply lands in the store', () => {
     ])
   })
 
+  /**
+   * The renderer switches on `type` with Zernio's own vocabulary, so an outbound
+   * photo has to be stored the way an inbound one is or the reply the customer
+   * just sent draws as words with nothing under them.
+   */
+  it('files the attachment on the outbound row, in the shape the renderer reads', async () => {
+    await recordSentReply({
+      ...reply,
+      attachments: [{ type: 'image', url: 'https://cdn.example.com/a.jpg?token=t' }],
+    })
+
+    const insert = statement('insert into inbox_messages')
+    expect(JSON.parse(String(insert!.params[7]))).toEqual([
+      { type: 'image', url: 'https://cdn.example.com/a.jpg?token=t' },
+    ])
+  })
+
+  it('writes an empty array, never null, when nothing was attached', async () => {
+    await recordSentReply(reply)
+    expect(statement('insert into inbox_messages')!.params[7]).toBe('[]')
+  })
+
   it('reports a receipt a webhook already filed as such, never as a failure', async () => {
     // The partial unique index refuses the second write. We win the race either way.
     state.insertRows = []

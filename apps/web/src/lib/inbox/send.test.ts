@@ -109,6 +109,34 @@ describe('replyToThread — the window is re-derived on the server, never truste
     expect(seen[0]?.[3]).toEqual({ message: 'Yes we do', wire: {} })
   })
 
+  it('carries an attachment through to the port, and neither key without one', async () => {
+    const seen: unknown[][] = []
+    const d = deps({ onSend: (args) => seen.push(args) })
+
+    await replyToThread(d, {
+      conversationId: 'conv-1',
+      message: 'Here it is',
+      intent: { kind: 'free_form' },
+      attachment: { url: 'https://cdn.example.com/a.jpg?token=t', type: 'image' },
+    })
+    expect(seen[0]?.[3]).toEqual({
+      message: 'Here it is',
+      wire: {},
+      attachmentUrl: 'https://cdn.example.com/a.jpg?token=t',
+      attachmentType: 'image',
+    })
+
+    await replyToThread(d, {
+      conversationId: 'conv-1',
+      message: 'Just words',
+      intent: { kind: 'free_form' },
+    })
+    // Not `attachmentUrl: undefined`. An `attachmentType` alone would be a claim
+    // about a file that is not there, so the pair is absent together or present
+    // together and nothing between.
+    expect(Object.keys(seen[1]?.[3] as object).sort()).toEqual(['message', 'wire'])
+  })
+
   it('carries the authorised tag once the free-form window has lapsed', async () => {
     const seen: unknown[][] = []
     const d = deps({ now: at(30), onSend: (args) => seen.push(args) })

@@ -1,4 +1,5 @@
 import type {
+  AttachmentType,
   ScopedAccountId,
   ScopedProfileId,
   ZernioReads,
@@ -109,7 +110,18 @@ function fromError(error: unknown, what: string): SendOutcome {
  */
 export async function replyToThread(
   deps: ReplyDeps,
-  input: { conversationId: string; message: string; intent: ReplyIntent },
+  input: {
+    conversationId: string
+    message: string
+    intent: ReplyIntent
+    /**
+     * One file, already resolved to a url the platform can fetch and a type from
+     * Zernio's enum. Resolving it is the ACTION's job, not this module's: the id the
+     * browser sent has to be checked against the workspace, and a decision that can
+     * be wrong about tenancy does not belong in a pure function over ports.
+     */
+    attachment?: { url: string; type: AttachmentType }
+  },
 ): Promise<SendOutcome> {
   const empty = emptyReply(input.message)
   if (empty) return empty
@@ -156,6 +168,12 @@ export async function replyToThread(
     const receipt = await deps.sends.sendMessage(deps.profile, deps.account, input.conversationId, {
       message: input.message,
       wire: authorisation.wire,
+      // Spread, so a reply with no file carries neither key. The port refuses to put
+      // an `attachmentType` on the wire without a url beside it, and this is the
+      // layer that makes the pair inseparable in the first place.
+      ...(input.attachment === undefined
+        ? {}
+        : { attachmentUrl: input.attachment.url, attachmentType: input.attachment.type }),
     })
     return fromReceipt(receipt)
   } catch (error) {

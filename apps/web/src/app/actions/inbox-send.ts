@@ -15,8 +15,10 @@ import { commentsHref } from '@/components/inbox/commented-post-row'
 import { threadHref } from '@/components/inbox/thread-href'
 import { scopedAccount } from '@/lib/inbox/read'
 import { recordSentReply } from '@/lib/inbox/record-sent'
+import { resolveAttachment, type ResolvedAttachment } from '@/lib/inbox/attachment-asset'
 import { reportServerError } from '@/lib/observability/report'
 import { zernioClientSends } from '@/lib/zernio/server'
+import { activeWorkspaceRead } from '@/lib/workspaces'
 
 /**
  * Sending an inbox reply through Zernio: a DM, a comment, a review.
@@ -152,10 +154,34 @@ export async function sendThreadReply(
   conversationId: string,
   message: string,
   tag?: unknown,
+  /**
+   * One file from the customer's own library, named by id.
+   *
+   * An ID and never a url. A url parameter here would let this action send any
+   * link on the internet into a conversation, under the customer's name — the
+   * browser is not a place a tenancy decision can be made. `resolveAttachment`
+   * reads the row inside the active workspace and mints the link itself.
+   */
+  attachment?: { assetId: string },
 ): Promise<InboxSendState> {
   try {
     const resolved = await sendDeps(accountId)
     if (!resolved.ok) return { ok: false, status: 'failed', message: resolved.message }
+
+    let file: ResolvedAttachment | undefined
+    if (attachment !== undefined) {
+      const workspace = await activeWorkspaceRead()
+      if (workspace.status !== 'ok') {
+        return { ok: false, status: 'failed', message: 'Sahoda could not open your library.' }
+      }
+      const found = await resolveAttachment(workspace.workspace.id, attachment.assetId)
+      // REFUSED, not failed, and nothing is sent: a file that is not this
+      // workspace's is a statement about the request, not about the network. The
+      // words are not sent on their own either — a reply that quietly lost its
+      // photo reads on screen as a success.
+      if (!found.ok) return { ok: false, status: 'refused', message: found.message }
+      file = found.attachment
+    }
 
     let intent: ReplyIntent = { kind: 'free_form' }
     if (tag !== undefined && tag !== null && tag !== '') {
@@ -165,7 +191,12 @@ export async function sendThreadReply(
       intent = { kind: 'tagged', tag: parsed.data }
     }
 
-    const outcome = await performThreadReply(resolved.deps, { conversationId, message, intent })
+    const outcome = await performThreadReply(resolved.deps, {
+      conversationId,
+      message,
+      intent,
+      ...(file === undefined ? {} : { attachment: file }),
+    })
     return await toState(outcome, threadHref({ accountId, conversationId }), (platformId) =>
       recordSentReply({
         accountId,
@@ -175,6 +206,7 @@ export async function sendThreadReply(
         platformMessageId: platformId,
         sentAt: resolved.deps.now,
         authorUserId: resolved.userId,
+        ...(file === undefined ? {} : { attachments: [{ type: file.type, url: file.url }] }),
       }),
     )
   } catch (error) {
