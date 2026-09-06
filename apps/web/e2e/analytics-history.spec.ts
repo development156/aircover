@@ -70,11 +70,35 @@ test.describe('the performance-over-time card @smoke', () => {
       .single()
     const workspaceId = (post as { workspace_id: string }).workspace_id
 
-    // ── 1. THE TABLE IS THERE AND HOLDS NOTHING ───────────────────────────────
+    // ── 0. NOTHING PUBLISHED, NOTHING MEASURED: THE WORKED EXAMPLE ───────────
+    // Since 2e6ce453 the page shows a made-up bakery until the workspace has
+    // either published or been measured, and the history card is not on that
+    // screen. The old first step asked for the card here and waited on the
+    // example (run 34009643341). The example is asserted as what it is, then
+    // one channel is marked published so the real page, and the card, appear.
     await page.goto('/analytics')
     await expect(page.getByRole('heading', { name: 'Analytics', level: 1 })).toBeVisible({
       timeout: 30_000,
     })
+    await expect(page.getByText(/made-up bakery/i)).toBeVisible()
+    await expect(page.getByText(/has started keeping a history/i)).toHaveCount(0)
+
+    const { error: variantError } = await admin!.from('post_variants').insert({
+      workspace_id: workspaceId,
+      post_id: postId,
+      channel: 'instagram',
+      body: 'A post the test marks as published.',
+      char_count: 36,
+      publish_status: 'published',
+    })
+    expect(variantError, `could not mark a channel published: ${variantError?.message}`).toBeNull()
+
+    // ── 1. THE TABLE IS THERE AND HOLDS NOTHING ───────────────────────────────
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'Analytics', level: 1 })).toBeVisible({
+      timeout: 30_000,
+    })
+    await expect(page.getByText(/made-up bakery/i)).toHaveCount(0)
     await expect(page.getByText(/has started keeping a history/i)).toBeVisible()
     // NOT the old sentence. Saying "does not keep a history yet" once the table
     // exists would describe the product rather than this workspace.
