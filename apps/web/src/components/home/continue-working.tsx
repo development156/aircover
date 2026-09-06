@@ -45,7 +45,18 @@ export function ContinueWorking({ planCost }: { planCost: number }) {
       cost: planCost,
     },
     { href: '/brain', icon: Lightbulb, title: 'Research brand', note: 'Find new ideas' },
-    { href: '/posts/new', icon: SquarePen, title: 'Create post', note: 'Start from scratch' },
+    {
+      /* `as Route`, and it is not a formality. Next's `typedRoutes` builds its
+         `Route` union from the LITERAL route tree, and `/posts/new` is not in
+         it: the page is served by `posts/[id]/page.tsx`, whose own `const NEW =
+         'new'` treats that id as "this post does not exist yet". So the link
+         resolves at runtime and the type does not know it. `create/post/page.tsx`
+         and `needs-attention.tsx` each cast for the same reason. */
+      href: '/posts/new' as Route,
+      icon: SquarePen,
+      title: 'Create post',
+      note: 'Start from scratch',
+    },
     { href: '/approvals', icon: Timer, title: 'Review drafts', note: 'Finish your content' },
   ]
 
