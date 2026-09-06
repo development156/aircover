@@ -62,8 +62,18 @@ describe('the three doors', () => {
    */
   test('every step points somewhere that works with no setup at all', () => {
     for (const step of startSteps()) {
-      expect(step.href).toMatch(/^\/(brain|connections|posts\/new)$/)
+      expect(step.href).toMatch(/^\/(onboarding|connections|posts\/new)$/)
     }
+  })
+
+  /**
+   * MEASURED on the wt-core preview, 2026-09-06: the lead button sent a
+   * brainless workspace to /brain, which rendered "Sahoda doesn't know your
+   * brand yet" and a second button to /onboarding. The topbar's own ring for
+   * the same state already goes to /onboarding directly. One door, one hop.
+   */
+  test('the brain door is the flow that builds one, not the page that reports there is none', () => {
+    expect(startSteps().find((s) => s.id === 'brain')?.href).toBe('/onboarding')
   })
 
   /**
