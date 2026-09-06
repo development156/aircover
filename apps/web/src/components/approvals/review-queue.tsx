@@ -1,30 +1,35 @@
 'use client'
 
-import Link from 'next/link'
-import type { Route } from 'next'
 import { useState, useTransition } from 'react'
 import { Check } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { approvePosts } from '@/app/actions/approvals'
-import { Badge } from '@/components/ui/badge'
+import { returnToDraft } from '@/app/actions/posts-review'
 import { Button } from '@/components/ui/button'
-import { CHANNEL_SHORT } from '@/components/posts/channel-label'
-import { bulkApproveMessage } from '@/lib/approvals/state'
+import { approveMessage, bulkApproveMessage } from '@/lib/approvals/state'
+import type { QueueContext } from '@/lib/approvals/queue-context'
 import type { DisplayPost } from '@/lib/posts/display-post'
-import { cn } from '@/lib/utils'
+
+import { ReviewRow } from './review-row'
+
+export interface ReviewQueueProps {
+  posts: readonly DisplayPost[]
+  /** Per-row context, built on the server. A missing id renders the row bare. */
+  context: QueueContext
+  zone: string
+  currentUserId: string | null
+  /** Whether the reader may decide at all. Viewers see the queue read-only. */
+  decides: boolean
+}
+
+const VIEWER_NOTE =
+  'You can read what is waiting, but only an owner, editor or approver can approve or send back.'
 
 /**
- * THE REVIEW QUEUE — select, then approve the selection.
- *
- * ── WHY THE ROW IS A LINK AND THE CHECKBOX IS NOT PART OF IT ─────────────────
- * Home's `NeedsAttention` deliberately has no inline Approve, and its reasoning
- * holds: approving from a summary, where you cannot see the body, is the wrong
- * place for the decision. This screen is not a summary — it exists to be the
- * place that decision is made — but the same instinct applies to the ROW. The
- * title is a link into the editor, and approving is a separate, explicit act on
- * a selection. A single click that both navigates and approves is how somebody
- * approves the wrong post.
+ * THE REVIEW QUEUE — every post waiting on a decision, with what the decision
+ * needs beside it (F-23), a per-row Approve and Send back (F-06), and the bulk
+ * bar over a selection.
  *
  * ── THE BULK BAR APPEARS WITH A SELECTION AND NOT BEFORE ─────────────────────
  * A permanently visible "Approve" over an empty selection is a control that
@@ -32,11 +37,12 @@ import { cn } from '@/lib/utils'
  * nothing ticked there is no bulk action, so there is no bar.
  *
  * ── AND THE OUTCOME IS REPORTED IN THREE PARTS ───────────────────────────────
- * `approvePosts` returns approved / moved / failed and the toast says all three.
- * "4 approved · 1 had already moved on" is the honest sentence for a stale list;
- * "Approved" over that would be a fabricated success. See `approvals/state.ts`.
+ * `approvePosts` returns approved / scheduled / moved / failed and the toast
+ * says all of them. "4 approved · 1 had already moved on" is the honest
+ * sentence for a stale list; "Approved" over that would be a fabricated
+ * success. See `approvals/state.ts`.
  */
-export function ReviewQueue({ posts }: { posts: readonly DisplayPost[] }) {
+export function ReviewQueue({ posts, context, zone, currentUserId, decides }: ReviewQueueProps) {
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [pending, startTransition] = useTransition()
 
@@ -55,36 +61,60 @@ export function ReviewQueue({ posts }: { posts: readonly DisplayPost[] }) {
     setSelected(allSelected ? new Set() : new Set(posts.map((p) => p.id)))
   }
 
+  function report(result: Awaited<ReturnType<typeof approvePosts>>, single: boolean) {
+    if (!result.ok) {
+      toast.error(result.message)
+      return
+    }
+    const cleared = result.approved + result.scheduled
+    // One row: the sentence names what happened to THAT post. Several: the counts.
+    const message =
+      single && cleared === 1 && result.moved === 0 && result.failed === 0
+        ? approveMessage(result.scheduled === 1 ? 'scheduled' : 'approved')
+        : bulkApproveMessage(result)
+    if (cleared > 0 && result.moved === 0 && result.failed === 0) toast.success(message)
+    else if (cleared > 0) toast.warning(message)
+    else toast.error(message)
+  }
+
   function runBulk() {
     const ids = [...selected]
     startTransition(async () => {
-      const result = await approvePosts(ids)
-      if (!result.ok) {
-        toast.error(result.message)
-        return
-      }
-      // The three counts decide the tone, not the absence of an error. A run
-      // that approved nothing is not a success message.
-      const message = bulkApproveMessage(result)
-      const cleared = result.approved + result.scheduled
-      if (cleared > 0 && result.moved === 0 && result.failed === 0) toast.success(message)
-      else if (cleared > 0) toast.warning(message)
-      else toast.error(message)
+      report(await approvePosts(ids), false)
       setSelected(new Set())
     })
+  }
+
+  async function approveOne(id: string) {
+    report(await approvePosts([id]), true)
+    setSelected((current) => {
+      if (!current.has(id)) return current
+      const next = new Set(current)
+      next.delete(id)
+      return next
+    })
+  }
+
+  async function sendBack(id: string, reason: string): Promise<string | null> {
+    const result = await returnToDraft(id, reason)
+    if (!result.ok) return result.message
+    toast.success('Sent back to draft with your note.')
+    return null
   }
 
   return (
     <section aria-labelledby="approvals-queue" className="surface-ring rounded-card bg-surface">
       <header className="flex flex-wrap items-center gap-3 border-b border-line-soft px-3 py-2.5">
         <label className="flex min-h-[34px] items-center gap-2 text-[13px] font-semibold max-narrow:min-h-[44px]">
-          <input
-            type="checkbox"
-            checked={allSelected}
-            onChange={toggleAll}
-            className="size-4 accent-[var(--brand)]"
-            aria-label={allSelected ? 'Clear the selection' : 'Select every post below'}
-          />
+          {decides ? (
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={toggleAll}
+              className="size-4 accent-[var(--brand)]"
+              aria-label={allSelected ? 'Clear the selection' : 'Select every post below'}
+            />
+          ) : null}
           <span id="approvals-queue">Waiting for you</span>
         </label>
         <span className="type-sm text-muted">
@@ -94,6 +124,12 @@ export function ReviewQueue({ posts }: { posts: readonly DisplayPost[] }) {
           {posts.length === 1 ? ' post' : ' posts'}
         </span>
       </header>
+
+      {!decides ? (
+        <p className="type-sm border-b border-line-soft px-3 py-2 text-muted" data-queue-readonly>
+          {VIEWER_NOTE}
+        </p>
+      ) : null}
 
       {selected.size > 0 ? (
         <div className="flex flex-wrap items-center gap-2 border-b border-line-soft bg-s2 px-3 py-2">
@@ -114,38 +150,34 @@ export function ReviewQueue({ posts }: { posts: readonly DisplayPost[] }) {
 
       <ul>
         {posts.map((post) => (
-          <li
+          <ReviewRow
             key={post.id}
-            className={cn(
-              'flex flex-wrap items-center gap-3 border-b border-line-soft px-3 py-3 last:border-b-0',
-              selected.has(post.id) && 'bg-brand-wash',
-            )}
-          >
-            <input
-              type="checkbox"
-              checked={selected.has(post.id)}
-              onChange={() => toggle(post.id)}
-              className="size-4 shrink-0 accent-[var(--brand)]"
-              aria-label={`Select ${post.title?.trim() || 'Untitled post'}`}
-            />
-            <Link
-              href={`/posts/${post.id}` as Route}
-              className="min-w-0 flex-1 rounded-sm text-[13px] font-[550] text-ink hover:text-accent"
-            >
-              <span className="block truncate">{post.title?.trim() || 'Untitled post'}</span>
-              {post.channels.length > 0 ? (
-                <span className="type-sm block truncate text-muted">
-                  {post.channels.map((channel) => CHANNEL_SHORT[channel]).join(' · ')}
-                </span>
-              ) : null}
-            </Link>
-            {/* The REASON it is here, not its status word. A dated draft is in
-                this queue because it cannot go out until someone approves it;
-                "Draft" says what it is and not why it is waiting. */}
-            <Badge rung="urgent">{post.intent === 'review' ? 'In review' : 'Needs approval'}</Badge>
-          </li>
+            post={post}
+            context={context[post.id] ?? BARE}
+            zone={zone}
+            currentUserId={currentUserId}
+            decides={decides}
+            selected={selected.has(post.id)}
+            onToggle={() => toggle(post.id)}
+            onApprove={() => approveOne(post.id)}
+            onSendBack={(reason) => sendBack(post.id, reason)}
+          />
         ))}
       </ul>
     </section>
   )
+}
+
+/** A row whose context was not built: every read reports as not done. */
+const BARE: QueueContext[string] = {
+  when: null,
+  excerpt: null,
+  body: null,
+  thumbnail: undefined,
+  readiness: [],
+  authorship: '',
+  review: undefined,
+  returnedReason: null,
+  comments: undefined,
+  versions: undefined,
 }

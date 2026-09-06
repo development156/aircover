@@ -5,7 +5,10 @@ import type { DisplayPost } from '@/lib/posts/display-post'
 
 import { ReviewQueue } from './review-queue'
 
+const BARE = { context: {}, zone: 'Asia/Calcutta', currentUserId: null, decides: true }
+
 vi.mock('@/app/actions/approvals', () => ({ approvePosts: vi.fn() }))
+vi.mock('@/app/actions/posts-review', () => ({ returnToDraft: vi.fn() }))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), warning: vi.fn(), error: vi.fn() } }))
 
 const WS_ID = '22222222-2222-4222-8222-222222222222'
@@ -36,22 +39,40 @@ function post(overrides: Partial<DisplayPost> & { id: string; intent: DisplayPos
  */
 describe('ReviewQueue · the row badge', () => {
   test('a dated draft reads "Needs approval", not its status word', () => {
-    render(<ReviewQueue posts={[post({ id: 'a', intent: 'draft' })]} />)
+    render(<ReviewQueue posts={[post({ id: 'a', intent: 'draft' })]} {...BARE} />)
 
     expect(screen.getByText('Needs approval')).toBeInTheDocument()
     expect(screen.queryByText('Draft')).toBeNull()
   })
 
   test('a dated idea reads "Needs approval" too', () => {
-    render(<ReviewQueue posts={[post({ id: 'a', intent: 'idea' })]} />)
+    render(<ReviewQueue posts={[post({ id: 'a', intent: 'idea' })]} {...BARE} />)
 
     expect(screen.getByText('Needs approval')).toBeInTheDocument()
   })
 
   test('a post in review keeps "In review"', () => {
-    render(<ReviewQueue posts={[post({ id: 'a', intent: 'review' })]} />)
+    render(<ReviewQueue posts={[post({ id: 'a', intent: 'review' })]} {...BARE} />)
 
     expect(screen.getByText('In review')).toBeInTheDocument()
     expect(screen.queryByText('Needs approval')).toBeNull()
+  })
+})
+
+describe('ReviewQueue · who may decide', () => {
+  test('a viewer sees the queue read-only: no checkbox, no Approve, no Send back, and the note says why', () => {
+    render(<ReviewQueue posts={[post({ id: 'a', intent: 'draft' })]} {...BARE} decides={false} />)
+
+    expect(screen.queryByRole('checkbox')).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Approve/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Send back/ })).toBeNull()
+    expect(screen.getByText(/only an owner, editor or approver/i)).toBeInTheDocument()
+  })
+
+  test('a decider gets Approve and Send back on every row', () => {
+    render(<ReviewQueue posts={[post({ id: 'a', intent: 'draft' })]} {...BARE} />)
+
+    expect(screen.getByRole('button', { name: /^Approve$/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Send back/ })).toBeInTheDocument()
   })
 })
