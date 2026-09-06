@@ -13,7 +13,9 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 const WS_ID = '22222222-2222-4222-8222-222222222222'
 const POST_ID = '11111111-1111-4111-8111-111111111111'
-const WHEN = '2026-09-10T09:00:00.000Z'
+// A day ahead of the real clock: the action now checks the lead against
+// `new Date()`, so a literal future date would start failing the day it passed.
+const WHEN = new Date(Date.now() + 86_400_000).toISOString()
 
 const state = vi.hoisted(() => ({
   post: null as { id: string; channels: string[] } | null,
@@ -60,6 +62,46 @@ describe('schedulePost needs a channel', () => {
     const result = await schedulePost(POST_ID, WHEN, false)
 
     expect(result).toEqual({ ok: true, scheduledAt: WHEN })
+    expect(state.rpcCalls.map((call) => call.fn)).toEqual(['release_post_for_publish'])
+  })
+})
+
+describe('schedulePost checks the lead on the server', () => {
+  /**
+   * The lead check lived in `ScheduleField` only — CLIENT-side, and the row's
+   * own header admitted it: "Server-side lead validation is still a filed ask."
+   * Anything that calls the action directly, or a stale tab, could book a time
+   * already gone. The validator is the one in `lib/posts/schedule.ts`, so the
+   * sentence is the same one the picker shows.
+   */
+  test('a time in the past is refused with the validator’s sentence, and the RPC is never called', async () => {
+    const past = new Date(Date.now() - 60_000).toISOString()
+
+    const result = await schedulePost(POST_ID, past, false)
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.message).toMatch(/at least 5 minutes from now/i)
+    expect(state.rpcCalls).toEqual([])
+  })
+
+  test('a time inside a picked channel’s lead is refused too', async () => {
+    const soon = new Date(Date.now() + 2 * 60_000).toISOString()
+
+    const result = await schedulePost(POST_ID, soon, true)
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.message).toMatch(/at least 5 minutes from now/i)
+    expect(state.rpcCalls).toEqual([])
+  })
+
+  test('a time past the lead is released (the control)', async () => {
+    const clear = new Date(Date.now() + 10 * 60_000).toISOString()
+
+    const result = await schedulePost(POST_ID, clear, false)
+
+    expect(result.ok).toBe(true)
     expect(state.rpcCalls.map((call) => call.fn)).toEqual(['release_post_for_publish'])
   })
 })

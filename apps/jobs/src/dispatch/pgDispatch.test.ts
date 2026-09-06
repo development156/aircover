@@ -171,9 +171,12 @@ describe('createDispatchStore — listCandidates', () => {
     const sql = squash(calls[0]!.text)
     expect(sql).toContain('scheduled_at is not null')
     expect(sql).toContain('scheduled_at <= now()')
-    // The status list is passed as a parameter built from the shared constant, never typed
-    // out in the SQL, so the gate cannot drift from @sahoda/shared.
-    expect(calls[0]!.params[0]).toEqual(['approved', 'scheduled'])
+    // The status list is a LITERAL derived from the shared constant — a parameter
+    // would keep `posts_due_idx` (a partial index) from ever being used. The
+    // literal must still be the constant's own value, so the gate cannot drift
+    // from @sahoda/shared; pgDispatch.index-shape.test.ts pins the full predicate.
+    expect(sql).toContain("status in ('approved', 'scheduled')")
+    expect(calls[0]!.params).toEqual([200])
   })
 
   it('reads the publish mode from the latest succeeded log only', async () => {

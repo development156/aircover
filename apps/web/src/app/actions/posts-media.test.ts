@@ -53,6 +53,14 @@ vi.mock('@/lib/posts/read', () => ({
   readVariantFormats: () => Promise.resolve(state.formats ?? {}),
 }))
 
+// The storage meter is read through its own module. The fake below has no
+// `workspace_storage_usage` RPC, and since the meter fails CLOSED an unmocked
+// read would refuse every upload in this file for a reason no test is about.
+vi.mock('@/lib/storage/usage', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/storage/usage')>()),
+  readStorageUsage: () => Promise.resolve({ kind: 'not_deployed' as const }),
+}))
+
 vi.mock('@/lib/supabase/server', () => ({
   createServerSupabase: () => ({
     storage: {

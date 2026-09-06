@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 import { CalendarClock, Send } from 'lucide-react'
 import type { Channel, ChannelSet } from '@sahoda/shared'
 
+import { ReviewControls, type ReviewState } from '@/components/approvals/review-controls'
 import { cn } from '@/lib/utils'
 import type { VariantStatusRow } from '@/lib/posts/variant-status'
 
@@ -48,6 +49,14 @@ export interface FinishPanelProps {
   saveAllVersions: () => Promise<boolean>
   /** How many versions are not in their row yet. */
   unsavedVersions: number
+  /**
+   * The approval side: what the post is waiting on, and the two review acts.
+   * Optional so a caller that has no review state (a test, a surface without
+   * one) renders the panel exactly as before.
+   */
+  review?: ReviewState
+  /** The row id at call time; a new post has none until its first save. */
+  readPostId?: () => string | null
 }
 
 /** The two things that can happen to a finished post. */
@@ -157,9 +166,22 @@ export function FinishPanel({
   saveVariantNow,
   saveAllVersions,
   unsavedVersions,
+  review,
+  readPostId,
 }: FinishPanelProps) {
   const [chosen, setChosen] = useState<Route | null>(null)
   const route = chosen ?? (scheduledAt === null ? null : 'schedule')
+  const reviewControls =
+    review !== undefined ? (
+      <ReviewControls
+        postId={postId}
+        scheduledAt={scheduledAt}
+        zone={zone}
+        flush={flush}
+        readPostId={readPostId ?? (() => postId)}
+        {...review}
+      />
+    ) : null
 
   return (
     <section
@@ -170,6 +192,16 @@ export function FinishPanel({
       <h2 id="finish-heading" className="type-h2">
         Send it
       </h2>
+
+      {/* ── WHERE THE POST STANDS, BEFORE THE QUESTION ────────────────────
+          A post in review, approved or booked has already answered "how does
+          this go out" once. Its state is named FIRST, with the way back, so the
+          two tiles below read as "change your mind" rather than as the first
+          decision. A draft gets the review offer under the tiles instead: the
+          tiles are the primary question and review is the alternative. */}
+      {review !== undefined && review.intent !== 'draft' && review.intent !== 'idea'
+        ? reviewControls
+        : null}
 
       <div
         role="group"
@@ -197,6 +229,10 @@ export function FinishPanel({
       {route === null ? (
         <p className="type-meta text-muted">Nothing goes out until you choose one of these.</p>
       ) : null}
+
+      {review !== undefined && (review.intent === 'draft' || review.intent === 'idea')
+        ? reviewControls
+        : null}
 
       {route === 'schedule' ? (
         <FinishSchedule

@@ -25,6 +25,15 @@ export interface AssetCard {
   createdAt: string
   /** Short-lived signed URL. null means it could not be minted; the FILE exists. */
   previewUrl: string | null
+  /**
+   * Signed URL of the 480 px WebP thumbnail, or null when there is none.
+   *
+   * A thumbnail is best effort at upload time (`lib/media/thumb.ts`), so null
+   * is an ordinary state and not a failure: the grid then loads the original
+   * through `previewUrl`. The drawer and the composer always use the original,
+   * because a person opening a photo wants the photo, not a 480 px reading of it.
+   */
+  thumbUrl: string | null
   usage: AssetUsageSite[]
   /**
    * Every folder this file is filed in, from `asset_folder_items`.

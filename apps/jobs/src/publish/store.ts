@@ -3,6 +3,7 @@ import type { Pool } from 'pg'
 import { assertPlatformPostId, type Channel, type PublishPostPayload } from '@sahoda/shared'
 import type { PublishLogEntry, PublishVariant, VariantUpdate } from './runPublishPost'
 import type { StoredConnection } from './tokens'
+import { withTransaction, type TxClient } from '../db/transaction'
 
 export interface PublishStoreOptions {
   pool: Pool
@@ -111,12 +112,21 @@ export function createPublishStore(opts: PublishStoreOptions) {
     }
   }
 
-  async function writeLog(entry: PublishLogEntry): Promise<void> {
-    await pool.query(
+  /**
+   * The one INSERT every log row goes through, over whichever connection the
+   * caller holds. `idempotency_key` is the adapter's own key
+   * (`publishIdempotencyKey`, `${postId}:${channel}:${scheduledAt}`), written on
+   * EVERY row so the database can hold the line the platform only promises: a
+   * partial unique index on `(idempotency_key) where status = 'succeeded'` refuses
+   * a second succeeded row for the same send, whatever path tried to write it.
+   */
+  async function insertLog(q: TxClient, entry: PublishLogEntry): Promise<void> {
+    await q.query(
       `insert into post_publish_logs
          (workspace_id, post_id, variant_id, connection_id, channel, attempt,
-          status, mode, platform_post_id, permalink, error, job_run_id, published_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+          status, mode, platform_post_id, permalink, error, job_run_id, published_at,
+          idempotency_key)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
       [
         entry.workspaceId,
         entry.postId,
@@ -131,8 +141,61 @@ export function createPublishStore(opts: PublishStoreOptions) {
         entry.error ? JSON.stringify(entry.error) : null,
         entry.jobRunId,
         entry.publishedAt,
+        entry.idempotencyKey,
       ],
     )
+  }
+
+  async function updateVariant(q: TxClient, update: VariantUpdate): Promise<void> {
+    await q.query(
+      `update post_variants
+          set publish_status = $3,
+              platform_post_id = coalesce($4, platform_post_id),
+              permalink = coalesce($5, permalink),
+              last_error = $6,
+              -- Every terminal outcome ends the claim. Leaving it set would make a
+              -- published row look like it still held a lease.
+              publish_claimed_at = null
+        where id = $1 and workspace_id = $2`,
+      [
+        update.variantId,
+        update.workspaceId,
+        update.publishStatus,
+        // Refuses a 24-hex provider object id outright. This column is the analytics
+        // key; a Zernio `_id` here reads as populated and returns zeros forever.
+        assertPlatformPostId(update.platformPostId),
+        update.permalink ?? null,
+        update.lastError ? JSON.stringify(update.lastError) : null,
+      ],
+    )
+  }
+
+  async function writeLog(entry: PublishLogEntry): Promise<void> {
+    await insertLog(pool, entry)
+  }
+
+  /**
+   * The succeeded log row and the `published` mark, in ONE transaction (F-33).
+   *
+   * ── THE CRASH THIS CLOSES ────────────────────────────────────────────────────
+   * These were two pool statements: `writeLog` committed, then `markVariant` ran.
+   * A process killed between them left the platform holding a live post, the log
+   * holding a succeeded row, and the variant still `publishing` with its claim
+   * timestamp set — so once the lease ran out `claimVariant` took it over and the
+   * next tick SENT IT AGAIN. Inside one transaction on one checked-out client the
+   * two writes land together or not at all; and for the rows that predate this
+   * (or any other writer that still splits them), `claimVariant`'s NOT EXISTS
+   * refuses to re-claim a variant whose succeeded log is newer than its claim.
+   *
+   * The unique index on `idempotency_key where status = 'succeeded'` is the
+   * database's own backstop: a second succeeded row for the same send fails the
+   * insert, which rolls the whole pair back, and the variant is left untouched.
+   */
+  async function recordPublished(entry: PublishLogEntry, update: VariantUpdate): Promise<void> {
+    await withTransaction(pool, async (tx) => {
+      await insertLog(tx, entry)
+      await updateVariant(tx, update)
+    })
   }
 
   /**
@@ -189,9 +252,12 @@ export function createPublishStore(opts: PublishStoreOptions) {
    * Re-claiming means re-PUBLISHING, and there is one case where that can post
    * twice. `publishing` + a stale claim is reachable only by process death (the
    * transient path releases explicitly and leaves `scheduled`). If the process died
-   * AFTER the platform accepted the post but BEFORE `writeLog` committed, the post
-   * is live with no log row — so `listUnresolvedPublishes` cannot see it either, and
-   * the next tick past the lease publishes it again.
+   * AFTER the platform accepted the post but BEFORE `recordPublished` committed, the
+   * post is live with no log row — so neither the NOT EXISTS below nor
+   * `listUnresolvedPublishes` can see it, and the next tick past the lease
+   * publishes it again. (Death AFTER the log row committed is the case that used
+   * to re-send and no longer can: the row and the mark are one transaction now,
+   * and the NOT EXISTS covers the rows written before they were.)
    *
    * The adapter's `requestId` is the caller's key, `${postId}:${channel}:${scheduledAt}`,
    * and Zernio documents collapsing a repeat onto one post — but doc 13 §5 puts that
@@ -220,7 +286,22 @@ export function createPublishStore(opts: PublishStoreOptions) {
           and (publish_status in ('pending', 'scheduled', 'failed', 'publishing')
                or (publish_status = 'published' and permalink like 'fixture://%'))
           and (publish_claimed_at is null
-               or publish_claimed_at < now() - make_interval(secs => $4::int))`,
+               or publish_claimed_at < now() - make_interval(secs => $4::int))
+          -- ── A SEND THAT ALREADY SUCCEEDED UNDER THIS CLAIM IS NOT WORK TO DO ──
+          -- A succeeded log row newer than the live claim means the platform took
+          -- the post and only the variant mark is missing (a crash between the two
+          -- statements this pair used to be, or a writer that still splits them).
+          -- Re-claiming that row re-SENDS it. The check is in the statement, not a
+          -- preceding read, for the same reason the rest of the predicate is.
+          -- The index behind it: post_publish_logs (variant_id, created_at desc).
+          and not exists (
+                select 1
+                  from post_publish_logs l
+                 where l.variant_id = post_variants.id
+                   and l.status = 'succeeded'
+                   and post_variants.publish_claimed_at is not null
+                   and l.created_at > post_variants.publish_claimed_at
+              )`,
       [payload.variantId, payload.postId, payload.workspaceId, leaseSeconds],
     )
     return (r.rowCount ?? 0) > 0
@@ -252,27 +333,7 @@ export function createPublishStore(opts: PublishStoreOptions) {
   }
 
   async function markVariant(update: VariantUpdate): Promise<void> {
-    await pool.query(
-      `update post_variants
-          set publish_status = $3,
-              platform_post_id = coalesce($4, platform_post_id),
-              permalink = coalesce($5, permalink),
-              last_error = $6,
-              -- Every terminal outcome ends the claim. Leaving it set would make a
-              -- published row look like it still held a lease.
-              publish_claimed_at = null
-        where id = $1 and workspace_id = $2`,
-      [
-        update.variantId,
-        update.workspaceId,
-        update.publishStatus,
-        // Refuses a 24-hex provider object id outright. This column is the analytics
-        // key; a Zernio `_id` here reads as populated and returns zeros forever.
-        assertPlatformPostId(update.platformPostId),
-        update.permalink ?? null,
-        update.lastError ? JSON.stringify(update.lastError) : null,
-      ],
-    )
+    await updateVariant(pool, update)
   }
 
   /** Flip a connection out of `active` so the UI can raise a reconnect CTA. */
@@ -454,6 +515,7 @@ export function createPublishStore(opts: PublishStoreOptions) {
     releaseVariant,
     writeLog,
     markVariant,
+    recordPublished,
     markConnection,
     loadConnection,
     countLiveSends,

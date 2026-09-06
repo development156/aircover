@@ -56,6 +56,14 @@ export const PostStatusSchema = z.enum([
 ])
 export type PostStatus = z.infer<typeof PostStatusSchema>
 
+/**
+ * One row per decision at the approval gate (post_approvals, 20260906213000).
+ * `submitted` = sent for review, `approved` = cleared by approve_posts,
+ * `returned` = sent back to draft with a reason.
+ */
+export const PostApprovalDecisionSchema = z.enum(['submitted', 'approved', 'returned'])
+export type PostApprovalDecision = z.infer<typeof PostApprovalDecisionSchema>
+
 /** Per-channel publish sub-status on a variant. */
 export const VariantPublishStatusSchema = z.enum([
   'pending',

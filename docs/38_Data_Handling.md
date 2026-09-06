@@ -51,9 +51,11 @@ not a description somebody wrote down — it is a fact about how the database is
 holding a customer's data carries a `workspace_id` column, and the boundary between two customers is
 enforced by the database itself (PostgreSQL row-level security), not by the application.
 
-**MEASURED 2026-09-01: 59 tables.** They are listed in full in §3, and
+**MEASURED 2026-09-06: 61 tables.** They are listed in full in §3, and
 `packages/db/tests/data_handling_doc.pglite.test.ts` fails the build if that number or that list
-stops matching the database. (It read 52 on 2026-08-26, the figure this sentence carried until now.
+stops matching the database. (It read 59 on 2026-09-01; the sixtieth and sixty-first are
+`post_approvals` and `post_comments`, which arrived on 2026-09-06 when approval became a recorded
+gate. It read 52 on 2026-08-26.
 FOUR arrived on 2026-08-28 from three different lanes, which is why no lane's own figure — 53, 54
 and 53 again — was right: each counted only its own. Studio's `studio_designs` and
 `studio_exports`, which arrived when Studio stopped being a roadmap screen and started saving a
@@ -149,6 +151,8 @@ the table belongs to one identified workspace.
 | `playbook_run_items` | what each playbook run produced | `title` `body` | removed |
 | `playbook_runs` | every playbook run | `created_by` | removed |
 | `playbooks` | your playbooks | `created_by` | removed |
+| `post_approvals` | who sent each post for review, who cleared it, who sent it back and why | `actor` `reason` | removed |
+| `post_comments` | the notes people left on posts while they were being written | `author` `body` | removed |
 | `post_media` | pictures attached to posts | no direct identifiers | removed |
 | `post_metric_snapshots` | how your posts performed | no direct identifiers | removed |
 | `post_publish_logs` | every publish attempt | no direct identifiers | removed |

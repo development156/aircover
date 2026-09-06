@@ -230,6 +230,16 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   },
   { table: 'playbook_runs', readability: 'readable', describes: 'every playbook run' },
   { table: 'playbooks', readability: 'readable', describes: 'your playbooks' },
+  {
+    table: 'post_approvals',
+    readability: 'readable',
+    describes: 'who sent each post for review, who cleared it, who sent it back and why',
+  },
+  {
+    table: 'post_comments',
+    readability: 'readable',
+    describes: 'the notes people left on posts while they were being written',
+  },
   { table: 'post_media', readability: 'readable', describes: 'pictures attached to posts' },
   {
     table: 'post_metric_snapshots',

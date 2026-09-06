@@ -146,6 +146,14 @@ function harness(over: Partial<PublishPostDeps> & { variant?: Partial<PublishVar
     markVariant: async (u) => {
       variantUpdates.push(u)
     },
+    // The transactional pair, recorded into the same two lists so every assertion
+    // about "the succeeded row" and "the published mark" keeps meaning what it
+    // meant. The atomicity itself is proven on a real Postgres in
+    // lease.pglite.test.ts; here the pair is a pair.
+    recordPublished: async (e, u) => {
+      logs.push(e)
+      variantUpdates.push(u)
+    },
     markConnection: async (connectionId, status) => {
       connectionUpdates.push({ connectionId, status })
     },

@@ -19,6 +19,7 @@ const card = (id: string, over: Partial<AssetCard> = {}): AssetCard => ({
   height: 900,
   createdAt: '2026-08-25T09:00:00.000Z',
   previewUrl: null,
+  thumbUrl: null,
   usage: [],
   folderIds: [],
   deletedAt: null,

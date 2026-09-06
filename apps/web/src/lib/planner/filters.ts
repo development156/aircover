@@ -48,6 +48,15 @@ export function parseDate(raw: string | undefined): string | null {
   return Number.isNaN(at.getTime()) ? null : raw
 }
 
+/**
+ * `?month=YYYY-MM`, or null for "this month". Parsed the way `parseDate` is: a
+ * value that is not a month falls back to now rather than to a grid of nothing.
+ */
+export function parseMonth(raw: string | undefined): string | null {
+  if (raw === undefined || !/^\d{4}-(0[1-9]|1[0-2])$/.test(raw)) return null
+  return raw
+}
+
 /** Trimmed, and capped so a pathological URL cannot become a pathological regex. */
 export function parseQuery(raw: string | undefined): string {
   return (raw ?? '').trim().slice(0, 120)

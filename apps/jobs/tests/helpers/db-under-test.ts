@@ -75,6 +75,13 @@ async function pglitePool(): Promise<Pool & { pglite: PGlite }> {
   const pool = {
     pglite,
     query: (text: string, values?: unknown[]) => pglite.query(text, values),
+    // `recordPublished` checks a client out for its transaction. PGlite is one
+    // connection, so the "client" is the same handle; `begin`/`commit` on it are
+    // real, and `release` has nothing to give back.
+    connect: async () => ({
+      query: (text: string, values?: unknown[]) => pglite.query(text, values),
+      release: () => {},
+    }),
     on: () => pool,
     end: () => pglite.close(),
   }

@@ -60,8 +60,8 @@ describe('publish store (live schema)', () => {
     created.push(ws)
 
     const p = await pool.query<{ id: string }>(
-      `insert into posts (workspace_id, title, body, status, channels)
-       values ($1, 'test post', 'body', 'scheduled', array['x']) returning id`,
+      `insert into posts (workspace_id, title, body, status, channels, scheduled_at)
+       values ($1, 'test post', 'body', 'scheduled', array['x'], now()) returning id`,
       [ws],
     )
     postId = p.rows[0]!.id
@@ -110,6 +110,7 @@ describe('publish store (live schema)', () => {
       error: null,
       jobRunId: 'run_abc',
       publishedAt: '2026-07-19T10:00:05.000Z',
+      idempotencyKey: `${postId}:x:2026-07-19T10:00:00.000Z`,
     })
 
     const r = await pool.query(
@@ -143,6 +144,7 @@ describe('publish store (live schema)', () => {
       error: { code: 'RATE_LIMITED', classification: 'transient', message: 'HTTP 429' },
       jobRunId: 'run_abc',
       publishedAt: null,
+      idempotencyKey: `${postId}:x:2026-07-19T10:00:00.000Z`,
     })
 
     const r = await pool.query<{ error: { code: string; classification: string } }>(
@@ -166,6 +168,7 @@ describe('publish store (live schema)', () => {
       error: { code: 'SERVER_ERROR', classification: 'transient' as const, message: 'HTTP 503' },
       jobRunId: 'run_abc',
       publishedAt: null,
+      idempotencyKey: `${postId}:x:2026-07-19T10:00:00.000Z`,
     }
     await store.writeLog({ ...base, attempt: 1 })
     await store.writeLog({ ...base, attempt: 2 })

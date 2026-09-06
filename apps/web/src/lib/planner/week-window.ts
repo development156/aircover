@@ -43,6 +43,23 @@ export function mondayOf(zone: string, at: Date): Date {
   return startOfDayInZone(zone, addDaysInZone(zone, at, -weekdayOffset(zone, at)))
 }
 
+/**
+ * How many weeks from the week holding `now` the week holding `day` is, in
+ * `zone`. Negative for the past. The offset the mini calendar writes when a
+ * day is picked in day or week view, so the grid draws the week that holds it.
+ *
+ * Measured on calendar dates, not elapsed hours: the two Mondays are read as
+ * day keys and differenced through `Date.UTC`, so a clock change between them
+ * is still exactly seven days.
+ */
+export function weekOffsetOf(zone: string, now: Date, day: Date): number {
+  const utcDay = (at: Date): number => {
+    const [y, m, d] = dayKey(zone, mondayOf(zone, at)).split('-').map(Number)
+    return Date.UTC(y ?? 0, (m ?? 1) - 1, d ?? 1)
+  }
+  return Math.round((utcDay(day) - utcDay(now)) / (7 * 86_400_000))
+}
+
 export interface WeekWindow {
   /** Seven instants, midnight in the zone of each day, Monday first. */
   days: Date[]

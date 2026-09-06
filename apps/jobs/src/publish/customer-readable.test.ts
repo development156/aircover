@@ -62,6 +62,7 @@ function deps(over: Partial<PublishPostDeps> & { body?: string } = {}): PublishP
     adapterFor: (channel) => createFixtureAdapter(channel),
     writeLog: async () => {},
     markVariant: async () => {},
+    recordPublished: async () => {},
     ...over,
   }
 }
