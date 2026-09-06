@@ -84,8 +84,7 @@
       "getOpsAdmin",
       "read",
       "soft",
-      "read",
-      "readApprovalQueue"
+      "read"
     ]
   },
   {
@@ -125,6 +124,7 @@
       "read",
       "soft",
       "read",
+      "readBrain",
       "readBrain"
     ]
   },
@@ -138,6 +138,7 @@
       "read",
       "soft",
       "read",
+      "readBrain",
       "readAudiencePage"
     ]
   },
@@ -150,7 +151,8 @@
       "getOpsAdmin",
       "read",
       "soft",
-      "read"
+      "read",
+      "readBrain"
     ]
   },
   {
@@ -163,6 +165,7 @@
       "read",
       "soft",
       "read",
+      "readBrain",
       "readBrain"
     ]
   },
@@ -176,6 +179,7 @@
       "read",
       "soft",
       "read",
+      "readBrain",
       "readLibrary"
     ]
   },
@@ -190,6 +194,7 @@
       "soft",
       "read",
       "readBrain",
+      "readBrain",
       "readCitedPassages"
     ]
   },
@@ -203,6 +208,7 @@
       "read",
       "soft",
       "read",
+      "readBrain",
       "readBrain"
     ]
   },
@@ -384,8 +390,7 @@
       "getOpsAdmin",
       "read",
       "soft",
-      "read",
-      "readLoop"
+      "read"
     ]
   },
   {
@@ -577,8 +582,7 @@
       "getOpsAdmin",
       "read",
       "soft",
-      "read",
-      "activeWorkspaceRead"
+      "read"
     ]
   },
   {

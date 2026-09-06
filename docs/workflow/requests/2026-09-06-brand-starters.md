@@ -1,7 +1,7 @@
 # Migration request — brand starters
 
 **Raised by** girija, lane `wt-girija`, 2026-09-06.
-**File** `packages/db/supabase/migrations/20260906120000_brand_starters.sql`
+**File** `packages/db/supabase/migrations/20260906221300_brand_starters.sql`
 **Needs** somebody with `supabase db push` on project `rloztdhzfliyvpvxsgjl`.
 
 ## What it asks for

@@ -132,14 +132,35 @@ describe('L3 preconditions', () => {
   /**
    * A cycle the CRON opened and nobody approved is not supervision. This is the
    * arm that a guard reading only `status = 'reported'` would let through.
+   *
+   * ── THE SHAPE THIS TEST USED TO ASSERT NO LONGER EXISTS ────────────────────
+   * It inserted a `reported` cycle with `cost_approved_at` null, which is what a
+   * cron-opened, never-approved, finished cycle looked like. Since
+   * `20260906221200_loop_cycle_approval_and_claim.sql` the CHECK
+   * `loop_cycles_create_needs_approval` makes that row unstorable: creating,
+   * testing, staging and reported all require a `cost_approved_at`. The
+   * guarantee got STRONGER, so the test moves rather than goes — retargeted, not
+   * deleted, and it now pins both halves.
    */
+  it('cannot even STORE a finished cycle that nobody approved', async () => {
+    await expect(
+      db.exec(`insert into loop_cycles (workspace_id, iso_year, iso_week, status,
+                                        trigger_source, created_by)
+                 values ('${WS}', 2026, 33, 'reported', 'schedule', '${USER}')`),
+    ).rejects.toThrow(/loop_cycles_create_needs_approval|violates check/i)
+  })
+
   it('REFUSES L3 when a cycle finished but no person approved its cost', async () => {
     await activeBrain(ALL_FOUR)
+    // `failed` is the terminal status the CHECK deliberately excludes, so this is
+    // the finished-and-unapproved cycle that CAN still exist: the cron opened it,
+    // nobody answered the cost preview, and the sweep aged it out. Supervision
+    // means a person approved a cost, and none did.
     // trigger_source 'schedule' is the cron's own value — the table admits only
-    // 'schedule' and 'manual'. Nobody approved a cost, which is the point.
+    // 'schedule' and 'manual'.
     await db.exec(`insert into loop_cycles (workspace_id, iso_year, iso_week, status,
                                             trigger_source, created_by)
-                     values ('${WS}', 2026, 33, 'reported', 'schedule', '${USER}')`)
+                     values ('${WS}', 2026, 33, 'failed', 'schedule', '${USER}')`)
     await expect(setLevel(3)).rejects.toThrow(/AUTOPILOT_NEEDS_SUPERVISED_CYCLE/)
   })
 

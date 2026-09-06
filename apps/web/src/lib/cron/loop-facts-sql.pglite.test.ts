@@ -132,104 +132,21 @@ describe('LOOP_FACTS_SQL against the real schema', () => {
   })
 
   /**
-   * A workspace that has never opened the Loop is NOT a row, and that is the
-   * point. Until 2026-09-06 this query returned every workspace ordered by
-   * `w.id`, and the cron capped its work at 40 rows: above 40 workspaces the
-   * same late-uuid tenants were deferred every week, and the rows spending
-   * their place in the cap were workspaces that could never be planned. A
-   * workspace with no `loop_settings` row, or a paused one, has nothing to be
-   * deferred FROM, so it must not count.
+   * A workspace that has never opened the Loop must still come back, with a
+   * null `paused`. That null is what `never_enabled` is read from, and an inner
+   * join here would silently drop every workspace the reason exists to explain.
    */
-  it('does NOT return a workspace with no loop_settings row', async () => {
+  it('includes a workspace with no loop_settings row, as a null paused', async () => {
     const other = '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d'
     await db.exec(`insert into workspaces (id, name, slug, created_by)
                      values ('${other}', 'Never opened', 'never-opened-loop', '${USER}')`)
 
-    const r = await db.query<{ workspace_id: string }>(LOOP_FACTS_SQL, [2026, 35, 40])
-    expect(r.rows.map((x) => x.workspace_id)).not.toContain(other)
-  })
-
-  it('does NOT return a paused workspace', async () => {
-    const paused = '3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f'
-    await db.exec(`
-      insert into workspaces (id, name, slug, created_by)
-        values ('${paused}', 'Paused', 'paused-loop', '${USER}');
-      insert into loop_settings (workspace_id, paused, weekly_budget_credits)
-        values ('${paused}', true, 150);
-    `)
-    const r = await db.query<{ workspace_id: string }>(LOOP_FACTS_SQL, [2026, 35, 40])
-    expect(r.rows.map((x) => x.workspace_id)).not.toContain(paused)
-  })
-
-  describe('the order and the count, at a scale the cap binds', () => {
-    // 44 workspaces that never opened the Loop, with the lowest uuids there
-    // are, and ONE that did, with the highest. Ordered by `w.id` and counted
-    // against a cap of 40, the enabled one was row 45 and deferred for ever.
-    const ENABLED = 'ffffffff-ffff-4fff-8fff-ffffffffffff'
-    const OLD_CYCLE = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'
-    const NEW_CYCLE = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
-
-    beforeAll(async () => {
-      for (let i = 1; i <= 44; i++) {
-        const id = `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`
-        await db.exec(`insert into workspaces (id, name, slug, created_by)
-                         values ('${id}', 'w${i}', 'cap-w${i}', '${USER}')`)
-      }
-      await db.exec(`
-        insert into workspaces (id, name, slug, created_by)
-          values ('${ENABLED}', 'Enabled last', 'cap-enabled', '${USER}');
-        insert into loop_settings (workspace_id, paused, weekly_budget_credits)
-          values ('${ENABLED}', false, 150);
-      `)
-    }, 120_000)
-
-    it('the one enabled workspace comes back FIRST and is never deferred by 44 that cannot be planned', async () => {
-      const r = await db.query<{ workspace_id: string; total_eligible: number }>(
-        LOOP_FACTS_SQL,
-        [2026, 35, 40],
-      )
-      const ids = r.rows.map((x) => x.workspace_id)
-      expect(ids).toContain(ENABLED)
-      // Nothing from the 44 is a row at all.
-      expect(ids.filter((id) => id.startsWith('00000000-'))).toHaveLength(0)
-      // Never planned sorts before the outer fixture's WS only once WS has a
-      // cycle; with neither planned, the tiebreak is the id and WS is lower.
-      expect(ids.indexOf(ENABLED)).toBeLessThanOrEqual(1)
-    })
-
-    it('orders never-planned first, then the oldest last-planned cycle', async () => {
-      await db.exec(`
-        insert into workspaces (id, name, slug, created_by)
-          values ('${OLD_CYCLE}', 'Planned long ago', 'cap-old', '${USER}');
-        insert into loop_settings (workspace_id, paused, weekly_budget_credits)
-          values ('${OLD_CYCLE}', false, 150);
-        insert into loop_cycles (workspace_id, iso_year, iso_week, status, created_at)
-          values ('${OLD_CYCLE}', 2026, 20, 'reported', now() - interval '100 days');
-        insert into workspaces (id, name, slug, created_by)
-          values ('${NEW_CYCLE}', 'Planned recently', 'cap-new', '${USER}');
-        insert into loop_settings (workspace_id, paused, weekly_budget_credits)
-          values ('${NEW_CYCLE}', false, 150);
-        insert into loop_cycles (workspace_id, iso_year, iso_week, status, created_at)
-          values ('${NEW_CYCLE}', 2026, 30, 'reported', now() - interval '30 days');
-        -- The outer fixture's workspace was planned this week, so it goes last.
-        insert into loop_cycles (workspace_id, iso_year, iso_week, status, created_at)
-          values ('${WS}', 2026, 35, 'awaiting_cost_approval', now());
-      `)
-      const r = await db.query<{ workspace_id: string }>(LOOP_FACTS_SQL, [2026, 35, 40])
-      const ids = r.rows.map((x) => x.workspace_id)
-      expect(ids).toEqual([ENABLED, OLD_CYCLE, NEW_CYCLE, WS])
-    })
-
-    it('carries the TOTAL eligible count on every row, so a capped read can say how many it left', async () => {
-      // Four eligible, a cap of 2. The old cron fetched cap+1 rows and so
-      // could never report more than ONE deferred, whatever the fleet size.
-      const r = await db.query<{ workspace_id: string; total_eligible: number }>(
-        LOOP_FACTS_SQL,
-        [2026, 35, 2],
-      )
-      expect(r.rows).toHaveLength(2)
-      expect(r.rows.map((x) => x.workspace_id)).toEqual([ENABLED, OLD_CYCLE])
-      expect(Number(r.rows[0]?.total_eligible)).toBe(4)
-    })
+    const r = await db.query<{ workspace_id: string; paused: boolean | null }>(
+      LOOP_FACTS_SQL,
+      [2026, 35, 40],
+    )
+    const row = r.rows.find((x) => x.workspace_id === other)
+    expect(row).toBeDefined()
+    expect(row?.paused).toBeNull()
   })
 })

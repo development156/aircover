@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, test, vi } from 'vitest'
 
+import { CREATE_WORKSPACE_LABEL } from '@/components/workspace/create-workspace-button'
+
 import { BrainSections } from './brain-sections'
 
 /**
@@ -11,8 +13,15 @@ import { BrainSections } from './brain-sections'
  * anything: the resolve needs a workspace to live in, so the sentence named a
  * remedy that could not work — the defect `no-impossible-remedy.spec.ts` exists
  * to catch, on a branch it does not visit. /brain's own page and the console
- * both offer "Create a workspace" for the same status; this is the third
- * rendering of it and the only one that did not.
+ * both offer the same remedy for the same status; this is the third rendering
+ * of it and the only one that did not.
+ *
+ * It now renders the SHARED `CreateWorkspaceButton`, so it is asserted through
+ * `CREATE_WORKSPACE_LABEL` rather than a literal. This branch used to carry a
+ * hand-written form whose label read "Create a workspace" while every other
+ * screen's button read "Create workspace" — a wording that was already drifting
+ * when it was three separate controls. Naming the constant is what stops the
+ * fourth copy.
  */
 vi.mock('@/lib/brand/read-brain', () => ({
   readBrain: async () => ({ status: 'no-workspace' }),
@@ -28,7 +37,9 @@ describe('BrainSections with no workspace', () => {
   test('offers the one remedy that can work, and does not ask for a resolve', async () => {
     render(await BrainSections({ only: ['brand_persona'] }))
 
-    expect(await screen.findByRole('button', { name: /create a workspace/i })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('button', { name: new RegExp(CREATE_WORKSPACE_LABEL, 'i') }),
+    ).toBeInTheDocument()
     expect(screen.queryByText(/resolved once/i)).not.toBeInTheDocument()
   })
 })

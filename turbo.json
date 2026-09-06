@@ -106,7 +106,6 @@
         "ZERNIO_API_KEY",
         "NEXT_PUBLIC_APP_URL",
         "APIFY_TOKEN",
-        "TINYFISH_API_KEY",
         "SAHODA_RADAR_SCAN_MODE"
       ]
     },

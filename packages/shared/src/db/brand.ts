@@ -69,7 +69,7 @@ export type MemoryEvent = z.infer<typeof MemoryEventSchema>
 
 /**
  * `brand_starters` — the picture ideas written once per Brand Brain version.
- * See `20260906120000_brand_starters.sql` for why `brand_version` (not
+ * See `20260906221300_brand_starters.sql` for why `brand_version` (not
  * `workspaces.id` alone) is the key: a row whose `brand_version` is not the
  * active one is stale by construction and must not be served.
  *

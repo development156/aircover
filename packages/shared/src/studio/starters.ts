@@ -33,7 +33,7 @@ export type BrandStarterIdea = z.infer<typeof BrandStarterIdeaSchema>
  * Floored at three because a screen offering one or two ideas offers close to
  * no choice at all. Capped at eight so a malformed model answer cannot write
  * an unbounded list into a jsonb column: `brand_starters_shape` in
- * `20260906120000_brand_starters.sql` asserts the identical bound at the
+ * `20260906221300_brand_starters.sql` asserts the identical bound at the
  * database, so a row this schema would refuse can never be written in the
  * first place either.
  */

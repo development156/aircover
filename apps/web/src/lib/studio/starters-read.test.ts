@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
  * THE READ SIDE OF THE STARTER LADDER, AND THE THREE FAILURE MODES A HAPPY
  * PATH TEST WOULD NEVER EXERCISE.
  *
- * `brand_starters` is unapplied today (`20260906120000_brand_starters.sql`),
+ * `brand_starters` is unapplied today (`20260906221300_brand_starters.sql`),
  * so the codes a healthy deploy of THIS code will actually see from Postgres
  * are exactly the ones asserted here as "fall through, never throw, never
  * reach the screen."
