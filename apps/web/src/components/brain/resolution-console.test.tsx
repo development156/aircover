@@ -320,3 +320,18 @@ describe('ResolutionConsole', () => {
     )
   })
 })
+
+describe('ResolutionConsole — answers the person gave at setup', () => {
+  test('an intake field sits in its own group, named as theirs, ahead of the guesses', () => {
+    const provenance: Provenance = new Map(
+      BRAIN_FIELDS.map((f) => [f.path, f.path === 'taboo.red_lines' ? 'intake' : 'guessed']),
+    )
+    renderConsole(provenance)
+
+    const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
+    expect(headings[0]).toMatch(/your/i)
+    expect(screen.getByText('From your answer')).toHaveAttribute('data-certainty', 'proposed')
+    // Still fourteen guesses: the intake field is not one of them.
+    expect(screen.getAllByText('Guess')).toHaveLength(BRAIN_FIELDS.length - 1)
+  })
+})

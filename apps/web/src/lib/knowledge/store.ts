@@ -199,6 +199,8 @@ export async function searchLibrary(query: string, limit = 20): Promise<SearchRe
     const { data, error } = await supabase
       .from('knowledge_current_chunks')
       .select('id, document_id, document_title, ordinal, text')
+      // BR-05: the view admits every workspace the person belongs to.
+      .eq('workspace_id', workspace.workspace.id)
       .textSearch('tsv', trimmed, { type: 'plain', config: 'english' })
       .limit(limit)
 
@@ -232,6 +234,7 @@ export async function readCurrentPassages(limit: number): Promise<SearchRead> {
     const { data, error } = await supabase
       .from('knowledge_current_chunks')
       .select('id, document_id, document_title, ordinal, text')
+      .eq('workspace_id', workspace.workspace.id)
       .order('document_id', { ascending: true })
       .order('ordinal', { ascending: true })
       .limit(limit)
@@ -402,4 +405,43 @@ export async function countPendingLibrarySuggestions(): Promise<number | null> {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
+}
+
+/**
+ * What deleting a document would orphan, in the ONE workspace it belongs to.
+ *
+ * Both reads used to run without a workspace filter. With two memberships the
+ * `brand_memory` read returned two active rows and `.maybeSingle()` errored, so
+ * the count came back 0 and the confirm dialog promised no impact.
+ */
+export async function readDeleteImpactFor(
+  workspaceId: string,
+  documentId: string,
+): Promise<{ brandFields: number; pendingProposals: number }> {
+  const supabase = createServerSupabase()
+  const cite = `document:${documentId}`
+
+  const brain = await supabase
+    .from('brand_memory')
+    .select('payload')
+    .eq('workspace_id', workspaceId)
+    .eq('status', 'active')
+    .maybeSingle()
+
+  let brandFields = 0
+  const meta = (brain.data as { payload?: { field_meta?: Record<string, { source?: string }> } })
+    ?.payload?.field_meta
+  if (meta) brandFields = Object.values(meta).filter((m) => m?.source === cite).length
+
+  const proposals = await supabase
+    .from('memory_events')
+    .select('id, evidence_refs')
+    .eq('workspace_id', workspaceId)
+    .eq('status', 'pending')
+
+  const pendingProposals = (proposals.data ?? []).filter((row) =>
+    JSON.stringify((row as { evidence_refs?: unknown }).evidence_refs ?? '').includes(documentId),
+  ).length
+
+  return { brandFields, pendingProposals }
 }

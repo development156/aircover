@@ -320,3 +320,12 @@ describe('FieldRow refuses to save a blank', () => {
     expect(screen.getByLabelText(TEXT_FIELD.label)).toHaveFocus()
   })
 })
+
+describe('FieldRow — a field seeded from a setup answer', () => {
+  test('is labelled as theirs-reworded, not as a guess, and still offers Confirm', () => {
+    render(<FieldRow field={LIST_FIELD} value={['guilt-free']} state="intake" />)
+    expect(screen.getByText('From your answer')).toHaveAttribute('data-certainty', 'proposed')
+    expect(screen.queryByText('Guess')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /confirm · free/i })).toBeInTheDocument()
+  })
+})

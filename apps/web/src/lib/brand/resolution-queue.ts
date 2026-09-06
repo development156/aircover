@@ -79,6 +79,9 @@ function entry(field: BrainField, payload: BrandMemoryPayload, provenance: Prove
 }
 
 function byRank(a: QueueEntry, b: QueueEntry): number {
+  // What the person told Sahoda comes before anything Sahoda made up.
+  const intake = Number(b.state === 'intake') - Number(a.state === 'intake')
+  if (intake !== 0) return intake
   const kind = KIND_RANK[a.field.metaKind] - KIND_RANK[b.field.metaKind]
   if (kind !== 0) return kind
   return (PRIORITY.get(a.field.path) ?? 0) - (PRIORITY.get(b.field.path) ?? 0)
@@ -105,6 +108,8 @@ export function settledFields(payload: BrandMemoryPayload, provenance: Provenanc
 }
 
 export interface QueueTally {
+  /** Seeded from setup answers; the wording is Sahoda's, the substance theirs. */
+  fromIntake: number
   /** Guesses on fields the contract says are only the owner's to answer. */
   unearned: number
   /** Guesses on fields where a proposal is what the field is FOR. */
@@ -116,9 +121,11 @@ export interface QueueTally {
 }
 
 export function queueTally(queue: readonly QueueEntry[]): QueueTally {
+  const guesses = queue.filter((item) => item.state !== 'intake')
   return {
-    unearned: queue.filter((item) => item.field.metaKind === 'asked').length,
-    proposed: queue.filter((item) => item.field.metaKind === 'negotiated').length,
+    fromIntake: queue.length - guesses.length,
+    unearned: guesses.filter((item) => item.field.metaKind === 'asked').length,
+    proposed: guesses.filter((item) => item.field.metaKind === 'negotiated').length,
     total: queue.length,
     registered: BRAIN_FIELDS.length,
   }
@@ -162,4 +169,16 @@ export const ENTITLEMENT: Record<BrainFieldMetaKind, Entitlement> = {
 
 export function entitlementOf(field: BrainField): Entitlement {
   return ENTITLEMENT[field.metaKind]
+}
+
+/** The group for fields seeded from setup answers. Not an entitlement: the person IS entitled. */
+export const INTAKE_GROUP: Entitlement = {
+  label: 'From your answer',
+  heading: 'Check Sahoda kept your meaning',
+  line: 'You told Sahoda these at setup and it put them in its own words. Confirm if the wording is right, or correct it.',
+}
+
+/** The heading, sentence and marker for a row: intake rows are grouped by state, the rest by kind. */
+export function groupOf(entry: QueueEntry): Entitlement {
+  return entry.state === 'intake' ? INTAKE_GROUP : ENTITLEMENT[entry.field.metaKind]
 }

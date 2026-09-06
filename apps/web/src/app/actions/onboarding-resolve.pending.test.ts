@@ -16,6 +16,7 @@ const runTask = vi.fn()
 const readActiveBrandMemory = vi.fn()
 const savePendingBrain = vi.fn()
 const readPendingBrain = vi.fn()
+const hasPendingBrainStore = vi.fn(() => true)
 const fixedWindowAllow = vi.fn()
 
 vi.mock('@clerk/nextjs/server', () => ({ auth: async () => ({ userId: 'user-1' }) }))
@@ -34,6 +35,7 @@ vi.mock('@/lib/onboarding/read-brain', () => ({
 vi.mock('@/lib/onboarding/pending-brain', () => ({
   savePendingBrain: (...args: unknown[]) => savePendingBrain(...args),
   readPendingBrain: (...args: unknown[]) => readPendingBrain(...args),
+  hasPendingBrainStore: () => hasPendingBrainStore(),
 }))
 vi.mock('@/lib/workspaces', () => ({
   workspaceForWrite: async () => ({ ok: true, workspace: { id: 'ws-1', name: 'TRAINX' } }),
@@ -62,6 +64,7 @@ beforeEach(() => {
   vi.resetModules()
   readActiveBrandMemory.mockResolvedValue({ status: 'none' })
   readPendingBrain.mockResolvedValue(null)
+  hasPendingBrainStore.mockReturnValue(true)
   fixedWindowAllow.mockResolvedValue({ allowed: true, count: 1, unmeasured: false })
   runTask.mockResolvedValue({ ok: true, data: DEMO_FALLBACK_PAYLOAD })
   withCredits.mockImplementation(async (_opts: unknown, fn: (ctx: unknown) => Promise<unknown>) => {
@@ -145,5 +148,39 @@ describe('the daily free limit', () => {
     expect(state).toMatchObject({ ok: false, kind: 'limit' })
     expect((state as { message: string }).message).toMatch(/tomorrow/i)
     expect(runTask).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * BR-16. A paid resolve is charged once per brain version and REPLAYED for free
+ * on a retry, which is right for a customer who closed a tab. The thing that
+ * stops that replay being a free loop of model calls is the parked brain, and
+ * the parked brain lives only in Upstash. Without the store the guard silently
+ * allowed. Money must fail closed: no store, no paid run, nothing charged.
+ */
+describe('a paid resolve without the parking store', () => {
+  it('is refused before any charge or model call, in a sentence that says nothing was charged', async () => {
+    hasPendingBrainStore.mockReturnValue(false)
+    readActiveBrandMemory.mockResolvedValue({
+      status: 'ok',
+      brain: { version: 2, payload: {}, source: 'resolved' },
+    })
+
+    const state = await callResolve()
+
+    expect(state).toMatchObject({
+      ok: false,
+      kind: 'error',
+      message: expect.stringMatching(/charged/i),
+    })
+    expect(withCredits).not.toHaveBeenCalled()
+    expect(runTask).not.toHaveBeenCalled()
+  })
+
+  it('the FREE first resolve still runs: no money is at stake', async () => {
+    hasPendingBrainStore.mockReturnValue(false)
+    const state = await callResolve()
+    expect(state).toMatchObject({ ok: true, kind: 'free' })
+    expect(runTask).toHaveBeenCalledTimes(1)
   })
 })

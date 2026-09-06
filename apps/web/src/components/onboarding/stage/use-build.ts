@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from 'react'
 import type { BrandMemoryPayload } from '@sahoda/shared'
 
 import { saveBrandMemory, type BrandMemorySource } from '@/app/actions/brand-resolve'
+import { intakeDerivedPaths } from '@/lib/onboarding/intake-paths'
 import { resolveOnboarding } from '@/app/actions/onboarding-resolve'
 import { saveWorkspaceTheme } from '@/app/actions/theme'
 import { refineWithDoorText } from '@/lib/onboarding/classify'
@@ -424,6 +425,9 @@ export function useBuild({
           brainSource,
           [],
           storedIntakeFrom(intakeTextOf(data), doorText(doorRef.current), {}),
+          // Not confirmations. The fields these answers seeded are stamped
+          // `intake`, so /brain shows them as theirs-reworded and not as a guess.
+          { intakePaths: intakeDerivedPaths(data) },
         )
         if (!result.ok) {
           setSaveError(result.message)

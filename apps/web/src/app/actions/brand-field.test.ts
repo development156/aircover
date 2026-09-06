@@ -79,6 +79,8 @@ describe('confirmBrainField', () => {
       writeLeaf(BRAIN, 'hook.primary_emotion', 'Confidence'),
       'manual',
       ['hook.primary_emotion'],
+      null,
+      { expectedVersion: 3 },
     )
   })
 
@@ -136,14 +138,18 @@ describe('confirmBrainField', () => {
     const result = await confirmBrainField('hook.primary_emotion', BRAIN.hook.primary_emotion)
 
     expect(result).toEqual({ ok: true, version: 4, unchanged: false })
-    expect(saveBrandMemory).toHaveBeenCalledWith(BRAIN, 'manual', ['hook.primary_emotion'])
+    expect(saveBrandMemory).toHaveBeenCalledWith(BRAIN, 'manual', ['hook.primary_emotion'], null, {
+      expectedVersion: 3,
+    })
   })
 
   test('an unchanged LIST confirms too', async () => {
     const result = await confirmBrainField('taboo.red_lines', [...BRAIN.taboo.red_lines])
 
     expect(result).toEqual({ ok: true, version: 4, unchanged: false })
-    expect(saveBrandMemory).toHaveBeenCalledWith(BRAIN, 'manual', ['taboo.red_lines'])
+    expect(saveBrandMemory).toHaveBeenCalledWith(BRAIN, 'manual', ['taboo.red_lines'], null, {
+      expectedVersion: 3,
+    })
   })
 
   test('unchanged text on an ALREADY-confirmed field writes nothing', async () => {
@@ -272,5 +278,28 @@ describe('confirmBrainField refuses a blank', () => {
 
     expect(result.ok).toBe(true)
     expect(saveBrandMemory).toHaveBeenCalledTimes(1)
+  })
+})
+
+/**
+ * BR-04. Two overlapping confirms each read the payload and each wrote the whole
+ * thing back; the later one stamped provenance against a stale base and
+ * silently reverted the earlier confirmation. The RPC's compare-and-set has
+ * existed since 2026-08-12 and no hand-edit path sent the version it read.
+ */
+describe('confirmBrainField sends the version it read', () => {
+  test('the save carries expectedVersion from the brain it modified', async () => {
+    await confirmBrainField('hook.primary_emotion', 'Confidence')
+    const [, , , , options] = saveBrandMemory.mock.calls[0]!
+    expect(options).toEqual({ expectedVersion: 3 })
+  })
+
+  test('a version conflict is returned as the reload sentence, not swallowed', async () => {
+    state.saveResult = {
+      ok: false,
+      message: 'The Brand Brain changed while you were editing. Reload and try again.',
+    }
+    const result = await confirmBrainField('hook.primary_emotion', 'Confidence')
+    expect(result).toMatchObject({ ok: false, message: expect.stringMatching(/reload/i) })
   })
 })

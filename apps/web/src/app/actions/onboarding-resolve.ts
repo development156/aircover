@@ -26,7 +26,11 @@ import {
 } from '@/lib/brand/resolve-result'
 import { IntakeSchema } from '@/lib/onboarding/intake'
 import { FREE_RESOLVES_PER_DAY, freeResolveAllowed } from '@/lib/onboarding/limits'
-import { readPendingBrain, savePendingBrain } from '@/lib/onboarding/pending-brain'
+import {
+  hasPendingBrainStore,
+  readPendingBrain,
+  savePendingBrain,
+} from '@/lib/onboarding/pending-brain'
 import { readActiveBrandMemory } from '@/lib/onboarding/read-brain'
 import { toResolveInput } from '@/lib/onboarding/to-resolve-input'
 import { reportServerError } from '@/lib/observability/report'
@@ -293,9 +297,25 @@ export async function resolveOnboarding(
       return { ok: false, kind: 'error', message: BRAIN_UNREADABLE_MESSAGE }
     }
     const args: ResolveArgs = { workspaceId: workspace.id, userId, input }
-    return active.status === 'none'
-      ? await resolveFree(args)
-      : await resolveCharged({ ...args, activeVersion: active.brain.version })
+    if (active.status === 'none') return await resolveFree(args)
+
+    // BR-16. A paid run is replayed free on retry by design, and the parked
+    // brain is the only thing that makes the replay a hand-back rather than a
+    // second model call. No store, no paid run: the free first resolve above
+    // costs nobody anything and still runs.
+    if (!hasPendingBrainStore()) {
+      reportServerError(new Error('PENDING_BRAIN_STORE_ABSENT'), {
+        action: 'resolveOnboarding.charged',
+        workspaceId,
+      })
+      return {
+        ok: false,
+        kind: 'error',
+        message:
+          'Re-running the resolve is unavailable right now. Nothing was charged and your Brand Brain is unchanged.',
+      }
+    }
+    return await resolveCharged({ ...args, activeVersion: active.brain.version })
   } catch (error) {
     reportServerError(error, { action: 'resolveOnboarding', workspaceId })
     reportPaidActionFailure('onboarding-resolve', error)

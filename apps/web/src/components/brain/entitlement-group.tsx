@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 
 import type { BrainFieldMetaKind } from '@/lib/brand/fields'
-import { ENTITLEMENT } from '@/lib/brand/resolution-queue'
+import { ENTITLEMENT, INTAKE_GROUP } from '@/lib/brand/resolution-queue'
 import { cn } from '@/lib/utils'
 
 /**
@@ -25,12 +25,12 @@ export function EntitlementGroup({
   divided,
   children,
 }: {
-  kind: BrainFieldMetaKind
+  kind: BrainFieldMetaKind | 'intake'
   /** A rule above the header. False for the first group, whose separator is the bar above it. */
   divided: boolean
   children: ReactNode
 }) {
-  const entitlement = ENTITLEMENT[kind]
+  const entitlement = kind === 'intake' ? INTAKE_GROUP : ENTITLEMENT[kind]
   const headingId = `console-group-${kind}`
   return (
     <section aria-labelledby={headingId}>

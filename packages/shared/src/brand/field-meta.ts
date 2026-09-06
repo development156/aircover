@@ -65,3 +65,11 @@ export const SOURCE_OWNER = 'owner'
 
 /** `FieldMeta.source` when `brand_guidelines` produced the value. */
 export const SOURCE_MODEL = 'model:brand_guidelines'
+
+/**
+ * `FieldMeta.source` when the value was seeded from an answer the person typed
+ * at setup and the model then put it in its own words. Never `confirmed`: the
+ * wording is Sahoda's until the person agrees to it. The third state between
+ * a guess and a confirmation — see apps/web/src/lib/onboarding/intake-paths.ts.
+ */
+export const SOURCE_INTAKE = 'intake'

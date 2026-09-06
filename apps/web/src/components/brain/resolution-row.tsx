@@ -6,7 +6,7 @@ import { Pencil } from 'lucide-react'
 import { confirmBrainField } from '@/app/actions/brand-field'
 import { blankReason } from '@/lib/brand/blank'
 import { Button } from '@/components/ui/button'
-import { entitlementOf, type QueueEntry } from '@/lib/brand/resolution-queue'
+import { groupOf, type QueueEntry } from '@/lib/brand/resolution-queue'
 import { leavesEqual, type BrainLeaf } from '@/lib/brand/leaf'
 import { cn } from '@/lib/utils'
 
@@ -63,7 +63,7 @@ export function ResolutionRow({
   cited,
 }: ResolutionRowProps) {
   const { field, value, state, blank } = entry
-  const entitlement = entitlementOf(field)
+  const entitlement = groupOf(entry)
 
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<BrainLeaf>(value)

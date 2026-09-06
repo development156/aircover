@@ -78,7 +78,9 @@ export async function confirmBrainFields(paths: readonly string[]): Promise<Reso
      * active brain itself to stamp provenance against it, so this hands back
      * exactly what it was given and the only thing that moves is `field_meta`.
      */
-    const saved: SaveBrandState = await saveBrandMemory(brain.active, 'manual', requested)
+    const saved: SaveBrandState = await saveBrandMemory(brain.active, 'manual', requested, null, {
+      expectedVersion: brain.version,
+    })
     if (!saved.ok) return { ok: false, message: saved.message }
 
     // The ring lives in the app layout, so a page-scoped revalidate would leave

@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import { Check, Sparkles } from 'lucide-react'
+import { Check, MessageSquareQuote, Sparkles } from 'lucide-react'
 
 import { confirmBrainFields } from '@/app/actions/brain-resolve-fields'
 import { Button } from '@/components/ui/button'
@@ -183,8 +183,15 @@ export function ResolutionConsole({ payload, provenance, evidence }: ResolutionC
           indexed over the FILTERED list, so if every `asked` row is confirmed
           the surviving group is still index 0 and grows no stray top rule.
         */}
-        {(['asked', 'negotiated'] as const)
-          .map((kind) => ({ kind, rows: open.filter((entry) => entry.field.metaKind === kind) }))
+        {(['intake', 'asked', 'negotiated'] as const)
+          .map((kind) => ({
+            kind,
+            rows: open.filter((entry) =>
+              kind === 'intake'
+                ? entry.state === 'intake'
+                : entry.state !== 'intake' && entry.field.metaKind === kind,
+            ),
+          }))
           .filter((group) => group.rows.length > 0)
           .map((group, index) => (
             <EntitlementGroup key={group.kind} kind={group.kind} divided={index > 0}>
@@ -302,9 +309,23 @@ function Settled({ entries }: { entries: readonly QueueEntry[] }) {
  * Exported so the page header and the queue cannot drift: both read the same
  * tally from the same function.
  */
-export function QueueLegend({ unearned, proposed }: { unearned: number; proposed: number }) {
+export function QueueLegend({
+  unearned,
+  proposed,
+  fromIntake = 0,
+}: {
+  unearned: number
+  proposed: number
+  fromIntake?: number
+}) {
   return (
     <ul className="flex flex-wrap gap-x-5 gap-y-1">
+      {fromIntake > 0 ? (
+        <li className="type-sm flex items-center gap-icon-gap text-muted">
+          <MessageSquareQuote className="size-[13px] shrink-0 text-ink" aria-hidden />
+          <span className="num font-[550] text-ink">{fromIntake}</span> from your answers
+        </li>
+      ) : null}
       <li className="type-sm flex items-center gap-icon-gap text-muted">
         <Sparkles className="size-[13px] shrink-0 text-ink" aria-hidden />
         <span className="num font-[550] text-ink">{unearned}</span> only you can answer

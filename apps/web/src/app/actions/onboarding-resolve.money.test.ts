@@ -17,6 +17,13 @@ const withCredits = vi.fn()
 const runTask = vi.fn()
 const readActiveBrandMemory = vi.fn()
 
+vi.mock('@/lib/onboarding/pending-brain', () => ({
+  // The paid path refuses to run without the parking store (BR-16). These
+  // suites are about the charge itself, so the store is simply present.
+  hasPendingBrainStore: () => true,
+  savePendingBrain: vi.fn(async () => {}),
+  readPendingBrain: vi.fn(async () => null),
+}))
 vi.mock('@clerk/nextjs/server', () => ({ auth: async () => ({ userId: 'user-1' }) }))
 vi.mock('@sahoda/billing', () => ({
   createWithCredits: () => (opts: unknown, fn: unknown) => withCredits(opts, fn),

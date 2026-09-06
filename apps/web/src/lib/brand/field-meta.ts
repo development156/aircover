@@ -1,4 +1,5 @@
 import {
+  SOURCE_INTAKE,
   SOURCE_MODEL,
   SOURCE_OWNER,
   type BrandFieldMetaMap,
@@ -21,6 +22,11 @@ function guess(metaKind: FieldMeta['kind']): FieldMeta {
 
 function confirmedByOwner(metaKind: FieldMeta['kind']): FieldMeta {
   return { kind: metaKind, confirmed: true, source: SOURCE_OWNER }
+}
+
+/** Seeded from a setup answer and reworded by the model: theirs in substance, not yet in wording. */
+function fromIntake(metaKind: FieldMeta['kind']): FieldMeta {
+  return { kind: metaKind, confirmed: false, source: SOURCE_INTAKE }
 }
 
 /**
@@ -66,10 +72,17 @@ export function nextFieldMeta(
    * to be counted. Naming the path decouples the confirmation from the text.
    */
   confirmPaths: readonly string[] = [],
+  /**
+   * Fields whose value was seeded from an answer the person typed at setup.
+   * Stamped `source: 'intake'`, unconfirmed. Confirming outranks it. Passed by
+   * the onboarding save only; a hand edit never names any.
+   */
+  intakePaths: readonly string[] = [],
 ): BrandFieldMetaMap {
   const meta: BrandFieldMetaMap = {}
   const priorMeta = previous?.meta
   const confirming = new Set(confirmPaths)
+  const seeded = new Set(intakePaths)
 
   for (const field of BRAIN_FIELDS) {
     if (confirming.has(field.path)) {
@@ -82,9 +95,17 @@ export function nextFieldMeta(
       previous !== null &&
       leavesEqual(readLeaf(previous.payload, field.path), readLeaf(next, field.path))
 
-    // Rule 1 above when both hold; rule 2 in every other case. A field nobody had
-    // confirmed stays a guess either way.
-    meta[field.path] = prior?.confirmed === true && unchanged ? prior : guess(field.metaKind)
+    // Rule 1 above, generalised: UNCHANGED text keeps everything that was known
+    // about it — a confirmation, an intake source, a library citation. Rule 2
+    // in every other case: changed text is the model's sentence now. This used
+    // to keep only confirmations, so one hand edit of a different field reset
+    // every `document:<id>` citation and (now) every intake source to the
+    // model's name, for a reason the person never caused.
+    if (prior && unchanged) {
+      meta[field.path] = prior
+      continue
+    }
+    meta[field.path] = seeded.has(field.path) ? fromIntake(field.metaKind) : guess(field.metaKind)
   }
 
   return meta

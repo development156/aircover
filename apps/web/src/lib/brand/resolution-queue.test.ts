@@ -5,6 +5,7 @@ import { BRAIN_FIELDS, DERIVED_FIELDS } from './fields'
 import type { Provenance } from './provenance'
 import {
   ENTITLEMENT,
+  INTAKE_GROUP,
   entitlementOf,
   isBlank,
   queueTally,
@@ -182,5 +183,29 @@ describe('entitlementOf', () => {
     expect('Sahoda inferred this from your website.').toMatch(
       /\b(from|on) your (site|website|page|pdf|document)/i,
     )
+  })
+})
+
+describe('resolutionQueue — answers the person gave at setup', () => {
+  const withIntake: Provenance = new Map(
+    BRAIN_FIELDS.map((f) => [f.path, f.path === 'taboo.red_lines' ? 'intake' : 'guessed']),
+  )
+
+  test('an intake field stays in the queue: its wording is unconfirmed', () => {
+    const queue = resolutionQueue(DEMO_FALLBACK_PAYLOAD, withIntake)
+    expect(queue.some((e) => e.field.path === 'taboo.red_lines' && e.state === 'intake')).toBe(true)
+  })
+
+  test('the tally counts it apart from guesses, and first', () => {
+    const queue = resolutionQueue(DEMO_FALLBACK_PAYLOAD, withIntake)
+    const tally = queueTally(queue)
+    expect(tally.fromIntake).toBe(1)
+    expect(tally.unearned + tally.proposed + tally.fromIntake).toBe(tally.total)
+    expect(queue[0]?.field.path).toBe('taboo.red_lines')
+  })
+
+  test('the group copy for it names the person, not Sahoda, as the source', () => {
+    expect(INTAKE_GROUP.heading).toMatch(/your/i)
+    expect(INTAKE_GROUP.line).toMatch(/setup|told/i)
   })
 })

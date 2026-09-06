@@ -13,7 +13,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
  * arrival where the ring changes the most was the one that served the old one.
  */
 
-const state = vi.hoisted(() => ({ revalidated: [] as string[] }))
+const state = vi.hoisted(() => ({ revalidated: [] as string[], rpcArgs: [] as unknown[] }))
 
 vi.mock('next/cache', () => ({
   revalidatePath: (path: string) => {
@@ -26,7 +26,8 @@ vi.mock('@/lib/workspaces', () => ({
 }))
 vi.mock('@/lib/supabase/server', () => ({
   createServerSupabase: () => ({
-    rpc: vi.fn(async () => ({
+    rpc: vi.fn(async (_name: string, args: unknown) => ({
+      ...((state.rpcArgs.push(args), {}) as object),
       data: {
         version: 1,
         replayed: false,
@@ -74,6 +75,7 @@ const BRAIN = vi.hoisted(() => ({
 
 beforeEach(() => {
   state.revalidated.length = 0
+  state.rpcArgs.length = 0
 })
 
 describe('saveBrandMemory revalidation', () => {
@@ -85,5 +87,29 @@ describe('saveBrandMemory revalidation', () => {
     expect(result).toEqual(expect.objectContaining({ ok: true }))
     expect(state.revalidated).toContain('/')
     expect(state.revalidated).toContain('/brain')
+  })
+})
+
+describe('saveBrandMemory optimistic version', () => {
+  test('omits p_expected_version by default (onboarding Finish must replay, not conflict)', async () => {
+    const { saveBrandMemory } = await import('./brand-resolve')
+    await saveBrandMemory(BRAIN, 'resolved', [])
+    expect(state.rpcArgs[0]).not.toHaveProperty('p_expected_version')
+  })
+
+  test('sends p_expected_version when a hand edit names the version it read', async () => {
+    const { saveBrandMemory } = await import('./brand-resolve')
+    await saveBrandMemory(BRAIN, 'manual', ['voice.descriptor'], null, { expectedVersion: 4 })
+    expect(state.rpcArgs[0]).toMatchObject({ p_expected_version: 4 })
+  })
+
+  test('stamps intake-seeded paths with source intake', async () => {
+    const { saveBrandMemory } = await import('./brand-resolve')
+    await saveBrandMemory(BRAIN, 'resolved', [], null, { intakePaths: ['taboo.red_lines'] })
+    const payload = (
+      state.rpcArgs[0] as { p_payload: { field_meta: Record<string, { source: string }> } }
+    ).p_payload
+    expect(payload.field_meta['taboo.red_lines']?.source).toBe('intake')
+    expect(payload.field_meta['voice.descriptor']?.source).toBe('model:brand_guidelines')
   })
 })

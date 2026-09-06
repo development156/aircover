@@ -1,4 +1,4 @@
-import { Check, Sparkles } from 'lucide-react'
+import { Check, MessageSquareQuote, Sparkles } from 'lucide-react'
 
 import type { FieldState } from '@/lib/brand/provenance'
 import { cn } from '@/lib/utils'
@@ -47,6 +47,16 @@ const MARKS: Record<
     className: 'is-proposed',
     Glyph: Sparkles,
     title: 'Sahoda inferred this. Nobody has confirmed it yet.',
+  },
+  // Proposed treatment, not real: the SUBSTANCE is theirs and the WORDING is
+  // Sahoda's, and until a person agrees to the wording it stays dashed. The
+  // glyph and label are the difference from a guess — a quote, not a sparkle.
+  intake: {
+    label: 'From your answer',
+    className: 'is-proposed',
+    Glyph: MessageSquareQuote,
+    title:
+      'You told Sahoda this at setup and it put it in its own words. Confirm the wording or correct it.',
   },
 }
 

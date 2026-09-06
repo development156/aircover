@@ -1,4 +1,4 @@
-import { Check, Sparkles } from 'lucide-react'
+import { Check, MessageSquareQuote, Sparkles } from 'lucide-react'
 
 import { brainRing } from '@/lib/brand/brain-ring'
 import type { Provenance } from '@/lib/brand/provenance'
@@ -21,7 +21,7 @@ import type { Provenance } from '@/lib/brand/provenance'
  */
 export function ConfidenceCard({ provenance }: { provenance: Provenance }) {
   const ring = brainRing(provenance)
-  const inferred = Math.max(0, ring.total - ring.confirmed)
+  const inferred = Math.max(0, ring.total - ring.confirmed - ring.intake)
   const pct = ring.total === 0 ? 0 : Math.round((ring.confirmed / ring.total) * 100)
 
   return (
@@ -44,7 +44,7 @@ export function ConfidenceCard({ provenance }: { provenance: Provenance }) {
         <div
           className="surface-ring flex h-[10px] w-full overflow-hidden rounded-pill bg-surface"
           role="img"
-          aria-label={`${ring.confirmed} of ${ring.total} fields confirmed by a person; ${inferred} still inferred by Sahoda.`}
+          aria-label={`${ring.confirmed} of ${ring.total} fields confirmed by a person; ${ring.intake > 0 ? `${ring.intake} from your setup answers, reworded by Sahoda; ` : ''}${inferred} still inferred by Sahoda.`}
         >
           <div className="h-full bg-ink" style={{ width: `${pct}%` }} />
           {/* The remainder is HATCHED — `.is-simulated`'s texture, meaning "not
@@ -65,6 +65,12 @@ export function ConfidenceCard({ provenance }: { provenance: Provenance }) {
             <Check className="size-[13px] shrink-0 text-ink" aria-hidden />
             <span className="font-[550] text-ink tabular-nums">{ring.confirmed}</span> confirmed
           </li>
+          {ring.intake > 0 ? (
+            <li className="type-sm flex items-center gap-icon-gap text-muted">
+              <MessageSquareQuote className="size-[13px] shrink-0" aria-hidden />
+              <span className="font-[550] tabular-nums">{ring.intake}</span> from your answers
+            </li>
+          ) : null}
           <li className="flex items-center gap-[6px] text-[12px] text-muted">
             <Sparkles className="size-[13px] shrink-0" aria-hidden />
             <span className="font-[550] tabular-nums">{inferred}</span> still Sahoda&rsquo;s guess

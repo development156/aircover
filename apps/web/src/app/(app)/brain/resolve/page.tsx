@@ -203,7 +203,11 @@ export default async function ResolveConsolePage() {
             )}
           </p>
           <div className="mt-3">
-            <QueueLegend unearned={tally.unearned} proposed={tally.proposed} />
+            <QueueLegend
+              unearned={tally.unearned}
+              proposed={tally.proposed}
+              fromIntake={tally.fromIntake}
+            />
           </div>
         </section>
       ) : null}

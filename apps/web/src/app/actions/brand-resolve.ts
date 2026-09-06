@@ -102,6 +102,14 @@ export async function saveBrandMemory(
    * new intake at worst and can never destroy a stored one.
    */
   intake: BrandIntake | null = null,
+  /**
+   * `expectedVersion`: the version the caller READ, for the RPC's compare-and-
+   * set. Hand edits pass it (BR-04: two overlapping confirms used to revert each
+   * other); onboarding's Finish deliberately does not, so a rage-click replays
+   * instead of conflicting. `intakePaths`: fields seeded from setup answers,
+   * stamped `source: 'intake'` — see lib/onboarding/intake-paths.ts.
+   */
+  options: { expectedVersion?: number | null; intakePaths?: readonly string[] } = {},
 ): Promise<SaveBrandState> {
   // Hoisted so the catch can tag the tenant — see lib/observability/report.ts.
   let workspaceId: string | undefined
@@ -139,6 +147,7 @@ export async function saveBrandMemory(
       previous.status === 'ok' ? { payload: previous.active, meta: previous.meta } : null,
       payload,
       confirmPaths,
+      options.intakePaths ?? [],
     )
 
     // Carried forward when this write has nothing to say about it — see the
@@ -156,6 +165,9 @@ export async function saveBrandMemory(
         ...(nextIntake.success ? { intake: nextIntake.data } : {}),
       },
       p_source: source,
+      ...(typeof options.expectedVersion === 'number'
+        ? { p_expected_version: options.expectedVersion }
+        : {}),
     })
     if (error || !data) return { ok: false, message: mapSaveBrandError(error) }
     // The parked build, if this save came from a reveal, is now an active row.

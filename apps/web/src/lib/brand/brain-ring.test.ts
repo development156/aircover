@@ -88,3 +88,14 @@ describe('ringAriaLabel', () => {
     expect(label).toContain(`1 of ${RING_DENOMINATOR} fields confirmed`)
   })
 })
+
+describe('brainRing — intake answers', () => {
+  test('counts fields seeded from setup answers apart from guesses, and not as confirmed', () => {
+    const p = new Map<string, FieldState>(
+      BRAIN_FIELDS.map((f) => [f.path, f.path === 'taboo.red_lines' ? 'intake' : 'guessed']),
+    )
+    const ring = brainRing(p)
+    expect(ring.confirmed).toBe(0)
+    expect(ring.intake).toBe(1)
+  })
+})

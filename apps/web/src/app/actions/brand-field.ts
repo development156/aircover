@@ -94,7 +94,10 @@ export async function confirmBrainField(
     }
 
     const next = unchangedText ? brain.active : writeLeaf(brain.active, path, value)
-    const saved: SaveBrandState = await saveBrandMemory(next, 'manual', [path])
+    // The version this read: the RPC refuses the write if anyone moved it since.
+    const saved: SaveBrandState = await saveBrandMemory(next, 'manual', [path], null, {
+      expectedVersion: brain.version,
+    })
     if (!saved.ok) return { ok: false, message: saved.message }
 
     // The ring lives in the app layout, so a page-scoped revalidate would leave

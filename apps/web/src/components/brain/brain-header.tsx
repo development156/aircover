@@ -1,7 +1,7 @@
 import Link from 'next/link'
 
 import { brainRing } from '@/lib/brand/brain-ring'
-import type { Provenance } from '@/lib/brand/provenance'
+import { stateOf, type Provenance } from '@/lib/brand/provenance'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -77,7 +77,10 @@ export function BrainHeader({ provenance, version }: { provenance: Provenance; v
               note below already says editing is free and saying it twice on one
               card is the noise this pass exists to remove. */}
           <p className="mt-1 text-[12.5px] text-muted">
-            Sahoda guessed <span className="font-semibold">{ring.next.label}</span>
+            {stateOf(provenance, ring.next.path) === 'intake'
+              ? 'Sahoda reworded your answer for'
+              : 'Sahoda guessed'}{' '}
+            <span className="font-semibold">{ring.next.label}</span>
           </p>
         </div>
       ) : (

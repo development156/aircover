@@ -20,10 +20,17 @@ vi.mock('@/lib/workspaces', () => ({ readActiveWorkspace: () => readActiveWorksp
 /** What `from('knowledge_documents').select(...)` answers with. */
 let answer: { data: unknown; error: unknown } = { data: [], error: null }
 
+/** Every `.eq(column, value)` any chain received since the last reset. */
+const eqCalls: Array<[string, unknown]> = []
+
 function chain() {
   const b: Record<string, unknown> = {}
   const self = () => b
-  for (const k of ['select', 'eq', 'order', 'limit']) b[k] = self
+  for (const k of ['select', 'order', 'limit', 'textSearch', 'maybeSingle']) b[k] = self
+  b.eq = (column: string, value: unknown) => {
+    eqCalls.push([column, value])
+    return b
+  }
   b.then = (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
     Promise.resolve(answer).then(res, rej)
   return b
@@ -32,7 +39,8 @@ vi.mock('@/lib/supabase/server', () => ({
   createServerSupabase: () => ({ from: () => chain() }),
 }))
 
-const { readLibrary, LIST_LIMIT } = await import('./store')
+const { readLibrary, LIST_LIMIT, searchLibrary, readCurrentPassages, readDeleteImpactFor } =
+  await import('./store')
 
 const WS = '11111111-1111-4111-8111-111111111111'
 
@@ -46,6 +54,7 @@ const docs = (n: number): Array<Record<string, unknown>> =>
 
 beforeEach(() => {
   vi.clearAllMocks()
+  eqCalls.length = 0
   answer = { data: [], error: null }
   readActiveWorkspace.mockResolvedValue({ status: 'ok', workspace: { id: WS } })
 })
@@ -83,5 +92,33 @@ describe('readLibrary bounds the read and reports truncation', () => {
   it('no rows is empty, not truncated', async () => {
     answer = { data: [], error: null }
     expect((await readLibrary()).status).toBe('empty')
+  })
+})
+
+/**
+ * BR-05. `knowledge_current_chunks` is `security_invoker` over the tenant
+ * policy, which admits EVERY workspace the person belongs to. These three reads
+ * resolved the active workspace and then never used it, so a two-workspace
+ * member searched both libraries and a charged extraction could draw passages
+ * from the wrong one. `read-brain.ts` documents the trap; these did not copy it.
+ */
+describe('library reads are scoped to the active workspace', () => {
+  it('searchLibrary filters chunks by workspace_id', async () => {
+    answer = { data: [], error: null }
+    await searchLibrary('prices', 10)
+    expect(eqCalls).toContainEqual(['workspace_id', WS])
+  })
+
+  it('readCurrentPassages filters chunks by workspace_id', async () => {
+    answer = { data: [], error: null }
+    await readCurrentPassages(25)
+    expect(eqCalls).toContainEqual(['workspace_id', WS])
+  })
+
+  it('readDeleteImpactFor filters the brain and the proposals by workspace_id', async () => {
+    answer = { data: null, error: null }
+    await readDeleteImpactFor(WS, 'doc-1')
+    const wsFilters = eqCalls.filter(([c, v]) => c === 'workspace_id' && v === WS)
+    expect(wsFilters.length).toBeGreaterThanOrEqual(2)
   })
 })

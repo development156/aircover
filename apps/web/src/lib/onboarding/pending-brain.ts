@@ -67,6 +67,19 @@ async function pipeline(store: Upstash, commands: unknown[][]): Promise<unknown[
   return Array.isArray(results) ? results : null
 }
 
+/**
+ * Whether a parked brain can exist at all in this deployment.
+ *
+ * The paid re-resolve is charged once per brain version and replayed for free
+ * on a retry; the parked brain is what turns that replay into "hand back the
+ * result" instead of "run the model again for nothing". Without the store the
+ * guard silently allowed (BR-16). Money fails closed: the caller refuses a paid
+ * run when this is false.
+ */
+export function hasPendingBrainStore(env?: Readonly<Record<string, string | undefined>>): boolean {
+  return upstash(env) !== null
+}
+
 /** Park a freshly resolved brain. A no-op without a store; never throws. */
 export async function savePendingBrain(workspaceId: string, pending: PendingBrain): Promise<void> {
   const store = upstash()

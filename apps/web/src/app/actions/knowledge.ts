@@ -26,9 +26,9 @@ import { reportServerError } from '@/lib/observability/report'
 import { readStorageUsage, storageRefusal } from '@/lib/storage/usage'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { proposeFromLibrary } from '@/lib/knowledge/propose'
-import { readCurrentPassages } from '@/lib/knowledge/store'
+import { readCurrentPassages, readDeleteImpactFor } from '@/lib/knowledge/store'
 import { MAX_EVIDENCE_CHUNKS } from '@sahoda/research'
-import { workspaceForWrite } from '@/lib/workspaces'
+import { readActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
 // Aliased: this file already binds `credits` to the withCredits Result, and
 // shadowing it inside the sentence below would read as the wallet figure
 // while being the call outcome.
@@ -392,30 +392,11 @@ export async function deleteKnowledgeDocument(
 export async function readDeleteImpact(
   documentId: string,
 ): Promise<{ brandFields: number; pendingProposals: number }> {
-  const supabase = createServerSupabase()
-  const cite = `document:${documentId}`
-
-  const brain = await supabase
-    .from('brand_memory')
-    .select('payload')
-    .eq('status', 'active')
-    .maybeSingle()
-
-  let brandFields = 0
-  const meta = (brain.data as { payload?: { field_meta?: Record<string, { source?: string }> } })
-    ?.payload?.field_meta
-  if (meta) brandFields = Object.values(meta).filter((m) => m?.source === cite).length
-
-  const proposals = await supabase
-    .from('memory_events')
-    .select('id, evidence_refs')
-    .eq('status', 'pending')
-
-  const pendingProposals = (proposals.data ?? []).filter((row) =>
-    JSON.stringify((row as { evidence_refs?: unknown }).evidence_refs ?? '').includes(documentId),
-  ).length
-
-  return { brandFields, pendingProposals }
+  // Scoped to the active workspace (BR-05); the query itself lives beside the
+  // other library reads so one test file can prove the filter on all of them.
+  const workspace = await readActiveWorkspace()
+  if (workspace.status !== 'ok') return { brandFields: 0, pendingProposals: 0 }
+  return readDeleteImpactFor(workspace.workspace.id, documentId)
 }
 
 export interface LibraryResolveState {
