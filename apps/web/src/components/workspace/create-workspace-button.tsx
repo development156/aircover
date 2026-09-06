@@ -88,6 +88,9 @@ export function CreateWorkspaceButton({
           // be broken across lines when the row runs short.
           'flex items-center gap-2 whitespace-nowrap transition-micro disabled:opacity-45',
           VARIANTS[variant],
+          // Compact = icon only on a phone, and an icon-only control still owes
+          // the 44px floor in BOTH axes: MEASURED run 34017127220, 40x44.
+          compactOnNarrow && 'max-narrow:min-w-[44px] max-narrow:justify-center',
         )}
       >
         <Plus size={16} className="shrink-0" aria-hidden />

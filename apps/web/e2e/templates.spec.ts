@@ -89,6 +89,9 @@ test.describe('templates @smoke', () => {
     // exactly what is in the box before the click, so "the template put these
     // words here" is still the only reading of the line after it.
     await expect(page.locator('[data-variant-editor="linkedin"]')).toHaveValue(SEED_BODY)
+    // The list lives inside the browser here too (run 34017127220: 180s
+    // waiting for a name the closed card never shows).
+    await page.getByRole('button', { name: /^browse templates$/i }).click()
     await page.getByText(NAME).click()
     await expect(page.getByLabel('Your post', { exact: true })).toHaveValue(BODY)
     await expect(page.locator('[data-variant-editor="linkedin"]')).toHaveValue(BODY)
