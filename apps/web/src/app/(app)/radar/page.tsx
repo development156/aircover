@@ -7,6 +7,7 @@ import { creditWord } from '@/lib/credit-words'
 import { ChangeFeed } from '@/components/radar/change-feed'
 import { RadarScope } from '@/components/radar/radar-scope'
 import { WatchBoard } from '@/components/radar/watch-board'
+import { WatchCard } from '@/components/radar/watch-card'
 import { connectedChannels } from '@/app/actions/radar'
 import { radarScanEnabled } from '@/lib/cron/radar-enabled'
 import { watchCards } from '@/lib/radar/cards'
@@ -85,6 +86,12 @@ export default async function RadarPage() {
   const scanning = snapshot.collector !== 'absent'
   const cards = watchCards(snapshot)
   const watching = cards.length > 0
+  // Both computed on the SERVER. A date computed in the reader's browser is a
+  // different answer on the evenings that straddle midnight in UTC, and React
+  // re-renders the mismatch; the switch is an environment variable this process
+  // can read and the browser cannot.
+  const nextScan = nextScanDate(new Date())
+  const scanArmed = radarScanEnabled()
 
   return (
     <div className="space-y-grid">
@@ -160,12 +167,21 @@ export default async function RadarPage() {
         </section>
       ) : (
         <>
+          {/* The instrument AND the cards are rendered HERE, on the server, and
+              handed in as nodes. `watch-board.tsx` is a client component, and
+              importing them into it put this route 12.6 kB over its byte budget:
+              static SVG and static markup that never needed to reach the browser
+              as JavaScript at all. The board keeps only what genuinely needs it
+              — which of three states is showing, the filter, and the form. */}
           <WatchBoard
-            cards={cards}
-            nextScan={nextScanDate(new Date())}
-            scanArmed={radarScanEnabled()}
+            items={cards.map((card) => ({
+              id: card.competitor.id,
+              changed: card.status.claim === 'changed',
+              card: <WatchCard card={card} nextScan={nextScan} scanArmed={scanArmed} />,
+            }))}
+            scope={<RadarScope marks={Math.max(cards.length, 1)} scanning={scanning} />}
+            nextScan={nextScan}
             perScan={perScan}
-            scanning={scanning}
           />
 
           {/* ── WHAT CHANGED, UNDER THE LIST RATHER THAN BESIDE IT ──────────

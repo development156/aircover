@@ -1,28 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import {
-  ArrowRight,
-  AtSign,
-  Building2,
-  Check,
-  CheckCheck,
-  MapPin,
-  Plus,
-  Radar as RadarIcon,
-  Timer,
-  Trash2,
-} from 'lucide-react'
+import { Check, Timer } from 'lucide-react'
 
-import { removeCompetitor } from '@/app/actions/radar'
-import { InlineError } from '@/components/posts/inline-error'
-import { RadarScope } from '@/components/radar/radar-scope'
 import { WatchForm } from '@/components/radar/watch-list'
 import { Button } from '@/components/ui/button'
-import type { WatchCard } from '@/lib/radar/cards'
-import { COMPETITOR_KIND_LABELS, type CompetitorKind } from '@/lib/radar/types'
 
 /**
  * THE RADAR BOARD — three states, and each one is a fact rather than a step.
@@ -47,18 +30,15 @@ import { COMPETITOR_KIND_LABELS, type CompetitorKind } from '@/lib/radar/types'
  * it did at submit, and failing that on a timer. A screen that waits forever for
  * a render that already happened is the ordinary way this pattern breaks, and
  * the person is left looking at an animation with their work apparently lost.
+ *
+ * ── WHY THE CARDS AND THE RADAR ARRIVE AS NODES ─────────────────────────────
+ * They are rendered by the SERVER and handed in. Both are static markup, and
+ * pulling them into this `'use client'` module dragged the radar's geometry, the
+ * three kind icons and the four claim sentences into the browser bundle: it put
+ * `/radar` 12.6 kB over its byte budget and failed the build. What genuinely
+ * needs JavaScript here is which of three states is showing, the filter, and the
+ * form — so that is all this file holds.
  */
-
-/**
- * One mark per kind of page. `AtSign` for Instagram rather than a brand glyph:
- * this lucide build ships no brand icons, and a handle is what the reader
- * actually typed in.
- */
-const KIND_ICON: Record<CompetitorKind, typeof Building2> = {
-  website: Building2,
-  instagram: AtSign,
-  google_business: MapPin,
-}
 
 /** Longest the reveal may hold, if the refreshed list never arrives. */
 const SETTLE_CEILING_MS = 6000
@@ -67,21 +47,25 @@ const SETTLE_FLOOR_MS = 900
 
 type Filter = 'all' | 'watching' | 'changed'
 
+/** One rendered card, plus the two facts the filter needs to sort it. */
+export interface BoardItem {
+  id: string
+  changed: boolean
+  card: React.ReactNode
+}
+
 export function WatchBoard({
-  cards,
+  items,
+  scope,
   nextScan,
-  scanArmed,
   perScan,
-  scanning,
 }: {
-  cards: readonly WatchCard[]
+  items: readonly BoardItem[]
+  /** The radar face, rendered on the server. */
+  scope: React.ReactNode
   /** The next weekly pass, `YYYY-MM-DD`, computed on the server in UTC. */
   nextScan: string
-  /** Whether the weekly pass is switched on in this environment. */
-  scanArmed: boolean
   perScan: number
-  /** Whether Radar is collecting at all. Freezes the sweep when false. */
-  scanning: boolean
 }) {
   const router = useRouter()
   const [settling, setSettling] = useState(false)
@@ -90,12 +74,12 @@ export function WatchBoard({
   const [filter, setFilter] = useState<Filter>('all')
   const countAtSubmit = useRef<number | null>(null)
 
-  const changed = cards.filter((card) => card.status.claim === 'changed')
+  const changed = items.filter((item) => item.changed).length
 
   // ── THE REVEAL ENDS ON THE DATA, WITH A CLOCK AS THE BACKSTOP ─────────────
   useEffect(() => {
     if (!settling) return
-    const arrived = countAtSubmit.current !== null && cards.length > countAtSubmit.current
+    const arrived = countAtSubmit.current !== null && items.length > countAtSubmit.current
     if (arrived) setLanded(true)
 
     const done = window.setTimeout(
@@ -107,26 +91,24 @@ export function WatchBoard({
       arrived ? SETTLE_FLOOR_MS : SETTLE_CEILING_MS,
     )
     return () => window.clearTimeout(done)
-  }, [settling, cards.length])
+  }, [settling, items.length])
 
   function added() {
-    countAtSubmit.current = cards.length
+    countAtSubmit.current = items.length
     setLanded(false)
     setSettling(true)
     setFormOpen(false)
     router.refresh()
   }
 
-  if (settling) {
-    return <Settling landed={landed} nextScan={nextScan} scanning={scanning} marks={cards.length} />
-  }
+  if (settling) return <Settling landed={landed} nextScan={nextScan} scope={scope} />
 
   // ── ADD: THE INTRODUCTION AND THE FORM, AND NO RADAR ──────────────────────
   // A radar face above an empty watch list is a picture of somebody else's
-  // competitors. `RadarScope` already refuses to draw marks nobody added; this
-  // goes one further and does not draw the instrument at all until there is
+  // competitors. `RadarScope` already refuses to draw marks nobody added; the
+  // page goes one further and does not draw the instrument at all until there is
   // something on it, which is what makes its arrival mean something.
-  if (cards.length === 0) {
+  if (items.length === 0) {
     return (
       <div className="mx-auto w-full max-w-[720px]">
         <WatchForm onAdded={added} perScan={perScan} />
@@ -136,10 +118,10 @@ export function WatchBoard({
 
   const shown =
     filter === 'all'
-      ? cards
+      ? items
       : filter === 'changed'
-        ? changed
-        : cards.filter((c) => c.status.claim !== 'changed')
+        ? items.filter((item) => item.changed)
+        : items.filter((item) => !item.changed)
 
   return (
     <section id="radar-watch-list" aria-labelledby="radar-list" className="flex flex-col gap-5">
@@ -153,15 +135,14 @@ export function WatchBoard({
                 the form, which is the control that commits it; repeating it
                 beside a list of businesses somebody is already paying for is
                 the sentence arriving after the decision it was for. */}
-            Sahoda is reading <span className="num">{cards.length}</span>{' '}
-            {cards.length === 1 ? 'business' : 'businesses'} for you, once a week. A page that will
+            Sahoda is reading <span className="num">{items.length}</span>{' '}
+            {items.length === 1 ? 'business' : 'businesses'} for you, once a week. A page that will
             not load is skipped and not charged.
           </p>
         </div>
 
         <Button onClick={() => setFormOpen((open) => !open)} aria-expanded={formOpen}>
-          <Plus size={15} aria-hidden />
-          Add another
+          {formOpen ? 'Close the form' : 'Add another'}
         </Button>
       </div>
 
@@ -170,13 +151,13 @@ export function WatchBoard({
       {/* Only where the third count can be anything but zero. A filter row whose
           last tab always reads nothing is chrome that teaches a reader the
           feature is broken. */}
-      {scanning && changed.length > 0 ? (
+      {changed > 0 ? (
         <div role="group" aria-label="Filter the watch list" className="flex flex-wrap gap-2">
           {(
             [
-              { id: 'all' as const, label: 'All', n: cards.length },
-              { id: 'watching' as const, label: 'Watching', n: cards.length - changed.length },
-              { id: 'changed' as const, label: 'Changed', n: changed.length },
+              { id: 'all' as const, label: 'All', n: items.length },
+              { id: 'watching' as const, label: 'Watching', n: items.length - changed },
+              { id: 'changed' as const, label: 'Changed', n: changed },
             ] satisfies { id: Filter; label: string; n: number }[]
           ).map((tab) => (
             <button
@@ -196,7 +177,13 @@ export function WatchBoard({
         </div>
       ) : null}
 
-      <WatchCards cards={shown} nextScan={nextScan} scanArmed={scanArmed} />
+      <ul className="grid gap-3 wide:grid-cols-2">
+        {shown.map((item) => (
+          <li key={item.id} className="min-w-0">
+            {item.card}
+          </li>
+        ))}
+      </ul>
     </section>
   )
 }
@@ -207,28 +194,21 @@ export function WatchBoard({
 function Settling({
   landed,
   nextScan,
-  scanning,
-  marks,
+  scope,
 }: {
   landed: boolean
   nextScan: string
-  scanning: boolean
-  marks: number
+  scope: React.ReactNode
 }) {
   return (
     <section
       aria-labelledby="radar-settling"
       className="grid items-center gap-8 wide:grid-cols-[minmax(0,360px)_minmax(0,1fr)]"
     >
-      <div className="mx-auto w-full max-w-[360px] max-narrow:max-w-[240px]">
-        <RadarScope marks={Math.max(marks, 1)} scanning={scanning} />
-      </div>
+      <div className="mx-auto w-full max-w-[360px] max-narrow:max-w-[240px]">{scope}</div>
 
       <div role="status" aria-live="polite" className="min-w-0">
-        <p className="type-eyebrow flex items-center gap-2 text-accent">
-          <RadarIcon size={15} strokeWidth={1.9} aria-hidden />
-          Radar
-        </p>
+        <p className="type-eyebrow text-accent">Radar</p>
         <h2 id="radar-settling" className="mt-2 type-display text-ink">
           Adding to your radar
         </h2>
@@ -249,8 +229,11 @@ function Settling({
             label="First read"
             body={
               <>
-                The weekly pass runs on <span className="num">{nextScan}</span>, and what it finds
-                appears on the card.
+                The weekly pass runs on{' '}
+                <span data-scan-date={nextScan} className="num">
+                  {nextScan}
+                </span>
+                , and what it finds appears on the card.
               </>
             }
           />
@@ -288,151 +271,5 @@ function Step({
         <span className="type-sm block text-muted">{body}</span>
       </span>
     </li>
-  )
-}
-
-/**
- * The cards. Its own error, so a refused removal is reported beside the rows
- * rather than under a form somewhere else on the screen.
- */
-function WatchCards({
-  cards,
-  nextScan,
-  scanArmed,
-}: {
-  cards: readonly WatchCard[]
-  nextScan: string
-  scanArmed: boolean
-}) {
-  const [error, setError] = useState<string | null>(null)
-  const [pending, setPending] = useState<string | null>(null)
-  const router = useRouter()
-
-  async function drop(id: string) {
-    setError(null)
-    setPending(id)
-    // The result is READ. Discarding it left a refused delete looking like a
-    // successful one: the row stayed on screen, nothing was said, and the
-    // obvious next move for the reader is to press it again.
-    const result = await removeCompetitor(id)
-    setPending(null)
-    if (!result.ok) {
-      setError(result.message)
-      return
-    }
-    router.refresh()
-  }
-
-  return (
-    <div className="flex flex-col gap-3">
-      {error ? <InlineError>{error}</InlineError> : null}
-      <ul className="grid gap-3 wide:grid-cols-2">
-        {cards.map(({ competitor, status }) => {
-          const Icon = KIND_ICON[competitor.kind]
-          const moved = status.claim === 'changed'
-          return (
-            <li
-              key={competitor.id}
-              // `min-w-0` IS LOAD-BEARING, not tidying. These are GRID items,
-              // and a grid item's default `min-width: auto` refuses to shrink
-              // below its content's min-content width — so the `truncate` on
-              // the name never gets a chance to act and the row pushes the whole
-              // page wider than the viewport.
-              className="surface-ring flex min-w-0 flex-col gap-3 rounded-card bg-surface p-4 transition-micro hover:bg-surface-2"
-            >
-              <div className="flex min-w-0 items-start gap-3">
-                <span className="surface-ring flex size-[36px] shrink-0 items-center justify-center rounded-card text-muted">
-                  <Icon size={16} strokeWidth={1.8} aria-hidden />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="type-sm block truncate font-[550] text-ink">
-                    {competitor.name}
-                  </span>
-                  <span className="type-meta block truncate text-muted">
-                    {COMPETITOR_KIND_LABELS[competitor.kind]}
-                    {competitor.lastObservedAt ? (
-                      <>
-                        {' · last read '}
-                        <span className="num">{competitor.lastObservedAt.slice(0, 10)}</span>
-                      </>
-                    ) : (
-                      // NOT a dash. "Never read" is a fact about our collector,
-                      // and a dash here would read as "nothing has happened at
-                      // that business" — the exact confusion this screen exists
-                      // to prevent.
-                      ' · not read yet'
-                    )}
-                  </span>
-                </span>
-                <span
-                  className={`shrink-0 rounded-pill px-2.5 py-1 type-chip ${
-                    moved ? 'bg-tint-100 text-accent dark:bg-s2' : 'surface-ring text-muted'
-                  }`}
-                >
-                  {moved ? 'Changed' : 'Watching'}
-                </span>
-              </div>
-
-              <p className="surface-ring rounded-card px-3 py-2 type-sm text-muted">
-                {status.claim === 'changed' ? (
-                  <>
-                    <span className="num">{status.count}</span>{' '}
-                    {status.count === 1 ? 'change' : 'changes'} Radar can show you evidence for.
-                  </>
-                ) : status.claim === 'quiet' ? (
-                  'Read, and nothing moved.'
-                ) : status.claim === 'not-read' ? (
-                  'On the list. Nothing has been read yet, which is not the same as a quiet week.'
-                ) : (
-                  'Stored and being read. The readings are not on this screen yet, so Radar cannot tell you either way.'
-                )}
-              </p>
-
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="type-meta flex items-center gap-1.5 text-muted">
-                  {scanArmed ? (
-                    <>
-                      <Timer size={13} strokeWidth={1.8} aria-hidden />
-                      Next check <span className="num">{nextScan}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Timer size={13} strokeWidth={1.8} aria-hidden />
-                      The weekly pass is switched off, so no read is scheduled.
-                    </>
-                  )}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => drop(competitor.id)}
-                    disabled={pending !== null}
-                  >
-                    <Trash2 size={14} aria-hidden />
-                    <span className="sr-only">Stop watching {competitor.name}</span>
-                    <span aria-hidden>Remove</span>
-                  </Button>
-                  <Link
-                    href={`/radar/${competitor.id}`}
-                    className="card-link inline-flex items-center gap-1.5 rounded-pill px-3 py-1.5 type-sm font-[550] text-ink transition-micro hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                  >
-                    View details
-                    <ArrowRight size={14} aria-hidden />
-                  </Link>
-                </span>
-              </div>
-            </li>
-          )
-        })}
-      </ul>
-
-      {cards.length === 0 ? (
-        <p className="surface-ring flex items-center gap-2 rounded-card bg-surface p-4 type-sm text-muted">
-          <CheckCheck size={14} strokeWidth={1.8} aria-hidden />
-          Nothing on this filter.
-        </p>
-      ) : null}
-    </div>
   )
 }

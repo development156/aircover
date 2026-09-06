@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import { creditCost } from '@sahoda/shared'
 
 import { WatchBoard } from './watch-board'
+import { WatchCard } from './watch-card'
 import { watchCards } from '@/lib/radar/cards'
 import type { Competitor } from '@/lib/radar/types'
 
@@ -11,6 +12,8 @@ vi.mock('@/app/actions/radar', () => ({
   addCompetitor: vi.fn(),
   removeCompetitor: vi.fn(),
 }))
+
+const NEXT_SCAN = '2026-09-07'
 
 const watch = (over: Partial<Competitor> = {}): Competitor => ({
   id: 'comp-sunrise',
@@ -22,26 +25,35 @@ const watch = (over: Partial<Competitor> = {}): Competitor => ({
   ...over,
 })
 
-function board(competitors: Competitor[]) {
+/**
+ * The whole composition, exactly as `page.tsx` assembles it: the board holds the
+ * state and the filter, and the cards arrive as nodes the server rendered. A
+ * test that rendered the board alone would assert nothing about what a card says.
+ */
+function board(competitors: Competitor[], scanArmed = true) {
+  const cards = watchCards({ collector: 'reading', competitors, days: [] })
   return render(
     <WatchBoard
-      cards={watchCards({ collector: 'reading', competitors, days: [] })}
-      nextScan="2026-09-07"
-      scanArmed
+      items={cards.map((card) => ({
+        id: card.competitor.id,
+        changed: card.status.claim === 'changed',
+        card: <WatchCard card={card} nextScan={NEXT_SCAN} scanArmed={scanArmed} />,
+      }))}
+      scope={null}
+      nextScan={NEXT_SCAN}
       perScan={creditCost('radar_scan')}
-      scanning
     />,
   )
 }
 
 /**
- * ── THESE FOUR GUARANTEES CAME OFF A COMPONENT THAT NO LONGER EXISTS ────────
+ * ── FOUR OF THESE CAME OFF A COMPONENT THAT NO LONGER EXISTS ────────────────
  * `watch-summary.tsx` held a three-figure tile block, the price, and a "View all
  * watches" link. The 2026-09-06 redesign retires it: the counts are the list
  * itself, and the price moved onto the form that commits the charge. The tests
- * that pinned the tiles went with it. The four below did NOT — each states a
- * rule about what this screen may say, and a rule does not stop applying because
- * the element carrying it moved.
+ * that pinned the tiles went with it. These did NOT — each states a rule about
+ * what this screen may say, and a rule does not stop applying because the
+ * element carrying it moved.
  */
 describe('the watch board', () => {
   it('prints the price this product actually charges, on the control that charges it', () => {
@@ -72,7 +84,8 @@ describe('the watch board', () => {
     // are a worse sentence than the one sentence they replace, and a zero about
     // the reader's own business is the figure this product is most careful with.
     const { container } = board([])
-    expect(container.querySelector('.num')?.textContent).toBe(String(creditCost('radar_scan')))
+    const figures = [...container.querySelectorAll('.num')].map((n) => n.textContent)
+    expect(figures).toEqual([String(creditCost('radar_scan'))])
     expect(screen.queryByRole('group', { name: /filter the watch list/i })).toBeNull()
   })
 
@@ -105,21 +118,18 @@ describe('the watch board', () => {
     expect(screen.getByText(/read, and nothing moved/i)).toBeTruthy()
   })
 
-  it('states the day of the next read, and does not promise one when the pass is off', () => {
-    const competitors = [watch()]
-    const { rerender } = board(competitors)
-    expect(screen.getByText(/next check/i).textContent).toContain('2026-09-07')
+  it('states the day of the next read, and promises none when the pass is off', () => {
+    board([watch()])
+    expect(screen.getByText(/next check/i).textContent).toContain(NEXT_SCAN)
 
-    rerender(
-      <WatchBoard
-        cards={watchCards({ collector: 'reading', competitors, days: [] })}
-        nextScan="2026-09-07"
-        scanArmed={false}
-        perScan={creditCost('radar_scan')}
-        scanning
-      />,
-    )
-    expect(screen.queryByText(/next check/i)).toBeNull()
-    expect(screen.getByText(/switched off/i)).toBeTruthy()
+    board([watch()], false)
+    expect(screen.getAllByText(/switched off/i).length).toBeGreaterThan(0)
+  })
+
+  it('shows the filter only where the third tab can be anything but empty', () => {
+    // Every business quiet: a "Changed" tab that always reads nothing is chrome
+    // teaching the reader that the feature is broken.
+    board([watch({ lastObservedAt: '2026-09-02T03:41:00.000Z' })])
+    expect(screen.queryByRole('group', { name: /filter the watch list/i })).toBeNull()
   })
 })
