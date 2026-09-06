@@ -113,7 +113,6 @@ function open(picture: CanvasPicture = PICTURE) {
       formats={[]}
       library={{ status: 'ok', pictures: [] }}
       signals={[]}
-      balance={null}
       initialValues={INITIAL}
       sourceGenerationId="gen-1"
       remixLocked

@@ -3,7 +3,12 @@
 import { auth } from '@clerk/nextjs/server'
 import { createPgLedgerPort, createWithCredits, loadBillingEnv } from '@sahoda/billing'
 import { createMesh, promptRefineTask, type Mesh } from '@sahoda/mesh'
-import { creditCost, type BrandSignal, type WithCreditsFn } from '@sahoda/shared'
+import {
+  creditCost,
+  PromptRefineSettingsSchema,
+  type BrandSignal,
+  type WithCreditsFn,
+} from '@sahoda/shared'
 import { z } from 'zod'
 import { randomUUID } from 'node:crypto'
 
@@ -54,6 +59,13 @@ const ACTION = 'studio_prompt_refine' as const
 const RefineInputSchema = z.object({
   /** Same bound the image-conditioning prompt box already carries. */
   wanted: z.string().trim().min(3).max(1000),
+  /**
+   * The screen's own settings, exactly what `conditionPrompt` will use to
+   * assemble the SENT prompt later. Passed straight through to
+   * `promptRefineTask` so the refiner can compose for them without naming
+   * one, per `@sahoda/mesh`'s own file header.
+   */
+  settings: PromptRefineSettingsSchema,
 })
 
 export type RefinePromptState =
@@ -129,7 +141,11 @@ export async function refineStudioPrompt(input: unknown): Promise<RefinePromptSt
       async (ctx) => {
         const result = await getMesh().runTask(
           promptRefineTask.def,
-          { wanted: parsed.data.wanted, signals: refineContext.signals },
+          {
+            wanted: parsed.data.wanted,
+            signals: refineContext.signals,
+            settings: parsed.data.settings,
+          },
           {
             workspaceId: workspace.id,
             traceId,

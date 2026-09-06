@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { BrandSignalSchema } from '@sahoda/shared'
-import type { MeshContext, MeshTaskDef } from '@sahoda/shared'
+import { BrandSignalSchema, PromptRefineSettingsSchema } from '@sahoda/shared'
+import type { MeshContext, MeshTaskDef, PromptRefineSettings, StampAnchor } from '@sahoda/shared'
 import type { ChatMessage } from '../providers/types'
 import type { MeshTaskSpec } from '../engine'
 import { PROSE_RULES } from '../prose-rules'
@@ -57,10 +57,22 @@ import { PROSE_RULES } from '../prose-rules'
  * ── PRICING ──────────────────────────────────────────────────────────────────
  * `pricing.config.json` has no entry for this task. None is invented here —
  * see the server action for where that is flagged.
+ *
+ * ── COMPOSING FOR THE SETTINGS, WITHOUT NAMING ONE ──────────────────────────
+ * Founder's ruling, 2026-09-06: refine the words AND the screen's own
+ * settings, as one structured image prompt. `input.settings`
+ * (`PromptRefineSettingsSchema`) carries the canvas shape, the stamp and its
+ * corner, the mode and whether a reference is attached, the exclusion text,
+ * and how closely to follow a reference, never the ratio, the pixel size or
+ * "logo" (still the strip's job below). `settingsGuidance` turns each one
+ * into a composition instruction the model can act on without being told
+ * the setting's name, and rides as its own uncached system message AFTER
+ * the brand block, so a settings change (every press) never invalidates the
+ * Brand Brain cache prefix.
  */
 
-/** Small: a refined prompt is a few sentences, not an essay. JSON + a 1200-char cap comfortably fits. */
-const MAX_TOKENS = 400
+/** A little more room than before: the prompt now covers subject, setting, light, composition and mood, still one string under the 1200-char schema cap. */
+const MAX_TOKENS = 450
 
 export const PromptRefineInputSchema = z.object({
   /** What the person typed. Never rewritten in place — the caller keeps this and the refinement side by side. */
@@ -71,6 +83,8 @@ export const PromptRefineInputSchema = z.object({
    * brain" — see the file header for why that collapse is correct here.
    */
   signals: z.array(BrandSignalSchema).max(16),
+  /** The screen's own settings, to compose FOR without ever naming one. See the file header. */
+  settings: PromptRefineSettingsSchema,
 })
 export type PromptRefineInput = z.infer<typeof PromptRefineInputSchema>
 
@@ -82,11 +96,12 @@ export type PromptRefineInput = z.infer<typeof PromptRefineInputSchema>
  * other half of it (after deleting only the ratio) tends to leave a dangling
  * fragment. Dropping the whole sentence is the safer failure.
  *
- * Deliberately over-inclusive within its five categories (ratio/format, pixel
- * size, image count, named model, logo) rather than trying to be clever about
- * intent — a false positive here costs one sentence of a multi-sentence
- * refinement; a false negative lets a contradiction through to the model that
- * actually draws the picture.
+ * Deliberately over-inclusive within its six categories (ratio/format, pixel
+ * size, image count, named model, logo, and the exclusion clause below)
+ * rather than trying to be clever about intent — a false positive here costs
+ * one sentence of a multi-sentence refinement; a false negative lets a
+ * contradiction, or a duplicate, through to the model that actually draws
+ * the picture.
  */
 const SETTINGS_SENTENCE_PATTERNS: readonly RegExp[] = [
   // Aspect ratio / format.
@@ -105,6 +120,11 @@ const SETTINGS_SENTENCE_PATTERNS: readonly RegExp[] = [
   /\bwhich\s+model\b/i,
   // The logo. Placement is set by a separate control.
   /\blogo\b/i,
+  // The exclusion clause. `excludeText` (via `settings.excludeText`) is
+  // appended separately, downstream, by `apps/web`'s `conditionPrompt`. A
+  // refinement that also states it as a bolted "Avoid including: X." clause
+  // would put the same instruction in the prompt actually sent twice.
+  /\bavoid\s+including\b/i,
 ]
 
 function mentionsSetting(sentence: string): boolean {
@@ -138,11 +158,76 @@ export const NO_SETTINGS_RULE =
   'model draws it, or the logo. The screen sets all of those separately, and repeating one here ' +
   'can contradict what was actually chosen.'
 
+/**
+ * SUBJECT, SETTING, LIGHT, COMPOSITION, MOOD: the usual shape a diffusion
+ * model reads well, front-loading the thing the picture is OF and narrowing
+ * to atmosphere, the order a photographer would brief a shoot in. Asked for
+ * as guidance over ONE flowing description, not a labelled list: the box
+ * this returns to holds a single string a person can read and edit, and
+ * five labelled fields would not read back as their own words.
+ */
 const SYSTEM =
   'You refine an image-generation prompt a Sahoda customer already typed, so a picture-generation ' +
   'model has more to work with. Output ONLY a JSON object {"refined": string} — no markdown, no ' +
-  'commentary. Keep the same subject and intent the person described; write two to four sentences ' +
-  `of concrete, visual description. ${NO_INVENTION_RULE} ${NO_SETTINGS_RULE} ${PROSE_RULES}`
+  'commentary. Keep the same subject and intent the person described. Write two to five sentences ' +
+  'of concrete, visual description that cover the subject, the setting around it, the light, how ' +
+  'the picture is composed, and the mood, roughly in that order, as one flowing description rather ' +
+  `than a labelled list. ${NO_INVENTION_RULE} ${NO_SETTINGS_RULE} ${PROSE_RULES}`
+
+/** The four `StampAnchorSchema` values, in plain English: the model is told where to leave room, never the word "anchor". */
+const CORNER_PHRASE: Record<StampAnchor, string> = {
+  'bottom-right': 'bottom-right',
+  'bottom-left': 'bottom-left',
+  'top-right': 'top-right',
+  'top-left': 'top-left',
+}
+
+const SHAPE_DIRECTION: Record<PromptRefineSettings['shape'], string> = {
+  square:
+    'This picture will be seen in a square crop: center the subject with balanced space on every side.',
+  tall: 'This picture will be seen in a tall crop: give the subject headroom and let the scene run vertically.',
+  wide: 'This picture will be seen in a wide crop: leave open space beside the subject rather than filling the frame edge to edge.',
+}
+
+/**
+ * The screen's settings, turned into composition instructions, never into
+ * names. Exported so each instruction is testable on its own, the same
+ * discipline `stripSettingsLanguage` gets. The shape line is always
+ * present; the rest apply only when their setting does.
+ */
+export function settingsGuidance(settings: PromptRefineSettings): string {
+  const lines: string[] = [SHAPE_DIRECTION[settings.shape]]
+
+  if (settings.stampEnabled) {
+    lines.push(
+      `Leave calm, uncluttered space in the ${CORNER_PHRASE[settings.stampAnchor]} corner of ` +
+        'the frame, since something else will be placed there.',
+    )
+  }
+
+  if (settings.mode === 'explore') {
+    lines.push('Favor a loose, varied interpretation over one fixed, precise composition.')
+  } else if (settings.hasReference) {
+    lines.push(
+      'Write this as a variation on the picture already attached rather than a brand new scene, ' +
+        'without describing what that picture shows.',
+    )
+    if (settings.referenceFollow === 'close') {
+      lines.push('Ask for the composition to stay close to the attached picture.')
+    } else if (settings.referenceFollow === 'loose') {
+      lines.push('Ask for freedom to vary the composition loosely from the attached picture.')
+    }
+  }
+
+  if (settings.excludeText !== undefined) {
+    lines.push(
+      `Write the description so it naturally never includes ${settings.excludeText}, folded ` +
+        'into the sentence rather than added as a separate note at the end.',
+    )
+  }
+
+  return lines.join(' ')
+}
 
 const RawPromptRefineOutputSchema = z.object({ refined: z.string().trim().min(1).max(1200) })
 
@@ -189,6 +274,11 @@ function buildMessages(input: PromptRefineInput, _ctx: MeshContext): ChatMessage
       cache: true,
     })
   }
+  // After the (possibly cached) brand block, never before it: settings
+  // change on every press, so putting this ahead of the brand block would
+  // make it part of the cached prefix and invalidate the cache on every
+  // press regardless of whether the Brand Brain changed.
+  messages.push({ role: 'system', content: settingsGuidance(input.settings) })
   messages.push({ role: 'user', content: input.wanted })
   return messages
 }
@@ -201,7 +291,7 @@ const def: MeshTaskDef<PromptRefineInput, PromptRefineOutput> = {
   maxTokens: MAX_TOKENS,
 }
 
-// No demo-fallback: only brand_guidelines has one. A double JSON failure (or an
+// No demo-fallback: only brand_guidelines has one. A double JSON failure (or
 // output that is nothing but settings language, twice) returns a typed
 // PROVIDER_ERROR, never a plausible-looking string.
 export const promptRefineTask: MeshTaskSpec<PromptRefineInput, PromptRefineOutput> = {

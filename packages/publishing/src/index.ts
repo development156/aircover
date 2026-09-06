@@ -120,6 +120,21 @@ export {
   type MessageSortOrder,
   type ZernioDemographicBucket,
   type ZernioInstagramDemographics,
+  type ZernioInboxAnalyticsFilter,
+  type ZernioInboxVolume,
+  type ZernioInboxVolumeSummary,
+  type ZernioInboxVolumeDay,
+  type ZernioInboxVolumePlatform,
+  type ZernioInboxHeatmap,
+  type ZernioInboxHeatmapBucket,
+  type ZernioInboxSourceBreakdown,
+  type ZernioInboxSourceRow,
+  type ZernioInboxSourcePlatform,
+  type ZernioInboxResponseTime,
+  type ZernioInboxResponseTimeSummary,
+  type ZernioInboxResponseTimeBucket,
+  type ZernioInboxTopAccounts,
+  type ZernioInboxTopAccount,
 } from './zernio/reads'
 
 // ── What an audience read is ALLOWED to claim ────────────────────────────────

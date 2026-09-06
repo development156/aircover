@@ -1,5 +1,4 @@
 import { Suspense } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
 import * as Sentry from '@sentry/nextjs'
 
@@ -126,11 +125,20 @@ export async function Rail() {
   const [isOpsAdmin, waiting] = await Promise.all([showsAdminItem(), approvalCount()])
 
   return (
-    /* ── THE RAIL FLOATS, AND IT IS DARK IN BOTH THEMES (v5) ──────────────────
+    /* ── THE RAIL FLOATS, AND IT IS THE PAGE'S OPPOSITE (v5) ──────────────────
        Two changes, one idea. MEASURED off the reference: a rounded panel inset
        10px from every viewport edge, radius 28px, fill #171717, against a
        #fafafa page. That inset is what makes the rail read as an OBJECT on the
        page rather than a wall beside it, and it is most of the reference's feel.
+
+       THIS HEADING USED TO PROMISE THE SAME FILL IN EITHER THEME, AND THAT
+       IS NO LONGER TRUE. The inverse scope serves the LIGHT ladder under `[data-theme=
+       'dark']`, so the rail is #171717 on a light page and #ffffff on a dark
+       one: always the page's opposite, which is the actual rule and the one
+       that survived. The stale sentence cost a logo — `logo-white.png` was
+       chosen BECAUSE this comment promised a dark panel, and it rendered white
+       on white the day the scope changed. A claim in a comment is load-bearing
+       for whoever reads it next.
 
        The outer div owns the inset and the stickiness; the panel is `h-full`
        inside it. Written that way rather than as `h-[calc(100dvh - 20px)]`
@@ -139,9 +147,10 @@ export async function Rail() {
        compiled stylesheet, so it looks applied and is not.
 
        `data-surface="inverse"` is the load-bearing attribute. The panel's fill
-       does NOT follow the theme, so its text tokens cannot either: without the
-       scope, `text-ink` is #000000 here and the whole rail is black on
-       near-black in light mode. See THE INVERSE SURFACE in tokens.css. */
+       is the page's opposite rather than the page's own, so its text tokens
+       cannot follow the theme either: without the scope, `text-ink` is #000000
+       here and the whole rail is black on near-black in light mode. See THE
+       INVERSE SURFACE in tokens.css. */
     <div className="sticky top-0 h-dvh flex-none p-rail-inset relative">
       <aside
         data-guide="nav.rail"
@@ -169,21 +178,42 @@ export async function Rail() {
               lockup down into illegibility — which is why this is an
               overflow-hidden box with a fixed height, not a resized image.
 
-              ONE image now, not two. The rail is dark in both themes, so the
-              light-mode lockup has nowhere left to render — and a `dark:hidden`
-              pair here would swap to the BLACK wordmark on a black panel the
-              moment someone flipped the theme. The inverse surface removed a
-              whole class of bug rather than restyling one. */}
-            <span className="block h-[34px] w-[120px] overflow-hidden rail-min:w-[34px]">
-              <Image
-                src="/brand/logo-white.png"
-                alt="Sahoda"
-                width={120}
-                height={34}
-                priority
-                className="block h-[34px] w-[120px] max-w-none"
-              />
-            </span>
+              ── WHY THIS IS A MASK AND NOT A PAINTED IMAGE ───────────────────
+              It was `logo-white.png`, chosen when this file promised a panel that
+              never followed the theme. That stopped being true: this panel carries
+              `data-surface="inverse"`, and the inverse scope now serves the
+              LIGHT ladder in dark theme, so the rail is WHITE there and a white
+              lockup rendered as nothing at all. MEASURED from a founder
+              screenshot on 2026-09-06: the rail visible, the logo absent.
+
+              Swapping to a `dark:hidden` pair of PNGs would fix the vanishing
+              and keep the mark grey-on-grey chrome. The founder's ruling is
+              that it wears the brand colour instead, matching the tab icon.
+
+              A PNG cannot be recoloured, so the alpha channel drives a mask and
+              the FILL is a token. MEASURED with sharp: both files are 826x235
+              with identical alpha and exactly one opaque colour each (white,
+              and #101014), so the glyph is entirely described by its alpha and
+              nothing is lost by discarding the colour.
+
+              One asset, one fill, correct on either ladder, and no second file
+              to keep in step with the first. `--acc` is #ff6600 in both themes,
+              which is 3.0:1 on the white rail and about 5:1 on the dark one:
+              above the 3:1 that a graphical object is held to, on both. */}
+            <span
+              aria-hidden
+              className="block h-[34px] w-[120px] overflow-hidden bg-accent rail-min:w-[34px]"
+              style={{
+                WebkitMaskImage: 'url(/brand/logo-white.png)',
+                maskImage: 'url(/brand/logo-white.png)',
+                WebkitMaskSize: '120px 34px',
+                maskSize: '120px 34px',
+                WebkitMaskRepeat: 'no-repeat',
+                maskRepeat: 'no-repeat',
+                WebkitMaskPosition: 'left center',
+                maskPosition: 'left center',
+              }}
+            />
           </Link>
         </div>
 

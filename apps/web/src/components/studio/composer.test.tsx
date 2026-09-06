@@ -81,14 +81,12 @@ const LIBRARY = [
 const open = (
   library: LibraryPicture[] | LibraryRead = LIBRARY,
   signals: BrandSignal[] | null = [],
-  balance: number | null = null,
 ) =>
   render(
     <Composer
       formats={generatableFormats()}
       library={Array.isArray(library) ? { status: 'ok', pictures: library } : library}
       signals={signals}
-      balance={balance}
     />,
   )
 
@@ -138,36 +136,75 @@ async function chooseModeUI(user: ReturnType<typeof userEvent.setup>, name: RegE
 
 describe('the shape of the bar', () => {
   /**
-   * ── CAPPED AT 820PX AND CENTRED ────────────────────────────────────────
-   * `Wall.dc.html` is the spec for the rebuilt screen and draws the bar with
-   * `margin: 0 auto` — centred, not flush against the page's own left edge.
-   * The wall's compact header no longer needs the bar's left edge to line up
-   * with a title that used to run the page's own width, so the earlier
-   * "capped, not centred" ruling (kept in this file's git history) is
-   * superseded by the new artboard.
+   * ── CAPPED AT THE FORM MEASURE, FLUSH LEFT, NOT CENTRED ──────────────────
+   * REVERSED: this used to assert `max-w-[820px]` and `mx-auto`, a hand-picked
+   * width centred within whatever the wall's own width happened to be — which
+   * is exactly the bug the founder's review named. "Page content sat at
+   * x=120 while the composer's inner content sat at x=136": the title and the
+   * wall both sit flush against this screen's one true left edge, and a
+   * centred bar of a different width never lands on it. `--measure-form`
+   * replaces the magic 820, and `mx-auto` is gone so this wrapper's own left
+   * edge is whatever edge its caller already uses — the same one the credits
+   * row, `ComposerWillSend` and `ComposerNotBuilt` below already sit on.
+   *
+   * MUTATION: put `mx-auto` back on this wrapper and this test goes red.
    */
-  test('is capped at 820px and centred', () => {
+  test('is capped at the form measure, flush left', () => {
     const { container } = open()
     const bar = container.querySelector('[data-guide="studio-bar"]') as HTMLElement
     const wrap = bar.parentElement as HTMLElement
-    expect(wrap.className).toContain('max-w-[820px]')
-    expect(wrap.className).toContain('mx-auto')
+    expect(wrap.className).toContain('max-w-[var(--measure-form)]')
+    expect(wrap.className).not.toMatch(/(^|\s)mx-auto(\s|$)/)
+  })
+
+  /**
+   * ── THE BAR'S OWN PADDING NEVER READS AS A SECOND LEFT EDGE ──────────────
+   * The bar carries `p-3` for its own visual containment, which would sit its
+   * inner content 12px right of the wrapper's edge above. `-ml-3` cancels
+   * exactly that on the left, and `w-[calc(100%+var(--space-3))]` grows the
+   * box by the same amount so the right edge is unaffected.
+   *
+   * MUTATION: delete `-ml-3` from the bar's className in `composer.tsx` and
+   * this goes red.
+   */
+  test("the bar's own left padding is cancelled at the wrapper edge", () => {
+    const { container } = open()
+    const bar = container.querySelector('[data-guide="studio-bar"]') as HTMLElement
+    expect(bar.className).toMatch(/(^|\s)-ml-3(\s|$)/)
+    expect(bar.className).toContain('w-[calc(100%+var(--space-3))]')
   })
 })
 
 describe('choosing which model draws it', () => {
-  test('the reachable models are offered by what they are good at, never by id', async () => {
+  /**
+   * RETARGETED, not deleted: `model.goodAt` used to print inline on the
+   * option itself and is checked there for `within(picker).getAllByRole
+   * ('button')`.  The founder's ruling on `/connections` vs. `/studio` moved
+   * "what it is good at" off the choosing surface and into the Model
+   * control's own drawer (`model-picker.tsx`'s `ControlDetails`), so the
+   * count now excludes that one "Details" trigger (`button[aria-pressed]`
+   * rather than every button), and `goodAt` is asserted inside the opened
+   * drawer instead of inline. `model-picker.test.tsx` pins the same claim
+   * against the component directly and in more detail; this keeps the
+   * composer's own wiring honest.
+   */
+  test('the reachable models are offered by their name, never by id, and say what they are good at in the drawer', async () => {
     const user = userEvent.setup()
     const { container } = open()
     await openModel(user)
     const picker = container.querySelector('[data-guide="studio-model"]') as HTMLElement
     expect(picker).not.toBeNull()
 
-    expect(within(picker).getAllByRole('button')).toHaveLength(routedModels().length)
+    expect(picker.querySelectorAll('button[aria-pressed]')).toHaveLength(routedModels().length)
     for (const model of routedModels()) {
       expect(picker.textContent, model.id).toContain(model.label)
-      expect(picker.textContent, model.id).toContain(model.goodAt)
       expect(picker.textContent, model.id).not.toContain(model.id)
+    }
+
+    await user.click(within(picker).getByRole('button', { name: /read what each model does/i }))
+    const drawer = screen.getByRole('dialog')
+    for (const model of routedModels()) {
+      expect(drawer.textContent, model.id).toContain(model.goodAt)
     }
   })
 
@@ -177,7 +214,7 @@ describe('choosing which model draws it', () => {
     await openModel(user)
 
     const picker = container.querySelector('[data-guide="studio-model"]') as HTMLElement
-    expect(within(picker).getAllByRole('button')).toHaveLength(routedModels().length)
+    expect(picker.querySelectorAll('button[aria-pressed]')).toHaveLength(routedModels().length)
 
     const waiting = container.querySelectorAll('[data-guide="studio-model-waiting"]')
     expect(waiting).toHaveLength(unroutedModels().length)
@@ -675,7 +712,6 @@ describe('a second press cannot reach the action while the first is in flight', 
         formats={generatableFormats()}
         library={{ status: 'ok', pictures: LIBRARY }}
         signals={[]}
-        balance={null}
         onBusyChange={(busy) => seen.push(busy)}
       />,
     )
@@ -789,7 +825,7 @@ describe('the bar', () => {
   test('no panel is open by default, and the bar stays usable', () => {
     open()
     expect(screen.queryByRole('group', { name: /how should sahoda approach it/i })).toBeNull()
-    expect(screen.getByRole('textbox')).toBeTruthy()
+    expect(screen.getByLabelText(/what should the picture show/i)).toBeTruthy()
     expect(screen.getByRole('button', { name: /generate image/i })).toBeTruthy()
   })
 
@@ -883,6 +919,72 @@ describe('what Sahoda will send, shown before the spend', () => {
     expect(value.textContent).toBe(long.value)
   })
 
+  /**
+   * ── ONE COLUMN TOKEN, NOT "AUTO" ──────────────────────────────────────
+   * `auto` sizes the label column to whatever this render's longest label
+   * happens to be, so the value column starts at a different x depending on
+   * which fields a workspace's Brand Brain answered. `--space-20` is fixed,
+   * so every render agrees with itself.
+   *
+   * MUTATION: change `grid-cols-[var(--space-20)_1fr]` back to
+   * `grid-cols-[auto_1fr]` in `composer-will-send.tsx` and this goes red.
+   */
+  test('the label column is a fixed token width, not "auto"', async () => {
+    const user = userEvent.setup()
+    const { container } = open(LIBRARY, [{ field: 'voice', certainty: 'confirmed', value: 'Warm' }])
+    await user.click(screen.getByRole('button', { name: /will send/i }))
+    const dl = container.querySelector('[data-guide="studio-signals"] dl') as HTMLElement
+    expect(dl).not.toBeNull()
+    expect(dl.className).toContain('grid-cols-[var(--space-20)_1fr]')
+    expect(dl.className).not.toMatch(/grid-cols-\[auto/)
+  })
+
+  /**
+   * ── THE DOT'S MEANING, SAID IN WORDS ───────────────────────────────────
+   * A filled vs. hollow mark beside each field is a real distinction
+   * (confirmed vs. guessed), previously spoken only to a screen reader.
+   *
+   * MUTATION: delete the legend paragraph in `composer-will-send.tsx` and
+   * this goes red.
+   */
+  test('says in words what the filled and hollow dots mean', async () => {
+    const user = userEvent.setup()
+    open(LIBRARY, [{ field: 'voice', certainty: 'confirmed', value: 'Warm' }])
+    await user.click(screen.getByRole('button', { name: /will send/i }))
+    expect(screen.getByText(/filled dot means you confirmed it/i)).toBeTruthy()
+    expect(screen.getByText(/hollow one means sahoda guessed it/i)).toBeTruthy()
+  })
+
+  /**
+   * ── EVERY SWATCH CARRIES A RING THAT SHOWS AGAINST WHITE ───────────────
+   * `surface-ring` alone (`--line-soft`, 5% black) is invisible against a
+   * near-white brand colour, which is exactly what the founder's review
+   * found. `--line-firm` is an alpha overlay, so it always darkens or
+   * lightens whatever sits under it rather than trying to out-contrast an
+   * unknown fixed colour.
+   *
+   * MUTATION: drop `shadow-[inset_0_0_0_1px_var(--line-firm)]` from the
+   * swatch's className in `composer-will-send.tsx` and this goes red.
+   */
+  test('every colour swatch carries a ring, even a near-white one', async () => {
+    const colours: BrandSignal = {
+      field: 'colours',
+      certainty: 'guessed',
+      value: 'oklch(0.98 0.01 90), oklch(0.5663 0.16 262.1)',
+    }
+    const user = userEvent.setup()
+    const { container } = open(LIBRARY, [colours])
+    await user.click(screen.getByRole('button', { name: /will send/i }))
+    const signals = container.querySelector('[data-guide="studio-signals"]') as HTMLElement
+    const swatches = Array.from(signals.querySelectorAll('span[style*="background"]'))
+    expect(swatches.length).toBe(2)
+    for (const swatch of swatches) {
+      expect((swatch as HTMLElement).className).toContain(
+        'shadow-[inset_0_0_0_1px_var(--line-firm)]',
+      )
+    }
+  })
+
   test('an empty Brand Brain and an unreadable one are different sentences', async () => {
     const user = userEvent.setup()
     open(LIBRARY, [])
@@ -916,24 +1018,148 @@ describe('what Sahoda will send, shown before the spend', () => {
   })
 })
 
-describe('the rest of the composer', () => {
-  test('shows the balance when it was read, and nothing at all when it was not', () => {
-    open(LIBRARY, [], 1240)
-    expect(screen.getByText(/credits left/i).textContent).toMatch(/1,240/)
-    cleanup()
+describe("leave out: a request, never a rewrite of the customer's own words", () => {
+  test('what is typed reaches the press, and appears in "Will send"', async () => {
+    const user = userEvent.setup()
+    const { container } = open()
+    await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
+    await user.type(screen.getByLabelText('Leave out'), 'no people')
 
-    open(LIBRARY, [], null)
+    await user.click(screen.getByRole('button', { name: /will send/i }))
+    const willSendExclude = container.querySelector(
+      '[data-guide="studio-will-send-exclude"]',
+    ) as HTMLElement
+    expect(willSendExclude).not.toBeNull()
+    expect(willSendExclude.textContent).toContain('no people')
+    expect(willSendExclude.textContent).toMatch(/cannot guarantee removal/i)
+
+    vi.mocked(queueGeneration).mockResolvedValue({
+      ok: true,
+      generationId: 'g1',
+      balanceAfter: 5,
+      made: 1,
+      asked: 1,
+    })
+    await user.click(screen.getByRole('button', { name: /generate image/i }))
+    expect(queueGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({ wanted: 'a shopfront', excludeText: 'no people' }),
+    )
+  })
+
+  test('blank text is not sent as an empty exclusion', async () => {
+    vi.mocked(queueGeneration).mockResolvedValue({
+      ok: true,
+      generationId: 'g1',
+      balanceAfter: 5,
+      made: 1,
+      asked: 1,
+    })
+    const user = userEvent.setup()
+    open()
+    await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
+    await user.click(screen.getByRole('button', { name: /generate image/i }))
+    expect(queueGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({ excludeText: undefined }),
+    )
+  })
+})
+
+describe('follow how closely: meaningless with no reference, and it says so', () => {
+  test('is unavailable, with the reason stated, until a picture is picked', async () => {
+    const user = userEvent.setup()
+    const { container } = open(LIBRARY)
+    for (const button of screen.getAllByRole('button', { name: /closely|balanced/i })) {
+      expect(button).toBeDisabled()
+    }
+    expect(screen.getByText(/pick a picture to match first/i)).toBeTruthy()
+
+    await openMatch(user)
+    const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
+    await user.click(within(picker).getAllByRole('button')[0]!)
+
+    for (const button of screen.getAllByRole('button', { name: /closely|balanced/i })) {
+      expect(button).toBeEnabled()
+    }
+    expect(screen.queryByText(/pick a picture to match first/i)).toBeNull()
+  })
+
+  test('a chosen step reaches the press, and appears in "Will send"', async () => {
+    vi.mocked(queueGeneration).mockResolvedValue({
+      ok: true,
+      generationId: 'g1',
+      balanceAfter: 5,
+      made: 1,
+      asked: 1,
+    })
+    const user = userEvent.setup()
+    const { container } = open(LIBRARY)
+    await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
+    await openMatch(user)
+    const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
+    await user.click(within(picker).getAllByRole('button')[0]!)
+
+    await user.click(screen.getByRole('button', { name: 'Closely' }))
+    await user.click(screen.getByRole('button', { name: /will send/i }))
+    const willSendFollow = container.querySelector(
+      '[data-guide="studio-will-send-follow"]',
+    ) as HTMLElement
+    expect(willSendFollow).not.toBeNull()
+    expect(willSendFollow.textContent).toContain('Closely')
+    expect(willSendFollow.textContent).toMatch(/does not guarantee an exact match/i)
+
+    await user.click(screen.getByRole('button', { name: /generate image/i }))
+    expect(queueGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({ referenceFollow: 'close' }),
+    )
+  })
+
+  test('"balanced", the default, is never named in "Will send"', async () => {
+    const user = userEvent.setup()
+    const { container } = open(LIBRARY)
+    await openMatch(user)
+    const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
+    await user.click(within(picker).getAllByRole('button')[0]!)
+
+    await user.click(screen.getByRole('button', { name: /will send/i }))
+    expect(screen.queryByText(/follow how closely:/i)).toBeNull()
+  })
+})
+
+describe('the rest of the composer', () => {
+  /**
+   * ── THE TOPBAR PILL IS THE ONE READOUT, NOT THIS BAR ─────────────────────
+   * REPLACES a test that used to render a `balance` prop and assert this bar
+   * printed "N credits left" of its own. That prop and that sentence are
+   * gone: the founder's review found the same figure floating a second time,
+   * right-aligned and anchored to nothing, while the topbar's own credit
+   * pill (`credit-chip.tsx`) already carries it on every screen this bar can
+   * appear on. See `composer.tsx`'s own header.
+   *
+   * MUTATION: put the deleted balance block back (even without a prop to
+   * feed it, hard-coding a number) and this goes red.
+   */
+  test('never shows a credits balance of its own', () => {
+    open()
     expect(screen.queryByText(/credits left/i)).toBeNull()
-    expect(screen.queryByText(/\b0\b/)).toBeNull()
   })
 
   test('names the controls that are designed and not built, as text not buttons', () => {
     open()
-    for (const title of ['Leave out', 'Same again', 'Follow how closely']) {
-      expect(screen.getByText(title), title).toBeTruthy()
-      expect(screen.queryByRole('button', { name: title }), title).toBeNull()
-    }
+    expect(screen.getByText('Same again')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Same again' })).toBeNull()
     expect(screen.getByText(/nothing here changes what a press does today/i)).toBeTruthy()
+  })
+
+  /**
+   * "Leave out" and "Follow how closely" left the not-built row on 2026-09-06:
+   * they render as real controls now (`composer-refine-controls.tsx`), not as
+   * a locked name in this list.
+   */
+  test('"Leave out" and "Follow how closely" no longer sit in the not-built row', () => {
+    const { container } = open()
+    const row = container.querySelector('[data-guide="studio-coming-soon"]') as HTMLElement
+    expect(row.textContent).not.toMatch(/leave out/i)
+    expect(row.textContent).not.toMatch(/follow how closely/i)
   })
 
   test('does not name the prompt refiner as missing while the refiner is on screen', () => {
@@ -1250,6 +1476,171 @@ describe('rewrite for the model', () => {
 })
 
 /**
+ * THE FLAG THAT STOPS A REFINED PROMPT CARRYING THE BRAND TWICE.
+ *
+ * `prompt.test.ts` proves `conditionPrompt` itself skips the `Brand context:`
+ * block when told to. `studio-brand-carried.test.ts` proves the flag reaches
+ * that call through `queueGeneration`'s own input. This block proves the
+ * THIRD hop: that the composer sets and clears the flag correctly as a person
+ * refines, edits and reverts.
+ */
+describe('the flag that stops a refined prompt carrying the brand twice', () => {
+  const REFINED = {
+    ok: true as const,
+    original: 'a shopfront',
+    refined: 'A warm, plain-spoken shopfront at dusk, oat-milk latte art',
+    headline: 'Built from your words alone',
+    body: 'placeholder body',
+    brainState: 'ok' as const,
+    usedSignals: [],
+    balanceAfter: 99,
+    creditsCharged: 1,
+  }
+
+  function mockQueued(): void {
+    vi.mocked(queueGeneration).mockResolvedValue({
+      ok: true,
+      generationId: 'g1',
+      balanceAfter: 5,
+      made: 1,
+      asked: 1,
+    })
+  }
+
+  /**
+   * MUTATION (flag ignored): pass a literal `false` instead of `brandCarried`
+   * in `use-composer.ts`'s `generate`. Goes red.
+   */
+  test('accepting a refine, then pressing Generate, sends brandAlreadyCarried: true', async () => {
+    vi.mocked(refineStudioPrompt).mockResolvedValue(REFINED)
+    mockQueued()
+    const user = userEvent.setup()
+    open()
+    await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
+    await user.click(screen.getByRole('button', { name: /rewrite for the model/i }))
+    await waitFor(() =>
+      expect(
+        (screen.getByLabelText(/what should the picture show/i) as HTMLTextAreaElement).value,
+      ).toBe(REFINED.refined),
+    )
+
+    await user.click(screen.getByRole('button', { name: /generate image/i }))
+    expect(queueGeneration).toHaveBeenLastCalledWith(
+      expect.objectContaining({ brandAlreadyCarried: true }),
+    )
+  })
+
+  test('a prompt never refined this press sends brandAlreadyCarried: false', async () => {
+    mockQueued()
+    const user = userEvent.setup()
+    open()
+    await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
+    await user.click(screen.getByRole('button', { name: /generate image/i }))
+    expect(queueGeneration).toHaveBeenLastCalledWith(
+      expect.objectContaining({ brandAlreadyCarried: false }),
+    )
+  })
+
+  /**
+   * MUTATION (revert leaves the flag set): delete `setBrandCarried(false)`
+   * from `revertRefine` in `use-composer.ts`. Goes red.
+   */
+  test('reverting drops the flag: the next press sends brandAlreadyCarried: false', async () => {
+    vi.mocked(refineStudioPrompt).mockResolvedValue(REFINED)
+    mockQueued()
+    const user = userEvent.setup()
+    open()
+    await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
+    await user.click(screen.getByRole('button', { name: /rewrite for the model/i }))
+    await waitFor(() =>
+      expect(
+        (screen.getByLabelText(/what should the picture show/i) as HTMLTextAreaElement).value,
+      ).toBe(REFINED.refined),
+    )
+
+    await user.click(screen.getByRole('button', { name: /get your own words back/i }))
+    await user.click(screen.getByRole('button', { name: /generate image/i }))
+    expect(queueGeneration).toHaveBeenLastCalledWith(
+      expect.objectContaining({ brandAlreadyCarried: false }),
+    )
+  })
+
+  /**
+   * THE RULE UNDER TEST: a small edit to a refined prompt keeps the flag.
+   * "Make it evening instead of morning" is the founder's own example —
+   * changing one word deep in a long sentence leaves the rest, and the flag,
+   * intact.
+   */
+  test('a small edit after refining keeps the flag set', async () => {
+    vi.mocked(refineStudioPrompt).mockResolvedValue(REFINED)
+    mockQueued()
+    const user = userEvent.setup()
+    open()
+    const prompt = screen.getByLabelText(/what should the picture show/i) as HTMLTextAreaElement
+    await user.type(prompt, 'a shopfront')
+    await user.click(screen.getByRole('button', { name: /rewrite for the model/i }))
+    await waitFor(() => expect(prompt.value).toBe(REFINED.refined))
+
+    // One small edit deep in the sentence: "dusk" becomes "dawn", everything
+    // else on both sides is untouched. A single change event, the same shape
+    // React's controlled `<textarea>` fires for any one keystroke.
+    fireEvent.change(prompt, { target: { value: REFINED.refined.replace('dusk', 'dawn') } })
+
+    await user.click(screen.getByRole('button', { name: /generate image/i }))
+    expect(queueGeneration).toHaveBeenLastCalledWith(
+      expect.objectContaining({ brandAlreadyCarried: true }),
+    )
+  })
+
+  /**
+   * THE OTHER HALF: clearing the box entirely and retyping something new
+   * drops the flag, because nothing of the refined sentence survives.
+   */
+  test('clearing the box and typing something new drops the flag', async () => {
+    vi.mocked(refineStudioPrompt).mockResolvedValue(REFINED)
+    mockQueued()
+    const user = userEvent.setup()
+    open()
+    const prompt = screen.getByLabelText(/what should the picture show/i) as HTMLTextAreaElement
+    await user.type(prompt, 'a shopfront')
+    await user.click(screen.getByRole('button', { name: /rewrite for the model/i }))
+    await waitFor(() => expect(prompt.value).toBe(REFINED.refined))
+
+    await user.clear(prompt)
+    await user.type(prompt, 'a cup of chai beside a window')
+
+    await user.click(screen.getByRole('button', { name: /generate image/i }))
+    expect(queueGeneration).toHaveBeenLastCalledWith(
+      expect.objectContaining({ brandAlreadyCarried: false }),
+    )
+  })
+
+  /**
+   * A starter chip replaces the box outright, same as clearing and retyping:
+   * nothing of a previously refined sentence survives.
+   */
+  test('picking a starter after refining drops the flag', async () => {
+    vi.mocked(refineStudioPrompt).mockResolvedValue(REFINED)
+    mockQueued()
+    const user = userEvent.setup()
+    const { container } = open()
+    const prompt = screen.getByLabelText(/what should the picture show/i) as HTMLTextAreaElement
+    await user.type(prompt, 'a shopfront')
+    await user.click(screen.getByRole('button', { name: /rewrite for the model/i }))
+    await waitFor(() => expect(prompt.value).toBe(REFINED.refined))
+
+    await user.clear(prompt)
+    const starters = container.querySelector('[data-guide="studio-starters"]') as HTMLElement
+    await user.click(within(starters).getAllByRole('button')[0]!)
+
+    await user.click(screen.getByRole('button', { name: /generate image/i }))
+    expect(queueGeneration).toHaveBeenLastCalledWith(
+      expect.objectContaining({ brandAlreadyCarried: false }),
+    )
+  })
+})
+
+/**
  * `scrollHeight` is not implemented by jsdom's layout engine, so `Textarea`'s
  * own `fit()` always sees 0 unless a test supplies one. This stub answers
  * with a height proportional to the number of lines in the field's OWN
@@ -1360,7 +1751,6 @@ describe('starting from an existing generation, for the viewer to reuse', () => 
         formats={generatableFormats()}
         library={{ status: 'ok', pictures: LIBRARY }}
         signals={[]}
-        balance={null}
         initialValues={{
           wanted: 'a plate of samosas',
           mode: 'match',
@@ -1402,7 +1792,6 @@ describe('starting from an existing generation, for the viewer to reuse', () => 
         formats={generatableFormats()}
         library={{ status: 'ok', pictures: LIBRARY }}
         signals={[]}
-        balance={null}
         onGenerated={onGenerated}
       />,
     )
@@ -1415,13 +1804,12 @@ describe('starting from an existing generation, for the viewer to reuse', () => 
   })
 
   test('extraControls renders inside the chip row', () => {
-    const { container } = open(LIBRARY, [], null)
+    const { container } = open(LIBRARY, [])
     render(
       <Composer
         formats={generatableFormats()}
         library={{ status: 'ok', pictures: LIBRARY }}
         signals={[]}
-        balance={null}
         extraControls={<span data-testid="remix-slot">Remix this</span>}
       />,
       { container: document.body.appendChild(document.createElement('div')) },

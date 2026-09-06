@@ -7,6 +7,7 @@ import {
 } from '../enums'
 import { JsonbSchema } from '../common'
 import { BrandMemoryPayloadSchema } from '../brand/resolve'
+import { BrandStarterIdeasSchema } from '../studio/starters'
 
 /** Append-only versions; revert = a new version. Members read only — all writes server-side. */
 export const BrandMemorySchema = z.object({
@@ -65,3 +66,25 @@ export const MemoryEventSchema = z.object({
   updated_at: z.string(),
 })
 export type MemoryEvent = z.infer<typeof MemoryEventSchema>
+
+/**
+ * `brand_starters` — the picture ideas written once per Brand Brain version.
+ * See `20260906120000_brand_starters.sql` for why `brand_version` (not
+ * `workspaces.id` alone) is the key: a row whose `brand_version` is not the
+ * active one is stale by construction and must not be served.
+ *
+ * `starters` is `BrandStarterIdeasSchema`, not a plain string array: each idea
+ * is a chip label and a full prompt sentence, so the box gets the whole thing
+ * and the chip stays short. The database CHECK bounds the array at 3 to 8
+ * elements regardless of shape, which an array of objects satisfies exactly
+ * like an array of strings would.
+ */
+export const BrandStartersRowSchema = z.object({
+  id: z.uuid(),
+  workspace_id: z.uuid(),
+  brand_version: z.int(),
+  starters: BrandStarterIdeasSchema,
+  model_id: z.string().nullable(),
+  created_at: z.string(),
+})
+export type BrandStartersRow = z.infer<typeof BrandStartersRowSchema>

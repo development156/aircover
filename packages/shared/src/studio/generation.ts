@@ -309,3 +309,55 @@ export type StampOptions = z.infer<typeof StampOptionsSchema>
 
 /** Exactly today's behaviour, as a value: on, bottom-right, medium (14%). */
 export const DEFAULT_STAMP_OPTIONS: StampOptions = StampOptionsSchema.parse({})
+
+/**
+ * A FEW WORDS DESCRIBING WHAT THE PICTURE SHOULD NOT SHOW.
+ *
+ * ── WHY THIS IS PROMPT-LEVEL, AND WHY THE COMMENT MATTERS MORE THAN THE CODE ─
+ * MEASURED against `packages/mesh/src/providers/openrouter.ts`: the images
+ * request body carries exactly `model`, `prompt`, `size` and
+ * `input_references`. There is no negative-prompt field. So this text is
+ * appended to the SENTENCE Sahoda sends, not passed to a switch the model is
+ * obliged to honour. A diffusion model follows an exclusion imperfectly, and
+ * every caller reading this value must say what it is asking for, never what
+ * it is guaranteeing.
+ *
+ * ── WHY IT NEVER TOUCHES `wanted` ────────────────────────────────────────────
+ * The clause is appended to the prompt actually SENT to the model
+ * (`studio_generations.prompt_sent`); the words the customer typed
+ * (`prompt_given`) are never rewritten by it, the same separation brand
+ * conditioning already keeps.
+ *
+ * ── THE BOUND IS A COST CONTROL, NOT A STYLE RULE ────────────────────────────
+ * `wanted` alone can already reach 1,000 characters (`ImageGenerateInputSchema`
+ * in `mesh/tasks.ts`), which is the hard ceiling the assembled prompt must
+ * clear. A short bound here leaves room for the exclusion clause without the
+ * caller having to reason about the exact character budget left over from a
+ * long description; the caller still decides, deliberately, what to do when
+ * the two together would still be too long — see `IMAGE_PROMPT_MAX_CHARS`.
+ */
+export const LEAVE_OUT_MAX_CHARS = 120
+export const LeaveOutSchema = z.string().trim().min(1).max(LEAVE_OUT_MAX_CHARS)
+export type LeaveOut = z.infer<typeof LeaveOutSchema>
+
+/**
+ * HOW CLOSELY A PICTURE SHOULD FOLLOW THE REFERENCE IMAGES IT WAS GIVEN.
+ *
+ * Same honesty rule as `LeaveOutSchema` above and the same measured fact: the
+ * provider has no strength field, so this is a sentence appended to the
+ * prompt, never a dial the model is bound to obey.
+ *
+ * ── MEANINGLESS WITHOUT A REFERENCE, AND THAT IS THE CALLER'S JOB TO ENFORCE ─
+ * This schema does not know whether any reference was picked; a caller with
+ * zero references must not pass anything other than the default, and the
+ * screen that offers this choice must show it as unavailable rather than
+ * rendering a live control that silently does nothing.
+ *
+ * `balanced` is the default and adds NOTHING to the prompt: it is already
+ * what every mode's own direction already asks for, so a request that never
+ * mentions this field draws exactly the picture it always has.
+ */
+export const REFERENCE_FOLLOW_STEPS = ['loose', 'balanced', 'close'] as const
+export const ReferenceFollowSchema = z.enum(REFERENCE_FOLLOW_STEPS).default('balanced')
+export type ReferenceFollow = z.infer<typeof ReferenceFollowSchema>
+export const DEFAULT_REFERENCE_FOLLOW: ReferenceFollow = ReferenceFollowSchema.parse(undefined)

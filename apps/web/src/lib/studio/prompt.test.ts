@@ -100,6 +100,168 @@ describe('conditionPrompt', () => {
     })
     expect(used.map((s) => s.field)).toEqual(['voice'])
   })
+
+  /**
+   * LEAVE OUT: A CLAUSE APPENDED, NEVER A REWRITE OF THE CUSTOMER'S OWN WORDS.
+   *
+   * MUTATION: fold `excludeText` into `wanted` instead of appending it as its
+   * own part and this goes red, because the person's own words no longer
+   * start the prompt unchanged.
+   */
+  test("what to leave out reaches the prompt as its own clause, after the customer's words", () => {
+    const { prompt } = conditionPrompt({
+      mode: 'on_brand',
+      wanted: 'a plate of samosas',
+      signals: [],
+      excludeText: 'no people',
+    })
+    expect(prompt.startsWith('a plate of samosas')).toBe(true)
+    expect(prompt).toContain('no people')
+  })
+
+  test('blank or absent exclusion text adds nothing', () => {
+    const absent = conditionPrompt({ mode: 'on_brand', wanted: 'x', signals: [] }).prompt
+    const blank = conditionPrompt({
+      mode: 'on_brand',
+      wanted: 'x',
+      signals: [],
+      excludeText: '   ',
+    }).prompt
+    expect(blank).toBe(absent)
+  })
+
+  /**
+   * THE MODEL IS ASKED, NEVER PROMISED. A diffusion model follows an
+   * exclusion imperfectly, and the sentence sent must not claim otherwise.
+   */
+  test('the exclusion clause asks rather than guarantees', () => {
+    const { prompt } = conditionPrompt({
+      mode: 'on_brand',
+      wanted: 'x',
+      signals: [],
+      excludeText: 'no text on the sign',
+    })
+    expect(prompt).not.toMatch(/will not include/i)
+    expect(prompt).not.toMatch(/guarantee/i)
+  })
+
+  /**
+   * FOLLOW HOW CLOSELY: `balanced` IS THE SAME PROMPT AS NAMING NOTHING.
+   *
+   * MUTATION: always append a `referenceFollow` line, even for `balanced`,
+   * and this goes red.
+   */
+  test('"balanced" adds nothing: it is already the mode\'s own direction', () => {
+    const withoutField = conditionPrompt({ mode: 'match', wanted: 'x', signals: [] }).prompt
+    const withBalanced = conditionPrompt({
+      mode: 'match',
+      wanted: 'x',
+      signals: [],
+      referenceFollow: 'balanced',
+    }).prompt
+    expect(withBalanced).toBe(withoutField)
+  })
+
+  /**
+   * THE DEFECT THIS FIX EXISTS FOR: A REFINED PROMPT MUST CARRY THE BRAND ONCE.
+   *
+   * MUTATION 1 (flag ignored): delete the `&& !input.brandAlreadyCarried`
+   * guard so the block always appends. Both tests in this pair go red: the
+   * first because the refined prompt would gain a second `Brand context:`
+   * block it must not have.
+   *
+   * MUTATION 2 (flag inverted): flip the condition to
+   * `!used.length || input.brandAlreadyCarried` (or equivalent). The second
+   * test goes red because an ordinary, unrefined prompt would then lose its
+   * `Brand context:` block.
+   */
+  test('a refined prompt (brandAlreadyCarried) is sent with the brand once, not twice', () => {
+    const { prompt } = conditionPrompt({
+      mode: 'on_brand',
+      wanted: 'A warm, plain-spoken shopfront at dusk',
+      signals: [confirmed, guessed],
+      brandAlreadyCarried: true,
+    })
+    expect(prompt).not.toContain('Brand context:')
+    // Neither signal's LABELLED form reaches the model twice: the values may
+    // legitimately appear inside the person's own refined sentence, but the
+    // list this function would otherwise build must not.
+    expect(prompt).not.toMatch(/- voice:/)
+    expect(prompt).not.toMatch(/- audience:/)
+  })
+
+  test('an unrefined prompt still gets its Brand context block', () => {
+    const { prompt } = conditionPrompt({
+      mode: 'on_brand',
+      wanted: 'a shopfront',
+      signals: [confirmed, guessed],
+    })
+    expect(prompt).toContain('Brand context:')
+    expect(prompt).toContain('- voice: warm and direct')
+  })
+
+  test('brandAlreadyCarried never hides the mode direction, exclusion or follow clauses', () => {
+    const carried = conditionPrompt({
+      mode: 'match',
+      wanted: 'a shopfront',
+      signals: [confirmed],
+      brandAlreadyCarried: true,
+      excludeText: 'no people',
+      referenceFollow: 'close',
+    }).prompt
+    const notCarried = conditionPrompt({
+      mode: 'match',
+      wanted: 'a shopfront',
+      signals: [confirmed],
+      excludeText: 'no people',
+      referenceFollow: 'close',
+    }).prompt
+
+    for (const prompt of [carried, notCarried]) {
+      expect(prompt).toMatch(/match the style, lighting and composition/i)
+      expect(prompt).toContain('Avoid including: no people.')
+      expect(prompt).toMatch(/follow the reference images closely/i)
+    }
+  })
+
+  test('brandAlreadyCarried still reports which signals applied, for the record and the disclosure', () => {
+    const { used } = conditionPrompt({
+      mode: 'on_brand',
+      wanted: 'a shopfront',
+      signals: [confirmed, guessed],
+      brandAlreadyCarried: true,
+    })
+    expect(used).toHaveLength(2)
+  })
+
+  test('brandAlreadyCarried is a no-op when there is nothing to fold in anyway', () => {
+    const withFlag = conditionPrompt({
+      mode: 'on_brand',
+      wanted: 'x',
+      signals: [],
+      brandAlreadyCarried: true,
+    }).prompt
+    const withoutFlag = conditionPrompt({ mode: 'on_brand', wanted: 'x', signals: [] }).prompt
+    expect(withFlag).toBe(withoutFlag)
+  })
+
+  test('loose and close each add a different, honest direction', () => {
+    const loose = conditionPrompt({
+      mode: 'match',
+      wanted: 'x',
+      signals: [],
+      referenceFollow: 'loose',
+    }).prompt
+    const close = conditionPrompt({
+      mode: 'match',
+      wanted: 'x',
+      signals: [],
+      referenceFollow: 'close',
+    }).prompt
+    expect(loose).toMatch(/loosely|inspiration/i)
+    expect(close).toMatch(/closely/i)
+    expect(loose).not.toBe(close)
+  })
 })
 
 describe('describeConditioning', () => {

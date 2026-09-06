@@ -16,6 +16,18 @@ import { describe, expect, test } from 'vitest'
  * route the pointer is over), which is the only prefetch a navigation rail
  * needs. This test reads the source because prefetch is not observable in
  * the rendered DOM: a `<Link>` without the prop looks identical to one with it.
+ *
+ * ── WHAT IT CANNOT SEE, STATED SO NOBODY READS SILENCE AS COVERAGE ──────────
+ *  · It reads FOUR named files. A fifth shell surface, a link moved into a new
+ *    component, or a nav rendered by something outside this list is invisible
+ *    to it, and would prefetch twenty routes again with nothing going red.
+ *  · The match is a regex over `<Link …>` TEXT. A link whose props are spread
+ *    (`<Link {...props}>`), built by a wrapper component, or given the value
+ *    through a variable rather than the literal `prefetch={false}` reads as a
+ *    violation or as a pass depending only on how it was typed.
+ *  · It cannot see a REQUEST. It asserts the prop is written, never that the
+ *    browser stopped firing `?_rsc=` on sight — that was measured by hand in
+ *    Vercel's function log and is not re-measured here.
  */
 const SHELL = resolve(import.meta.dirname)
 const FILES = ['nav-item.tsx', 'bottom-nav.tsx', 'more-sheet.tsx', 'rail.tsx']

@@ -5,12 +5,15 @@ import Link from 'next/link'
 import type { BrandSignal, GenerationMode, StampAnchor, StampSizeStep } from '@sahoda/shared'
 
 import type { QueueGenerationState } from '@/app/actions/studio'
-import { creditWord } from '@/lib/credit-words'
 import { ComposerChips } from '@/components/studio/composer-chips'
 import { ComposerNotBuilt } from '@/components/studio/composer-not-built'
 import { ComposerPanels } from '@/components/studio/composer-panels'
 import { ComposerPickedReferences } from '@/components/studio/composer-picked-references'
 import { ComposerPrompt } from '@/components/studio/composer-prompt'
+import {
+  ComposerLeaveOut,
+  ComposerReferenceFollow,
+} from '@/components/studio/composer-refine-controls'
 import { ComposerStarters } from '@/components/studio/composer-starters'
 import { ComposerWillSend } from '@/components/studio/composer-will-send'
 import { PromptRefineControl } from '@/components/studio/prompt-refine-control'
@@ -18,6 +21,7 @@ import { ReferencePreview } from '@/components/studio/reference-preview'
 import { useComposer } from '@/components/studio/use-composer'
 import type { StudioFormat } from '@/lib/studio/formats'
 import type { LibraryRead } from '@/lib/studio/read'
+import { combineStudioStarters, type StudioStarters } from '@/lib/studio/starter-ladder'
 
 /**
  * THE COMPOSER. A BAR, NOT A CARD, AND NOW A COMPONENT OF ITS OWN.
@@ -57,6 +61,15 @@ import type { LibraryRead } from '@/lib/studio/read'
  * control that belongs to a caller and not to the bar itself — the viewer's
  * remix toggle is the first one expected to use it.
  *
+ * ── NO BALANCE READOUT HERE ────────────────────────────────────────────
+ * This bar used to print "N credits left" of its own, right-aligned and
+ * anchored to nothing. The topbar's own credit pill (`credit-chip.tsx`)
+ * already carries that exact figure on every screen this bar can appear on,
+ * so a second copy here was the same number twice, not a second fact. If a
+ * caller ever needs to show something the pill does not (say, a shortfall
+ * specific to the press about to run), that belongs in `note`/`short`
+ * below, which already exists for exactly that kind of per-press claim.
+ *
  * ── WHAT DOES NOT LIVE HERE ANY MORE ─────────────────────────────────────
  * `activeId`, the canvas, `viewing`/`drawing`, the version toggle and the
  * "use these words again" / "use it in a post" actions were all about a
@@ -88,8 +101,15 @@ export interface ComposerProps {
   library: LibraryRead
   /** What the Brand Brain will add to this request, shown before the press. Null means the read failed. */
   signals: BrandSignal[] | null
-  /** Spendable credits, or null when the read did not produce a number. Null renders as nothing, never as zero. */
-  balance: number | null
+  /**
+   * The three-step starter ladder (`lib/studio/starter-ladder.ts`), already
+   * resolved by a caller that could reach the database — `/studio`'s own page
+   * is the one that does. Omitted for a caller with no such read (the viewer,
+   * a post's own composer): this bar then falls back to steps 2 and 3 alone,
+   * computed here from `signals`, which is always a real improvement over
+   * nothing and never a network call of its own.
+   */
+  starters?: StudioStarters
   /** See this file's header. Omitted for a bar that starts from nothing. */
   initialValues?: ComposerInitialValues
   /** Fires with a successful press's own result, before this bar refreshes the router. See this file's header. */
@@ -109,13 +129,14 @@ export function Composer({
   formats,
   library,
   signals,
-  balance,
+  starters,
   initialValues,
   onGenerated,
   onBusyChange,
   extraControls,
 }: ComposerProps) {
   const c = useComposer({ formats, library, initialValues, onGenerated })
+  const effectiveStarters = starters ?? combineStudioStarters(null, signals)
 
   // `onBusyChange` mirrors `busy` for a caller outside this tree, whose
   // render already depends on it — done as a plain effect rather than inside
@@ -125,17 +146,25 @@ export function Composer({
   }, [c.busy, onBusyChange])
 
   return (
-    <div className="mx-auto flex w-full max-w-[820px] flex-col gap-3">
-      {balance === null ? null : (
-        <div className="flex justify-end">
-          <span className="type-sm text-muted" data-guide="studio-balance">
-            <span className="num">{balance.toLocaleString()}</span> {creditWord(balance)} left
-          </span>
-        </div>
-      )}
-
+    <div className="flex w-full max-w-[var(--measure-form)] flex-col gap-3">
       <div
-        className="surface-ring flex flex-col gap-3 rounded-xl bg-surface p-3 shadow-lg"
+        /*
+         * ── ONE LEFT EDGE, NOT TWO ─────────────────────────────────────────
+         * This wrapper carries no side padding of its own, so its left edge
+         * IS whatever edge the caller already lines its other content up on
+         * (the wall's page edge, the viewer aside's own edge) — the same
+         * edge `ComposerWillSend` and `ComposerNotBuilt` below already sit
+         * on, unpadded. The bar itself is the one element in this tree that
+         * carries `p-3` for its own visual containment (the surface, the
+         * ring, the shadow), which would otherwise read as a second, 12px-
+         * indented left edge next to that one. `-ml-3` cancels exactly that
+         * padding on the left only; `w-[calc(100%+var(--space-3))]` grows
+         * the box by the same amount so the RIGHT edge lands where it would
+         * have anyway. The result: the prompt text, the pills and the price
+         * all start at the one true edge, and the card still has a ring of
+         * breathing room on every other side.
+         */
+        className="surface-ring -ml-3 flex w-[calc(100%+var(--space-3))] flex-col gap-3 rounded-xl bg-surface p-3 shadow-lg"
         data-guide="studio-bar"
         data-surface="inverse"
       >
@@ -149,9 +178,18 @@ export function Composer({
           onSubmit={c.generate}
         />
 
-        <PromptRefineControl wanted={c.wanted} onChange={c.setWanted} />
+        <PromptRefineControl
+          wanted={c.wanted}
+          onAccept={c.acceptRefine}
+          onRevert={c.revertRefine}
+          settings={c.refineSettings}
+        />
 
-        <ComposerStarters visible={c.wanted.trim() === ''} onPick={c.setWanted} />
+        <ComposerStarters
+          visible={c.wanted.trim() === ''}
+          starters={effectiveStarters.starters}
+          onPick={c.setWanted}
+        />
 
         <ComposerPickedReferences
           picked={c.picked}
@@ -174,6 +212,15 @@ export function Composer({
           onStepCount={c.setCount}
           extraControls={extraControls}
         />
+
+        <div className="flex flex-wrap items-start gap-4">
+          <ComposerLeaveOut value={c.excludeText} onChange={c.setExcludeText} />
+          <ComposerReferenceFollow
+            value={c.referenceFollow}
+            onChange={c.setReferenceFollow}
+            hasReference={c.picked.length > 0}
+          />
+        </div>
 
         {c.count === 1 ? null : (
           <p className="type-sm text-muted">
@@ -211,7 +258,12 @@ export function Composer({
         />
       </div>
 
-      <ComposerWillSend signals={signals} />
+      <ComposerWillSend
+        signals={signals}
+        excludeText={c.excludeText}
+        referenceFollow={c.referenceFollow}
+        hasReference={c.picked.length > 0}
+      />
       <ComposerNotBuilt />
 
       {c.note === null ? null : (

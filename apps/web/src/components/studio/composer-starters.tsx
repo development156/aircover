@@ -1,4 +1,4 @@
-import { PROMPT_STARTERS } from '@/lib/studio/prompt'
+import type { PromptStarter } from '@/lib/studio/prompt'
 
 /**
  * SOMETHING TO TRY, FOR A BOX NOBODY KNOWS WHAT TO PUT IN.
@@ -6,19 +6,27 @@ import { PROMPT_STARTERS } from '@/lib/studio/prompt'
  * These FILL the prompt rather than generating, so nothing is spent by
  * trying one and the words can be edited first. Hidden once there is
  * something to edit, because then they are only in the way.
+ *
+ * `starters` is resolved by the caller (`composer.tsx`), through the
+ * three-step ladder in `lib/studio/starter-ladder.ts`: stored ideas a model
+ * wrote for this exact Brand Brain version, brand words folded into generic
+ * frames, or the five generic ideas, in that order. This component renders
+ * whichever list it is handed and does not know which step produced it.
  */
 export function ComposerStarters({
   visible,
+  starters,
   onPick,
 }: {
   visible: boolean
+  starters: readonly PromptStarter[]
   onPick: (text: string) => void
 }) {
   if (!visible) return null
 
   return (
     <ul className="flex flex-wrap gap-2" data-guide="studio-starters">
-      {PROMPT_STARTERS.map((starter) => (
+      {starters.map((starter) => (
         <li key={starter.prompt}>
           {/* The chip SHOWS the subject and its tooltip carries the sentence the
               box is about to get, so five sit on one line and a person can still

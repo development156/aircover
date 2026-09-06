@@ -1,8 +1,7 @@
 import { BrainCircuit } from 'lucide-react'
 
 import { EmptyState } from '@/components/empty-state'
-import { buttonVariants } from '@/components/ui/button'
-import { createWorkspace } from '@/app/actions/workspace'
+import { CreateWorkspaceCta } from '@/components/brain/create-workspace-cta'
 import { SectionCard } from '@/components/brain/section-card'
 import { SectionCardEmpty } from '@/components/brain/section-card-empty'
 import { BRAIN_SECTIONS, type BrainSectionKey } from '@/lib/brand/fields'
@@ -20,17 +19,6 @@ import { readBrain } from '@/lib/brand/read-brain'
  * exactly the sections it names, so adding a section to `BRAIN_SECTIONS` cannot
  * silently make it appear on a tab nobody chose it for.
  */
-/**
- * `createWorkspace` is shaped for `useActionState` (prev state, form data) and
- * returns a state object; a plain `<form action>` wants `(formData) => void`.
- * Success redirects into onboarding from inside the action, so the returned
- * failure state is the only thing this wrapper drops.
- */
-async function createWorkspaceFromBrain(formData: FormData): Promise<void> {
-  'use server'
-  await createWorkspace(null, formData)
-}
-
 export async function BrainSections({ only }: { only: readonly BrainSectionKey[] }) {
   const brain = await readBrain()
 
@@ -48,19 +36,7 @@ export async function BrainSections({ only }: { only: readonly BrainSectionKey[]
         icon={BrainCircuit}
         title="Create a workspace to build a Brand Brain"
         body="These fields are what Sahoda writes your captions, your weekly plan and your website from. A Brand Brain belongs to a workspace and you don’t have one yet. Nothing failed."
-        action={
-          /* A plain server-action form, not `CreateWorkspaceButton`. That
-             component carries the toast library, and importing it here put
-             35.8 kB on /brain/identity and /brain/voice — the js-budget guard
-             refused the build. Success redirects into onboarding either way;
-             this branch is reached by a person with no workspace at all, so
-             the failure toast it gives up is the rarer of two rare things. */
-          <form action={createWorkspaceFromBrain}>
-            <button type="submit" className={buttonVariants({ variant: 'primary' })}>
-              Create a workspace
-            </button>
-          </form>
-        }
+        action={<CreateWorkspaceCta />}
       />
     )
   }

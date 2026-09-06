@@ -56,7 +56,6 @@ export function ViewerScreen({
   formats,
   library,
   signals,
-  balance,
   initialValues,
   sourceGenerationId,
   remixLocked,
@@ -68,7 +67,6 @@ export function ViewerScreen({
   formats: StudioFormat[]
   library: LibraryRead
   signals: BrandSignal[] | null
-  balance: number | null
   initialValues: ComposerInitialValues
   sourceGenerationId: string
   remixLocked: boolean
@@ -146,12 +144,20 @@ export function ViewerScreen({
 
           <div className="flex flex-col gap-2">
             <span className="type-eyebrow text-muted">Change it</span>
+            {/* `composerValues`, never the raw `initialValues`: wt-core's draw
+                work switches the remix to `edit` mode seeded with the drawn
+                asset once somebody has drawn on this picture, and passing the
+                unmodified values would silently throw that away.
+
+                `balance` is NOT passed. This lane removed the whole prop chain
+                when the founder ruled the page must not print a figure the
+                topbar pill already carries, so `Composer` no longer accepts one
+                and `ViewerScreen` no longer takes one. */}
             <ViewerComposer
               key={drawnAssetId ?? 'as-generated'}
               formats={formats}
               library={library}
               signals={signals}
-              balance={balance}
               initialValues={composerValues}
               sourceGenerationId={sourceGenerationId}
               remixLocked={remixLocked}

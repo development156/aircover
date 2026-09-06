@@ -21,9 +21,10 @@ vi.mock('@/lib/studio/read', () => ({
 }))
 vi.mock('@/lib/studio/brand-signals', () => ({ brandSignalsFor: vi.fn().mockResolvedValue([]) }))
 vi.mock('@/lib/studio/formats', () => ({ generatableFormats: () => [] }))
-vi.mock('@/lib/wallet/read', () => ({
-  readBalance: vi.fn().mockResolvedValue({ status: 'ok', balance: { available: 42 } }),
-}))
+// No `@/lib/wallet/read` mock: this page no longer reads the balance at all
+// (`composer.tsx`'s own header says why), so a real read that hit the
+// network here would be the signal something regressed, not something to
+// paper over with a stub.
 vi.mock('@/lib/workspaces', () => ({
   activeWorkspaceRead: vi.fn().mockResolvedValue({ status: 'ok', workspace: { id: 'ws1' } }),
 }))

@@ -9,6 +9,7 @@ import { planWeekTask } from './tasks/plan-week'
 import { siteGenerateTask } from './tasks/site-generate'
 import { gateClassifyTask } from './tasks/gate-classify'
 import { promptRefineTask } from './tasks/prompt-refine'
+import { brandStartersTask } from './tasks/brand-starters'
 
 /**
  * EVERY TASK THIS PACKAGE EXPORTS CAN ACTUALLY BE RUN.
@@ -48,6 +49,7 @@ const EVERY_TASK = [
   siteGenerateTask,
   gateClassifyTask,
   promptRefineTask,
+  brandStartersTask,
 ]
 
 const ENV = {

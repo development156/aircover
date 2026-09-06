@@ -4,7 +4,8 @@ import { brandSignalsFor } from '@/lib/studio/brand-signals'
 import { canvasPictures } from '@/lib/studio/canvas'
 import { generatableFormats } from '@/lib/studio/formats'
 import { readGenerations, readLibraryPictures } from '@/lib/studio/read'
-import { readBalance } from '@/lib/wallet/read'
+import { readStoredStartersForActiveBrand } from '@/lib/studio/starters-read'
+import { combineStudioStarters } from '@/lib/studio/starter-ladder'
 import { activeWorkspaceRead } from '@/lib/workspaces'
 
 export const metadata = { title: 'Studio' }
@@ -39,7 +40,7 @@ export default async function StudioPage() {
    * `cache()`d, so the workspace itself is read once for the whole request no
    * matter how many readers ask.
    */
-  const [recent, library, signals, wallet] = await Promise.all([
+  const [recent, library, signals, storedStarters] = await Promise.all([
     readGenerations(),
     readLibraryPictures(),
     // NULL is "could not read", which the composer states as its own sentence.
@@ -49,24 +50,21 @@ export default async function StudioPage() {
     activeWorkspaceRead().then((active) =>
       active.status === 'ok' ? brandSignalsFor(active.workspace.id).catch(() => null) : null,
     ),
-    // In the same parallel arm as everything else, for the reason above.
-    readBalance(),
+    // Step 1 of the starters ladder, raced alongside the other three rather
+    // than awaited afterwards — see `starters-read.ts`'s own header for why.
+    // Steps 2 and 3 are pure and applied below, once every promise here has
+    // settled.
+    readStoredStartersForActiveBrand(),
   ])
 
-  /**
-   * ── THE BALANCE IS SHOWN ONLY WHEN IT WAS READ ────────────────────────────
-   * `readBalance` answers three ways and only one of them is a number. Neither
-   * of the others may become one here: rendering "0 credits left" for a read
-   * that FAILED would tell somebody with a full wallet they cannot afford to
-   * work, which is the exact defect that union exists to prevent.
-   *
-   * Null renders as nothing at all rather than as a diagnosis. This readout is
-   * a convenience beside the page title; the wallet screen owns the sentence
-   * for a failed read, and the refusal copy owns the one for a shortfall at the
-   * moment of spending. A header that announced an error would be a third voice
-   * on a question the other two already answer better.
-   */
-  const balance = wallet.status === 'ok' ? wallet.balance.available : null
+  const starters = combineStudioStarters(storedStarters, signals)
+
+  // ── NO BALANCE READ HERE ─────────────────────────────────────────────────
+  // This page used to also read the wallet balance to print "N credits left"
+  // beside the composer. The topbar's own credit pill already shows that
+  // figure on every screen, and this page carried no fact the pill did not,
+  // so the read (and the second sentence) left with the block that rendered
+  // it — see `composer.tsx`'s own header.
 
   const formats = generatableFormats()
   // The price is not handed in from here any more: it depends on which model
@@ -96,7 +94,7 @@ export default async function StudioPage() {
         library={library}
         pictures={pictures}
         signals={signals}
-        balance={balance}
+        starters={starters}
       />
     </div>
   )

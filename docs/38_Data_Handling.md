@@ -51,11 +51,13 @@ not a description somebody wrote down — it is a fact about how the database is
 holding a customer's data carries a `workspace_id` column, and the boundary between two customers is
 enforced by the database itself (PostgreSQL row-level security), not by the application.
 
-**MEASURED 2026-09-06: 61 tables.** They are listed in full in §3, and
+**MEASURED 2026-09-06: 62 tables.** They are listed in full in §3, and
 `packages/db/tests/data_handling_doc.pglite.test.ts` fails the build if that number or that list
-stops matching the database. (It read 59 on 2026-09-01; the sixtieth and sixty-first are
-`post_approvals` and `post_comments`, which arrived on 2026-09-06 when approval became a recorded
-gate. It read 52 on 2026-08-26.
+stops matching the database. (It read 59 on 2026-09-01. Three arrived on 2026-09-06 from two lanes,
+which is why neither lane's own figure, 61 and 60, was right: each counted only its own.
+`post_approvals` and `post_comments` came when approval became a recorded gate, and
+`brand_starters` holds the picture ideas written from a workspace's Brand Brain, so the Studio
+stops offering every business the same five. It read 52 on 2026-08-26.
 FOUR arrived on 2026-08-28 from three different lanes, which is why no lane's own figure — 53, 54
 and 53 again — was right: each counted only its own. Studio's `studio_designs` and
 `studio_exports`, which arrived when Studio stopped being a roadmap screen and started saving a
@@ -125,6 +127,7 @@ the table belongs to one identified workspace.
 | `audit_logs` | a record of admin actions | `actor` | removed |
 | `billing_profiles` | who your invoices are made out to | `legal_name` `address` `billing_email` | removed |
 | `brand_memory` | your Brand Brain | `payload` `created_by` | removed |
+| `brand_starters` | the picture ideas Sahoda wrote for you from your Brand Brain | `starters` | removed |
 | `campaign_posts` | posts inside campaigns | no direct identifiers | removed |
 | `campaigns` | your campaigns | `name` `created_by` | removed |
 | `competitor_subscriptions` | the businesses you asked Radar to watch | `created_by` | removed |

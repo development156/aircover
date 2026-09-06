@@ -10,6 +10,7 @@ import { Composer } from '@/components/studio/composer'
 import type { CanvasPicture } from '@/lib/studio/canvas'
 import type { StudioFormat } from '@/lib/studio/formats'
 import type { LibraryRead } from '@/lib/studio/read'
+import type { StudioStarters } from '@/lib/studio/starter-ladder'
 
 /**
  * THE WALL. THE PLACE A NEW PICTURE IS JUDGED AGAINST EVERY OTHER ONE.
@@ -37,6 +38,34 @@ import type { LibraryRead } from '@/lib/studio/read'
  * pass BEHIND its edge rather than showing through it — the artboard's own
  * point: looking for something to compare a new picture against should never
  * scroll the controls away.
+ *
+ * ── THREE STEPS OF VERTICAL RHYTHM, NOWHERE ELSE ─────────────────────────
+ * Every vertical gap and stack padding on this screen is one of three
+ * token-backed steps: `gap-2`/`py-2` (8px, `--space-2`, a tight pairing —
+ * a message beside its own status line), `gap-3`/`py-3` (12px, `--space-3`,
+ * a component's own internal rows — the sticky bar's own stack, the wall
+ * section's own rows), or `gap-grid`/`py-grid` (20px, `--spacing-grid`, one
+ * major region to the next). That third step is deliberately the SAME
+ * `--spacing-grid` this page's own `page.tsx` already uses for
+ * `space-y-grid` between the title and this component — this root used to
+ * run its own top-level stack at `gap-6` (24px) instead, a second "major
+ * section" number a few pixels from the first, which is the exact defect
+ * this rule exists to close. Icon-to-label micro gaps (`gap-1.5`,
+ * `--spacing-icon-gap`) and the count stepper's own `gap-0.5` are a
+ * different, smaller-scale typographic relationship (docs/26 §2) and are
+ * not part of this ladder.
+ *
+ * ── A RIGHT GUTTER FOR WHATEVER FLOATS ────────────────────────────────────
+ * This app has no fixed or floating control positioned over `/studio`
+ * today — checked, not assumed, since the finding this note answers named
+ * one clipping the chip row's trailing "N more" (`composer-chips.tsx`) and
+ * no such control exists in this tree to reproduce it against. What does
+ * carry a real margin: every element on this screen, including the
+ * composer bar and the wall grid, stays inside `--content-pad` and never
+ * runs to the viewport's own edge, so the row `composer-chips.tsx` ends
+ * with (`grow` spacer, "N more", then `extraControls`) already has page
+ * padding as its gutter rather than nothing. If a future floating control
+ * is added back, it must reserve its own width rather than lean on this.
  */
 
 /** Which shape of work the filter row is narrowed to. */
@@ -71,14 +100,15 @@ export function StudioWorkbench({
   library,
   pictures,
   signals,
-  balance,
+  starters,
 }: {
   formats: StudioFormat[]
   library: LibraryRead
   /** What this workspace has already made, newest first, for the wall. */
   pictures: CanvasPicture[]
   signals: BrandSignal[] | null
-  balance: number | null
+  /** The starter ladder's already-resolved answer. See `composer.tsx`'s own prop. */
+  starters?: StudioStarters
 }) {
   const [filter, setFilter] = useState<WorkFilter>('all')
   /**
@@ -93,10 +123,10 @@ export function StudioWorkbench({
     filter === 'all' ? pictures : pictures.filter((one) => categoryOf(one).includes(filter))
 
   return (
-    <div className="flex w-full flex-col gap-6" data-guide="studio-workbench">
+    <div className="flex w-full flex-col gap-grid" data-guide="studio-workbench">
       <section
         aria-labelledby="studio-make"
-        className="sticky top-topbar z-[2] -mx-page flex flex-col gap-3 bg-canvas px-page pb-4 pt-3 max-narrow:-mx-page-mobile max-narrow:px-page-mobile"
+        className="sticky top-topbar z-[2] -mx-page flex flex-col gap-3 bg-canvas px-page pt-3 pb-grid max-narrow:-mx-page-mobile max-narrow:px-page-mobile"
       >
         <h2 id="studio-make" className="sr-only">
           Make a picture
@@ -105,13 +135,21 @@ export function StudioWorkbench({
           formats={formats}
           library={library}
           signals={signals}
-          balance={balance}
+          starters={starters}
           onBusyChange={setBusy}
         />
       </section>
 
       {pictures.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-6" data-guide="studio-empty">
+        /*
+         * ── LEFT-RANGED, LIKE EVERYTHING ELSE ON THIS SCREEN ────────────────
+         * This used to be `items-center`, the one block on the wall not
+         * aligned to the screen's own left edge. Nothing about "nothing made
+         * yet" needs centring — it reads as a left-aligned line exactly like
+         * the sentence that replaces it once a picture exists
+         * ("Every picture is saved to your library…").
+         */
+        <div className="flex flex-col items-start gap-2 py-grid" data-guide="studio-empty">
           {busy ? (
             <p role="status" className="type-sm text-muted" data-guide="studio-empty-busy">
               Sahoda is generating your first image now. It usually takes a few seconds, and you can
@@ -163,7 +201,7 @@ export function StudioWorkbench({
               {shownPictures.map((picture) => {
                 const meta = [picture.formatId, picture.madeAgo].filter(Boolean).join(' · ')
                 return (
-                  <li key={picture.imageId} className="flex flex-col gap-1.5">
+                  <li key={picture.imageId} className="flex flex-col gap-2">
                     {/*
                      * ── A LINK, NOT A CLICK HANDLER ──────────────────────────
                      * `/studio/<id>` does not exist yet: a later pass builds

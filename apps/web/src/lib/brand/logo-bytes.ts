@@ -7,6 +7,7 @@ import { CHANNEL_MEDIA_CAP_BYTES, MEDIA_BUCKET } from '@/lib/posts/media-constan
 import { createServerSupabase } from '@/lib/supabase/server'
 
 import { readBrandLogo, readBrandLogoDark } from './logo'
+import { readCachedLogoFacts, writeLogoFacts } from './logo-facts-cache'
 import { logoFactsFromRaw, type LogoFacts } from './logo-facts'
 
 /**
@@ -43,11 +44,20 @@ import { logoFactsFromRaw, type LogoFacts } from './logo-facts'
  * for must never fail because of this function, so nothing it can do escapes it.
  *
  * ── WHAT IT DELIBERATELY DOES NOT DO ────────────────────────────────────────
- * It does not resize, re-encode, place or persist anything. `bytes` is the file
- * exactly as stored, so the caller composites from the original rather than from
- * something already thrown away once. It does not write `asset_logo_facts`
- * either: measuring is cheap next to the generation it rides on, and a reader
- * that writes is a reader that can fail.
+ * It does not resize, re-encode or place anything. `bytes` is the file exactly
+ * as stored, so the caller composites from the original rather than from
+ * something already thrown away once.
+ *
+ * ── IT DOES NOW WRITE `asset_logo_facts`, AND THAT IS A REVERSAL ────────────
+ * This header used to say measuring was cheap next to the generation it rides
+ * on and that a reader which writes is a reader that can fail. The first half
+ * was wrong: a full sharp decode of the logo happened on every generation, for
+ * an answer that cannot change while the file does not. The second half is
+ * kept, by making the cache unable to fail anything. A miss, a read that fails,
+ * a row that will not parse and a write that is refused all fall through to the
+ * measurement this file always did. See `logo-facts-cache.ts` for what keys a
+ * stored row to the bytes it describes, and for the three fields the table has
+ * no column for.
  */
 
 export interface BrandLogoBytes {
@@ -82,6 +92,21 @@ interface AssetRow {
   id: string
   storage_path: string
   bytes: number | null
+  /**
+   * Read for the cache, not for the download. It is what says whether a stored
+   * `asset_logo_facts` row still describes this file: the facts must have been
+   * computed no earlier than the asset row last changed. Kept `unknown` because
+   * a deploy whose schema predates the column would hand back nothing here, and
+   * `logo-facts-cache.ts` treats anything that is not a timestamp as "cannot
+   * prove it is current", which costs a decode and never a wrong mark.
+   */
+  updated_at: unknown
+}
+
+interface LogoFile {
+  bytes: Uint8Array
+  /** `assets.updated_at`, passed through to the facts cache unchanged. */
+  updatedAt: unknown
 }
 
 /**
@@ -89,12 +114,12 @@ interface AssetRow {
  * recorded size, before anything is transferred, and once on what actually
  * arrived, because that column is nullable and a null is not a small file.
  */
-async function downloadLogo(workspaceId: string, assetId: string): Promise<Uint8Array | null> {
+async function downloadLogo(workspaceId: string, assetId: string): Promise<LogoFile | null> {
   const supabase = createServerSupabase()
 
   const asset = await supabase
     .from('assets')
-    .select('id, storage_path, bytes')
+    .select('id, storage_path, bytes, updated_at')
     .eq('id', assetId)
     .eq('workspace_id', workspaceId)
     .maybeSingle()
@@ -109,7 +134,7 @@ async function downloadLogo(workspaceId: string, assetId: string): Promise<Uint8
 
   const bytes = new Uint8Array(await download.data.arrayBuffer())
   if (bytes.byteLength === 0 || bytes.byteLength > LOGO_CAP_BYTES) return null
-  return bytes
+  return { bytes, updatedAt: row.updated_at }
 }
 
 /**
@@ -133,6 +158,35 @@ async function measure(bytes: Uint8Array): Promise<LogoFacts | null> {
 }
 
 /**
+ * The facts about this file: the stored ones when they still describe it, and
+ * otherwise the decode, which is then stored.
+ *
+ * The write is awaited rather than left running. A serverless invocation ends
+ * when the response does and an unawaited round trip is one that may simply not
+ * happen, which would leave the cache empty for ever while looking like it
+ * worked. It cannot fail the caller: `writeLogoFacts` swallows every error it
+ * can meet.
+ */
+async function factsFor(
+  workspaceId: string,
+  assetId: string,
+  file: LogoFile,
+): Promise<LogoFacts | null> {
+  const cached = await readCachedLogoFacts({
+    workspaceId,
+    assetId,
+    assetUpdatedAt: file.updatedAt,
+  })
+  if (cached !== null) return cached
+
+  const facts = await measure(file.bytes)
+  if (facts === null) return null
+
+  await writeLogoFacts({ workspaceId, assetId, facts })
+  return facts
+}
+
+/**
  * Null when there is no logo, or it could not be read, or it could not be
  * measured.
  *
@@ -148,13 +202,13 @@ export const readBrandLogoBytes = cache(async function readBrandLogoBytes(
     const logo = await readBrandLogo(workspaceId)
     if (logo === null) return null
 
-    const bytes = await downloadLogo(workspaceId, logo.assetId)
-    if (bytes === null) return null
+    const file = await downloadLogo(workspaceId, logo.assetId)
+    if (file === null) return null
 
-    const facts = await measure(bytes)
+    const facts = await factsFor(workspaceId, logo.assetId, file)
     if (facts === null) return null
 
-    return { assetId: logo.assetId, bytes, facts }
+    return { assetId: logo.assetId, bytes: file.bytes, facts }
   } catch {
     // Undecodable bytes, a RangeError out of the measurement, a storage client
     // that threw. See the header: this function is never the reason a paid
@@ -182,13 +236,13 @@ export const readBrandLogoBytesDark = cache(async function readBrandLogoBytesDar
     const logo = await readBrandLogoDark(workspaceId)
     if (logo === null) return null
 
-    const bytes = await downloadLogo(workspaceId, logo.assetId)
-    if (bytes === null) return null
+    const file = await downloadLogo(workspaceId, logo.assetId)
+    if (file === null) return null
 
-    const facts = await measure(bytes)
+    const facts = await factsFor(workspaceId, logo.assetId, file)
     if (facts === null) return null
 
-    return { assetId: logo.assetId, bytes, facts }
+    return { assetId: logo.assetId, bytes: file.bytes, facts }
   } catch {
     return null
   }

@@ -707,6 +707,43 @@ cards explaining an absence the page could state once."* If a screen is empty be
 workspace has no connection, say that **once**, at the top, with the action — do not let
 five cards each discover it independently.
 
+### A choosing surface carries the name and the price. Explanation goes in a drawer.
+
+Founder's ruling, 2026-09-06, from two screenshots side by side. On `/connections`,
+pressing "Details" on a channel slides a panel in from the right holding the long
+explanation: ready to publish, slots used here, longest post, photos and video, posts
+per day, how long the link lasts. On `/studio`, the same kind of information sat inline:
+pressing a settings pill opened a wall of prose, four model options each with a
+paragraph, and the page became a document instead of a control. His words: *"no user
+friendly drop downs but such a wordy detailed options come up when I click on any
+settings button."* The `/connections` pattern **becomes the rule**.
+
+**What it is.** A screen where somebody is choosing between options shows only the name
+and the price on the surface itself. Anything longer, why one option beats another, what
+a limit means, why a state reads the way it does, goes behind one "Details" affordance
+that opens a right-hand drawer.
+
+**What to use.** `apps/web/src/components/ui/drawer.tsx`, the shared primitive.
+`apps/web/src/components/connections/channel-details.tsx` is the reference
+implementation. Nobody builds a second drawer.
+
+**Why that primitive and not a hand-rolled panel.** `Drawer` is a native `<dialog>`
+opened with `showModal()`, so it renders in the browser's top layer instead of the
+normal flow. That makes it immune to the `backdrop-filter` containing-block trap that
+`apps/web/CLAUDE.md` documents at length: the one that laid the command palette out at
+1834×137 instead of covering the viewport, reported as three separate defects before
+anyone found the single cause. A fixed-position panel built inside a `glass` element
+would reproduce that trap exactly; a `<dialog>` in the top layer cannot.
+
+**What it does not license.** Moving text into a drawer is not permission to shorten it
+into something less true. §17's rule, that a sentence must never become vaguer than the
+truth it replaces, still governs the copy inside the drawer. And the price never leaves
+the choosing surface: costs are shown before the spend, on the surface, not one tap away.
+
+**When it does not apply.** A short label, a single line of help, an inline error against
+the field it belongs to, stay where they are. The drawer is for explanation somebody
+chooses to read, not for a message they must see.
+
 ---
 
 ## 16 · Hierarchy — the rule, and how to decide
@@ -786,6 +823,8 @@ the slot (§9).
 - **Do not animate width/height/top/left.** §12.
 - **Do not give a nested surface a radius equal to or larger than its parent's.** §5.
 - **Do not add delight to a screen whose hierarchy is not settled.** §0.
+- **Do not put a wall of explanatory prose on a choosing surface.** Put it behind
+  "Details" in a drawer. §15.
 - **Do not loosen a guard to accommodate the change that broke it.** §19.
 
 ---

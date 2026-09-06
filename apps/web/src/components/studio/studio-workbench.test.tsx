@@ -103,7 +103,6 @@ const open = (library: LibraryPicture[] | LibraryRead = LIBRARY, pictures: Canva
       library={Array.isArray(library) ? { status: 'ok', pictures: library } : library}
       pictures={pictures}
       signals={[]}
-      balance={null}
     />,
   )
 
@@ -119,6 +118,23 @@ describe('the shape of the screen', () => {
     const { container } = open()
     const root = container.querySelector('[data-guide="studio-workbench"]') as HTMLElement
     expect(root.className).not.toMatch(/max-w-\[var\(--measure-form\)\]/)
+  })
+
+  /**
+   * ── THE EMPTY STATE SHARES THE SCREEN'S OWN LEFT EDGE ────────────────────
+   * This block used to be the one thing on the wall centred (`items-center`)
+   * while the title, the composer and the filter row all range left. Nothing
+   * about "nothing made yet" needs centring.
+   *
+   * MUTATION: put `items-center` back on the `studio-empty` block and this
+   * goes red.
+   */
+  test('the empty state is left-ranged, not centred', () => {
+    const { container } = open(LIBRARY, [])
+    const empty = container.querySelector('[data-guide="studio-empty"]') as HTMLElement
+    expect(empty).not.toBeNull()
+    expect(empty.className).toMatch(/(^|\s)items-start(\s|$)/)
+    expect(empty.className).not.toMatch(/items-center/)
   })
 
   /** The composer floats: sticky, with its own ground, so the wall passes under its edge. */
