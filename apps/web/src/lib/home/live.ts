@@ -171,7 +171,8 @@ export function liveLines(input: LiveInput): LiveLine[] {
       : {
           at: new Date(input.sweepRanAt).toISOString(),
           kind: 'check',
-          text: `Sahoda last checked for posts to send ${agoWords(new Date(input.sweepRanAt).toISOString(), input.now)}`,
+          // The line under it says when; the sentence must not say it twice.
+          text: 'Sahoda last checked for posts to send',
         }
 
   return [...events.slice(0, LIVE_LINES - 1), check]

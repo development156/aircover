@@ -56,7 +56,7 @@ describe('liveLines', () => {
       '“Weekend menu” is waiting for your OK',
       'You saved a draft: “Tuesday roast”',
       'Sahoda used 3 credits on a caption rewrite',
-      'Sahoda last checked for posts to send 2 minutes ago',
+      'Sahoda last checked for posts to send',
     ])
   })
 
