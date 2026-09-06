@@ -73,3 +73,38 @@ describe('MessageList when the direction cannot be classified', () => {
     expect(directions()).toEqual(['inbound'])
   })
 })
+
+describe('MessageList with attachments', () => {
+  const withPhoto: ZernioMessage[] = [
+    {
+      ...LIVE_THREAD[1]!,
+      id: 'm-photo',
+      message: '',
+      attachments: [
+        { type: 'image', url: 'https://scontent.cdninstagram.com/signed-and-expiring.jpg' },
+        { type: 'video', url: 'https://scontent.cdninstagram.com/clip.mp4' },
+      ],
+    },
+  ]
+
+  it('shows an image through the resolving route, never the expiring url itself', () => {
+    render(<MessageList messages={withPhoto} />)
+    const img = screen.getByRole('img', { name: 'Image attachment' })
+    expect(img.getAttribute('src')).toBe(
+      '/api/inbox/attachment?account=6a75caf7d0fe733d1afcc1f4&conversation=1580525030139202&message=m-photo&index=0',
+    )
+    expect(document.querySelector('img[src*="cdninstagram"]')).toBeNull()
+  })
+
+  it('renders a non-image as a named link at its own position', () => {
+    render(<MessageList messages={withPhoto} />)
+    expect(screen.getByRole('link', { name: 'Video' }).getAttribute('href')).toMatch(/index=1$/)
+  })
+
+  it('a stored row with no account id uses the url it holds', () => {
+    render(<MessageList messages={[{ ...withPhoto[0]!, accountId: '' }]} />)
+    expect(screen.getByRole('img', { name: 'Image attachment' }).getAttribute('src')).toBe(
+      'https://scontent.cdninstagram.com/signed-and-expiring.jpg',
+    )
+  })
+})

@@ -207,3 +207,21 @@ describe('omitting or forging the scope is a COMPILE error, not a review item', 
     expect(true).toBe(true)
   })
 })
+
+describe('messageAttachmentUrl', () => {
+  it('asks for JSON with the account on the wire, and returns the minted url', async () => {
+    const { reads, cap } = readsWith({ url: 'https://cdn.example/fresh.jpg' })
+    const url = await reads.messageAttachmentUrl(account, 'conv-1', 'msg-1', 2)
+    expect(url).toBe('https://cdn.example/fresh.jpg')
+    const req = cap.last()
+    expect(req.method).toBe('GET')
+    expect(req.url).toContain('/inbox/conversations/conv-1/messages/msg-1/attachments/2?')
+    expect(req.url).toContain('format=json')
+    expect(req.url).toContain(`accountId=${account}`)
+  })
+
+  it('answers null, not a throw, when the platform cannot re-mint (404)', async () => {
+    const { reads } = readsWith({ error: 'not_found' }, 404)
+    await expect(reads.messageAttachmentUrl(account, 'conv-1', 'msg-1', 0)).resolves.toBeNull()
+  })
+})

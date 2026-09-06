@@ -85,6 +85,34 @@ describe('a Facebook event is filed, not merely stored', () => {
     expect(upsert!.params[2]).toBe('dm')
   })
 
+  it('stores what came attached, in order, as Zernio sent it', async () => {
+    const { db, calls } = recorder()
+    const attachments = [
+      { type: 'image', url: 'https://scontent.cdninstagram.com/a.jpg', payload: { w: 1 } },
+      { type: 'video', url: 'https://scontent.cdninstagram.com/b.mp4' },
+    ]
+    await projectMessage(db, {
+      workspaceId: WS,
+      payload: {
+        message: {
+          id: 'm3',
+          platformMessageId: 'ig_msg_3',
+          platform: 'instagram',
+          direction: 'incoming',
+          text: null,
+          attachments,
+        },
+        conversation: { id: 'conv_3' },
+      },
+    })
+    const insert = calls.find((c) => /insert into inbox_messages/.test(c.sql))
+    expect(insert).toBeDefined()
+    // Positional: the renderer resolves an attachment by its index, so the order
+    // is part of the record. The body is the empty string, not "null".
+    expect(insert!.params[3]).toBe('')
+    expect(JSON.parse(insert!.params[7] as string)).toEqual(attachments)
+  })
+
   it('files a Telegram DM under the telegram channel', async () => {
     const { db, calls } = recorder()
     const out = await projectMessage(db, {
