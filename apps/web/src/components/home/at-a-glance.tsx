@@ -1,6 +1,8 @@
 import { CalendarClock, Coins, Inbox, Send } from 'lucide-react'
 
+import { MiniBars, Sparkline } from '@/components/charts/sparkline'
 import { StatCard, StatStrip, type StatAbsence } from '@/components/charts/stat-card'
+import type { BalanceDay } from '@/lib/home/balance-history'
 import { needsAPerson } from '@/lib/approvals/queue'
 import type { DisplayPost } from '@/lib/posts/display-post'
 import type { WeekBuckets } from '@/lib/planner/week'
@@ -60,16 +62,28 @@ const COMMITTED: ReadonlySet<PostStatus> = new Set<PostStatus>([
  * place to go and it is the place that number came from, so the whole card is
  * the target rather than a "View all" link beside it competing for the eye.
  */
+/** "Mon 7", for the bars' accessible sentence. */
+const DAY = new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short' })
+
 export function AtAGlance({
   posts,
   buckets,
   publish,
   balance,
+  history = [],
 }: {
   posts: readonly DisplayPost[]
   buckets: WeekBuckets
   publish: PublishSummary
   balance: BalanceRead
+  /**
+   * The wallet's total, day by day, from `balanceSeries`. Drawn under the
+   * credits figure as the one line every workspace can show from day one —
+   * see `lib/home/balance-history.ts` for why it is the ledger's own column
+   * and costs no query. Optional so a caller without a ledger read still gets
+   * the four numbers.
+   */
+  history?: readonly BalanceDay[]
 }) {
   const waiting = posts.filter((post) => needsAPerson(post)).length
   // COMMITTED intents only — the same three the certainty ladder draws as
@@ -78,10 +92,40 @@ export function AtAGlance({
   // outline. A dated draft or a post still in review is waiting on a person,
   // and the cell to the left already counts it; counting it here too claimed
   // a commitment nobody had made.
-  const scheduled = buckets.days.reduce(
-    (n, day) => n + day.posts.filter((post) => COMMITTED.has(post.intent)).length,
-    0,
+  const perDay = buckets.days.map(
+    (day) => day.posts.filter((post) => COMMITTED.has(post.intent)).length,
   )
+  const scheduled = perDay.reduce((n, count) => n + count, 0)
+
+  // ── THE TWO SHAPES A STAT CELL CAN CARRY WITHOUT INVENTING A POINT ───────
+  // Credits: the ledger's `balance_after` at the end of each of the last
+  // thirty days, which exists for every workspace from its welcome grant on.
+  // Scheduled: one bar per day of the week ahead, committed posts only. Both
+  // are counts of rows this product owns, which is the board's whole premise.
+  const measured = history.filter((d): d is BalanceDay & { total: number } => d.total !== null)
+  const first = measured[0]?.total
+  const lastTotal = measured[measured.length - 1]?.total
+  const balanceChart =
+    measured.length > 1 && first !== undefined && lastTotal !== undefined ? (
+      <Sparkline
+        values={history.map((d) => d.total)}
+        label={`Credits over the last ${history.length} days, from ${first.toLocaleString('en-IN')} to ${lastTotal.toLocaleString('en-IN')}.`}
+      />
+    ) : undefined
+  const weekChart =
+    buckets.days.length > 0 ? (
+      <MiniBars
+        values={perDay}
+        emphasis={0}
+        label={
+          scheduled === 0
+            ? 'Nothing approved on any of the next seven days.'
+            : `Approved posts by day: ${buckets.days
+                .map((day, i) => `${DAY.format(day.date)} ${perDay[i]}`)
+                .join(', ')}.`
+        }
+      />
+    ) : undefined
 
   // A read that THREW is `unreadable`, and it is the only absence these four
   // can take. `empty` is a successful read of nothing, which is a real zero and
@@ -93,6 +137,13 @@ export function AtAGlance({
     <StatStrip board>
       <StatCard
         variant="cell"
+        /* ── THE ONE CELL THAT ASKS FOR A DECISION WEARS THE WASH ───────────
+           docs/37 §16: what needs the reader leads. Four identical cells gave
+           "Waiting on you · 3" the same weight as "Published · 0"; the wash is
+           the same treatment the week strip gives today, and it is spent only
+           while there is something to decide. Nothing else on the board is
+           tinted, so the eye lands here first and nowhere else. */
+        className={waiting > 0 ? 'bg-brand-wash' : undefined}
         icon={<Inbox size={15} strokeWidth={1.9} />}
         label="Waiting on you"
         value={waiting}
@@ -107,6 +158,7 @@ export function AtAGlance({
         value={scheduled}
         unit={scheduled === 1 ? 'post' : 'posts'}
         note="Approved for the next seven days"
+        chart={weekChart}
         href="/planner"
       />
       <StatCard
@@ -135,6 +187,7 @@ export function AtAGlance({
             ? `${balance.balance.held} held by actions in progress`
             : 'To spend on drafts and plans'
         }
+        chart={balanceChart}
         href="/wallet"
       />
     </StatStrip>

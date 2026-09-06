@@ -55,6 +55,53 @@ function board(posts: DisplayPost[]) {
 
 const cell = (label: RegExp) => screen.getByRole('link', { name: label }).textContent ?? ''
 
+describe('the board draws only what it can prove', () => {
+  test('the credits cell carries the ledger line once two days are known', () => {
+    const buckets: WeekBuckets = { days: [], unscheduled: [], outside: [] }
+    render(
+      <AtAGlance
+        posts={[]}
+        buckets={buckets}
+        publish={PUBLISH}
+        balance={BALANCE}
+        history={[
+          { date: '2026-09-04', total: 0 },
+          { date: '2026-09-05', total: 100 },
+          { date: '2026-09-06', total: 70 },
+        ]}
+      />,
+    )
+    expect(
+      screen.getByRole('img', { name: /credits over the last 3 days, from 0 to 70/i }),
+    ).toBeInTheDocument()
+  })
+
+  test('no line is drawn from an empty or one-day history', () => {
+    const buckets: WeekBuckets = { days: [], unscheduled: [], outside: [] }
+    render(
+      <AtAGlance
+        posts={[]}
+        buckets={buckets}
+        publish={PUBLISH}
+        balance={BALANCE}
+        history={[{ date: '2026-09-06', total: 100 }]}
+      />,
+    )
+    expect(screen.queryByRole('img', { name: /credits over/i })).toBeNull()
+  })
+
+  test('the waiting cell wears the wash only while something waits', () => {
+    board([post('r', 'review')])
+    expect(screen.getByRole('link', { name: /^Waiting on you/ }).className).toMatch(/bg-brand-wash/)
+    expect(screen.getByRole('link', { name: /^Published/ }).className).not.toMatch(/bg-brand-wash/)
+  })
+
+  test('the week bars say what is on which day', () => {
+    board([post('a', 'approved'), post('d', 'draft')])
+    expect(screen.getByRole('img', { name: /approved posts by day: mon 1/i })).toBeInTheDocument()
+  })
+})
+
 describe('the board counts what the ladder counts', () => {
   test('"Scheduled" counts only committed posts in the week', () => {
     board([post('a', 'approved'), post('s', 'scheduled'), post('r', 'review'), post('d', 'draft')])

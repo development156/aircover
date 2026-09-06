@@ -987,3 +987,23 @@
     opacity: 1;
   }
 }
+
+/* ── THE SPARKLINE DRAW-IN ───────────────────────────────────────────────────
+   Reveals a line that is already in the markup, left to right, over the same
+   `--dur-count` the settled figures count up in, so a stat cell's number and
+   its shape arrive together. `pathLength="1"` on the path makes the dash
+   arithmetic unit-free. The global reduced-motion block in tokens.css
+   collapses this to 10ms like every other animation. */
+@keyframes spark-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.spark-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  animation: spark-draw var(--dur-count, 560ms) cubic-bezier(0.22, 1, 0.36, 1) both;
+}

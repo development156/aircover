@@ -33,6 +33,7 @@ import { onboardingStateRead } from '@/lib/onboarding/read-onboarding-state'
 import { readPostCounts } from '@/lib/home/posts'
 import { readPublishSummary } from '@/lib/home/publishing'
 import { readSpend } from '@/lib/home/spend'
+import { balanceSeries } from '@/lib/home/balance-history'
 import { setupLadder } from '@/lib/home/setup'
 import { startSteps, workspaceHasStarted, type StartedSignals } from '@/lib/home/started'
 import { resolveDisplayZone } from '@/lib/time/zone'
@@ -426,7 +427,18 @@ export default async function HomePage() {
           for the argument, which is that thirteen separate boxes down one page
           is most of what made this screen read as assembled parts. */}
       <StaggerItem i={0}>
-        <AtAGlance posts={displayPosts} buckets={buckets} publish={publish} balance={balance} />
+        <AtAGlance
+          posts={displayPosts}
+          buckets={buckets}
+          publish={publish}
+          balance={balance}
+          /* From the fifty ledger rows the activity feed already holds: the
+             one series every workspace can draw on day one, at no extra read.
+             An unreadable ledger is an empty list, and the cell keeps its
+             figure without a line — a chart is never drawn from a read that
+             did not answer. */
+          history={ledger.unreadable ? [] : balanceSeries(ledger.entries, now)}
+        />
       </StaggerItem>
 
       {/* ── WHAT NEEDS ME — FULL WIDTH, AND THAT IS THE RESTRUCTURE ───────
