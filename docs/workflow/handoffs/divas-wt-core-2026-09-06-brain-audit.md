@@ -53,7 +53,20 @@ offline confirm shows "Could not reach Sahoda…" inline and the tab stays.
 - Four files modified by another session in this worktree (`templates.spec.ts`, `command-palette.tsx`, `nav-item.tsx`, `create-workspace-button.tsx`) were left uncommitted and untouched.
 - The QA workspace keeps its 13-version "Sahoda QA Bakery" brain in production; it is test data for the next pass.
 
-## Decisions owed
+## The five decisions, taken (`c95dcf5d`, `a0d7f6f9`)
+
+The founder delegated all five. Shipped and verified on the rebuilt preview:
+
+- **BR-04** hand edits send `expectedVersion`; VERSION_CONFLICT → "Reload and try again". Two-tab test: both confirmations survived. The inline confirm also sends `asSeen`, and the action refuses when the stored text moved since the screen rendered.
+- **BR-05** `searchLibrary`, `readCurrentPassages`, `readDeleteImpactFor` filter by the active workspace.
+- **BR-09** `SOURCE_INTAKE`: the onboarding save stamps the three answer-seeded fields; `FieldState` gains `intake`; chip "From your answer"; console group "Check Sahoda kept your meaning" first; confidence card, ring and legend count them apart. Live after a fresh free resolve: "0 confirmed · 3 from your answers · 12 still Sahoda's guess". `nextFieldMeta` keeps everything known about unchanged text (also stops a hand edit resetting `document:` citations).
+- **BR-15** `buildBrandMessage(payload, field_meta)` tells the model which lines are owner-confirmed, which are the owner's words reworded, and that the rest is a draft.
+- **BR-16** a paid re-resolve refuses when the Upstash store is absent: nothing charged, reported; the free path is unaffected.
+- Also: console heading counts guesses only; the "only started recording" note shows only for brains without `field_meta`.
+
+Cleanup: every `brand_memory` row the audit created in the QA workspace was deleted from production (13 rows, then the re-resolve's rows after the second verification).
+
+## Decisions owed (all taken)
 
 - **BR-04** send `brain.version` as `p_expected_version` on the field paths (not onboarding) and map VERSION_CONFLICT to "reload".
 - **BR-05** filter `searchLibrary`, `readCurrentPassages`, `readDeleteImpact` by the active workspace (knowledge lane).
