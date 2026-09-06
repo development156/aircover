@@ -31,6 +31,49 @@ export interface LeadActionState {
   message?: string
 }
 
+/**
+ * What a write says when it changed nothing.
+ *
+ * A PostgREST update that matches no row is `{ error: null }` — a success with
+ * an empty result set. Both writes below therefore used to answer `{ok: true}`
+ * for a lead that had been deleted, that belongs to another workspace, or whose
+ * id the board is holding from before a workspace switch. The card then redrew
+ * itself in the stage it was never moved to and stayed there until a reload.
+ *
+ * The remedy is the one that works: a reload is what re-reads the board.
+ */
+const GONE = 'This lead is no longer here. Reload the board.'
+
+/**
+ * Mark a lead as looked at, and ONLY the first time.
+ *
+ * `read_at` is the moment somebody first saw this enquiry, which is the figure a
+ * response time is measured from. Every stage move used to overwrite it with
+ * `now()`, so a lead answered within a minute and dragged through the board a
+ * week later recorded a week-old first look — and the one number that could have
+ * said "nobody has opened this" could never be older than the last click.
+ *
+ * ── WHY THIS IS A SECOND STATEMENT AND NOT A SECOND COLUMN IN THE FIRST ──────
+ * `read_at = coalesce(read_at, now())` cannot be expressed through PostgREST,
+ * and putting `.is('read_at', null)` on the status update instead would make
+ * every ALREADY-READ lead match zero rows — which the caller now correctly
+ * treats as "this lead is gone". A healthy second move would report the board
+ * as stale. So the filter lives on its own statement, and ITS zero rows are the
+ * normal case: they mean the lead had already been read.
+ */
+async function markFirstLook(
+  supabase: ReturnType<typeof createServerSupabase>,
+  leadId: string,
+  workspaceId: string,
+): Promise<void> {
+  await supabase
+    .from('leads')
+    .update({ read_at: new Date().toISOString() })
+    .eq('id', leadId)
+    .eq('workspace_id', workspaceId)
+    .is('read_at', null)
+}
+
 /** Move a lead along the pipeline. */
 export async function setLeadStatus(leadId: string, status: unknown): Promise<LeadActionState> {
   let workspaceId: string | undefined
@@ -49,13 +92,19 @@ export async function setLeadStatus(leadId: string, status: unknown): Promise<Le
     }
 
     const supabase = createServerSupabase()
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('leads')
-      .update({ status: parsed.data, read_at: new Date().toISOString() })
+      .update({ status: parsed.data })
       .eq('id', leadId)
       .eq('workspace_id', workspaceId)
+      // The ROW COUNT is the answer, not the absent error. See `GONE`.
+      .select('id')
 
     if (error) return { ok: false, message: 'Could not move that lead. Try again.' }
+    if (!Array.isArray(data) || data.length !== 1) return { ok: false, message: GONE }
+
+    await markFirstLook(supabase, leadId, workspaceId)
+
     revalidatePath('/leads')
     return { ok: true }
   } catch (error) {
@@ -197,7 +246,7 @@ export async function updateLeadContact(
       value === null ? null : value.slice(0, max)
 
     const supabase = createServerSupabase()
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('leads')
       .update({
         name: cap(trim(edit.name), 200),
@@ -206,8 +255,14 @@ export async function updateLeadContact(
       })
       .eq('id', leadId)
       .eq('workspace_id', workspaceId)
+      // Same reason as the move above: an update that matched nothing is not an
+      // error, and reporting a correction as saved when it was not is worse than
+      // refusing it. See `GONE`.
+      .select('id')
 
     if (error) return { ok: false, message: 'Could not save those details. Try again.' }
+    if (!Array.isArray(data) || data.length !== 1) return { ok: false, message: GONE }
+
     revalidatePath('/leads')
     return { ok: true }
   } catch (error) {

@@ -2,8 +2,10 @@ import 'server-only'
 
 import { LeadSchema, type Lead, type LeadStatus } from '@sahoda/shared'
 
+import { connectionPlatformFor, leadOrigin, originWords, type LeadDoor } from '@/lib/leads/origin'
+import { received } from '@/lib/leads/received'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { activeWorkspaceRead } from '@/lib/workspaces'
+import { activeWorkspaceRead, type WorkspaceOption } from '@/lib/workspaces'
 
 /**
  * READING LEADS — under RLS, filtered to the active workspace.
@@ -17,10 +19,31 @@ import { activeWorkspaceRead } from '@/lib/workspaces'
  * RLS is the boundary. The member policy admits every workspace the user belongs
  * to, so a second membership would otherwise fold two shops' enquiries into one
  * list, with real people's names and numbers in it.
+ *
+ * ── EVERY SENTENCE ON A CARD IS BUILT HERE, NOT IN THE CARD ──────────────────
+ * The date, the age and the origin line are formatted server-side. Two reasons,
+ * and both are measured facts rather than preferences: a relative age computed
+ * during a client render disagrees with the server's copy of it (a hydration
+ * mismatch React corrects silently), and `components/leads/lead-card.tsx`
+ * records a 26.7 kB regression on this route from ONE client-side import. The
+ * card renders strings.
  */
 
 /** How many leads one screen shows. Exported so the screen can state its window. */
 export const LEADS_LIMIT = 200
+
+/**
+ * Whether the conversation an inbox lead came from can be reopened.
+ *
+ * THREE ANSWERS, NOT TWO. "The account this came through is no longer connected"
+ * is a claim about the customer's connections, and it may only be made when the
+ * connections were actually read. A read that FAILED says nothing at all — the
+ * same rule the list itself follows two paragraphs down.
+ */
+export type LeadConversation =
+  | { readonly state: 'link'; readonly href: string }
+  | { readonly state: 'disconnected' }
+  | { readonly state: 'none' }
 
 export interface LeadView {
   readonly id: string
@@ -33,12 +56,22 @@ export interface LeadView {
   readonly createdAt: string
   /** Where it came from, in the reader's words. Never an invented provenance. */
   readonly from: string
+  /** The same, plus the page, the form and the campaign the row recorded. */
+  readonly origin: string
+  /** Which door the row DECLARES. `unrecorded` is a real answer. */
+  readonly door: LeadDoor
+  /** "Sun 6 Sept, 3:12 pm", in the workspace's zone. Null if the stamp will not parse. */
+  readonly receivedWhen: string | null
+  /** "2 days ago". Null on the same condition. */
+  readonly receivedAge: string | null
+  /** Whether the conversation behind an inbox lead can be reopened. */
+  readonly conversation: LeadConversation
   /**
    * The raw platform key an inbox lead arrived on — `instagram`, `whatsapp` — or
    * null for a site form and for a row whose source records nothing.
    *
    * Separate from `from`, which is a SENTENCE. A card that shows a platform mark
-   * needs the key, and parsing it back out of "Your inbox · instagram" would be
+   * needs the key, and parsing it back out of "Your inbox · Instagram" would be
    * a second decoder that could disagree with the first.
    *
    * Null is a real answer: a site form has no platform, and neither does a lead
@@ -48,45 +81,88 @@ export interface LeadView {
 }
 
 export type LeadsRead =
-  | { status: 'ok'; leads: readonly LeadView[] }
+  | {
+      status: 'ok'
+      leads: readonly LeadView[]
+      /**
+       * Rows the schema refused. Counted rather than dropped in silence: a lead
+       * missing from a board is a person nobody rings back, and a screen that
+       * shows nine of ten enquiries with no notice is lying by omission.
+       */
+      unreadable: number
+    }
   | { status: 'no-workspace' }
   | { status: 'unreadable' }
 
 /**
- * The words for a lead's origin.
+ * The accounts this workspace still holds, by the platform key a LEAD carries.
  *
- * Read from `source.kind`, which the two writers set. A row whose source says
- * nothing reads as "not recorded" rather than being assigned to a door it may
- * not have come through — every lead in this table predates both doors, so a
- * default of "your site" would be a guess presented as a fact.
+ * `null` means the question could not be answered, which is not the same as "no
+ * accounts" — see `LeadConversation`.
+ *
+ * ── ONE QUERY, NOT ONE PER LEAD ──────────────────────────────────────────────
+ * `lib/zernio/scope.ts` has `accountForWorkspace`, and it is the wrong tool here
+ * twice over: it needs a `ScopedProfileId` fetched first, and it THROWS when a
+ * workspace holds no profile or no account for a platform. Two hundred leads
+ * would be two hundred round trips, and one throw would take the whole board
+ * down to "could not read your leads" over a link.
  */
-function fromOf(source: unknown): string {
-  if (typeof source !== 'object' || source === null) return 'Not recorded'
-  const kind = (source as { kind?: unknown }).kind
-  if (kind === 'site_form') return 'Your site'
-  if (kind === 'inbox') {
-    const channel = (source as { channel?: unknown }).channel
-    return typeof channel === 'string' ? `Your inbox · ${channel}` : 'Your inbox'
+async function activeAccountsByChannel(
+  supabase: ReturnType<typeof createServerSupabase>,
+  workspaceId: string,
+): Promise<Map<string, string> | null> {
+  const { data, error } = await supabase
+    .from('connections')
+    .select('platform, external_account, created_at')
+    .eq('workspace_id', workspaceId)
+    .eq('status', 'active')
+    // The FIRST account connected on a platform is the one a platform-shaped
+    // question resolves to. `accountForWorkspace` states the same rule for the
+    // same reason: with two accounts there is no single true answer, so the rule
+    // is written down rather than left to whichever row Postgres returned.
+    .order('created_at', { ascending: true })
+
+  if (error || !data) return null
+
+  const byPlatform = new Map<string, string>()
+  for (const row of data as Array<Record<string, unknown>>) {
+    const platform = typeof row.platform === 'string' ? row.platform : null
+    const account = row.external_account
+    const id =
+      typeof account === 'object' && account !== null ? (account as { id?: unknown }).id : undefined
+    if (platform === null || typeof id !== 'string' || id === '') continue
+    if (!byPlatform.has(platform)) byPlatform.set(platform, id)
   }
-  return 'Not recorded'
+  return byPlatform
 }
 
-/**
- * The platform key, or null when the row does not carry one.
- *
- * Reads the same `source` object `fromOf` does, and deliberately applies the
- * same rule: only an `inbox` source has a channel. A `site_form` lead has no
- * platform and gets null rather than a default, for the reason `fromOf`'s own
- * header gives — every lead in this table predates both doors.
- */
-function platformOf(source: unknown): string | null {
-  if (typeof source !== 'object' || source === null) return null
-  if ((source as { kind?: unknown }).kind !== 'inbox') return null
-  const channel = (source as { channel?: unknown }).channel
-  return typeof channel === 'string' && channel.trim() !== '' ? channel : null
+function conversationFor(
+  channel: string | null,
+  conversationRef: string | null,
+  accounts: Map<string, string> | null,
+): LeadConversation {
+  if (channel === null || conversationRef === null) return { state: 'none' }
+  // The connections read failed. Nothing may be claimed about them from that.
+  if (accounts === null) return { state: 'none' }
+
+  const accountId = accounts.get(connectionPlatformFor(channel))
+  if (accountId === undefined) return { state: 'disconnected' }
+  // The same two-segment shape `components/inbox/thread-href.ts` builds, and for
+  // the same reason: a conversation id is resolvable only WITHIN an account.
+  return {
+    state: 'link',
+    href: `/inbox/threads/${encodeURIComponent(accountId)}/${encodeURIComponent(conversationRef)}`,
+  }
 }
 
-function toView(lead: Lead): LeadView {
+function toView(
+  lead: Lead,
+  now: Date,
+  zone: string | null,
+  accounts: Map<string, string> | null,
+): LeadView {
+  const origin = leadOrigin(lead.source)
+  const when = received(lead.created_at, now, zone)
   return {
     id: lead.id,
     name: lead.name,
@@ -96,22 +172,28 @@ function toView(lead: Lead): LeadView {
     status: lead.status,
     readAt: lead.read_at,
     createdAt: lead.created_at,
-    from: fromOf(lead.source),
-    platform: platformOf(lead.source),
+    from: origin.from,
+    origin: originWords(origin),
+    door: origin.door,
+    receivedWhen: when.when,
+    receivedAge: when.age,
+    conversation: conversationFor(origin.channel, origin.conversationRef, accounts),
+    platform: origin.channel,
   }
 }
 
-export async function readLeads(): Promise<LeadsRead> {
+export async function readLeads(now: Date = new Date()): Promise<LeadsRead> {
   try {
     const workspace = await activeWorkspaceRead()
     if (workspace.status === 'none') return { status: 'no-workspace' }
     if (workspace.status !== 'ok') return { status: 'unreadable' }
+    const active: WorkspaceOption = workspace.workspace
 
     const supabase = createServerSupabase()
     const { data, error } = await supabase
       .from('leads')
       .select('*')
-      .eq('workspace_id', workspace.workspace.id)
+      .eq('workspace_id', active.id)
       .order('created_at', { ascending: false })
       .limit(LEADS_LIMIT)
 
@@ -120,11 +202,29 @@ export async function readLeads(): Promise<LeadsRead> {
     // of a failed request.
     if (error) return { status: 'unreadable' }
 
-    const leads = (data ?? []).flatMap((row) => {
-      const parsed = LeadSchema.safeParse(row)
-      return parsed.success ? [toView(parsed.data)] : []
+    const rows = data ?? []
+    const parsed = rows.map((row) => LeadSchema.safeParse(row))
+    const kept = parsed.flatMap((result) => (result.success ? [result.data] : []))
+    const unreadable = parsed.length - kept.length
+    if (unreadable > 0) {
+      // The count, never the row: a refused lead still holds a real person's
+      // name and number, and this line goes to a log aggregator.
+      console.error(`[leads] ${unreadable} of ${parsed.length} rows did not match the schema`)
+    }
+
+    // Only asked when something on the board could use the answer. A board of
+    // site-form leads pays for no second round trip.
+    const needsAccounts = kept.some((lead) => {
+      const origin = leadOrigin(lead.source)
+      return origin.channel !== null && origin.conversationRef !== null
     })
-    return { status: 'ok', leads }
+    const accounts = needsAccounts ? await activeAccountsByChannel(supabase, active.id) : null
+
+    return {
+      status: 'ok',
+      leads: kept.map((lead) => toView(lead, now, active.timezone, accounts)),
+      unreadable,
+    }
   } catch {
     return { status: 'unreadable' }
   }

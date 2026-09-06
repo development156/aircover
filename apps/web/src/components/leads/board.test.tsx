@@ -50,6 +50,11 @@ function lead(overrides: Partial<LeadView> = {}): LeadView {
     readAt: null,
     createdAt: new Date(Date.now() - HOUR).toISOString(),
     from: 'Your site',
+    origin: 'Sent from your site',
+    door: 'site_form',
+    receivedWhen: 'Sun 6 Sept, 3:12 pm',
+    receivedAge: '1 hour ago',
+    conversation: { state: 'none' },
     platform: null,
     ...overrides,
   }

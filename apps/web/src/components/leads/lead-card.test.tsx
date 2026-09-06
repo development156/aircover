@@ -43,6 +43,11 @@ function lead(overrides: Partial<LeadView> = {}): LeadView {
     readAt: null,
     createdAt: new Date().toISOString(),
     from: 'Your inbox · instagram',
+    origin: 'From an Instagram conversation',
+    door: 'inbox',
+    receivedWhen: 'Sun 6 Sept, 3:12 pm',
+    receivedAge: 'just now',
+    conversation: { state: 'none' },
     platform: 'instagram',
     ...overrides,
   }
