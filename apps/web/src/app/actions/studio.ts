@@ -7,6 +7,9 @@ import { createMesh, type Mesh } from '@sahoda/mesh'
 import {
   DEFAULT_STAMP_OPTIONS,
   GenerationModeSchema,
+  IMAGE_PROMPT_MAX_CHARS,
+  LeaveOutSchema,
+  ReferenceFollowSchema,
   StampOptionsSchema,
   StudioGenerationRowSchema,
   StudioGenerationSchema,
@@ -135,6 +138,21 @@ const GenerateInputSchema = z.object({
    * about what a valid choice is.
    */
   stamp: StampOptionsSchema.optional(),
+  /**
+   * A few words describing what the picture should not show. Absent means
+   * nothing is excluded. See `LeaveOutSchema`'s own header in
+   * `@sahoda/shared`: this is prompt-level guidance, never a guarantee, and
+   * it is appended to `prompt_sent` and never touches `prompt_given`.
+   */
+  excludeText: LeaveOutSchema.optional(),
+  /**
+   * How closely to follow the reference images picked for this press.
+   * Defaulted to `balanced` by the schema itself, which adds nothing to the
+   * prompt (see `ReferenceFollowSchema`). Meaningless without a reference:
+   * this action drops it to the default when `referenceAssetIds` is empty,
+   * the same way the composer disables the control for the same reason.
+   */
+  referenceFollow: ReferenceFollowSchema,
 })
 
 export type QueueGenerationState =
@@ -173,6 +191,16 @@ const REFUSALS = {
    * failed on `referenceAssetIds` and every failure mapped to one line.
    */
   tooManyReferences: `Pick at most ${MAX_REFERENCES} pictures for Sahoda to match.`,
+  /**
+   * The prompt actually sent (the customer's words, plus the mode's own
+   * direction, brand context, "leave out" and "follow how closely" when
+   * given) is over the provider's limit once everything is added together.
+   * Both halves of the remedy actually work: shortening either field brings
+   * the total back under the ceiling, so this never offers a fix that cannot
+   * work.
+   */
+  promptTooLong:
+    'This request is too long once everything is added together. Shorten your description or what to leave out.',
 } as const
 
 /**
@@ -283,7 +311,24 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
       mode: parsed.data.mode,
       wanted: parsed.data.wanted,
       signals,
+      excludeText: parsed.data.excludeText,
+      // Meaningless without a reference, so a request that named none gets
+      // the default rather than a clause about pictures it is not looking
+      // at. Defensive: the composer already disables the control for the
+      // same reason, but a hand-made request must be held to it too.
+      referenceFollow:
+        parsed.data.referenceAssetIds.length > 0 ? parsed.data.referenceFollow : undefined,
     })
+
+    // ── THE CEILING IS CHECKED BEFORE ANYTHING IS HELD, NOT DISCOVERED AFTER ──
+    // `ImageGenerateInputSchema` refuses a prompt over this length anyway, but
+    // only once a hold already exists and the mesh has been asked. Checking
+    // here means a request that cannot be sent is never charged for, never
+    // written as a row, and told a reason that names the actual cause rather
+    // than the generic "Sahoda could not make this image."
+    if (conditioned.prompt.length > IMAGE_PROMPT_MAX_CHARS) {
+      return { ok: false, insufficient: false, message: REFUSALS.promptTooLong }
+    }
 
     const supabase = createServerSupabase()
 

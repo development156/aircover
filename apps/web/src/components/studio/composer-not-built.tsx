@@ -8,13 +8,16 @@ import { Lock } from 'lucide-react'
  * announced as an action. A name leaves this list the day it ships — "Tidy
  * my words" sat here after the refiner shipped, so the bar carried a lock
  * beside a control that was rendering, working and charging a credit a few
- * hundred pixels above it.
+ * hundred pixels above it. "Leave out" and "Follow how closely" left the
+ * same way on 2026-09-06 (`composer-refine-controls.tsx`).
+ *
+ * "Same again" STAYS. It promises the exact same picture, and delivering
+ * that needs a seed: MEASURED, nothing in this repository sends a seed to
+ * any provider, the images request body has none, and `docs/43` documents
+ * none. Building it on top of a fresh, unseeded call would return a
+ * DIFFERENT picture under a name that promises the same one.
  */
-const COMING_SOON = [
-  { title: 'Leave out' },
-  { title: 'Same again' },
-  { title: 'Follow how closely' },
-] as const
+const COMING_SOON = [{ title: 'Same again' }] as const
 
 export function ComposerNotBuilt() {
   return (

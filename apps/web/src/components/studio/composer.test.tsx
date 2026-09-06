@@ -808,7 +808,7 @@ describe('the bar', () => {
   test('no panel is open by default, and the bar stays usable', () => {
     open()
     expect(screen.queryByRole('group', { name: /how should sahoda approach it/i })).toBeNull()
-    expect(screen.getByRole('textbox')).toBeTruthy()
+    expect(screen.getByLabelText(/what should the picture show/i)).toBeTruthy()
     expect(screen.getByRole('button', { name: /generate image/i })).toBeTruthy()
   })
 
@@ -1001,6 +1001,113 @@ describe('what Sahoda will send, shown before the spend', () => {
   })
 })
 
+describe("leave out: a request, never a rewrite of the customer's own words", () => {
+  test('what is typed reaches the press, and appears in "Will send"', async () => {
+    const user = userEvent.setup()
+    const { container } = open()
+    await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
+    await user.type(screen.getByLabelText('Leave out'), 'no people')
+
+    await user.click(screen.getByRole('button', { name: /will send/i }))
+    const willSendExclude = container.querySelector(
+      '[data-guide="studio-will-send-exclude"]',
+    ) as HTMLElement
+    expect(willSendExclude).not.toBeNull()
+    expect(willSendExclude.textContent).toContain('no people')
+    expect(willSendExclude.textContent).toMatch(/cannot guarantee removal/i)
+
+    vi.mocked(queueGeneration).mockResolvedValue({
+      ok: true,
+      generationId: 'g1',
+      balanceAfter: 5,
+      made: 1,
+      asked: 1,
+    })
+    await user.click(screen.getByRole('button', { name: /generate image/i }))
+    expect(queueGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({ wanted: 'a shopfront', excludeText: 'no people' }),
+    )
+  })
+
+  test('blank text is not sent as an empty exclusion', async () => {
+    vi.mocked(queueGeneration).mockResolvedValue({
+      ok: true,
+      generationId: 'g1',
+      balanceAfter: 5,
+      made: 1,
+      asked: 1,
+    })
+    const user = userEvent.setup()
+    open()
+    await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
+    await user.click(screen.getByRole('button', { name: /generate image/i }))
+    expect(queueGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({ excludeText: undefined }),
+    )
+  })
+})
+
+describe('follow how closely: meaningless with no reference, and it says so', () => {
+  test('is unavailable, with the reason stated, until a picture is picked', async () => {
+    const user = userEvent.setup()
+    const { container } = open(LIBRARY)
+    for (const button of screen.getAllByRole('button', { name: /closely|balanced/i })) {
+      expect(button).toBeDisabled()
+    }
+    expect(screen.getByText(/pick a picture to match first/i)).toBeTruthy()
+
+    await openMatch(user)
+    const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
+    await user.click(within(picker).getAllByRole('button')[0]!)
+
+    for (const button of screen.getAllByRole('button', { name: /closely|balanced/i })) {
+      expect(button).toBeEnabled()
+    }
+    expect(screen.queryByText(/pick a picture to match first/i)).toBeNull()
+  })
+
+  test('a chosen step reaches the press, and appears in "Will send"', async () => {
+    vi.mocked(queueGeneration).mockResolvedValue({
+      ok: true,
+      generationId: 'g1',
+      balanceAfter: 5,
+      made: 1,
+      asked: 1,
+    })
+    const user = userEvent.setup()
+    const { container } = open(LIBRARY)
+    await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
+    await openMatch(user)
+    const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
+    await user.click(within(picker).getAllByRole('button')[0]!)
+
+    await user.click(screen.getByRole('button', { name: 'Closely' }))
+    await user.click(screen.getByRole('button', { name: /will send/i }))
+    const willSendFollow = container.querySelector(
+      '[data-guide="studio-will-send-follow"]',
+    ) as HTMLElement
+    expect(willSendFollow).not.toBeNull()
+    expect(willSendFollow.textContent).toContain('Closely')
+    expect(willSendFollow.textContent).toMatch(/does not guarantee an exact match/i)
+
+    await user.click(screen.getByRole('button', { name: /generate image/i }))
+    expect(queueGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({ referenceFollow: 'close' }),
+    )
+  })
+
+  test('"balanced", the default, is never named in "Will send"', async () => {
+    const user = userEvent.setup()
+    const { container } = open(LIBRARY)
+    await openMatch(user)
+    const picker = container.querySelector('[data-guide="studio-references"]') as HTMLElement
+    await user.click(within(picker).getAllByRole('button')[0]!)
+
+    await user.click(screen.getByRole('button', { name: /will send/i }))
+    expect(screen.queryByText(/follow how closely:/i)).toBeNull()
+  })
+})
+
 describe('the rest of the composer', () => {
   /**
    * ── THE TOPBAR PILL IS THE ONE READOUT, NOT THIS BAR ─────────────────────
@@ -1021,11 +1128,21 @@ describe('the rest of the composer', () => {
 
   test('names the controls that are designed and not built, as text not buttons', () => {
     open()
-    for (const title of ['Leave out', 'Same again', 'Follow how closely']) {
-      expect(screen.getByText(title), title).toBeTruthy()
-      expect(screen.queryByRole('button', { name: title }), title).toBeNull()
-    }
+    expect(screen.getByText('Same again')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Same again' })).toBeNull()
     expect(screen.getByText(/nothing here changes what a press does today/i)).toBeTruthy()
+  })
+
+  /**
+   * "Leave out" and "Follow how closely" left the not-built row on 2026-09-06:
+   * they render as real controls now (`composer-refine-controls.tsx`), not as
+   * a locked name in this list.
+   */
+  test('"Leave out" and "Follow how closely" no longer sit in the not-built row', () => {
+    const { container } = open()
+    const row = container.querySelector('[data-guide="studio-coming-soon"]') as HTMLElement
+    expect(row.textContent).not.toMatch(/leave out/i)
+    expect(row.textContent).not.toMatch(/follow how closely/i)
   })
 
   test('does not name the prompt refiner as missing while the refiner is on screen', () => {

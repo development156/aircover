@@ -10,6 +10,10 @@ import { ComposerNotBuilt } from '@/components/studio/composer-not-built'
 import { ComposerPanels } from '@/components/studio/composer-panels'
 import { ComposerPickedReferences } from '@/components/studio/composer-picked-references'
 import { ComposerPrompt } from '@/components/studio/composer-prompt'
+import {
+  ComposerLeaveOut,
+  ComposerReferenceFollow,
+} from '@/components/studio/composer-refine-controls'
 import { ComposerStarters } from '@/components/studio/composer-starters'
 import { ComposerWillSend } from '@/components/studio/composer-will-send'
 import { PromptRefineControl } from '@/components/studio/prompt-refine-control'
@@ -188,6 +192,15 @@ export function Composer({
           extraControls={extraControls}
         />
 
+        <div className="flex flex-wrap items-start gap-4">
+          <ComposerLeaveOut value={c.excludeText} onChange={c.setExcludeText} />
+          <ComposerReferenceFollow
+            value={c.referenceFollow}
+            onChange={c.setReferenceFollow}
+            hasReference={c.picked.length > 0}
+          />
+        </div>
+
         {c.count === 1 ? null : (
           <p className="type-sm text-muted">
             <span className="num">{c.count}</span> different pictures from the same description, so
@@ -224,7 +237,12 @@ export function Composer({
         />
       </div>
 
-      <ComposerWillSend signals={signals} />
+      <ComposerWillSend
+        signals={signals}
+        excludeText={c.excludeText}
+        referenceFollow={c.referenceFollow}
+        hasReference={c.picked.length > 0}
+      />
       <ComposerNotBuilt />
 
       {c.note === null ? null : (

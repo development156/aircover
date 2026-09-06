@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  DEFAULT_REFERENCE_FOLLOW,
   DEFAULT_STAMP_OPTIONS,
+  LEAVE_OUT_MAX_CHARS,
+  LeaveOutSchema,
+  REFERENCE_FOLLOW_STEPS,
+  ReferenceFollowSchema,
   STAMP_ANCHOR_MOVE_REASONS,
   StampAnchorMoveReasonSchema,
   StampAnchorSchema,
@@ -72,5 +77,34 @@ describe('StampAnchorMoveReasonSchema: exactly two reasons a mark moves corner',
     // added here without one there would let a row store a reason no screen speaks.
     expect(StampAnchorMoveReasonSchema.safeParse('crowded').success).toBe(false)
     expect(StampAnchorMoveReasonSchema.safeParse('as_chosen').success).toBe(false)
+  })
+})
+
+describe('LeaveOutSchema', () => {
+  it('accepts a short phrase', () => {
+    expect(LeaveOutSchema.safeParse('no people').success).toBe(true)
+  })
+
+  it('refuses a blank string, so "present but empty" cannot slip through', () => {
+    expect(LeaveOutSchema.safeParse('   ').success).toBe(false)
+  })
+
+  it(`refuses anything past ${LEAVE_OUT_MAX_CHARS} characters`, () => {
+    expect(LeaveOutSchema.safeParse('a'.repeat(LEAVE_OUT_MAX_CHARS)).success).toBe(true)
+    expect(LeaveOutSchema.safeParse('a'.repeat(LEAVE_OUT_MAX_CHARS + 1)).success).toBe(false)
+  })
+})
+
+describe('ReferenceFollowSchema', () => {
+  it('accepts exactly the three named steps', () => {
+    for (const step of REFERENCE_FOLLOW_STEPS) {
+      expect(ReferenceFollowSchema.safeParse(step).success, step).toBe(true)
+    }
+    expect(ReferenceFollowSchema.safeParse('exact').success).toBe(false)
+  })
+
+  it('defaults to balanced, which is DEFAULT_REFERENCE_FOLLOW, not a second hand-written copy', () => {
+    expect(ReferenceFollowSchema.parse(undefined)).toBe('balanced')
+    expect(DEFAULT_REFERENCE_FOLLOW).toBe('balanced')
   })
 })

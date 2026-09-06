@@ -389,8 +389,17 @@ export const IMAGE_SIZES = {
 } as const
 export type ImageSizeName = keyof typeof IMAGE_SIZES
 
+/**
+ * The provider's own ceiling on the assembled prompt (docs/43), named here so
+ * a caller that builds the final sentence out of several pieces (the
+ * customer's words, the mode's direction, brand context, an exclusion clause)
+ * can check the SAME number the schema below enforces, before spending a hold
+ * on a call the schema will refuse anyway.
+ */
+export const IMAGE_PROMPT_MAX_CHARS = 1000
+
 export const ImageGenerateInputSchema = z.object({
-  prompt: z.string().min(3).max(1000),
+  prompt: z.string().min(3).max(IMAGE_PROMPT_MAX_CHARS),
   /** Square by default — see IMAGE_SIZES. */
   size: z.enum(['square', 'portrait', 'landscape']).default('square'),
   /**

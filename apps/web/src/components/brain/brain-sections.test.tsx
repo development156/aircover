@@ -22,10 +22,14 @@ vi.mock('@/components/workspace/create-workspace-button', () => ({
 }))
 
 describe('BrainSections with no workspace', () => {
+  // The button is code-split (see brain-sections.tsx: it carries `sonner` and
+  // would otherwise sit on every field tab's first load), so it resolves after
+  // a tick rather than synchronously — `findByRole` awaits it. That the remedy
+  // still arrives is the whole point of the split: it must not change behaviour.
   test('offers the one remedy that can work, and does not ask for a resolve', async () => {
     render(await BrainSections({ only: ['brand_persona'] }))
 
-    expect(screen.getByRole('button', { name: /create a workspace/i })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /create a workspace/i })).toBeInTheDocument()
     expect(screen.queryByText(/resolved once/i)).not.toBeInTheDocument()
   })
 })

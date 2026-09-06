@@ -2,9 +2,15 @@ import { Fragment, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import Link from 'next/link'
 
-import type { BrandSignal } from '@sahoda/shared'
+import type { BrandSignal, ReferenceFollow } from '@sahoda/shared'
 
 import { colorNames } from '@/lib/brand/color-name'
+
+const REFERENCE_FOLLOW_LABEL: Record<ReferenceFollow, string> = {
+  loose: 'Loosely inspired',
+  balanced: 'Balanced',
+  close: 'Closely',
+}
 
 /**
  * "WILL SEND": REFERENCE, NOT A DECISION TAKEN ON EVERY PRESS.
@@ -24,8 +30,24 @@ import { colorNames } from '@/lib/brand/color-name'
  * itself sometimes. Every value then starts at the same x, in every render,
  * because the column that precedes it always measures the same.
  */
-export function ComposerWillSend({ signals }: { signals: BrandSignal[] | null }) {
+export function ComposerWillSend({
+  signals,
+  excludeText,
+  referenceFollow,
+  hasReference,
+}: {
+  signals: BrandSignal[] | null
+  /** Trimmed by the caller; blank means nothing is excluded. */
+  excludeText: string
+  referenceFollow: ReferenceFollow
+  hasReference: boolean
+}) {
   const [open, setOpen] = useState(false)
+  const trimmedExclude = excludeText.trim()
+  // `balanced` adds nothing to the prompt (see `ReferenceFollowSchema`), and
+  // the control is unavailable without a reference, so neither is worth a
+  // line here.
+  const showFollow = hasReference && referenceFollow !== 'balanced'
 
   return (
     <div className="flex flex-col gap-2" data-guide="studio-signals">
@@ -47,6 +69,19 @@ export function ComposerWillSend({ signals }: { signals: BrandSignal[] | null })
           link inside is wt-core's and is kept in full. */}
       {open ? (
         <div id="studio-signals-detail" className="flex flex-col gap-2">
+          {trimmedExclude === '' ? null : (
+            <p className="type-sm text-muted" data-guide="studio-will-send-exclude">
+              Leave out: <span className="text-ink">{trimmedExclude}</span>. Sahoda asks for the
+              picture without it. It cannot guarantee removal.
+            </p>
+          )}
+          {showFollow ? (
+            <p className="type-sm text-muted" data-guide="studio-will-send-follow">
+              Follow how closely:{' '}
+              <span className="text-ink">{REFERENCE_FOLLOW_LABEL[referenceFollow]}</span>. This
+              guides the picture. It does not guarantee an exact match.
+            </p>
+          ) : null}
           {/* ── A REMEDY ONLY WHERE ONE WORKS ──────────────────────────────
               Offered for the two answers a person can act on: a brain with
               things in it, where the work is confirming the guesses, and an

@@ -100,6 +100,85 @@ describe('conditionPrompt', () => {
     })
     expect(used.map((s) => s.field)).toEqual(['voice'])
   })
+
+  /**
+   * LEAVE OUT: A CLAUSE APPENDED, NEVER A REWRITE OF THE CUSTOMER'S OWN WORDS.
+   *
+   * MUTATION: fold `excludeText` into `wanted` instead of appending it as its
+   * own part and this goes red, because the person's own words no longer
+   * start the prompt unchanged.
+   */
+  test("what to leave out reaches the prompt as its own clause, after the customer's words", () => {
+    const { prompt } = conditionPrompt({
+      mode: 'on_brand',
+      wanted: 'a plate of samosas',
+      signals: [],
+      excludeText: 'no people',
+    })
+    expect(prompt.startsWith('a plate of samosas')).toBe(true)
+    expect(prompt).toContain('no people')
+  })
+
+  test('blank or absent exclusion text adds nothing', () => {
+    const absent = conditionPrompt({ mode: 'on_brand', wanted: 'x', signals: [] }).prompt
+    const blank = conditionPrompt({
+      mode: 'on_brand',
+      wanted: 'x',
+      signals: [],
+      excludeText: '   ',
+    }).prompt
+    expect(blank).toBe(absent)
+  })
+
+  /**
+   * THE MODEL IS ASKED, NEVER PROMISED. A diffusion model follows an
+   * exclusion imperfectly, and the sentence sent must not claim otherwise.
+   */
+  test('the exclusion clause asks rather than guarantees', () => {
+    const { prompt } = conditionPrompt({
+      mode: 'on_brand',
+      wanted: 'x',
+      signals: [],
+      excludeText: 'no text on the sign',
+    })
+    expect(prompt).not.toMatch(/will not include/i)
+    expect(prompt).not.toMatch(/guarantee/i)
+  })
+
+  /**
+   * FOLLOW HOW CLOSELY: `balanced` IS THE SAME PROMPT AS NAMING NOTHING.
+   *
+   * MUTATION: always append a `referenceFollow` line, even for `balanced`,
+   * and this goes red.
+   */
+  test('"balanced" adds nothing: it is already the mode\'s own direction', () => {
+    const withoutField = conditionPrompt({ mode: 'match', wanted: 'x', signals: [] }).prompt
+    const withBalanced = conditionPrompt({
+      mode: 'match',
+      wanted: 'x',
+      signals: [],
+      referenceFollow: 'balanced',
+    }).prompt
+    expect(withBalanced).toBe(withoutField)
+  })
+
+  test('loose and close each add a different, honest direction', () => {
+    const loose = conditionPrompt({
+      mode: 'match',
+      wanted: 'x',
+      signals: [],
+      referenceFollow: 'loose',
+    }).prompt
+    const close = conditionPrompt({
+      mode: 'match',
+      wanted: 'x',
+      signals: [],
+      referenceFollow: 'close',
+    }).prompt
+    expect(loose).toMatch(/loosely|inspiration/i)
+    expect(close).toMatch(/closely/i)
+    expect(loose).not.toBe(close)
+  })
 })
 
 describe('describeConditioning', () => {

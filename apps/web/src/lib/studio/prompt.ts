@@ -1,4 +1,4 @@
-import type { BrandSignal, GenerationMode } from '@sahoda/shared'
+import type { BrandSignal, GenerationMode, ReferenceFollow } from '@sahoda/shared'
 
 /**
  * BUILDING THE PROMPT FROM THE BRAND BRAIN, AND SAYING WHICH PARTS WERE GUESSES.
@@ -53,6 +53,21 @@ export type ConditioningInput = {
    * brain; this module decides what to do with them.
    */
   signals: readonly BrandSignal[]
+  /**
+   * A few words describing what the picture should not show, already trimmed.
+   * Absent or empty adds nothing. See `LeaveOutSchema`'s own header: this is
+   * prompt-level guidance appended to what is SENT, never a rewrite of what
+   * the customer typed.
+   */
+  excludeText?: string
+  /**
+   * How closely to follow the reference images. `undefined` and `'balanced'`
+   * behave identically: neither adds anything, because "balanced" is already
+   * what every mode's own direction asks for. The CALLER decides whether this
+   * is meaningful at all (a request with no reference picked must not pass
+   * anything other than the default) — this function trusts what it is given.
+   */
+  referenceFollow?: ReferenceFollow
 }
 
 export type Conditioned = {
@@ -70,6 +85,23 @@ export type Conditioned = {
  * out, cheaply, before committing. A mode that quietly applied full conditioning
  * would make Explore and On brand produce the same picture at two prices.
  */
+/**
+ * The sentence for each non-default follow step. `balanced` is deliberately
+ * absent: it is the mode's own direction already and adding a line for it
+ * would be the same instruction twice.
+ *
+ * Worded as a request to the model, not a promise to the customer — the
+ * screen that shows this choice carries its own honesty caveat; this text is
+ * what actually reaches the model and does not need to repeat it to a reader
+ * who will never see it.
+ */
+const REFERENCE_FOLLOW_DIRECTION: Record<Exclude<ReferenceFollow, 'balanced'>, string> = {
+  loose:
+    'Use the reference images loosely, as inspiration rather than a strict guide: vary composition, framing and detail freely.',
+  close:
+    'Follow the reference images closely: match their composition, framing, lighting and style as closely as possible.',
+}
+
 const MODE_DIRECTION: Record<GenerationMode, string> = {
   on_brand: 'Match the brand described below exactly.',
   explore: 'Explore freely. Vary composition, colour and mood.',
@@ -108,6 +140,18 @@ export function conditionPrompt(input: ConditioningInput): Conditioned {
     parts.push(
       ['Brand context:', ...used.map((signal) => `- ${signal.field}: ${signal.value}`)].join('\n'),
     )
+  }
+
+  // "Leave out": a request, not a guarantee — see `LeaveOutSchema`'s header.
+  const excludeText = input.excludeText?.trim() ?? ''
+  if (excludeText !== '') {
+    parts.push(`Avoid including: ${excludeText}.`)
+  }
+
+  // "Follow how closely": absent for `balanced`, which the mode direction
+  // above already expresses.
+  if (input.referenceFollow && input.referenceFollow !== 'balanced') {
+    parts.push(REFERENCE_FOLLOW_DIRECTION[input.referenceFollow])
   }
 
   // Said on every generation regardless of mode, because it is a property of

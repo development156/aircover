@@ -1,7 +1,7 @@
 import { BrainCircuit } from 'lucide-react'
 
 import { EmptyState } from '@/components/empty-state'
-import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
+import { CreateWorkspaceCta } from '@/components/brain/create-workspace-cta'
 import { SectionCard } from '@/components/brain/section-card'
 import { SectionCardEmpty } from '@/components/brain/section-card-empty'
 import { BRAIN_SECTIONS, type BrainSectionKey } from '@/lib/brand/fields'
@@ -36,7 +36,7 @@ export async function BrainSections({ only }: { only: readonly BrainSectionKey[]
         icon={BrainCircuit}
         title="Create a workspace to build a Brand Brain"
         body="These fields are what Sahoda writes your captions, your weekly plan and your website from. A Brand Brain belongs to a workspace and you don’t have one yet. Nothing failed."
-        action={<CreateWorkspaceButton variant="primary" />}
+        action={<CreateWorkspaceCta />}
       />
     )
   }

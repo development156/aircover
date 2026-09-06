@@ -1,10 +1,12 @@
 import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
+  DEFAULT_REFERENCE_FOLLOW,
   DEFAULT_STAMP_OPTIONS,
   IMAGE_TIER_ACTION,
   creditCost,
   type GenerationMode,
+  type ReferenceFollow,
   type StampAnchor,
   type StampSizeStep,
 } from '@sahoda/shared'
@@ -55,6 +57,11 @@ export function useComposer({
   const [stampSizeStep, setStampSizeStep] = useState<StampSizeStep>(
     initialValues?.stamp?.sizeStep ?? DEFAULT_STAMP_OPTIONS.sizeStep,
   )
+  // Not seeded from `initialValues`: neither is persisted anywhere a remix
+  // could read it back from, so there is nothing honest to seed with yet.
+  // See `composer.tsx`'s header for the gap this leaves.
+  const [excludeText, setExcludeText] = useState('')
+  const [referenceFollow, setReferenceFollow] = useState<ReferenceFollow>(DEFAULT_REFERENCE_FOLLOW)
   const [note, setNote] = useState<string | null>(null)
   const [short, setShort] = useState(false)
   const [viewingReference, setViewingReference] = useState<{
@@ -152,6 +159,11 @@ export function useComposer({
           count,
           modelId,
           stamp: { enabled: stampEnabled, anchor: stampAnchor, sizeStep: stampSizeStep },
+          excludeText: excludeText.trim() === '' ? undefined : excludeText.trim(),
+          // Meaningless with no reference picked; the control is disabled in
+          // that case, but this is the same defensive drop the server action
+          // makes, kept honest on both sides of the wire.
+          referenceFollow: picked.length > 0 ? referenceFollow : undefined,
         })
         if (result.ok) {
           setNote(describePartial({ made: result.made, asked: result.asked }))
@@ -187,6 +199,10 @@ export function useComposer({
     setStampAnchor,
     stampSizeStep,
     setStampSizeStep,
+    excludeText,
+    setExcludeText,
+    referenceFollow,
+    setReferenceFollow,
     note,
     short,
     viewingReference,
