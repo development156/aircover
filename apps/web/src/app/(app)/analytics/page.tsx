@@ -55,6 +55,7 @@ import {
 } from '@/lib/analytics/view-params'
 import { readWindow } from '@/lib/analytics/window-data'
 import { measureLine } from '@/lib/analytics/measure-line'
+import { nothingYetCard } from '@/lib/analytics/nothing-yet'
 import { MeasureNow } from '@/components/analytics/measure-now'
 import { formatScheduledAt } from '@/lib/posts/schedule-format'
 import { InboxAnalytics } from '@/components/analytics/inbox/inbox-analytics'
@@ -306,11 +307,7 @@ export default async function AnalyticsPage({
           channels={[]}
           measured={measured}
         />
-        <ReportExample
-          headline="Nothing to measure yet"
-          detail="Reach and followers come from the channel itself, so connecting an account starts the numbers even before you post."
-          action={{ label: 'Connect a channel', href: '/connections' }}
-        />
+        <ReportExample {...nothingYetCard(account.kind)} />
       </div>
     )
   }
