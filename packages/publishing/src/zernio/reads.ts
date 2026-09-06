@@ -515,6 +515,77 @@ export interface ZernioInboxTopAccounts {
   accounts: ZernioInboxTopAccount[]
 }
 
+// ── posting analytics, profile-scoped ────────────────────────────────────────
+
+/**
+ * ONE DAY OF `GET /v1/analytics/daily-metrics`.
+ *
+ * ── EVERY METRIC IS NULLABLE HERE AND IT IS NOT ON THE WIRE ──────────────────
+ * The OpenAPI schema types all eight as `integer` and the example sends all
+ * eight. They are typed `number | null` anyway, because this module's job is to
+ * report what arrived and not what was promised: a key the response omits, or
+ * sends as a string, or sends as `null`, must not reach a chart as a zero. A
+ * zero is a measurement of nothing and a null is the absence of a measurement,
+ * and once they are the same value nothing downstream can tell them apart.
+ *
+ * `postCount` and the `platforms` split are counts of rows Zernio holds, so
+ * those default to 0 and {} rather than to null: an absent day is simply not in
+ * the array.
+ */
+export interface ZernioDailyMetricValues {
+  impressions: number | null
+  reach: number | null
+  likes: number | null
+  comments: number | null
+  shares: number | null
+  saves: number | null
+  clicks: number | null
+  views: number | null
+}
+
+export interface ZernioDailyMetricsDay {
+  /** `YYYY-MM-DD`. */
+  date: string
+  postCount: number
+  /** Posts per platform on this day: `{ instagram: 2, twitter: 1 }`. */
+  platforms: Record<string, number>
+  metrics: ZernioDailyMetricValues
+}
+
+export interface ZernioDailyPlatformRow extends ZernioDailyMetricValues {
+  platform: string
+  postCount: number
+}
+
+export interface ZernioDailyMetrics {
+  dailyData: ZernioDailyMetricsDay[]
+  platformBreakdown: ZernioDailyPlatformRow[]
+}
+
+/**
+ * ── `attribution` IS NOT A PREFERENCE, IT DECIDES WHAT THE CHART MEANS ───────
+ * `publish` (Zernio's default) sums each post's LIFETIME total onto its publish
+ * date, so a column is "posts published that day, and everything they have ever
+ * earned since". `received` buckets the per-day INCREASE by the day it arrived,
+ * so a column is "engagement gained that day, on posts of any age". They are
+ * different questions with the same axis, and a screen that let the default
+ * decide would change what its y-axis means without saying so.
+ *
+ * Required here, with no default, for exactly that reason: a caller has to
+ * choose, and whatever it chooses it can then print.
+ */
+export interface ZernioDailyMetricsFilter {
+  /** ISO 8601. Inclusive. */
+  fromDate: string
+  /** ISO 8601. Inclusive. Zernio defaults to now. */
+  toDate?: string
+  /** One platform, or every platform when omitted. */
+  platform?: string
+  attribution: 'publish' | 'received'
+  /** `late` is published through Zernio, `external` is imported. */
+  source?: 'all' | 'late' | 'external'
+}
+
 export interface ZernioReads {
   // ── analytics, profile-scoped ──────────────────────────────────────────────
   /**
@@ -666,6 +737,30 @@ export interface ZernioReads {
     profile: ScopedProfileId,
     filter: ZernioInboxAnalyticsFilter & { limit?: number },
   ): Promise<ZernioInboxTopAccounts>
+
+  // ── posting analytics, profile-scoped ──────────────────────────────────────
+  /**
+   * Daily aggregated metrics and a per-platform breakdown, for /analytics.
+   *
+   * This is the ONLY source in this product for likes, comments, shares, saves,
+   * clicks and views. `post_metric_snapshots` stores impressions, reach and a
+   * single summed `engagement` and throws the parts away, which is why
+   * `headline.ts` has a card saying out loud that Sahoda cannot tell you how
+   * many people replied.
+   *
+   * `profileId` goes on the wire like every other profile-scoped read: omitted,
+   * it reads every profile on the API key, which is every tenant.
+   *
+   * ── IT CAN BE REFUSED FOR A REASON THAT IS NOT AN OUTAGE ────────────────────
+   * HTTP 402 `analytics_addon_required` on a legacy plan. That throws like any
+   * other refusal and MUST NOT be read as "nothing is connected": the accounts
+   * are connected and the plan does not carry the add-on. `lib/analytics/
+   * daily-metrics.ts` keeps the two apart.
+   */
+  dailyMetrics(
+    profile: ScopedProfileId,
+    filter: ZernioDailyMetricsFilter,
+  ): Promise<ZernioDailyMetrics>
 }
 
 export function createZernioReads(deps: ZernioClientDeps): ZernioReads {
@@ -1018,5 +1113,98 @@ export function createZernioReads(deps: ZernioClientDeps): ZernioReads {
         accounts: data.accounts ?? [],
       }
     },
+    // ── posting analytics, profile-scoped ────────────────────────────────────
+
+    async dailyMetrics(profile, filter) {
+      const { data } = await json<{
+        dailyData?: unknown[]
+        platformBreakdown?: unknown[]
+      }>(
+        'GET',
+        `/analytics/daily-metrics${qs({
+          profileId: profile,
+          fromDate: filter.fromDate,
+          toDate: filter.toDate,
+          platform: filter.platform,
+          attribution: filter.attribution,
+          source: filter.source,
+        })}`,
+        'dailyMetrics',
+      )
+
+      return {
+        dailyData: (Array.isArray(data.dailyData) ? data.dailyData : [])
+          .map(dailyDay)
+          .filter((day): day is ZernioDailyMetricsDay => day !== null),
+        platformBreakdown: (Array.isArray(data.platformBreakdown) ? data.platformBreakdown : [])
+          .map(dailyPlatform)
+          .filter((row): row is ZernioDailyPlatformRow => row !== null),
+      }
+    },
+  }
+}
+
+// ── posting analytics: narrowing ─────────────────────────────────────────────
+
+/**
+ * A finite number, or NOTHING.
+ *
+ * Never a coerced zero. A metric that arrives as a string, a null or not at all
+ * is one we hold no reading for, and the difference between that and a real
+ * zero is the difference between "the platform reported none" and "we never got
+ * an answer" — two sentences this product keeps apart everywhere else.
+ */
+function dailyNum(raw: unknown): number | null {
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null
+  if (typeof raw !== 'string' || raw === '') return null
+  const parsed = Number(raw)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function dailyValues(raw: Record<string, unknown>): ZernioDailyMetricValues {
+  return {
+    impressions: dailyNum(raw.impressions),
+    reach: dailyNum(raw.reach),
+    likes: dailyNum(raw.likes),
+    comments: dailyNum(raw.comments),
+    shares: dailyNum(raw.shares),
+    saves: dailyNum(raw.saves),
+    clicks: dailyNum(raw.clicks),
+    views: dailyNum(raw.views),
+  }
+}
+
+/** A day without a readable date is DROPPED. An invented date is a wrong column. */
+function dailyDay(raw: unknown): ZernioDailyMetricsDay | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const row = raw as Record<string, unknown>
+  const date = typeof row.date === 'string' ? row.date.slice(0, 10) : null
+  if (date === null || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null
+
+  const platforms: Record<string, number> = {}
+  if (typeof row.platforms === 'object' && row.platforms !== null) {
+    for (const [platform, count] of Object.entries(row.platforms as Record<string, unknown>)) {
+      const value = dailyNum(count)
+      if (value !== null) platforms[platform] = value
+    }
+  }
+
+  const metrics =
+    typeof row.metrics === 'object' && row.metrics !== null
+      ? dailyValues(row.metrics as Record<string, unknown>)
+      : dailyValues({})
+
+  return { date, postCount: dailyNum(row.postCount) ?? 0, platforms, metrics }
+}
+
+/** A breakdown row without a platform name is DROPPED, never bucketed as "other". */
+function dailyPlatform(raw: unknown): ZernioDailyPlatformRow | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const row = raw as Record<string, unknown>
+  if (typeof row.platform !== 'string' || row.platform === '') return null
+  return {
+    platform: row.platform,
+    postCount: dailyNum(row.postCount) ?? 0,
+    ...dailyValues(row),
   }
 }

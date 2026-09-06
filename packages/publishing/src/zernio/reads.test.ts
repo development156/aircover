@@ -72,6 +72,11 @@ describe('every profile-scoped read puts profileId on the wire', () => {
       'postAnalytics',
       (r: ReturnType<typeof readsWith>['reads']) => r.postAnalytics(profile, IG_MEDIA_ID),
     ],
+    [
+      'dailyMetrics',
+      (r: ReturnType<typeof readsWith>['reads']) =>
+        r.dailyMetrics(profile, { fromDate: '2026-08-01', attribution: 'publish' }),
+    ],
   ])('%s sends profileId', async (_name, call) => {
     const { reads, cap } = readsWith()
     await call(reads)
@@ -223,5 +228,130 @@ describe('messageAttachmentUrl', () => {
   it('answers null, not a throw, when the platform cannot re-mint (404)', async () => {
     const { reads } = readsWith({ error: 'not_found' }, 404)
     await expect(reads.messageAttachmentUrl(account, 'conv-1', 'msg-1', 0)).resolves.toBeNull()
+  })
+})
+
+describe('dailyMetrics', () => {
+  const DAY = {
+    date: '2026-08-01',
+    postCount: 3,
+    platforms: { instagram: 2, twitter: 1 },
+    metrics: {
+      impressions: 4520,
+      reach: 3200,
+      likes: 312,
+      comments: 45,
+      shares: 28,
+      saves: 67,
+      clicks: 89,
+      views: 1560,
+    },
+  }
+
+  it('shapes the days and the per-platform breakdown', async () => {
+    const { reads } = readsWith({
+      dailyData: [DAY],
+      platformBreakdown: [
+        {
+          platform: 'instagram',
+          postCount: 142,
+          impressions: 89400,
+          reach: 62100,
+          likes: 8930,
+          comments: 1204,
+          shares: 567,
+          saves: 2103,
+          clicks: 3402,
+          views: 45200,
+        },
+      ],
+    })
+    const result = await reads.dailyMetrics(profile, {
+      fromDate: '2026-08-01',
+      attribution: 'publish',
+    })
+
+    expect(result.dailyData[0]?.date).toBe('2026-08-01')
+    expect(result.dailyData[0]?.postCount).toBe(3)
+    expect(result.dailyData[0]?.platforms).toEqual({ instagram: 2, twitter: 1 })
+    expect(result.dailyData[0]?.metrics.saves).toBe(67)
+    expect(result.platformBreakdown[0]?.platform).toBe('instagram')
+    expect(result.platformBreakdown[0]?.comments).toBe(1204)
+  })
+
+  it('sends the wire names Zernio actually reads, and the attribution it was given', async () => {
+    // `fromDate`/`toDate`, not `from`/`to`. A parameter Zernio does not know is
+    // silently ignored, and the answer comes back as the last 180 days under a
+    // heading that says thirty.
+    const { reads, cap } = readsWith()
+    await reads.dailyMetrics(profile, {
+      fromDate: '2026-08-01',
+      toDate: '2026-08-31',
+      platform: 'instagram',
+      attribution: 'received',
+    })
+    const url = cap.last().url
+    expect(url).toContain('/analytics/daily-metrics?')
+    expect(url).toContain('fromDate=2026-08-01')
+    expect(url).toContain('toDate=2026-08-31')
+    expect(url).toContain('platform=instagram')
+    expect(url).toContain('attribution=received')
+    expect(url).not.toContain('from=2026')
+  })
+
+  it('never turns a metric it did not receive into a zero', async () => {
+    // The schema promises eight integers. What arrives decides, and a missing
+    // key must reach the table as the absence mark, not as a measurement of
+    // none — every other reading on /analytics obeys the same rule.
+    const { reads } = readsWith({
+      dailyData: [{ date: '2026-08-01', postCount: 1, metrics: { impressions: 10 } }],
+    })
+    const day = (
+      await reads.dailyMetrics(profile, { fromDate: '2026-08-01', attribution: 'publish' })
+    ).dailyData[0]
+
+    expect(day?.metrics.impressions).toBe(10)
+    expect(day?.metrics.saves).toBeNull()
+    expect(day?.metrics.likes).toBeNull()
+  })
+
+  it('keeps a real zero, which is a reading', async () => {
+    const { reads } = readsWith({
+      dailyData: [{ date: '2026-08-01', postCount: 1, metrics: { likes: 0 } }],
+    })
+    const day = (
+      await reads.dailyMetrics(profile, { fromDate: '2026-08-01', attribution: 'publish' })
+    ).dailyData[0]
+    expect(day?.metrics.likes).toBe(0)
+  })
+
+  it('drops a day with no readable date rather than inventing a column', async () => {
+    const { reads } = readsWith({ dailyData: [{ postCount: 4 }, { date: 'soon' }, DAY] })
+    const result = await reads.dailyMetrics(profile, {
+      fromDate: '2026-08-01',
+      attribution: 'publish',
+    })
+    expect(result.dailyData).toHaveLength(1)
+    expect(result.dailyData[0]?.date).toBe('2026-08-01')
+  })
+
+  it('answers empty arrays for a response holding neither key', async () => {
+    // A workspace with the add-on and no posts. Not an error, and not a throw.
+    const { reads } = readsWith({})
+    const result = await reads.dailyMetrics(profile, {
+      fromDate: '2026-08-01',
+      attribution: 'publish',
+    })
+    expect(result).toEqual({ dailyData: [], platformBreakdown: [] })
+  })
+
+  it('throws on the add-on refusal so the caller can tell it apart from empty', async () => {
+    // HTTP 402 `analytics_addon_required`. Answering `{ dailyData: [] }` here
+    // would tell a paying customer their accounts reported nothing, which is a
+    // claim about their shop drawn from a fact about their plan.
+    const { reads } = readsWith({ error: 'Analytics add-on required' }, 402)
+    await expect(
+      reads.dailyMetrics(profile, { fromDate: '2026-08-01', attribution: 'publish' }),
+    ).rejects.toThrow()
   })
 })
