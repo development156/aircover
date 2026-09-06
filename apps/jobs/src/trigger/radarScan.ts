@@ -38,12 +38,12 @@ const BATCH = 100
  *
  *   · A WEBSITE source normally costs NOTHING. The first rung is a conditional
  *     GET from our own server; a 304, or the same content hash, ends the night
- *     for that source. Zyte is bought only for a page we could not see at all —
+ *     for that source. TinyFish renders only a page we could not see at all —
  *     a bot wall, a 403, a JavaScript shell.
  *   · AN INSTAGRAM source always costs. No platform shows a stranger's account
  *     to a plain HTTP request, so for social the check IS the purchase. Social
  *     is substantially the whole bill.
- *   · With `APIFY_TOKEN` or `ZYTE_API_KEY` absent, the sources that would need
+ *   · With `APIFY_TOKEN` or `TINYFISH_API_KEY` absent, the sources that would need
  *     them are recorded as GAPS and nothing is bought. An unprovisioned
  *     environment therefore costs nothing rather than failing.
  *
@@ -74,7 +74,7 @@ const BATCH = 100
  * it take its guarded default. Handing the raw global to both transports is the
  * defect that made `http://169.254.169.254/` a fetchable competitor and this
  * server's own cloud credentials a snapshot row. `fetch` below is the PROVIDER
- * transport only: Apify and Zyte, whose URLs this repository writes.
+ * transport only: Apify and TinyFish, whose URLs this repository writes.
  *
  * All behaviour is in `runRadarPass`, which imports no scheduler SDK, so it stays
  * testable and the sanctioned Vercel-cron + QStash fallback remains a wrapper
@@ -96,7 +96,7 @@ export const radarScanTask = schedules.task({
       // and an absent one are the same to `runRadarPass`, but the spread keeps
       // that true under `exactOptionalPropertyTypes`.
       ...(env.apifyToken ? { apifyToken: env.apifyToken } : {}),
-      ...(env.zyteApiKey ? { zyteApiKey: env.zyteApiKey } : {}),
+      ...(env.tinyfishApiKey ? { tinyfishApiKey: env.tinyfishApiKey } : {}),
       batch: BATCH,
     })
   },

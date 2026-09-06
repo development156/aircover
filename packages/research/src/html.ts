@@ -11,7 +11,7 @@ import TurndownService from 'turndown'
  */
 
 /**
- * Removed before conversion. This is the poor cousin of Firecrawl's
+ * Removed before conversion. This is the poor cousin of a rendering vendor's
  * `onlyMainContent`, and deliberately a BLUNT one: Readability-style heuristics
  * want a long prose block and an SMB café homepage is nav + hero + hours, so
  * they routinely return nothing on exactly the sites tier 1 exists to read.

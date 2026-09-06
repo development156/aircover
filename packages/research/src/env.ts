@@ -1,6 +1,6 @@
 /**
- * Server-only. Firecrawl's key is a vendor secret and the crawl reaches
- * arbitrary customer-supplied URLs — neither belongs in a browser bundle.
+ * Server-only. The vendor key is a secret and the crawl reaches arbitrary
+ * customer-supplied URLs — neither belongs in a browser bundle.
  */
 export function assertServerOnly(): void {
   if (typeof (globalThis as { window?: unknown }).window !== 'undefined') {
@@ -9,31 +9,26 @@ export function assertServerOnly(): void {
 }
 
 export interface ResearchEnv {
-  firecrawlKey: string
-  /** Overridable for a self-hosted Firecrawl; defaults to the hosted v2 API. */
-  firecrawlUrl: string
+  tinyfishKey: string
+  /** Overridable for a proxy or a fixture server; defaults to TinyFish's hosted Fetch API. */
+  tinyfishFetchUrl: string
 }
 
-export const DEFAULT_FIRECRAWL_URL = 'https://api.firecrawl.dev/v2'
+export const DEFAULT_TINYFISH_FETCH_URL = 'https://api.fetch.tinyfish.ai'
 
 /**
- * Fail-fast loader in the house style (mirrors mesh + billing): name the missing
- * variable, never echo a value.
- *
- * NOTE: `FIRECRAWL_API_KEY` must also be listed in turbo.json's
- * `@sahoda/web#build` env allowlist, or the Vercel build will not see it and the
- * URL door will fail in production while passing every local gate.
+ * Fails loudly at boot when the key is absent — callers that can run without
+ * tier 3 (onboarding does) check `process.env.TINYFISH_API_KEY` themselves and
+ * simply do not arm the flag, rather than calling this.
  */
 export function loadResearchEnv(source: NodeJS.ProcessEnv = process.env): ResearchEnv {
   assertServerOnly()
-
-  const firecrawlKey = source.FIRECRAWL_API_KEY?.trim() ?? ''
-  if (firecrawlKey.length === 0) {
-    throw new Error('@sahoda/research: missing required env — FIRECRAWL_API_KEY')
+  const tinyfishKey = source.TINYFISH_API_KEY?.trim() ?? ''
+  if (tinyfishKey.length === 0) {
+    throw new Error('@sahoda/research: missing required env — TINYFISH_API_KEY')
   }
-
   return {
-    firecrawlKey,
-    firecrawlUrl: source.FIRECRAWL_API_URL?.trim() || DEFAULT_FIRECRAWL_URL,
+    tinyfishKey,
+    tinyfishFetchUrl: source.TINYFISH_FETCH_URL?.trim() || DEFAULT_TINYFISH_FETCH_URL,
   }
 }

@@ -13,10 +13,10 @@ does today.
 
 ## 0. Two corrections before anything else
 
-**Firecrawl does not run through OpenRouter.** OpenRouter routes LLM inference
-and offers web *search* via a plugin. Firecrawl's crawl, scrape and extract are
-a separate service with its own API and its own key. That is a direct
-integration, not a mesh route.
+**The site fetch does not run through OpenRouter.** OpenRouter routes LLM
+inference and offers web *search* via a plugin. The rendered fetch (TinyFish
+Fetch since 2026-09-06; Firecrawl before it) is a separate service with its own
+API and its own key. That is a direct integration, not a mesh route.
 
 This is good news. It's simpler, it's priced per-call (which passes the vendor
 rule — rent execution, own judgment), and it keeps a scraping failure from
@@ -368,7 +368,7 @@ signup gets chat; an agency workspace gets URL and upload.
 | **Upload** | brands with a brand book; agencies inheriting one | drag a PDF |
 | **Chat** | the owner who is the answer | four questions |
 
-### The URL door — where Firecrawl earns its place
+### The URL door — where the rendered fetch earns its place
 
 This is the highest-leverage input in the product. One paste yields what
 otherwise takes twelve questions:
@@ -382,7 +382,7 @@ otherwise takes twelve questions:
 Crawl several pages, not one. A single page yields the category's voice, not the
 company's.
 
-**Everything Firecrawl returns is quarantined.** It goes to the quarantined
+**Everything the fetch returns is quarantined.** It goes to the quarantined
 model with no tool access, delimited and provenance-tagged, and comes back as
 extracted fields marked `confirmed: false`. A website that says *"our voice is
 bold and we make strong claims"* is a data point about their copy, not an
@@ -651,7 +651,7 @@ without them the first Odia caption renders as boxes.
 **Phase 4 — The gate (3 days).** Deterministic pre-publish check, versioned rule
 sets, audit trail. **Before regimes are exposed in the UI.**
 
-**Phase 5 — Doors (3 days).** Question bank as data, then URL (Firecrawl,
+**Phase 5 — Doors (3 days).** Question bank as data, then URL (the fetch,
 quarantined) and chat. Upload last — extraction quality varies wildly by
 document and it is the easiest to add later.
 
@@ -669,7 +669,7 @@ the writeback queue exists. Then the governor.
 | 3 | **Where do regime rule sets come from, and who keeps them current?** | Being confidently wrong about a clinical advertising rule is worse than having no rule |
 | 4 | **How many models at launch?** | Six models × four regimes is 24 question sets. Author the models properly, let regime only edit constraints — six sets plus an overlay |
 | 5 | **Does a confirmed answer go stale?** | Shops pivot. Re-ask the heaviest fields once a quarter as one "still true?" check. Never decay silently |
-| 6 | **Firecrawl budget** | Priced per call. A multi-page crawl per signup is a real cost line at volume |
+| 6 | **Fetch budget** | Was priced per call under Firecrawl. TinyFish Fetch is free per call and capped at 1,000 a day per key, so the cost line became a rate line (2026-09-06) |
 
 ---
 
@@ -691,7 +691,7 @@ language, and a real resting point where it says "sharp enough."
 this brand guide unchanged, it contains no information. A generic brain is a
 signal the inference is weak, and the ring should say so rather than hide it.
 
-**Firecrawl returns nothing useful.** Thin sites, JS-only sites, Facebook-only
+**The fetch returns nothing useful.** Thin sites, JS-only sites, Facebook-only
 businesses. Mitigation: fail honestly and fall back to asking. Never invent.
 
 ---

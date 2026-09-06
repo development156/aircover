@@ -1,6 +1,6 @@
 import { crawlSite } from './crawl-site'
 import { createDirectSource, type DirectSourceOptions } from './direct-source'
-import { createFirecrawlClient } from './firecrawl'
+import { createTinyFishSource } from './tinyfish'
 import { createReaderSource } from './reader-source'
 import type { CrawlFailureReason, CrawlOutcome, PageSource } from './types'
 
@@ -10,9 +10,9 @@ import type { CrawlFailureReason, CrawlOutcome, PageSource } from './types'
  *   tier 1  direct     plain fetch + turndown. Always tried first. Free.
  *   tier 2  reader     free reader service. ONLY on js_only / thin. DEFAULT OFF —
  *                      cached snapshots and third-party disclosure, not cost.
- *   tier 3  firecrawl  the paid vendor. Behind a flag, DEFAULT OFF.
+ *   tier 3  tinyfish   the rendered vendor fetch. Behind a flag, DEFAULT OFF.
  *
- * The flag lives here rather than inside `crawlSite` or the Firecrawl client on
+ * The flag lives here rather than inside `crawlSite` or the vendor source on
  * purpose: the vendor client stays exactly as it was, so its committed tests
  * keep meaning what they meant, and the decision about who gets called sits in
  * one readable place.
@@ -37,8 +37,12 @@ export interface TierFlags {
    * Opt in per call when those are acceptable.
    */
   reader?: boolean
-  /** Tier 3. Default OFF — it is the only tier that spends money. */
-  firecrawl?: boolean
+  /**
+   * Tier 3. Default OFF. TinyFish Fetch is free per call, but it discloses the
+   * customer's URL to a third party and reads through a foreign residential
+   * IP, so it stays an opt-in like tier 2 rather than a default.
+   */
+  vendor?: boolean
 }
 
 export interface OpenSiteOptions {
@@ -47,9 +51,9 @@ export interface OpenSiteOptions {
   minWords?: number
   direct?: DirectSourceOptions
   reader?: { baseUrl?: string; apiKey?: string; fetchImpl?: typeof fetch }
-  firecrawl?: { apiKey: string; baseUrl?: string; fetchImpl?: typeof fetch }
+  vendor?: { apiKey: string; baseUrl?: string; fetchImpl?: typeof fetch }
   /** Injected in tests. Replaces the whole ladder's source construction. */
-  sources?: { direct?: PageSource; reader?: PageSource; firecrawl?: PageSource }
+  sources?: { direct?: PageSource; reader?: PageSource; vendor?: PageSource }
 }
 
 export interface TierAttempt {
@@ -81,7 +85,7 @@ export async function openSite(
   rawUrl: string,
   opts: OpenSiteOptions = {},
 ): Promise<OpenSiteResult> {
-  const flags = { reader: false, firecrawl: false, ...opts.flags }
+  const flags = { reader: false, vendor: false, ...opts.flags }
   const attempts: TierAttempt[] = []
   let creditsUsed = 0
 
@@ -125,10 +129,12 @@ export async function openSite(
     last = second
   }
 
-  if (flags.firecrawl) {
-    const vendor =
-      opts.sources?.firecrawl ??
-      (opts.firecrawl ? createFirecrawlClient(opts.firecrawl) : undefined)
+  if (flags.vendor) {
+    // TinyFish Fetch has no discovery endpoint, so it gets tier 1's links the
+    // same way the reader does. Wrapped here, for the same reason as above.
+    const bare =
+      opts.sources?.vendor ?? (opts.vendor ? createTinyFishSource(opts.vendor) : undefined)
+    const vendor = bare ? withFallbackLinks(bare, knownLinks) : undefined
     if (vendor) {
       const third = await crawlSite(rawUrl, {
         client: vendor,

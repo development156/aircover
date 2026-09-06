@@ -13,7 +13,7 @@ import { chargeSubscribers, scanWeekKey, type ScanSeen } from './charge'
 import { cheapCheck, contentHashOf, type FetchLike } from './cheap-check'
 import type { DueSource, RadarDb } from './db'
 import { APIFY_PROFILE_ESTIMATE_MICROS, fetchInstagramProfile } from './providers/apify'
-import { ZYTE_RENDER_ESTIMATE_MICROS, zyteFetch } from './providers/zyte'
+import { TINYFISH_RENDER_ESTIMATE_MICROS, tinyfishFetch } from './providers/tinyfish'
 import { isRefusal, withSpend } from './spend'
 
 /**
@@ -29,7 +29,7 @@ import { isRefusal, withSpend } from './spend'
  *      There is nothing left to pay for, and the naive design that "renders on
  *      change" would have paid here for a second copy of what it already held.
  *   3. ONLY IF WE COULD NOT SEE THE PAGE — a bot wall, a 403, a JavaScript shell —
- *      does anything get bought, and only then does Zyte appear.
+ *      does the rendered fetch run, and only then does TinyFish appear.
  *
  * For a social account there is no free rung: no platform will show a stranger's
  * account to a plain HTTP request, so the check is the purchase. That is why
@@ -50,7 +50,7 @@ import { isRefusal, withSpend } from './spend'
 export interface RadarPassOptions {
   db: RadarDb
   /**
-   * The PROVIDER transport — Apify and Zyte, both fixed hosts we own the URL of.
+   * The PROVIDER transport — Apify and TinyFish, both fixed hosts we own the URL of.
    * Injected so the whole pass is executable without a network.
    *
    * This is deliberately NOT the transport a competitor's page is read with. See
@@ -77,7 +77,7 @@ export interface RadarPassOptions {
    */
   fetchPage?: FetchLike
   apifyToken?: string
-  zyteApiKey?: string
+  tinyfishApiKey?: string
   /**
    * The credit wrapper, and it is REQUIRED on purpose.
    *
@@ -354,9 +354,10 @@ async function checkWebsite(
     return 'seen'
   }
 
-  // Rung 3. The only place money is spent on a website, and only for the
-  // failures a proxy can actually fix.
-  if (!result.escalate || !options.zyteApiKey) {
+  // Rung 3. The rendered fetch, only for the failures a residential proxy can
+  // actually fix. Free per call since TinyFish replaced Zyte (2026-09-06), so
+  // what it spends is one of the key's 1,000 daily fetches, not money.
+  if (!result.escalate || !options.tinyfishApiKey) {
     // The free check already settled its own reservation as could_not_check with
     // the real reason, so the gap is on record. Only the counter is owed here.
     report.couldNotCheck += 1
@@ -369,17 +370,17 @@ async function checkWebsite(
     {
       sourceId: source.sourceId,
       mode: 'render',
-      provider: 'zyte',
-      estimateMicros: ZYTE_RENDER_ESTIMATE_MICROS,
-      // Zyte reports cost nowhere. See providers/zyte.ts.
-      costBasis: 'estimated',
+      provider: 'tinyfish',
+      estimateMicros: TINYFISH_RENDER_ESTIMATE_MICROS,
+      // Zero, and 'free' says why on the row. See providers/tinyfish.ts.
+      costBasis: 'free',
     },
     async () => {
-      const rendered = await zyteFetch(url, { apiKey: options.zyteApiKey! })
+      const rendered = await tinyfishFetch(url, { apiKey: options.tinyfishApiKey! })
       return {
         outcome: 'changed' as const,
-        costMicros: ZYTE_RENDER_ESTIMATE_MICROS,
-        costBasis: 'estimated' as const,
+        costMicros: TINYFISH_RENDER_ESTIMATE_MICROS,
+        costBasis: 'free' as const,
         detail: { escalatedFrom: result.why },
         value: rendered,
       }
@@ -393,7 +394,7 @@ async function checkWebsite(
   }
 
   report.changed += 1
-  report.spendMicros.estimated += ZYTE_RENDER_ESTIMATE_MICROS
+  report.spendMicros.free += TINYFISH_RENDER_ESTIMATE_MICROS
   const hash = contentHashOf(normalizePageText(paid.value.html))
   await options.db.rememberCheck(
     source.sourceId,

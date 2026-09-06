@@ -332,8 +332,14 @@ async function readSite(
 > {
   emit({ stage: 'crawl.start', detail: `Reading ${new URL(url).hostname}` })
   let landingHtml = ''
+  // Tier 3 (TinyFish Fetch) is armed only when its key exists: without it a
+  // JavaScript-only site reads as "could not read", and the brain is built from
+  // the answers, which is what the flow already did. The key is read here and
+  // not through `env` because @sahoda/research owns the name and the shape.
+  const tinyfishKey = process.env.TINYFISH_API_KEY?.trim()
   const site = await openSite(url, {
     direct: { timeoutMs: 20_000, onLandingHtml: (html) => (landingHtml ||= html) },
+    ...(tinyfishKey ? { flags: { vendor: true }, vendor: { apiKey: tinyfishKey } } : {}),
   })
   if (!site.outcome.ok) return { ok: false, message: site.outcome.message }
 

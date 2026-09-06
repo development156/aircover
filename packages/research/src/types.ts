@@ -21,13 +21,13 @@ export interface ScrapedPage {
  *
  *   tier 1  direct    plain fetch + turndown. No vendor, no key, no credits.
  *   tier 2  reader    a free reader service. Fallback on js_only / thin only.
- *   tier 3  firecrawl the paid vendor. Behind a flag, default off.
+ *   tier 3  tinyfish  the rendered vendor fetch. Behind a flag, default off.
  */
 export interface PageSource {
   /** Named so a report can say which tier produced a corpus. */
   readonly name: string
   /**
-   * Vendor credits billed per call. Omitted means 1 (the Firecrawl case, which
+   * Vendor credits billed per call. Omitted means 1 (the paid-vendor case, which
    * this interface was extracted from). Tier 1 sets 0 — and 0 must mean zero in
    * the report, not "we forgot to count".
    */
@@ -69,7 +69,7 @@ export type CrawlFailureReason =
   | 'js_only'
   /** Real text, but not enough of it to be a voice corpus. */
   | 'thin'
-  /** Firecrawl itself failed: bad key, out of credits, rate limited, 5xx. */
+  /** The vendor itself failed: bad key, out of funds, rate limited, 5xx. */
   | 'crawler_error'
 
 export interface CrawlFailure {
@@ -86,7 +86,7 @@ export interface CrawlFailure {
   /** Pages we managed to fetch, if any — kept so `thin` can say how thin. */
   pagesFetched: number
   wordsFound: number
-  /** Firecrawl credits spent even though the outcome was unusable. */
+  /** Vendor credits spent even though the outcome was unusable. */
   creditsUsed: number
 }
 
@@ -118,7 +118,7 @@ export const MIN_CORPUS_WORDS = 150
 
 /**
  * Crawl several pages, not one: a single page yields the CATEGORY's voice, not
- * the company's (doc 18 §5). Capped because Firecrawl bills per page and this
+ * the company's (doc 18 §5). Capped because a paid vendor bills per page and this
  * runs once per signup — see the cost note in README.
  */
 export const MAX_PAGES = 5

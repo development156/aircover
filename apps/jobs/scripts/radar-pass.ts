@@ -114,9 +114,9 @@ function print(report: RadarPassReport): void {
   console.log(`snapshots written ${report.snapshotsWritten}`)
   console.log(`changes written   ${report.changesWritten}`)
   console.log(`free-check rate   ${(report.freeCheckRate * 100).toFixed(1)}%`)
-  // Split, never summed into one figure: Zyte reports cost nowhere, so an
-  // estimate added to a measurement is not a total, it is a guess with a
-  // decimal point.
+  // Split, never summed into one figure: an estimate added to a measurement is
+  // not a total, it is a guess with a decimal point. (Website renders are free
+  // since TinyFish replaced Zyte and land in the free column.)
   console.log(`spend measured    ${usd(s.measured)}`)
   console.log(`spend estimated   ${usd(s.estimated)}   <- list price, unverifiable`)
 }
@@ -132,7 +132,7 @@ async function main(): Promise<number> {
   }
   console.log(await classifyHost(dbUrl))
 
-  for (const name of ['APIFY_TOKEN', 'ZYTE_API_KEY'] as const) {
+  for (const name of ['APIFY_TOKEN', 'TINYFISH_API_KEY'] as const) {
     // Named, never echoed. A missing provider is not fatal: the sources it would
     // serve are recorded as gaps and the rest of the pass still runs.
     if (!process.env[name]) console.log(`${name}: absent — its sources will be recorded as gaps`)
@@ -151,14 +151,14 @@ async function main(): Promise<number> {
       // like every other charge. Same pool: one connection budget, one place a
       // failure shows up.
       withCredits: createWithCredits(createPgLedgerPort({ connectionString: dbUrl, pool })),
-      // The PROVIDER transport only — Apify and Zyte, whose URLs this repository
+      // The PROVIDER transport only — Apify and TinyFish, whose URLs this repository
       // writes. The competitor's own page is fetched by `fetchPage`, which is
       // deliberately NOT named here so it takes its guarded default. Handing the
       // raw global to both is the defect this split closes: it made
       // `http://169.254.169.254/` a fetchable competitor.
       fetch: globalThis.fetch as never,
       ...(process.env.APIFY_TOKEN ? { apifyToken: process.env.APIFY_TOKEN } : {}),
-      ...(process.env.ZYTE_API_KEY ? { zyteApiKey: process.env.ZYTE_API_KEY } : {}),
+      ...(process.env.TINYFISH_API_KEY ? { tinyfishApiKey: process.env.TINYFISH_API_KEY } : {}),
       batch: Number(arg('batch') ?? DEFAULT_BATCH),
     })
     print(report)

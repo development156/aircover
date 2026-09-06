@@ -28,7 +28,7 @@ export interface DueSource {
 export interface BeginFetchRequest {
   sourceId: string
   mode: 'cheap' | 'render'
-  provider: 'direct' | 'zyte' | 'apify'
+  provider: 'direct' | 'tinyfish' | 'apify'
   estimateMicros: number
   costBasis: 'measured' | 'estimated' | 'free'
 }

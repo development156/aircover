@@ -16,7 +16,7 @@ import { runRadarPass } from './run'
  *
  * The transport for the competitor's page is named (`fetchPage`) so no socket
  * is opened; the provider transport throws if touched, because a website check
- * with no escalation must never reach Zyte or Apify.
+ * with no escalation must never reach TinyFish or Apify.
  */
 
 const WS_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'

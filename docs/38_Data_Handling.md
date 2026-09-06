@@ -577,9 +577,16 @@ Two things are **deliberately kept**, and both should be understood rather than 
 **Resend** — email. **Used only to reach Sahoda's own staff** — an approval code for a credit
 top-up, and an alert when a scheduled job stops. **No email is ever sent to a customer or a lead.**
 
-**Apify and Zyte** — Radar's page fetching, run from the nightly job. Apify receives **an Instagram
-handle** and nothing else. Zyte receives **a URL** and nothing else. Both describe a **competitor**
-the customer chose to watch, not the customer. Nothing identifying the Sahoda customer is sent.
+**Apify and TinyFish** — Radar's page fetching, run from the nightly job. Apify receives **an Instagram
+handle** and nothing else. TinyFish (which replaced Zyte on 2026-09-06) receives **a URL** and nothing
+else, and reads it through a residential IP outside India (US, GB, CA, DE, FR, JP, AU). Both describe a
+**competitor** the customer chose to watch, not the customer. Nothing identifying the Sahoda customer is
+sent.
+
+**TinyFish, at onboarding** — the same Fetch API is tier 3 of the customer's own site read, armed only
+when `TINYFISH_API_KEY` is set and only after our own fetch found a JavaScript-only or thin site. It then
+receives **the customer's own URL**, which is the one thing tier 1 never discloses. Nothing else about the
+customer travels with it, and the result is quarantined exactly as tier 1's is.
 
 > **⚠ A customer-typed value reaches an outbound fetch with no server-side URL guard.** The
 > onboarding path has a full one — scheme check, private-address blocklist, DNS pinning — and the
@@ -602,8 +609,8 @@ served from its own servers.
 
 Named so that reading the dependency list does not produce a false answer. Each of these has code
 and no live path: **Trigger.dev** (never deployed), the **direct X and Google Business Profile
-APIs** (every call stops at an unwired credential store), **Firecrawl** and **Jina Reader** (behind
-a flag that is off, and both would send the customer's own URL), **Stripe** and **Razorpay** (names
+APIs** (every call stops at an unwired credential store), **Jina Reader** (behind a flag that is off; it
+would send the customer's own URL; Firecrawl, which sat beside it, was replaced by TinyFish on 2026-09-06), **Stripe** and **Razorpay** (names
 in a database column and nothing more).
 
 ### 7.7 · What has not been done

@@ -73,7 +73,7 @@ export function radarPassDeps(options: RadarPassDepsOptions = {}): RadarPassOpti
     // explicitly-undefined one stay the same thing under
     // `exactOptionalPropertyTypes`.
     ...(env.apifyToken ? { apifyToken: env.apifyToken } : {}),
-    ...(env.zyteApiKey ? { zyteApiKey: env.zyteApiKey } : {}),
+    ...(env.tinyfishApiKey ? { tinyfishApiKey: env.tinyfishApiKey } : {}),
     ...(options.batch === undefined ? {} : { batch: options.batch }),
   }
 }
