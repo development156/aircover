@@ -78,6 +78,15 @@ describe('contentVariantsTask', () => {
     expect(user).toMatch(/gbp:[\s\S]*no keyword list/) // GBP is indexed, takes no keywords
   })
 
+  it('asks for keywords on every channel except GBP, in the brief the model reads', () => {
+    // MEASURED on the preview: keywords came back only for the channel whose
+    // BRIEF mentioned them. The system rule alone was not enough, so the ask is
+    // in each channel's own line now — 2 to 5 for X, none for GBP.
+    const user = contentVariantsTask.buildMessages(input, ctx).at(-1)!.content
+    expect(user).toMatch(/x:[\s\S]*2-5 keywords/)
+    expect(user).toMatch(/gbp:[\s\S]*no keywords/)
+  })
+
   it('resolves a valid model response into per-channel variants', async () => {
     const result = await runnerFor(fixedProvider([validOut])).run(contentVariantsTask, input, ctx)
     expect(result.ok).toBe(true)

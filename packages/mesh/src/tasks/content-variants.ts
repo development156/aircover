@@ -29,10 +29,11 @@ export type ContentVariantsInput = z.infer<typeof ContentVariantsInputSchema>
  * CONTENT right: a keyword is a phrase a customer would type into a search box,
  * which is a different thing from a hashtag and is usually more than one word.
  */
-const KEYWORD_RULE = `KEYWORDS, NOT HASHTAGS. The "hashtags" field holds SEARCH KEYWORDS. \
-Never write a "#". Write the plain words somebody would type into a search box, and prefer \
-a real phrase over a single word: "chai in pune" beats "chai". Sahoda wraps each one as \
-[keyword] when it publishes, so do not add brackets yourself. Two to six per channel.`
+const KEYWORD_RULE = `KEYWORDS, NOT HASHTAGS. Fill each channel's "hashtags" field with SEARCH \
+KEYWORDS. Never write a "#". Write the plain words somebody would type into a search box, and \
+prefer a real phrase over a single word: "chai in pune" beats "chai". Sahoda wraps each one as \
+[keyword] when it publishes, so do not add brackets yourself. Give 2 to 5 for EVERY channel \
+except Google Business Profile, which takes none because Google indexes the body itself.`
 
 const SYSTEM = `You adapt one canonical social post into native per-channel variants for Sahoda.
 Output ONLY a JSON object matching:
@@ -84,8 +85,18 @@ const CHANNEL_STYLE: Record<Channel, string> = {
 function channelBrief(channel: Channel): string {
   const spec = CONSTRAINTS[channel]
   const parts = [`max ${spec.maxChars} chars`, `links ${spec.linkPolicy}`]
-  if (spec.maxHashtags !== undefined) parts.push(`≤${spec.maxHashtags} keywords`)
-  if (spec.gbp) parts.push(`CTA one of: ${spec.gbp.ctaTypes.join('/')}`)
+  // The keyword ask goes in the per-channel brief, not only in the system rule:
+  // MEASURED on the preview, keywords came back only for the one channel whose
+  // brief mentioned them (Instagram, which carries a `maxHashtags`). GBP takes
+  // none; every other channel gets 2 to 5, capped where the platform caps them.
+  if (spec.gbp) {
+    parts.push(`CTA one of: ${spec.gbp.ctaTypes.join('/')}`)
+    parts.push('no keywords')
+  } else if (spec.maxHashtags !== undefined) {
+    parts.push(`2-5 keywords (max ${spec.maxHashtags})`)
+  } else {
+    parts.push('2-5 keywords')
+  }
   return `- ${channel}: ${parts.join('; ')}\n    voice: ${CHANNEL_STYLE[channel]}`
 }
 
