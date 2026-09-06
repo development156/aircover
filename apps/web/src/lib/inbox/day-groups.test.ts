@@ -9,7 +9,7 @@ import { dayKey, dayLabel, groupByDay } from './day-groups'
  */
 const LATE_UTC_EARLY_IST = '2026-08-08T19:00:00.000Z'
 const SAME_IST_DAY_LATER = '2026-08-08T20:30:00.000Z'
-const NEXT_IST_DAY = '2026-08-09T10:00:00.000Z'
+const NEXT_IST_DAY = '2026-08-09T20:00:00.000Z'
 
 describe('dayKey', () => {
   it('keys by the Kolkata calendar day, not the UTC one', () => {
@@ -43,7 +43,9 @@ describe('groupByDay', () => {
 
   it('gives an unreadable-timestamp message its own group, keyed null', () => {
     const groups = groupByDay([{ id: 'm1', createdAt: undefined }])
-    expect(groups).toEqual([{ key: null, label: null, items: [{ id: 'm1', createdAt: undefined }] }])
+    expect(groups).toEqual([
+      { key: null, label: null, items: [{ id: 'm1', createdAt: undefined }] },
+    ])
   })
 
   it('returns nothing for an empty list', () => {
