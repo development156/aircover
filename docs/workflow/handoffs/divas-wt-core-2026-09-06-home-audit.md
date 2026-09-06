@@ -94,6 +94,23 @@ their own build. `079e8d26` is what the branch alias serves until that is fixed.
 The QA workspace holds three seeded posts for the capture (titles begin
 "Audit visual:"); delete them when done.
 
+## Plain words, a live console, curved charts (15:39 IST brief)
+
+`c5cdb350` + `dec221b3` + the budget fix: every Home sentence rewritten in plain
+English with the claim kept exact (32 assertions retargeted, none deleted).
+`lib/home/live.ts` builds six plain lines from rows that exist (posts changed,
+credits moved, sweep heartbeat); `components/home/live-console.tsx` polls
+`actions/home-live.ts` every 20 s while visible, keeps the last good lines on a
+failed poll and says so, never polls a hidden tab. Charts: `curvePath` (exported
+from trend-area) for the spend line and the sparkline, marked peak, draw-in;
+week bars grow in. **The first Vercel build failed js-budget (+86 kB on /home)**
+because the client card imported `live.ts`, which drags the cron schedule and
+wallet copy tables into the browser; `lib/home/ago.ts` + `live-types.ts` are
+import-free and the local build reports 83 routes within budget. Verified on a
+local production build in both themes. The founder's "takes live feedback and
+does that" was NOT built: there is no backend action to carry a typed
+instruction, and a box that pretends to would be a remedy that cannot work.
+
 ## Cleanup done
 
 The audit's post `87e589c2` (and its one variant) was deleted from the QA
