@@ -96,6 +96,21 @@ export type WindowRead =
       timezone: string
       /** Every published channel inside the window. */
       rows: PublishedRow[]
+      /**
+       * The same shape for the window immediately before this one, read at the
+       * SAME `ageDays`.
+       *
+       * This is what the KPI strip differences against, and the shared age is
+       * the whole reason it may. A stored value is a running lifetime total, so
+       * a previous window read at its own best age has had a month longer to
+       * accumulate: the delta would measure how long ago something went out and
+       * print it as how well it did. `buildWindowRows` takes one age and both
+       * leg sets so the two cannot drift apart by a later edit.
+       *
+       * The channel filter applies to both, for the same reason: a comparison
+       * between one channel and every channel is not a comparison.
+       */
+      previousRows: PublishedRow[]
       /** Distinct posts, not publish legs. A post on three channels is one post. */
       postsPublished: number
       /** The same count for the window before this one, for the comparison. */
@@ -230,6 +245,7 @@ export async function readWindow(view: AnalyticsView): Promise<WindowRead> {
         kind: 'ready',
         timezone,
         rows: [],
+        previousRows: [],
         postsPublished: 0,
         postsPublishedPrevious: null,
         weeksOfHistory: 0,
@@ -280,27 +296,21 @@ export async function readWindow(view: AnalyticsView): Promise<WindowRead> {
     const channelOf = view.channel
     const visible = channelOf === null ? inWindow : inWindow.filter((l) => l.channel === channelOf)
 
-    const rows: PublishedRow[] = visible.map((leg) => ({
-      postId: leg.postId,
-      channel: leg.channel,
-      publishedAt: leg.publishedAt,
-      title: titles.get(leg.postId) ?? 'Untitled post',
-      reachAtAge:
-        ageDays === null ? null : readingValue(aged.get(`${leg.postId}:${leg.channel}`), ageDays),
-      impressionsAtAge:
-        ageDays === null
-          ? null
-          : readingValue(agedImpressions.get(`${leg.postId}:${leg.channel}`), ageDays),
-      engagementAtAge:
-        ageDays === null
-          ? null
-          : readingValue(agedEngagement.get(`${leg.postId}:${leg.channel}`), ageDays),
-    }))
-
     const previous = previousWindow(view)
     const previousLegs = legs.filter((leg) => {
       const day = dayIn(leg.publishedAt, timezone)
       return day !== null && day >= previous.from && day <= previous.to
+    })
+    const previousVisible =
+      channelOf === null ? previousLegs : previousLegs.filter((l) => l.channel === channelOf)
+
+    const { rows, previousRows } = buildWindowRows({
+      current: visible,
+      previous: previousVisible,
+      titles,
+      snapshots,
+      ageDays,
+      aged: { reach: aged, impressions: agedImpressions, engagement: agedEngagement },
     })
 
     const first = legs.reduce(
@@ -344,6 +354,7 @@ export async function readWindow(view: AnalyticsView): Promise<WindowRead> {
       kind: 'ready',
       timezone,
       rows,
+      previousRows,
       postsPublished: new Set(visible.map((leg) => leg.postId)).size,
       postsPublishedPrevious: new Set(previousLegs.map((leg) => leg.postId)).size,
       weeksOfHistory,
@@ -356,6 +367,61 @@ export async function readWindow(view: AnalyticsView): Promise<WindowRead> {
   } catch {
     return { kind: 'unreadable' }
   }
+}
+
+/**
+ * THE ROWS FOR BOTH WINDOWS, READ AT ONE AGE.
+ *
+ * Pure, exported, and it takes both leg sets together rather than being called
+ * twice. That shape is the guarantee: there is one `ageDays` parameter and both
+ * windows are read at it, so a later edit cannot give the previous window an age
+ * of its own without deleting an argument. `window-data.test.ts` executes the
+ * case it protects against, an older post whose latest reading is nine times its
+ * reading at the shared age.
+ *
+ * `aged` is optional and is only ever passed by `readWindow`, which has already
+ * built the three maps for the timing grid. Without it they are built here, so a
+ * test can hand this function plain snapshot rows and no database.
+ */
+export function buildWindowRows({
+  current,
+  previous,
+  titles,
+  snapshots,
+  ageDays,
+  aged,
+}: {
+  current: ReadonlyArray<{ postId: string; channel: Channel; publishedAt: string }>
+  previous: ReadonlyArray<{ postId: string; channel: Channel; publishedAt: string }>
+  titles: ReadonlyMap<string, string>
+  snapshots: readonly SnapshotReading[]
+  /** Null means no day is shared by enough posts, so nothing is measured. */
+  ageDays: number | null
+  aged?: Record<MetricKey, Map<string, AgedPost>>
+}): { rows: PublishedRow[]; previousRows: PublishedRow[] } {
+  const both = [...current, ...previous]
+  const maps: Record<MetricKey, Map<string, AgedPost>> = aged ?? {
+    reach: agedFor(both, snapshots, 'reach'),
+    impressions: agedFor(both, snapshots, 'impressions'),
+    engagement: agedFor(both, snapshots, 'engagement'),
+  }
+
+  const rowFor = (leg: { postId: string; channel: Channel; publishedAt: string }): PublishedRow => {
+    const key = `${leg.postId}:${leg.channel}`
+    const at = (metric: MetricKey) =>
+      ageDays === null ? null : readingValue(maps[metric].get(key), ageDays)
+    return {
+      postId: leg.postId,
+      channel: leg.channel,
+      publishedAt: leg.publishedAt,
+      title: titles.get(leg.postId) ?? 'Untitled post',
+      reachAtAge: at('reach'),
+      impressionsAtAge: at('impressions'),
+      engagementAtAge: at('engagement'),
+    }
+  }
+
+  return { rows: current.map(rowFor), previousRows: previous.map(rowFor) }
 }
 
 function readingValue(post: AgedPost | undefined, age: number): number | null {

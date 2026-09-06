@@ -9,8 +9,10 @@ import { PostRows } from '@/components/analytics/post-rows'
 import { ReportExample } from '@/components/analytics/report-example'
 import { TimingHeatmap } from '@/components/analytics/timing-heatmap'
 import { ViewControls } from '@/components/analytics/view-controls'
-import { changeFor, type Headline } from '@/lib/analytics/headline'
+import type { Headline } from '@/lib/analytics/headline'
 import { HeadlineStrip } from '@/components/analytics/headline-strip'
+import { KpiStrip } from '@/components/analytics/kpi-strip'
+import { analyticsKpis, followersFromAccount } from '@/lib/analytics/kpi'
 import { ACCOUNT_READ_TTL_MINUTES } from '@/lib/analytics/account-insights'
 import { analyticsReadiness } from '@/lib/analytics/readiness'
 import { readAnalyticsPage } from '@/lib/analytics/page-data'
@@ -163,18 +165,29 @@ export default async function AnalyticsPage({
         'Enquiries are recorded, but nothing links one to the post that brought it, so this figure would not be about your posting.',
       change: { kind: 'no-previous' },
     },
-    {
-      id: 'published',
-      label: 'Posts published',
-      meaning: 'How many of your posts went out in this period.',
-      value: ready ? ready.postsPublished : null,
-      absence: ready ? undefined : 'unreadable',
-      caveat: 'Counts each post once, however many channels it went to.',
-      change: ready
-        ? changeFor(ready.postsPublished, ready.postsPublishedPrevious, ready.weeksOfHistory)
-        : { kind: 'no-previous' },
-    },
   ]
+
+  /**
+   * ── THE FIGURES THIS PRODUCT CAN ACTUALLY REPORT ──────────────────────────
+   * The strip above is the record of what it cannot: unique reach, replies,
+   * attributed enquiries. This one is engagement rate, reach summed post by
+   * post, followers, the count of posts and the best of them. Each is compared
+   * against the window before it, read at the SAME age (`buildWindowRows`).
+   *
+   * `Posts published` MOVED here from the strip above rather than being copied.
+   * One count, one card: two cards carrying the same number under two labels is
+   * how they come to disagree.
+   */
+  const kpis = ready
+    ? analyticsKpis({
+        rows: ready.rows,
+        previousRows: ready.previousRows,
+        postsPublished: ready.postsPublished,
+        postsPublishedPrevious: ready.postsPublishedPrevious,
+        weeksOfHistory: ready.weeksOfHistory,
+        followers: followersFromAccount(account),
+      })
+    : []
 
   if (window.kind === 'no-workspace') {
     return (
@@ -254,6 +267,18 @@ export default async function AnalyticsPage({
           below defers to it rather than re-diagnosing. */}
       <ReadinessLine readiness={readiness} />
 
+      {kpis.length > 0 ? (
+        <section aria-labelledby="kpis" className="space-y-2">
+          <h2 id="kpis" className="sr-only">
+            The numbers for {label}
+          </h2>
+          <KpiStrip kpis={kpis} windowLabel={label} />
+          {/* WHEN these figures were asked for, in the same sentence the button
+              in the header uses. One string, so the two cannot disagree. */}
+          <p className="type-meta text-muted">{measured}</p>
+        </section>
+      ) : null}
+
       <HeadlineStrip headlines={headlines} windowLabel={label} />
 
       <PerformanceOverTime series={series} />
@@ -293,11 +318,15 @@ export default async function AnalyticsPage({
       <ChannelCards rows={window.rows} ageDays={window.ageDays} />
 
       {/* ── ACCOUNT HEALTH, LAST AND ON PURPOSE ──────────────────────────────
-          Followers appear here and nowhere else on this page. A follower count
-          is the number every other tool puts at the top, and it is the one
-          figure on this screen that does not describe whether the work is
-          working. Putting it beside reach would teach the reader to read it as
-          performance. */}
+          The follower COUNT now also appears in the KPI strip at the top, by
+          the founder's brief of 2026-09-06, which asks this page to match what
+          Zernio's own analytics screen puts in front of a reader. This section
+          keeps the HISTORY: the daily line, the gains and the losses. It is
+          still last on purpose. A follower count is the number every other tool
+          leads with and the one figure here that does not describe whether the
+          work is working; the card at the top says as much in its own caveat
+          ("a count of right now, not of this period") rather than letting
+          proximity to reach make it read as performance. */}
       <section aria-labelledby="account-health" className="space-y-3">
         <h2 id="account-health" className="type-h3 text-ink">
           Account health

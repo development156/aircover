@@ -6,6 +6,7 @@ import {
   SNAPSHOT_METRICS,
   SNAPSHOT_ROW_CAP,
   agedFor,
+  buildWindowRows,
   type SnapshotReading,
 } from '@/lib/analytics/window-data'
 
@@ -130,5 +131,66 @@ describe('the cap, now that one read carries three metrics', () => {
     // `check (metric in ('impressions', 'reach', 'engagement'))`. A name here
     // that the column refuses would read as an absent metric for ever, silently.
     expect([...SNAPSHOT_METRICS].sort()).toEqual(['engagement', 'impressions', 'reach'])
+  })
+})
+
+/**
+ * ── THE WINDOW AND THE ONE BEFORE IT ARE READ AT ONE AGE ─────────────────────
+ * The KPI strip differences this window against the previous one, and a stored
+ * value is a running lifetime total. Read the two windows at two ages and the
+ * delta measures how long ago each set of posts went out, then reports it as how
+ * well they did: the exact defect `readWindow`'s header exists to prevent, told
+ * one level up.
+ *
+ * `buildWindowRows` takes ONE age and both leg sets, so the two cannot drift
+ * apart by a later edit rather than merely by convention.
+ */
+describe('the previous window is read at the same age as the current one', () => {
+  const CURRENT = [
+    { postId: 'now', channel: 'instagram' as const, publishedAt: '2026-08-20T09:00:00Z' },
+  ]
+  const PREVIOUS = [
+    { postId: 'then', channel: 'instagram' as const, publishedAt: '2026-07-20T09:00:00Z' },
+  ]
+  const snapshots: SnapshotReading[] = [
+    // Both posts measured at age 3.
+    { postId: 'now', channel: 'instagram', metric: 'reach', value: 100, measuredOn: '2026-08-23' },
+    { postId: 'then', channel: 'instagram', metric: 'reach', value: 40, measuredOn: '2026-07-23' },
+    // ...and the older post ALSO has a much later, much larger reading. Reading
+    // the previous window at its own best age would pick this one and report a
+    // fall that is really thirty extra days of accumulating.
+    { postId: 'then', channel: 'instagram', metric: 'reach', value: 900, measuredOn: '2026-08-19' },
+  ]
+
+  it('gives the previous window the same age, not its own best one', () => {
+    const built = buildWindowRows({
+      current: CURRENT,
+      previous: PREVIOUS,
+      titles: new Map([
+        ['now', 'This month'],
+        ['then', 'Last month'],
+      ]),
+      snapshots,
+      ageDays: 3,
+    })
+
+    expect(built.rows[0]?.reachAtAge).toBe(100)
+    expect(built.previousRows[0]?.reachAtAge).toBe(40)
+  })
+
+  it('leaves both windows unmeasured when there is no common age at all', () => {
+    const built = buildWindowRows({
+      current: CURRENT,
+      previous: PREVIOUS,
+      titles: new Map(),
+      snapshots,
+      ageDays: null,
+    })
+
+    expect(built.rows[0]?.reachAtAge).toBeNull()
+    expect(built.previousRows[0]?.reachAtAge).toBeNull()
+    // An unmeasured row is still a published post. Dropping it would understate
+    // the count the strip compares.
+    expect(built.previousRows).toHaveLength(1)
   })
 })
