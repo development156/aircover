@@ -246,6 +246,8 @@ export function PostCard({
             // makes it real"). The dialog uses this to decide whether deleting
             // here leaves a live post standing somewhere else, and a claim that
             // strong has to rest on evidence rather than on a status column.
+            // A `published` status with no link is deliberately NOT called live
+            // (see `channel-chip.tsx`), so it must not warn here either.
             liveElsewhere={variantStates.some((row) => row.permalink)}
           />
         </div>

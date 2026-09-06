@@ -190,6 +190,18 @@ export function useAutosave(
   const adopted = useRef<string>(post?.updated_at ?? '')
   const forceNext = useRef<boolean>(false)
   const createNext = useRef<boolean>(false)
+  /**
+   * ── RECOVERED TEXT IS NOT INTENT UNTIL IT IS TOUCHED ─────────────────────────
+   * Set true when a NEW post's editor is seeded from the crash buffer on mount,
+   * and cleared by the first real `update()`. While it is true, an untouched
+   * new-post draft must not create a row — not on the debounce, not on the
+   * unmount flush — because reopening a blank composer that happens to hold a
+   * leftover buffer is not the same act as writing a post. The words are shown
+   * so they are not lost; the row waits for a keystroke, exactly as it does on
+   * any other new post. Only relevant while `writingTo` is null; once a row
+   * exists the create gate below no longer looks at it.
+   */
+  const restoredUntouched = useRef<boolean>(false)
   const inFlight = useRef<number>(0)
   const deferredRead = useRef<Post | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -229,7 +241,15 @@ export function useAutosave(
     // Before any in-flight bookkeeping, so nothing needs unwinding. `error` is
     // deliberately NOT cleared here: an earlier create really did fail and the
     // writer has not retried it yet.
-    if (writingTo.current === null && !mayCreate && !worthARow(snapshot)) {
+    // A tick is not a post — and neither is a blank composer that merely
+    // repopulated itself from the crash buffer. `restoredUntouched` blocks the
+    // AUTOMATIC create (debounce, unmount flush); an explicit Save or publish
+    // sets `mayCreate` and passes, because that is intent.
+    if (
+      writingTo.current === null &&
+      !mayCreate &&
+      (!worthARow(snapshot) || restoredUntouched.current)
+    ) {
       setStatus('unsaved')
       return true
     }
@@ -326,6 +346,9 @@ export function useAutosave(
     (patch: Partial<PostDraft>) => {
       const next = { ...latest.current, ...patch }
       latest.current = next
+      // A real edit is intent: whatever the crash buffer restored, the writer is
+      // now writing, so the row may be created on the next save.
+      restoredUntouched.current = false
       setDraft(next)
       setStatus('unsaved')
       // Synchronous, local, and impossible to abort. The debounced write below is
@@ -409,8 +432,14 @@ export function useAutosave(
    * them. It is deliberately NOT treated as a conflict: nobody else wrote it and
    * there is nothing to choose between.
    *
-   * `update()` rather than a bare setState, so the recovered draft goes through
-   * the same debounce and reaches the row on its own.
+   * For an EXISTING post the recovery re-enters `update()`, so the words go
+   * through the debounce and reach the row on their own — the row is already
+   * there, so nothing is created that was not there before. For a NEW post
+   * (no id yet) the words are put back on screen but NOT armed to save: opening
+   * a blank composer that still holds a leftover buffer is not intent, and
+   * auto-creating a row from it is the "Untitled post" debris the whole
+   * create-on-first-edit design exists to prevent. The first keystroke promotes
+   * it to a real draft like any other.
    */
   const recovered = useRef(false)
   useEffect(() => {
@@ -420,6 +449,14 @@ export function useAutosave(
     if (stash === null) return
     if (sameDraft(stash, latest.current)) {
       clearStash(postId ?? NEW_POST_STASH_KEY)
+      return
+    }
+    if (postId === null) {
+      // Show it, mark it recovered-but-untouched, arm nothing.
+      restoredUntouched.current = true
+      latest.current = stash
+      setDraft(stash)
+      setStatus('unsaved')
       return
     }
     update(stash)

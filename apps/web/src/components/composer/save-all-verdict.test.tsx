@@ -119,3 +119,45 @@ describe('saveAllAndWait — the verdict two buttons act on', () => {
     expect(autosave.flush).toHaveBeenCalled()
   })
 })
+
+describe('saveVersion — a double press is not a self-inflicted conflict', () => {
+  /**
+   * ── THE BUG THIS PINS ────────────────────────────────────────────────────────
+   * `saveVersion` awaits the post flush before `saveNow` sets the variant's
+   * `saving` flag, so the version card's Save button stays live through the whole
+   * round trip. Two presses used to run two flushes and two `saveNow`s, both
+   * compare-and-setting against the same held version — the second lost to a
+   * conflict the writer inflicted on themselves. Remove the in-flight guard and
+   * `attempted` becomes ['x', 'x'] and the flush count 2, and this fails.
+   */
+  test('two concurrent saves of one channel run a single write', async () => {
+    const { result, attempted, autosave } = actions()
+
+    const [a, b] = [result.current.saveVersion('x'), result.current.saveVersion('x')]
+    const [ra, rb] = await Promise.all([a, b])
+
+    expect(ra).toBe(true)
+    expect(rb).toBe(true)
+    expect(attempted).toEqual(['x']) // saveNow ran once, not twice
+    expect(autosave.flush).toHaveBeenCalledTimes(1) // and the flush before it, once
+  })
+
+  test('once it settles, a fresh press writes again', async () => {
+    // The guard is per-write, not a permanent latch: a real second save later
+    // must still reach the row.
+    const { result, attempted } = actions()
+
+    await result.current.saveVersion('x')
+    await result.current.saveVersion('x')
+
+    expect(attempted).toEqual(['x', 'x'])
+  })
+
+  test('a save in flight for one channel does not block another', async () => {
+    const { result, attempted } = actions()
+
+    await Promise.all([result.current.saveVersion('x'), result.current.saveVersion('linkedin')])
+
+    expect(attempted.sort()).toEqual(['linkedin', 'x'])
+  })
+})

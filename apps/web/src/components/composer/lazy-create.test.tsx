@@ -59,6 +59,7 @@ function Inner({ idRef }: { idRef: { current: string | null } }) {
     <div>
       <span data-testid="status">{autosave.status}</span>
       <span data-testid="error">{autosave.error ?? ''}</span>
+      <span data-testid="body">{autosave.draft.body}</span>
       <button type="button" onClick={() => autosave.update({ body: 'Chai.' })}>
         write
       </button>
@@ -212,5 +213,59 @@ describe('a post that does not exist yet', () => {
 
     expect(createPost).toHaveBeenCalledTimes(1)
     expect(savePost).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('a leftover crash buffer is not a reason to create a post', () => {
+  /**
+   * ── THE BUG THIS PINS ────────────────────────────────────────────────────────
+   * The new-post crash buffer is one shared key (`sahoda.draft.new`). Recovery
+   * used to re-enter `update()`, which armed the debounce, so simply reopening a
+   * blank composer while a leftover buffer sat in the tab created a row from it —
+   * and dropped an abandoned draft's words into a fresh, unrelated post. Opening
+   * is not intent. The words are shown; the row waits for a keystroke.
+   *
+   * Remove `|| restoredUntouched.current` from the create gate and the unmount
+   * flush turns the leftover into a row, and this goes red.
+   */
+  function seedLeftover() {
+    sessionStorage.setItem(
+      'sahoda.draft.new',
+      JSON.stringify({ title: '', body: 'Leftover chai.', channels: [], scheduledAt: null }),
+    )
+  }
+
+  test('the leftover words are shown but nothing is written on mount or on leave', async () => {
+    seedLeftover()
+    const { unmount } = render(<Harness />)
+
+    // Restored to the editor so they are not lost...
+    await waitFor(() => expect(screen.getByTestId('body').textContent).toBe('Leftover chai.'))
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('unsaved'))
+    // ...but not persisted: opening the screen is not intent.
+    expect(createPost).not.toHaveBeenCalled()
+    expect(savePost).not.toHaveBeenCalled()
+
+    // Navigating away (unmount → flush) must not turn the leftover into a row.
+    unmount()
+    await waitFor(() => expect(createPost).not.toHaveBeenCalled())
+    expect(savePost).not.toHaveBeenCalled()
+  })
+
+  test('the first real edit after a restore does create the row', async () => {
+    // Recovery is deferred, not broken: once the writer touches it, it behaves
+    // like any other new post.
+    seedLeftover()
+    const user = userEvent.setup()
+    render(<Harness />)
+
+    await waitFor(() => expect(screen.getByTestId('body').textContent).toBe('Leftover chai.'))
+    await user.click(press('write'))
+    await user.click(press('flush'))
+
+    await waitFor(() => expect(createPost).toHaveBeenCalledTimes(1))
+    await waitFor(() =>
+      expect(savePost).toHaveBeenCalledWith(NEW_ID, expect.objectContaining({ body: 'Chai.' })),
+    )
   })
 })
