@@ -85,6 +85,13 @@ vi.mock('@/lib/supabase/server', () => ({
                 ? { data: [{ platform: 'x', status: 'active' }], error: null }
                 : { data: [], error: null },
             ),
+          // The brain gate reads `brand_memory` with two eq() and a head count.
+          // A resolved brain (count 1) lets the cycle proceed, which is what
+          // this suite exercises.
+          eq: () =>
+            Promise.resolve(
+              table === 'brand_memory' ? { count: 1, error: null } : { count: 0, error: null },
+            ),
         }),
       }),
     }),

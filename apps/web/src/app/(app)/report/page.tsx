@@ -31,6 +31,21 @@ import { readBalance } from '@/lib/wallet/read'
 
 export const metadata = { title: 'CMO Report' }
 
+// A report is written only once the cycle has produced posts. Before that a
+// cycle is mid-flight (planning, awaiting the owner's cost approval, creating),
+// and rendering it as a finished report showed a half-filled document that
+// claimed to be Monday's read. These are the statuses where the report exists.
+const REPORT_READY = new Set(['staging', 'reported', 'reporting', 'done', 'completed', 'finished'])
+
+function inFlightLine(status: string): string {
+  if (status === 'awaiting_cost_approval')
+    return 'This week is planned and waiting for your approval.'
+  if (status === 'creating') return 'Sahoda is creating this week\u2019s posts now.'
+  if (status === 'cancelled') return 'This week was stopped before it produced a report.'
+  if (status === 'failed') return 'This week could not be completed, so it has no report.'
+  return 'This week\u2019s cycle is still running.'
+}
+
 /**
  * THE CMO REPORT — the Monday read, from what the cycle actually produced.
  *
@@ -204,6 +219,27 @@ export default async function ReportPage() {
             ))}
           </div>
         </div>
+      </div>
+    )
+  }
+
+  if (!REPORT_READY.has(cycle.status)) {
+    // Mid-flight, cancelled or failed: no report to render. Say which, and send
+    // the reader back to The Loop where the state lives and the action is.
+    return (
+      <div className="space-y-6">
+        <ReportHeader week={`Week ${cycle.isoWeek}, ${cycle.isoYear}`} />
+        <section className="surface-ring rounded-card bg-surface p-5 shadow-card">
+          <h2 className="type-h2">This week has not been reported yet</h2>
+          <p className="type-body mt-1 max-w-[68ch] text-muted">
+            {inFlightLine(cycle.status)} Follow it on{' '}
+            <Link href="/loop" className="font-[550] text-accent underline underline-offset-2">
+              The Loop
+            </Link>
+            ; this page fills in once the week is created.
+          </p>
+        </section>
+        <BrainBlock brain={brain} n={1} />
       </div>
     )
   }

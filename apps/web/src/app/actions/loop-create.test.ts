@@ -335,3 +335,27 @@ describe('runCreateStage', () => {
     expect(out.created).toBe(1)
   })
 })
+
+describe('runCreateStage — credits run out mid-stage', () => {
+  it('HALTS instead of reporting the week: leaves the cycle in creating, never advances to staging', async () => {
+    h.store.readBriefs.mockResolvedValue([brief('b1'), brief('b2')])
+    // First brief succeeds, second is refused for want of credits.
+    let call = 0
+    h.withCredits.mockImplementation(async (_opts, fn) => {
+      call += 1
+      if (call === 1) {
+        return { ok: true, data: await fn({ actionType: 'post_variants', creditsCharged: DRAFT }) }
+      }
+      return { ok: false, error: { code: 'CREDIT_INSUFFICIENT' } }
+    })
+
+    const out = await runCreateStage('cycle-1')
+
+    expect(out.ok).toBe(false)
+    expect(out.insufficient).toBe(true)
+    expect(out.created).toBe(1)
+    // The week is NOT reported as done — the cycle stays in `creating`.
+    expect(h.store.setCycleStatus).not.toHaveBeenCalledWith('cycle-1', WS, 'staging')
+    expect(h.store.finishCycle).not.toHaveBeenCalled()
+  })
+})
