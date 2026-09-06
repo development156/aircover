@@ -35,6 +35,8 @@ export interface MapNode extends MapPoint {
 }
 
 export interface BrainMapLayout {
+  width: number
+  height: number
   core: MapPoint
   hubs: readonly MapHub[]
   nodes: readonly MapNode[]
@@ -82,7 +84,7 @@ export function brainMapLayout(): BrainMapLayout {
     }
   }
 
-  return { core: CORE, hubs, nodes }
+  return { width: MAP_W, height: MAP_H, core: CORE, hubs, nodes }
 }
 
 export type MapStates = Readonly<Record<string, FieldState>>
@@ -123,7 +125,8 @@ export function mapLevel(states: MapStates): MapLevel {
 }
 
 /** The spoken version of the picture. Numbers, never an arc. */
-export function mapAriaLabel(level: MapLevel): string {
+export function mapAriaLabel(level: MapLevel, dormant = false): string {
+  if (dormant) return 'Brand Brain map: not built yet.'
   const parts = [`${level.confirmed} of ${level.total} fields confirmed`]
   if (level.intake > 0) parts.push(`${level.intake} from your answers`)
   parts.push(`${level.guessed} still Sahoda's guess`)

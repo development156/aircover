@@ -1,21 +1,50 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
-import {
-  MAP_H,
-  MAP_W,
-  brainMapLayout,
-  mapAriaLabel,
-  mapLevel,
-  type MapStates,
-} from '@/lib/brand/brain-map'
-import type { FieldState } from '@/lib/brand/provenance'
 import { cn } from '@/lib/utils'
+
+/**
+ * PLAIN DATA ONLY, and that is a budget decision. The first cut imported the
+ * field registry, the provenance module and through it `@sahoda/shared`; the
+ * js-budget guard refused the build (+8.2 kB on the brain layout). The server
+ * computes the geometry, the counts and the spoken label from
+ * `lib/brand/brain-map.ts`; this file draws and pulses, nothing else.
+ */
+export type MapFieldState = 'confirmed' | 'guessed' | 'intake'
+export type MapStates = Readonly<Record<string, MapFieldState>>
+export interface MapPoint {
+  x: number
+  y: number
+}
+export interface MapHubData extends MapPoint {
+  section: string
+  title: string
+}
+export interface MapNodeData extends MapPoint {
+  path: string
+  label: string
+  section: string
+}
+export interface MapLayoutData {
+  width: number
+  height: number
+  core: MapPoint
+  hubs: readonly MapHubData[]
+  nodes: readonly MapNodeData[]
+}
+export interface MapLevelData {
+  confirmed: number
+  total: number
+}
 
 import { JUST_CHANGED_MS } from './use-just-changed'
 
 export interface BrainMapProps {
+  layout: MapLayoutData
+  level: MapLevelData
+  /** The spoken version: numbers, never an arc. Computed on the server. */
+  ariaLabel: string
   states: MapStates
   /** `wide` is the overview's picture; `compact` sits in the tab header on every brain screen. */
   variant?: 'wide' | 'compact'
@@ -24,7 +53,6 @@ export interface BrainMapProps {
   className?: string
 }
 
-const LAYOUT = brainMapLayout()
 const CORE_R = 22
 const CORE_C = 2 * Math.PI * CORE_R
 
@@ -46,8 +74,16 @@ const CORE_C = 2 * Math.PI * CORE_R
  * Everything animated is transform or opacity, nothing longer than
  * `--dur-slow`, and the global reduced-motion block collapses it all.
  */
-export function BrainMap({ states, variant = 'wide', dormant = false, className }: BrainMapProps) {
-  const level = useMemo(() => mapLevel(states), [states])
+export function BrainMap({
+  layout,
+  level,
+  ariaLabel,
+  states,
+  variant = 'wide',
+  dormant = false,
+  className,
+}: BrainMapProps) {
+  const LAYOUT = layout
   const previous = useRef<MapStates | null>(null)
   const [lit, setLit] = useState<ReadonlySet<string>>(() => new Set())
 
@@ -73,9 +109,9 @@ export function BrainMap({ states, variant = 'wide', dormant = false, className 
 
   return (
     <svg
-      viewBox={`0 0 ${MAP_W} ${MAP_H}`}
+      viewBox={`0 0 ${layout.width} ${layout.height}`}
       role="img"
-      aria-label={dormant ? 'Brand Brain map: not built yet.' : mapAriaLabel(level)}
+      aria-label={ariaLabel}
       data-brain-map={variant}
       data-dormant={dormant ? 'true' : undefined}
       className={cn('block h-auto w-full overflow-visible', className)}
@@ -102,7 +138,7 @@ export function BrainMap({ states, variant = 'wide', dormant = false, className 
       {/* Node → hub. Lit when the node is. */}
       {LAYOUT.nodes.map((node) => {
         const hub = LAYOUT.hubs.find((h) => h.section === node.section)!
-        const state: FieldState = states[node.path] ?? 'guessed'
+        const state: MapFieldState = states[node.path] ?? 'guessed'
         return (
           <line
             key={`e-${node.path}`}
@@ -127,7 +163,7 @@ export function BrainMap({ states, variant = 'wide', dormant = false, className 
       ))}
 
       {LAYOUT.nodes.map((node) => {
-        const state: FieldState = states[node.path] ?? 'guessed'
+        const state: MapFieldState = states[node.path] ?? 'guessed'
         const justLit = lit.has(node.path)
         return (
           <g key={node.path} data-node={node.path} data-state={state}>

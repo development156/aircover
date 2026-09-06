@@ -1,4 +1,10 @@
-import { DORMANT_STATES, mapLevel, statesOf } from '@/lib/brand/brain-map'
+import {
+  DORMANT_STATES,
+  brainMapLayout,
+  mapAriaLabel,
+  mapLevel,
+  statesOf,
+} from '@/lib/brand/brain-map'
 import { readBrain } from '@/lib/brand/read-brain'
 
 import { BrainMap } from './brain-map'
@@ -29,6 +35,9 @@ export async function BrainMapFrame() {
     >
       <BrainMap
         variant="compact"
+        layout={brainMapLayout()}
+        level={level}
+        ariaLabel={mapAriaLabel(level, dormant)}
         states={states}
         dormant={dormant}
         className="w-44 max-narrow:w-32"
