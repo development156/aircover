@@ -68,6 +68,26 @@ export type ConditioningInput = {
    * anything other than the default) — this function trusts what it is given.
    */
   referenceFollow?: ReferenceFollow
+  /**
+   * True exactly when `wanted` is a refined prompt that already weaves the
+   * brand into its own sentence, so the `Brand context:` block below must not
+   * repeat it.
+   *
+   * ── WHY THIS IS THE CALLER'S CALL, NOT SOMETHING GUESSED HERE ─────────────
+   * `conditionPrompt` cannot tell a refined sentence from a plain one by
+   * reading `wanted` alone. `studio_prompt_refine` already folds the same
+   * `signalsFor(mode, signals)` this function would otherwise append as a
+   * list, so appending it again would say the brand twice: once as prose,
+   * once as a bibliography stapled underneath. The caller (the composer's own
+   * refine control, then the server action) is the only thing that knows
+   * whether the box currently holds that refined text, so it carries the
+   * fact rather than this function inferring it.
+   *
+   * Absent and `false` behave identically, and every existing caller omits
+   * it, which is what keeps a hand-made or pre-existing request conditioned
+   * exactly as before.
+   */
+  brandAlreadyCarried?: boolean
 }
 
 export type Conditioned = {
@@ -136,7 +156,10 @@ export function conditionPrompt(input: ConditioningInput): Conditioned {
 
   const parts = [wanted, MODE_DIRECTION[input.mode]]
 
-  if (used.length > 0) {
+  // Skipped when the sentence above already carries the brand: appending the
+  // same facts as a labelled list underneath would say them twice. See
+  // `brandAlreadyCarried`'s own comment on `ConditioningInput`.
+  if (used.length > 0 && !input.brandAlreadyCarried) {
     parts.push(
       ['Brand context:', ...used.map((signal) => `- ${signal.field}: ${signal.value}`)].join('\n'),
     )

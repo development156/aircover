@@ -53,11 +53,24 @@ const REFINE_COST = creditCost('studio_prompt_refine')
 
 export function PromptRefineControl({
   wanted,
-  onChange,
+  onAccept,
+  onRevert,
   settings,
 }: {
   wanted: string
-  onChange: (next: string) => void
+  /**
+   * Fires with the refined text on a successful press. Separate from a plain
+   * "the box changed" callback because accepting a refinement is the one
+   * moment the caller must start treating the box as brand-carrying — see
+   * `use-composer.ts`'s `acceptRefine`.
+   */
+  onAccept: (next: string) => void
+  /**
+   * Fires with the ORIGINAL text on revert. Separate from `onAccept` for the
+   * same reason in reverse: reverting is the one moment the caller must stop
+   * treating the box as brand-carrying, unconditionally.
+   */
+  onRevert: (original: string) => void
   settings: PromptRefineSettings
 }) {
   const [busy, setBusy] = useState(false)
@@ -77,7 +90,7 @@ export function PromptRefineControl({
       setResult(state)
       if (state.ok) {
         setOriginal(asked)
-        onChange(state.refined)
+        onAccept(state.refined)
       }
     } finally {
       pressLocked.current = false
@@ -87,7 +100,7 @@ export function PromptRefineControl({
 
   function revert() {
     if (original === null) return
-    onChange(original)
+    onRevert(original)
     setOriginal(null)
     setResult(null)
   }

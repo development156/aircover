@@ -153,6 +153,17 @@ const GenerateInputSchema = z.object({
    * the same way the composer disables the control for the same reason.
    */
   referenceFollow: ReferenceFollowSchema,
+  /**
+   * True exactly when `wanted` is a refined prompt (or a small edit of one)
+   * that already weaves the brand into its own sentence. Told to
+   * `conditionPrompt` so it skips its `Brand context:` block rather than
+   * repeating what the sentence already says. Defaulted to `false`, which is
+   * exactly today's behaviour: a hand-made request, an old client, and a
+   * remix seeded from a past generation's `prompt_given` (which carries no
+   * way to know this fact, see `components/studio/use-composer.ts`'s own
+   * comment on `brandCarried`) all get the block exactly as they always have.
+   */
+  brandAlreadyCarried: z.boolean().default(false),
 })
 
 export type QueueGenerationState =
@@ -318,6 +329,7 @@ export async function queueGeneration(input: unknown): Promise<QueueGenerationSt
       // same reason, but a hand-made request must be held to it too.
       referenceFollow:
         parsed.data.referenceAssetIds.length > 0 ? parsed.data.referenceFollow : undefined,
+      brandAlreadyCarried: parsed.data.brandAlreadyCarried,
     })
 
     // ── THE CEILING IS CHECKED BEFORE ANYTHING IS HELD, NOT DISCOVERED AFTER ──

@@ -1459,6 +1459,171 @@ describe('rewrite for the model', () => {
 })
 
 /**
+ * THE FLAG THAT STOPS A REFINED PROMPT CARRYING THE BRAND TWICE.
+ *
+ * `prompt.test.ts` proves `conditionPrompt` itself skips the `Brand context:`
+ * block when told to. `studio-brand-carried.test.ts` proves the flag reaches
+ * that call through `queueGeneration`'s own input. This block proves the
+ * THIRD hop: that the composer sets and clears the flag correctly as a person
+ * refines, edits and reverts.
+ */
+describe('the flag that stops a refined prompt carrying the brand twice', () => {
+  const REFINED = {
+    ok: true as const,
+    original: 'a shopfront',
+    refined: 'A warm, plain-spoken shopfront at dusk, oat-milk latte art',
+    headline: 'Built from your words alone',
+    body: 'placeholder body',
+    brainState: 'ok' as const,
+    usedSignals: [],
+    balanceAfter: 99,
+    creditsCharged: 1,
+  }
+
+  function mockQueued(): void {
+    vi.mocked(queueGeneration).mockResolvedValue({
+      ok: true,
+      generationId: 'g1',
+      balanceAfter: 5,
+      made: 1,
+      asked: 1,
+    })
+  }
+
+  /**
+   * MUTATION (flag ignored): pass a literal `false` instead of `brandCarried`
+   * in `use-composer.ts`'s `generate`. Goes red.
+   */
+  test('accepting a refine, then pressing Generate, sends brandAlreadyCarried: true', async () => {
+    vi.mocked(refineStudioPrompt).mockResolvedValue(REFINED)
+    mockQueued()
+    const user = userEvent.setup()
+    open()
+    await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
+    await user.click(screen.getByRole('button', { name: /rewrite for the model/i }))
+    await waitFor(() =>
+      expect(
+        (screen.getByLabelText(/what should the picture show/i) as HTMLTextAreaElement).value,
+      ).toBe(REFINED.refined),
+    )
+
+    await user.click(screen.getByRole('button', { name: /generate image/i }))
+    expect(queueGeneration).toHaveBeenLastCalledWith(
+      expect.objectContaining({ brandAlreadyCarried: true }),
+    )
+  })
+
+  test('a prompt never refined this press sends brandAlreadyCarried: false', async () => {
+    mockQueued()
+    const user = userEvent.setup()
+    open()
+    await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
+    await user.click(screen.getByRole('button', { name: /generate image/i }))
+    expect(queueGeneration).toHaveBeenLastCalledWith(
+      expect.objectContaining({ brandAlreadyCarried: false }),
+    )
+  })
+
+  /**
+   * MUTATION (revert leaves the flag set): delete `setBrandCarried(false)`
+   * from `revertRefine` in `use-composer.ts`. Goes red.
+   */
+  test('reverting drops the flag: the next press sends brandAlreadyCarried: false', async () => {
+    vi.mocked(refineStudioPrompt).mockResolvedValue(REFINED)
+    mockQueued()
+    const user = userEvent.setup()
+    open()
+    await user.type(screen.getByLabelText(/what should the picture show/i), 'a shopfront')
+    await user.click(screen.getByRole('button', { name: /rewrite for the model/i }))
+    await waitFor(() =>
+      expect(
+        (screen.getByLabelText(/what should the picture show/i) as HTMLTextAreaElement).value,
+      ).toBe(REFINED.refined),
+    )
+
+    await user.click(screen.getByRole('button', { name: /get your own words back/i }))
+    await user.click(screen.getByRole('button', { name: /generate image/i }))
+    expect(queueGeneration).toHaveBeenLastCalledWith(
+      expect.objectContaining({ brandAlreadyCarried: false }),
+    )
+  })
+
+  /**
+   * THE RULE UNDER TEST: a small edit to a refined prompt keeps the flag.
+   * "Make it evening instead of morning" is the founder's own example —
+   * changing one word deep in a long sentence leaves the rest, and the flag,
+   * intact.
+   */
+  test('a small edit after refining keeps the flag set', async () => {
+    vi.mocked(refineStudioPrompt).mockResolvedValue(REFINED)
+    mockQueued()
+    const user = userEvent.setup()
+    open()
+    const prompt = screen.getByLabelText(/what should the picture show/i) as HTMLTextAreaElement
+    await user.type(prompt, 'a shopfront')
+    await user.click(screen.getByRole('button', { name: /rewrite for the model/i }))
+    await waitFor(() => expect(prompt.value).toBe(REFINED.refined))
+
+    // One small edit deep in the sentence: "dusk" becomes "dawn", everything
+    // else on both sides is untouched. A single change event, the same shape
+    // React's controlled `<textarea>` fires for any one keystroke.
+    fireEvent.change(prompt, { target: { value: REFINED.refined.replace('dusk', 'dawn') } })
+
+    await user.click(screen.getByRole('button', { name: /generate image/i }))
+    expect(queueGeneration).toHaveBeenLastCalledWith(
+      expect.objectContaining({ brandAlreadyCarried: true }),
+    )
+  })
+
+  /**
+   * THE OTHER HALF: clearing the box entirely and retyping something new
+   * drops the flag, because nothing of the refined sentence survives.
+   */
+  test('clearing the box and typing something new drops the flag', async () => {
+    vi.mocked(refineStudioPrompt).mockResolvedValue(REFINED)
+    mockQueued()
+    const user = userEvent.setup()
+    open()
+    const prompt = screen.getByLabelText(/what should the picture show/i) as HTMLTextAreaElement
+    await user.type(prompt, 'a shopfront')
+    await user.click(screen.getByRole('button', { name: /rewrite for the model/i }))
+    await waitFor(() => expect(prompt.value).toBe(REFINED.refined))
+
+    await user.clear(prompt)
+    await user.type(prompt, 'a cup of chai beside a window')
+
+    await user.click(screen.getByRole('button', { name: /generate image/i }))
+    expect(queueGeneration).toHaveBeenLastCalledWith(
+      expect.objectContaining({ brandAlreadyCarried: false }),
+    )
+  })
+
+  /**
+   * A starter chip replaces the box outright, same as clearing and retyping:
+   * nothing of a previously refined sentence survives.
+   */
+  test('picking a starter after refining drops the flag', async () => {
+    vi.mocked(refineStudioPrompt).mockResolvedValue(REFINED)
+    mockQueued()
+    const user = userEvent.setup()
+    const { container } = open()
+    const prompt = screen.getByLabelText(/what should the picture show/i) as HTMLTextAreaElement
+    await user.type(prompt, 'a shopfront')
+    await user.click(screen.getByRole('button', { name: /rewrite for the model/i }))
+    await waitFor(() => expect(prompt.value).toBe(REFINED.refined))
+
+    await user.clear(prompt)
+    const starters = container.querySelector('[data-guide="studio-starters"]') as HTMLElement
+    await user.click(within(starters).getAllByRole('button')[0]!)
+
+    await user.click(screen.getByRole('button', { name: /generate image/i }))
+    expect(queueGeneration).toHaveBeenLastCalledWith(
+      expect.objectContaining({ brandAlreadyCarried: false }),
+    )
+  })
+})
+
+/**
  * `scrollHeight` is not implemented by jsdom's layout engine, so `Textarea`'s
  * own `fit()` always sees 0 unless a test supplies one. This stub answers
  * with a height proportional to the number of lines in the field's OWN

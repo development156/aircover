@@ -178,7 +178,12 @@ export function Composer({
           onSubmit={c.generate}
         />
 
-        <PromptRefineControl wanted={c.wanted} onChange={c.setWanted} settings={c.refineSettings} />
+        <PromptRefineControl
+          wanted={c.wanted}
+          onAccept={c.acceptRefine}
+          onRevert={c.revertRefine}
+          settings={c.refineSettings}
+        />
 
         <ComposerStarters
           visible={c.wanted.trim() === ''}
