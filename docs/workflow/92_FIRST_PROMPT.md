@@ -148,7 +148,7 @@ root, from `$HOME`, from `/tmp`, from `/`, and with no `setup.sh` anywhere.
 | --- | --- |
 | 1 | Checks the branch, warns loudly on `main` |
 | 2 | `pnpm install` if `node_modules` is absent |
-| 3 | `git config core.hooksPath .githooks` — **the easiest thing to miss.** Skipping it silently disarms the QA guard *and* the block keeping `wt-karunesh` out of `wt-core` |
+| 3 | `git config core.hooksPath .githooks` — **the easiest thing to miss.** Skipping it silently disarms the QA guard *and* the block keeping every lane but `divas` out of `wt-core` |
 | 4 | Restores the 21 personal rule files; settings **merged**, existing values win, replaced files backed up |
 | 5 | Installs chromium — Playwright ships a downloader, not a browser, which is why the browser tests were unrun on every cloud lane for weeks |
 | 6 | Runs `account-verify.sh`, which **exits non-zero until it is genuinely complete** |

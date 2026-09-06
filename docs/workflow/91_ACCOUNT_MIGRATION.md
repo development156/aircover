@@ -134,7 +134,7 @@ all; `setup.sh` delegates when it can and always exits 0, so a misconfigured
 environment boots and says what is wrong instead of dying. It does the browser
 install and `core.hooksPath`. You paste the env values into the cloud session's
 environment settings once, and `SAHODA_LANE_OWNER` is one of them — without it
-the push block that keeps a karunesh lane out of `wt-core` and `wt-web` is off.
+the push block that keeps every lane but `divas` out of `wt-core`, and every lane out of `wt-web`, is off.
 
 Each person then starts with:
 

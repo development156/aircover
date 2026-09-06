@@ -83,7 +83,7 @@ Unchanged by going local, and enforced by `.githooks/pre-push`, which reads
 | | |
 | --- | --- |
 | `wt-web`, `main` | no lane, ever. `wt-web` is the live product. |
-| `wt-core` | open to `divas`, `jiban`, `girija`. CLOSED to `karunesh`. |
+| `wt-core` | **`divas` only.** Closed to `girija`, `jiban`, `karunesh` and to an unset owner. Everyone else PULLS `wt-core` into their lane. Founder's ruling, 6 September 2026. |
 | its own lane | always |
 
 Promotion out of `wt-core` costs a typed sentence:
@@ -94,7 +94,7 @@ rejects a non-fast-forward before the hook's verdict matters, so a dry run can
 look like the guard working when it never ran:
 
 ```bash
-echo "refs/heads/wt-karunesh $(git rev-parse HEAD) refs/heads/wt-core $(git rev-parse HEAD)" \
+echo "refs/heads/wt-girija $(git rev-parse HEAD) refs/heads/wt-core $(git rev-parse HEAD)" \
   | .githooks/pre-push origin x ; echo "exit=$?"   # must be 1
 ```
 
