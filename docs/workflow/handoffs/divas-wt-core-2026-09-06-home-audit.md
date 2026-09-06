@@ -1,7 +1,8 @@
 # Handoff — divas / wt-core (2026-09-06, /home deep audit)
 
-**Four fixes shipped in `c845e641` and verified live on the wt-core preview.** The
-full report is published as an artifact:
+**Four fixes shipped in `c845e641`, then the three delegated decisions in
+`a0ddbbfc`, all verified live on the wt-core preview.** The full report is
+published as an artifact:
 https://claude.ai/code/artifact/a1a78ffa-4c7e-4462-bfac-b8f12ea943ae
 
 Audited in a real Chromium against
@@ -38,6 +39,18 @@ and `savePost` revalidate `/home` (new `posts.revalidate.test.ts`). Verified on
 "Waiting on you · 1 post"; week entry tooltip present; empty-state lead href
 `/onboarding`.
 
+## The founder's answers (11:41 IST) and what was done with them
+
+| Decision | Ruling | Done in `a0ddbbfc` |
+| --- | --- | --- |
+| 1. Plan offer | Delegated | `planOfferDecision` takes `creditsAvailable`; silent (`credits-remain`) while more than half of Free's 100 credits remain, silent (`unknown`) when the balance is unreadable. Threshold read from `PLAN_CATALOG`. e2e `plan-offer.spec.ts` seeds a 60-credit DEBIT through `app.apply_ledger_entry` and fails loudly without `SUPABASE_DB_URL` |
+| 2. Queue | Delegated | `needsAPerson(post)` admits a draft or idea with a date and at least one channel (a decision, since `canApprove` admits drafts). Six call sites; Home and /approvals empty-state sentences rewritten; "every post reaches this queue" removed |
+| 3. "Scheduled" | Delegated | Counts approved, scheduled, publishing only; note "Approved for the next seven days" |
+| 4. Preview database | Production is production, staging is for development | NOT changed: the Preview env's four Supabase variables must be repointed at `yoxmzwkx`, which needs the staging service-role key and pooler password (not held here). See "Needs a decision" |
+
+Also: the greeting says "N drafts in progress", so "waiting" belongs to the board alone.
+RED first (12 failures across five suites), 294 green after across 27 files; typecheck, lint and prettier clean.
+
 ## Cleanup done
 
 The audit's post `87e589c2` (and its one variant) was deleted from the QA
@@ -47,11 +60,14 @@ workspace in production. The QA workspace itself was left as found.
 
 - Smoke suite not run locally: needs the e2e keys, which this session may not read into a shell.
 - Composer "Schedule it" rendered no date field once (dynamic client chunk, share cookie refreshing at that moment). Needs a re-test on a clean session before it is called a defect.
-- H-01 (plan offer), H-03 (queue definition), H-07 ("Scheduled" semantics), H-16 (preview → staging) not changed: each needs a decision.
+- H-16 (Preview → staging): ruled, not executed. Needs the staging service-role key and DB password, which only the Supabase dashboard holds; the staging password in the CI secret is already known to be wrong (session 6's finding).
+- The retargeted `plan-offer.spec.ts` was not run: it needs `SUPABASE_DB_URL`.
 
 ## Needs a decision
 
-1. What signal shows the plan offer, and whether a modal is ever right for it.
-2. Whether a dated, channelled draft counts as "waiting on you" (and the /approvals sentence "every post reaches this queue", which the code does not do).
-3. Whether "Scheduled" counts only approved posts.
-4. Whether the Vercel Preview environment should point at staging instead of production.
+Nothing needs a decision. One action needs a person with dashboards: set the
+Vercel **Preview** environment's `NEXT_PUBLIC_SUPABASE_URL`,
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` and
+`SUPABASE_DB_URL` to the staging project (`yoxmzwkxweasfaahhvpj`), after
+resetting the staging database password once so the same value can go into the
+`E2E_SUPABASE_DB_URL` GitHub secret.
