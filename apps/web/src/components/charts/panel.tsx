@@ -73,15 +73,27 @@ export function ChartSparse({
   children,
   from,
   to,
+  compact = false,
 }: {
   /** One sentence. What is missing, and what would fill it. */
   children: React.ReactNode
   /** The window's own ends, when they are known. Real dates, never invented. */
   from?: string
   to?: string
+  /**
+   * No reserved chart height: the sentence, the baseline and the dates, and
+   * nothing else. MEASURED 2026-09-06 on /home: the reserved 168px rendered as
+   * a 150–200px void under "0 credits" at every width, the largest empty
+   * object on the screen. The shape of what is coming is still drawn — the
+   * baseline and its two dates — at the height that content actually needs.
+   */
+  compact?: boolean
 }) {
   return (
-    <div data-testid="chart-sparse" className="flex h-[168px] flex-col max-narrow:h-[132px]">
+    <div
+      data-testid="chart-sparse"
+      className={cn('flex flex-col', compact ? 'gap-3' : 'h-[168px] max-narrow:h-[132px]')}
+    >
       <p className="max-w-[var(--measure-prose)] type-sm text-muted">{children}</p>
       <div className="flex flex-1 items-end">
         <div className="w-full">

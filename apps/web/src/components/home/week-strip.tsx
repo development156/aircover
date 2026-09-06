@@ -137,6 +137,7 @@ export function WeekStrip({ buckets, variantStates }: WeekStripProps) {
         {buckets.days.map((day, index) => (
           <li
             key={day.key}
+            aria-current={index === 0 ? 'date' : undefined}
             className={cn(
               // p-3 rather than p-2, and that also makes the radius ladder correct
               // rather than coincidental: tokens.css:305 sets a nested surface's
@@ -158,7 +159,10 @@ export function WeekStrip({ buckets, variantStates }: WeekStripProps) {
             <p
               className={cn(
                 'type-eyebrow mb-2.5 flex items-baseline gap-1 max-narrow:mb-0 max-narrow:w-16 max-narrow:shrink-0',
-                index === 0 ? 'text-brand-text' : 'text-ink-mute',
+                // `text-ink`, not `text-brand-text`: MEASURED 2.94:1 on the
+                // brand wash at 11px, below AA. The wash and the ring carry
+                // "today"; the label carries the day, in ink.
+                index === 0 ? 'text-ink' : 'text-ink-mute',
               )}
             >
               <span>{DAY_LABEL.format(day.date)}</span>

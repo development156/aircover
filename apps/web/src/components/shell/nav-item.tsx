@@ -105,6 +105,9 @@ export function NavItem({
   return (
     <Link
       href={href}
+      // Hover and focus still prefetch; only the on-sight fan-out is off.
+      // See shell-prefetch.test.ts for the twenty renders this stops.
+      prefetch={false}
       data-guide={guide}
       aria-current={active ? 'page' : undefined}
       /**

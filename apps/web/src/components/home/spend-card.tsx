@@ -185,7 +185,7 @@ export function SpendCard({ spend }: { spend: SpendRead }) {
           )}
         </>
       ) : (
-        <ChartSparse from={from} to={to}>
+        <ChartSparse from={from} to={to} compact>
           {readable
             ? 'Nothing spent yet. Your first AI action shows up here, broken down by what it was for.'
             : 'Sahoda could not read your spending just now. Nothing has been charged, and reloading will try again.'}

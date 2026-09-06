@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { greetingState } from './greeting'
+import { greetingFor, greetingState } from './greeting'
 import type { PostCounts } from './posts'
 import type { PublishSummary } from './publishing'
 
@@ -35,6 +35,16 @@ const publish = (live = 0): PublishSummary => ({
   fixture: 0,
   capped: false,
   coveredFrom: null,
+})
+
+describe('the greeting reads the workspace clock', () => {
+  test('one instant, two zones, two greetings', () => {
+    // 04:30Z is 10:00 in Kolkata and 13:30 in Tokyo.
+    const at = new Date('2026-09-06T04:30:00.000Z')
+    expect(greetingFor(at)).toBe('Good morning')
+    expect(greetingFor(at, 'Asia/Tokyo')).toBe('Good afternoon')
+    expect(greetingFor(at, 'America/New_York')).toBe('Good morning')
+  })
 })
 
 describe('the greeting sentence agrees with the queue beneath it', () => {

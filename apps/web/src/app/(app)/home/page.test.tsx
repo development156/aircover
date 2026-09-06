@@ -101,6 +101,15 @@ vi.mock('@/app/actions/posts', () => ({ createPost: vi.fn() }))
  * second is a `'use server'` export that opens a real payment order.
  */
 vi.mock('@/lib/billing/read', () => ({ readSubscription: vi.fn() }))
+// The page reads the workspace row for its timezone. `cookies()` has no
+// request scope under vitest, so the cached reader is answered here; every
+// other reader on the page is mocked above and never reaches it.
+vi.mock('@/lib/workspaces', () => ({
+  activeWorkspaceRead: vi.fn(async () => ({
+    status: 'ok',
+    workspace: { id: 'w1', name: 'W', slug: 'w', timezone: null },
+  })),
+}))
 vi.mock('@clerk/nextjs/server', () => ({ auth: async () => ({ sessionId: 'sess_test' }) }))
 vi.mock('@/app/actions/wallet', () => ({ startCheckout: vi.fn() }))
 
@@ -373,6 +382,50 @@ describe('Home for a workspace that exists', () => {
  * asks for it and obeys the answer — the half a pure test cannot reach, and the
  * half that would silently stop working if someone deleted one line here.
  */
+describe('the setup ladder on the full dashboard', () => {
+  beforeEach(() => {
+    balanceRead.mockResolvedValue({
+      status: 'ok',
+      balance: { total: 100, held: 0, available: 100, hasHold: false, heldNote: null },
+    })
+    vi.mocked(listPosts).mockResolvedValue([A_POST])
+  })
+
+  test('says what is missing once, at the top, and the cards stop repeating the remedy', async () => {
+    // One draft, no brain, no channel: the state the audit measured stating
+    // the same two absences six times across four containers.
+    render(await HomePage())
+
+    expect(screen.getByRole('region', { name: /1 of 3 set up/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /teach sahoda your brand/i })).toHaveAttribute(
+      'href',
+      '/onboarding',
+    )
+    // The Performance card keeps its slots and drops its copy of the remedy.
+    expect(screen.queryByText(/connect a channel to start measuring/i)).toBeNull()
+  })
+
+  test('a workspace that is set up shows no ladder', async () => {
+    vi.mocked(readBrain).mockResolvedValue({
+      status: 'ok',
+      active: { voice: { descriptor: 'Warm', formality_label: 'Casual' } },
+      version: 1,
+      provenance: new Map(),
+      meta: undefined,
+      intake: undefined,
+      source: 'resolved',
+      appliedFromLearning: false,
+    } as unknown as Awaited<ReturnType<typeof readBrain>>)
+    vi.mocked(listConnections).mockResolvedValue([
+      { id: 'c1', platform: 'instagram', status: 'active' },
+    ] as unknown as Awaited<ReturnType<typeof listConnections>>)
+
+    render(await HomePage())
+
+    expect(screen.queryByRole('region', { name: /set up/i })).toBeNull()
+  })
+})
+
 describe('the landing rule on the page that lands', () => {
   beforeEach(() => {
     balanceRead.mockResolvedValue({

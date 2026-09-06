@@ -1,3 +1,5 @@
+import { DEFAULT_DISPLAY_ZONE } from '@/lib/time/zone'
+
 import type { PostCounts } from './posts'
 import type { PublishSummary } from './publishing'
 
@@ -54,11 +56,18 @@ export function greetingState(counts: PostCounts, publish: PublishSummary): stri
   return `${clauses.join(', ')}.`
 }
 
-/** Time-of-day greeting in IST, where the workspaces are. */
-export function greetingFor(now: Date): string {
+/**
+ * Time-of-day greeting in the workspace's own zone.
+ *
+ * `zone` is whatever `resolveDisplayZone(workspace.timezone)` answered, and
+ * defaults to IST for the callers that render before a workspace exists.
+ * "Good morning" at 11pm is a small lie, and it was the first sentence on the
+ * screen for any workspace that had set a timezone other than Asia/Kolkata.
+ */
+export function greetingFor(now: Date, zone: string = DEFAULT_DISPLAY_ZONE): string {
   const hour = Number(
     new Intl.DateTimeFormat('en-IN', {
-      timeZone: 'Asia/Kolkata',
+      timeZone: zone,
       hour: 'numeric',
       hour12: false,
     }).format(now),

@@ -98,6 +98,14 @@ describe('what the card must not stop saying', () => {
     expect(screen.queryByText(/Showing from/i)).toBeNull()
   })
 
+  it('an empty window reserves no chart height', () => {
+    // MEASURED 2026-09-06: the reserved 168px rendered as a 150–200px void
+    // under "0 credits" at every width, the largest empty object on /home.
+    render(<SpendCard spend={base} />)
+    const sparse = screen.getByTestId('chart-sparse')
+    expect(sparse.className).not.toMatch(/h-\[168px\]/)
+  })
+
   it('a window that was read and had no spend is never the no-data state', () => {
     // Days that were READ and genuinely had no spend must not be reported as
     // "we have nothing". The chart draws thirty stubs; the sentence must not
