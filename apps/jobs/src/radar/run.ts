@@ -95,6 +95,31 @@ export interface RadarPassOptions {
   withCredits: WithCreditsFn
   /** How many sources to look at. A wall, not a target. */
   batch?: number
+  /**
+   * READ ONE COMPETITOR, FOR ONE WORKSPACE, NOW.
+   *
+   * Set by the "Read now" button on /radar and by nothing else. Two things
+   * change when it is present, and both are money:
+   *
+   *   1. The source list comes from `sourcesForCompetitor`, which ignores
+   *      cadence — that is what the button is asking for — and is joined to
+   *      this workspace's subscription, so it cannot name a competitor the
+   *      caller does not watch.
+   *   2. ONLY THIS WORKSPACE PAYS. A source is shared: a competitor watched by
+   *      six shops has six subscribers, and charging all of them because ONE
+   *      person pressed a button would take five people's credits for a scan
+   *      they did not ask for. The subscriber list is filtered to the caller,
+   *      and if the filter empties it the source is refused rather than read —
+   *      `chargeSubscribers` runs the scan for free when the list is empty, so
+   *      "skip it" and "pass an empty list" are opposite outcomes here.
+   *
+   * The weekly cadence is not otherwise weakened: the object ref
+   * `chargeSubscribers` builds is (competitor, ISO week, workspace), so a
+   * manual read in a week already paid for replays the same ledger keys and
+   * moves no money. The page is still fetched. Pressing the button repeatedly
+   * cannot run up a bill, and cannot silently do nothing either.
+   */
+  only?: { competitorId: string; workspaceId: string }
   now?: () => Date
 }
 
@@ -135,7 +160,9 @@ const emptyReport = (): RadarPassReport => ({
 export async function runRadarPass(options: RadarPassOptions): Promise<RadarPassReport> {
   const now = options.now ?? (() => new Date())
   const report = emptyReport()
-  const sources = await options.db.dueSources(options.batch ?? 100)
+  const sources = options.only
+    ? await options.db.sourcesForCompetitor(options.only.competitorId, options.only.workspaceId)
+    : await options.db.dueSources(options.batch ?? 100)
   report.considered = sources.length
 
   const week = scanWeekKey(now())
@@ -144,7 +171,20 @@ export async function runRadarPass(options: RadarPassOptions): Promise<RadarPass
     try {
       // WHO PAYS, before anything is read. One source, any number of watching
       // workspaces, one price each.
-      const workspaces = await options.db.subscribers(source.sourceId)
+      const subscribed = await options.db.subscribers(source.sourceId)
+      const only = options.only
+      const workspaces = only ? subscribed.filter((id) => id === only.workspaceId) : subscribed
+
+      if (only && workspaces.length === 0) {
+        // NOT SUBSCRIBED, so nothing is read and nothing is charged. This is a
+        // `continue` and not an empty list handed onward: `chargeSubscribers`
+        // treats no subscribers as "nobody to bill, run the read anyway" — the
+        // right answer for the weekly pass, and a free fetch on somebody else's
+        // competitor here.
+        report.refused.push({ sourceId: source.sourceId, reason: 'NOT_SUBSCRIBED' })
+        continue
+      }
+
       const outcome = await chargeSubscribers({
         withCredits: options.withCredits,
         workspaces,

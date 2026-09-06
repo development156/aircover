@@ -99,6 +99,59 @@ export function createRadarPgDb(pool: Pool): RadarDb {
     },
 
     /**
+     * ONE COMPETITOR'S SOURCES, FOR A WORKSPACE THAT WATCHES THEM.
+     *
+     * The join through `competitor_subscriptions` is the tenancy boundary, not
+     * a convenience: this pool is service-role, so a query keyed on the
+     * competitor alone would happily return a competitor the caller does not
+     * watch. `app.radar_workspace_spend_today` reads `radar_fetch_log` through
+     * the same join for the same reason.
+     *
+     * No cadence clause. A person pressing "Read now" is asking to bypass the
+     * schedule; the SPENDING gate is still `app.radar_begin_fetch` and the
+     * ledger, neither of which this path skips.
+     *
+     * The limit is a wall on a manual action, and a small one: a competitor is
+     * a website and a social account, not a hundred addresses.
+     */
+    async sourcesForCompetitor(competitorId: string, workspaceId: string) {
+      const { rows } = await pool.query<{
+        source_id: string
+        competitor_id: string
+        kind: DueSource['kind']
+        locator: string
+        cadence: DueSource['cadence']
+        etag: string | null
+        last_modified: string | null
+        content_hash: string | null
+        last_seen_at: string | null
+      }>(
+        `select cs.id as source_id, cs.competitor_id, cs.kind, cs.locator, cs.cadence,
+                cs.etag, cs.last_modified, cs.content_hash,
+                cs.last_seen_at::text as last_seen_at
+           from competitor_sources cs
+           join competitor_subscriptions sub
+             on sub.competitor_id = cs.competitor_id
+            and sub.workspace_id = $2::uuid
+          where cs.competitor_id = $1::uuid
+          order by cs.id asc
+          limit 10`,
+        [competitorId, workspaceId],
+      )
+      return rows.map((r) => ({
+        sourceId: r.source_id,
+        competitorId: r.competitor_id,
+        kind: r.kind,
+        locator: r.locator,
+        cadence: r.cadence,
+        etag: r.etag,
+        lastModified: r.last_modified,
+        contentHash: r.content_hash,
+        lastSeenAt: r.last_seen_at,
+      }))
+    },
+
+    /**
      * WHO PAYS FOR THIS SOURCE.
      *
      * A source belongs to a competitor and a competitor is watched by any

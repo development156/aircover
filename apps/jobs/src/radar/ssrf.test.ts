@@ -76,6 +76,8 @@ function spyDb(source: DueSource) {
   }
   const db: RadarDb = {
     dueSources: async () => [source],
+    // Never reached: only the manual "Read now" path scopes to a competitor.
+    sourcesForCompetitor: async () => [source],
     // A real watcher, so a refused address is also proved to be a refused
     // CHARGE. A source nobody subscribes to would never reach the ledger and
     // the "nothing was billed" half of this file would be vacuous.

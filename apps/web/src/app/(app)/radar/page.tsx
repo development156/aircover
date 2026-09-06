@@ -214,7 +214,7 @@ export default async function RadarPage() {
           {/* The list itself, full width under the two columns. It is what
               "View all watches" in the summary anchors to, and it renders
               nothing at all when there is nobody on it. */}
-          <WatchRows competitors={snapshot.competitors} />
+          <WatchRows competitors={snapshot.competitors} readCost={creditWord(perScan)} />
         </>
       )}
     </div>

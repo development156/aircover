@@ -30,7 +30,9 @@ import { getRuntime } from './runtime'
  * reintroduce it by accident, because there is no argument here that would.
  */
 
-export type { RadarPassReport } from './radar/run'
+import type { RadarPassReport } from './radar/run'
+
+export type { RadarPassReport }
 
 export interface RadarPassDepsOptions {
   /**
@@ -76,6 +78,28 @@ export function radarPassDeps(options: RadarPassDepsOptions = {}): RadarPassOpti
     ...(env.tinyfishApiKey ? { tinyfishApiKey: env.tinyfishApiKey } : {}),
     ...(options.batch === undefined ? {} : { batch: options.batch }),
   }
+}
+
+/**
+ * READ ONE COMPETITOR NOW, FOR ONE WORKSPACE.
+ *
+ * The "Read now" button on /radar, and the automatic first read a new watch
+ * gets the moment it is added. Same runner, same ladder, same spending gate as
+ * the weekly cron — the ONLY difference is which sources are looked at and who
+ * pays, and both of those live in `only` (see `RadarPassOptions`).
+ *
+ * A separate runner would have been the wrong shape twice over: it would have
+ * been a second place for the cap, the ledger and the SSRF-guarded transport to
+ * be got right, and the two would have drifted the first time one was fixed.
+ *
+ * `batch` is not passed because `only` does not use it: `sourcesForCompetitor`
+ * already caps at one competitor's handful of addresses.
+ */
+export async function readCompetitorNow(input: {
+  competitorId: string
+  workspaceId: string
+}): Promise<RadarPassReport> {
+  return runRadarPass({ ...radarPassDeps(), only: input })
 }
 
 export { runRadarPass }

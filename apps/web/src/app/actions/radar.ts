@@ -9,7 +9,7 @@ import { reportServerError } from '@/lib/observability/report'
 import { briefFromChange } from '@/lib/radar/brief'
 import { normalizeUrl } from '@/lib/radar/locator'
 import { radarStore } from '@/lib/radar/read'
-import type { AddCompetitorState, DraftFromChangeState } from '@/lib/radar/state'
+import type { AddCompetitorState, DraftFromChangeState, ReadNowState } from '@/lib/radar/state'
 import type { CompetitorKind, RadarChange } from '@/lib/radar/types'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
@@ -105,6 +105,19 @@ const REMOVE_FAILED =
 const DRAFT_NOT_STARTED = 'Sahoda could not read your Radar just now, so no draft was started.'
 const DRAFT_REFUSED = 'Could not start a draft from that change.'
 const DRAFT_UNFINISHED = 'Sahoda started the draft but could not finish it. Find it in your posts.'
+const NOT_WATCHING = 'That business is not on your watch list, so Sahoda did not read it.'
+const NOTHING_TO_READ =
+  'Sahoda has no address on file for that business, so there was nothing to read.'
+const READ_FAILED = 'Sahoda could not run that read. Nothing was charged.'
+const SHORT_BALANCE =
+  'Your balance is short of what a read costs, so Sahoda did not read them. Nothing was charged.'
+const CAPPED =
+  'Sahoda has reached its own reading limit for today. Nothing was charged, and the weekly scan will pick this up.'
+const COULD_NOT_READ = 'Sahoda could not read their page just now. Nothing was charged.'
+const SOMETHING_MOVED = 'Sahoda read them just now and something moved. It is in What changed.'
+const NOTHING_MOVED = 'Sahoda read them just now. Their page is the same as at the last read.'
+const FIRST_READ =
+  'Sahoda read them just now. This is the first read, so there is nothing to compare it against yet.'
 
 export async function addCompetitor(
   name: unknown,
@@ -198,6 +211,139 @@ export async function removeCompetitor(
   }
   revalidatePath(RADAR_CHANGE_REVALIDATE)
   return { ok: true }
+}
+
+/**
+ * READ ONE BUSINESS NOW.
+ *
+ * ── WHY THIS EXISTS AT ALL ──────────────────────────────────────────────────
+ * MEASURED against production on 2026-09-06: Radar had produced ZERO changes
+ * ever. One cron pass had run, on 31 August. A feature whose first answer
+ * arrives next Monday is a feature nobody ever sees work, and a customer who
+ * adds a competitor and is shown nothing for six days cannot tell an empty
+ * result from a broken one.
+ *
+ * ── IT RUNS THE CRON'S RUNNER, NOT A SECOND ONE ─────────────────────────────
+ * `readCompetitorNow` in `@sahoda/jobs/radar` is `runRadarPass` with `only`
+ * set. Same cheap-check ladder, same `app.radar_begin_fetch` cap, same
+ * SSRF-guarded transport for the competitor's own URL, same ledger. A private
+ * copy of any of that would be a second place for money and for a socket to go
+ * wrong.
+ *
+ * ── TWO GATES, AND NEITHER IS DECORATION ────────────────────────────────────
+ *   1. HERE, on the CALLER'S session client: is this competitor on your watch
+ *      list? RLS answers that honestly because `competitor_subscriptions` is
+ *      where tenancy lives.
+ *   2. IN THE RUNNER, on the service-role pool: the source query is joined to
+ *      the same subscription, and the subscriber list is filtered to this
+ *      workspace before anybody is charged. `run.only.test.ts` proves a source
+ *      the caller does not watch is never fetched.
+ *
+ * The registry is SHARED, so a competitor id is not a secret and the first
+ * gate alone would be a check that a determined caller simply does not make.
+ *
+ * ── WHAT IT COSTS, AND WHY PRESSING IT TWICE IS SAFE ────────────────────────
+ * `creditCost('radar_scan')`, charged by the same `chargeSubscribers` the cron
+ * uses, against the object ref (competitor, ISO week, workspace). A second read
+ * in a week already paid for REPLAYS those ledger keys: the page is fetched
+ * again and no further money moves. So the button shows the price before the
+ * spend and cannot be used to run up a bill.
+ *
+ * ── THE IMPORT IS DYNAMIC ON PURPOSE ────────────────────────────────────────
+ * `@sahoda/jobs/radar` pulls `pg`, the ledger and both providers. This module
+ * is imported by client components for its other actions, and a static import
+ * would put that graph in every route that offers an add form.
+ */
+export async function readCompetitorNow(competitorId: unknown): Promise<ReadNowState> {
+  const { userId } = await auth()
+  if (!userId) return { ok: false, reason: 'failed', message: 'Sign in to read a business.' }
+
+  const ws = await workspaceForWrite()
+  if (!ws.ok) return { ok: false, reason: 'failed', message: ws.message }
+
+  if (typeof competitorId !== 'string' || competitorId.length === 0) {
+    return { ok: false, reason: 'not-watching', message: NOT_WATCHING }
+  }
+
+  // GATE ONE. Read as the signed-in member, so RLS is what answers.
+  try {
+    const supabase = await createServerSupabase()
+    const { data, error } = await supabase
+      .from('competitor_subscriptions')
+      .select('competitor_id')
+      .eq('workspace_id', ws.workspace.id)
+      .eq('competitor_id', competitorId)
+      .maybeSingle()
+    if (error) {
+      reportServerError(error, { action: 'readCompetitorNow', workspaceId: ws.workspace.id })
+      return { ok: false, reason: 'failed', message: READ_FAILED }
+    }
+    if (!data) return { ok: false, reason: 'not-watching', message: NOT_WATCHING }
+  } catch (cause) {
+    reportServerError(cause, { action: 'readCompetitorNow', workspaceId: ws.workspace.id })
+    return { ok: false, reason: 'failed', message: READ_FAILED }
+  }
+
+  try {
+    const { readCompetitorNow: runRead } = await import('@sahoda/jobs/radar')
+    const report = await runRead({ competitorId, workspaceId: ws.workspace.id })
+    // Revalidated on EVERY outcome, refusals included: a wallet that is short
+    // is a fact the page's own credit figures should show on the next paint.
+    revalidatePath(RADAR_CHANGE_REVALIDATE)
+    return describeRead(report)
+  } catch (cause) {
+    reportServerError(cause, { action: 'readCompetitorNow', workspaceId: ws.workspace.id })
+    return { ok: false, reason: 'failed', message: READ_FAILED }
+  }
+}
+
+/** The shape of a pass report, as this action reads it. */
+interface ReadReport {
+  considered: number
+  unchanged: number
+  changed: number
+  couldNotCheck: number
+  refused: ReadonlyArray<{ sourceId: string; reason: string }>
+  changesWritten: number
+  credits: { debited: number; unpaid: number }
+}
+
+/**
+ * ONE PASS REPORT, TURNED INTO ONE SENTENCE — and the order is the point.
+ *
+ * A refusal is checked BEFORE a success, because a pass that refused one source
+ * and read nothing still returns zeroes everywhere else, and "nothing changed"
+ * is the one thing this screen may never say about a read that did not happen.
+ * Each branch states what is true of the money as well as of the page: FSD M9
+ * promises "a page that will not load is skipped and not charged", and a
+ * sentence that reports the failure without the charge leaves the reader to
+ * wonder.
+ */
+function describeRead(report: ReadReport): ReadNowState {
+  if (report.credits.unpaid > 0 || report.refused.some((r) => r.reason === 'CREDIT_INSUFFICIENT')) {
+    return { ok: false, reason: 'insufficient', message: SHORT_BALANCE }
+  }
+  if (report.refused.some((r) => r.reason === 'DAILY_CAP' || r.reason === 'WORKSPACE_CAP')) {
+    return { ok: false, reason: 'capped', message: CAPPED }
+  }
+  if (report.refused.some((r) => r.reason === 'NOT_SUBSCRIBED') || report.considered === 0) {
+    // Either the subscription went away between the two gates, or this business
+    // has no address on file to read. Both are "there was nothing to read",
+    // which is not the same as a page that would not load.
+    return { ok: false, reason: 'not-watching', message: NOTHING_TO_READ }
+  }
+  if (report.couldNotCheck > 0) {
+    return { ok: true, outcome: 'could-not-read', message: COULD_NOT_READ }
+  }
+  if (report.changesWritten > 0) {
+    return { ok: true, outcome: 'moved', message: SOMETHING_MOVED }
+  }
+  if (report.unchanged > 0) {
+    return { ok: true, outcome: 'unchanged', message: NOTHING_MOVED }
+  }
+  // Read, and there was no earlier read to compare it against. Saying "nothing
+  // changed" here would be a claim about a business Sahoda has seen once.
+  return { ok: true, outcome: 'read', message: FIRST_READ }
 }
 
 /** Find one change across the feed. The store returns days, not an index. */

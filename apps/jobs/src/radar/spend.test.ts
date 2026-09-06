@@ -39,6 +39,9 @@ function fakeDb(options: FakeDbOptions) {
     async dueSources() {
       return []
     },
+    async sourcesForCompetitor() {
+      return []
+    },
     async subscribers() {
       return []
     },

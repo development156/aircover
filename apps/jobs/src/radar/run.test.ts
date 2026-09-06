@@ -48,6 +48,8 @@ function fakeDb(subscribers: Record<string, string[]>) {
   }
   const db: RadarDb = {
     dueSources: async () => [source],
+    // Never reached: only the manual "Read now" path scopes to a competitor.
+    sourcesForCompetitor: async () => [source],
     subscribers: async (sourceId) => subscribers[sourceId] ?? [],
     beginFetch: async () => ({ allowed: true, reservationId: 'res-1', subscriberCount: 1 }),
     finishFetch: async (r) => {
