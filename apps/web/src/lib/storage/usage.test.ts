@@ -124,12 +124,25 @@ describe('storageRefusal', () => {
     expect(storageRefusal(ok(500 * MB), 100 * MB)).toBeNull()
   })
 
-  it('FAILS OPEN when usage could not be read', async () => {
-    // Deliberate. Refusing every upload in the product because one query failed
-    // turns a reporting fault into an outage, and every file is capped at 4 MB
-    // anyway, so nothing can run away while the read is broken.
-    for (const kind of ['read_failed', 'not_deployed', 'no_workspace'] as const) {
-      expect(storageRefusal({ kind }, 900 * MB), kind).toBeNull()
-    }
+  it('FAILS CLOSED when the read failed: nothing is uploaded, and the sentence says why', () => {
+    // DB-20. A workspace at 999 MB whose usage query is down could otherwise
+    // take an unbounded number of 4 MB files. The cost of refusing is one
+    // retry; the cost of allowing is a ceiling that quietly stops existing.
+    const refusal = storageRefusal({ kind: 'read_failed' }, 1)
+
+    expect(refusal).toBe('Sahoda could not check your storage just now. Try again in a moment.')
+  })
+
+  it('refuses when there is no workspace to count against', () => {
+    // Not a remedy sentence: a reload cannot create a workspace, and the caller
+    // that reaches here has already been told to create one. Just the fact.
+    expect(storageRefusal({ kind: 'no_workspace' }, 1)).toMatch(/no workspace/i)
+  })
+
+  it('fails OPEN only when the counting function is not deployed yet', () => {
+    // The one condition nobody but us can act on. Between this code landing and
+    // the migration being applied, every upload would otherwise be refused for a
+    // reason no customer could fix.
+    expect(storageRefusal({ kind: 'not_deployed' }, 900 * MB)).toBeNull()
   })
 })

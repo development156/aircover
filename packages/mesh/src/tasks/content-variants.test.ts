@@ -87,6 +87,18 @@ describe('contentVariantsTask', () => {
     expect(user).toMatch(/gbp:[\s\S]*no keywords/)
   })
 
+  it('makes the keyword field mandatory in the output contract, not optional', () => {
+    // MEASURED live on the preview at 54a84120: bodies adapted per channel but
+    // every keyword field came back empty. The shape showed `"hashtags"?` and
+    // the economy model reads the `?` as "skip it". The ask is now a MUST, and
+    // the shown shape drops the `?`, so keywords come back for X and LinkedIn.
+    const system = contentVariantsTask
+      .buildMessages(input, ctx)
+      .find((m) => m.role === 'system')!.content
+    expect(system).toMatch(/MUST carry "extras\.hashtags"/)
+    expect(system).not.toContain('"hashtags"?')
+  })
+
   it('resolves a valid model response into per-channel variants', async () => {
     const result = await runnerFor(fixedProvider([validOut])).run(contentVariantsTask, input, ctx)
     expect(result.ok).toBe(true)

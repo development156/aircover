@@ -15,6 +15,7 @@ const card = (id: string, bytes: number | null): AssetCard => ({
   height: 600,
   createdAt: '2026-08-20T00:00:00.000Z',
   previewUrl: null,
+  thumbUrl: null,
   usage: [],
   folderIds: [],
   deletedAt: null,

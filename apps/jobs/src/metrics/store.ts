@@ -36,6 +36,20 @@ const UNDEFINED_TABLE = '42P01'
 export interface MetricStoreOptions {
   pool: PgQueryable
   limit?: number
+  /**
+   * ONE workspace, or every workspace when absent.
+   *
+   * The nightly pass leaves this unset and sweeps the fleet, which is what it is
+   * for. "Measure now" — a person pressing a button on /analytics — must not:
+   * their click would otherwise spend the whole batch on somebody else's posts
+   * and answer them with nothing.
+   *
+   * It is a CORRECTNESS filter, not the tenant boundary. The boundary is still
+   * the `zernio_profiles` join, which pairs each post with its own workspace's
+   * profile; this narrows what the batch is spent on. The id is resolved from
+   * the signed-in session by the caller and never taken from a request body.
+   */
+  workspaceId?: string
 }
 
 interface TargetRow extends Record<string, unknown> {
@@ -56,7 +70,19 @@ function isMissingTable(error: unknown): boolean {
 }
 
 export function createMetricStore(opts: MetricStoreOptions) {
-  const { pool, limit = DEFAULT_LIMIT } = opts
+  const { pool, limit = DEFAULT_LIMIT, workspaceId } = opts
+
+  /**
+   * The workspace filter, or nothing at all.
+   *
+   * Written as an interpolated FRAGMENT and a bound PARAMETER, never as an
+   * interpolated value: `$2` is what carries the id, so a hostile string is a
+   * uuid comparison that finds nothing rather than SQL. Both forms of the query
+   * below are built from this one constant, which is what stops the 42P01
+   * fallback path from quietly sweeping the whole fleet.
+   */
+  const SCOPE = workspaceId === undefined ? '' : 'and v.workspace_id = $2'
+  const params: unknown[] = workspaceId === undefined ? [limit] : [limit, workspaceId]
 
   /**
    * Every published channel that can actually be asked about.
@@ -125,6 +151,7 @@ export function createMetricStore(opts: MetricStoreOptions) {
         where v.publish_status = 'published'
           and v.platform_post_id is not null
           and (v.permalink is null or v.permalink not like 'fixture://%')
+          ${SCOPE}
         order by ${order}
         limit $1`
 
@@ -142,10 +169,13 @@ export function createMetricStore(opts: MetricStoreOptions) {
   async function listTargets(): Promise<MetricTarget[]> {
     let r
     try {
-      r = await pool.query<TargetRow>(TARGETS_SQL(FAIR_ORDER), [limit])
+      r = await pool.query<TargetRow>(TARGETS_SQL(FAIR_ORDER), params)
     } catch (error) {
       if (!isMissingTable(error)) throw error
-      r = await pool.query<TargetRow>(TARGETS_SQL(NO_HISTORY_ORDER), [limit])
+      // SAME `params`. The fallback runs on every environment where the history
+      // table has not been applied, which is the path production takes today —
+      // so a scope applied to the fair ordering alone would be no scope at all.
+      r = await pool.query<TargetRow>(TARGETS_SQL(NO_HISTORY_ORDER), params)
     }
 
     return r.rows.map((row) => ({

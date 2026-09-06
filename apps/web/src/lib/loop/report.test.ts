@@ -18,6 +18,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const state = vi.hoisted(() => ({
   snapshots: [] as Record<string, unknown>[],
   posts: [] as Record<string, unknown>[],
+  liveLogs: null as Record<string, unknown>[] | null,
   events: [] as Record<string, unknown>[],
   /** Every .eq() the memory_events read applied, so the filter can be asserted. */
   eventFilters: [] as [string, unknown][],
@@ -38,7 +39,10 @@ vi.mock('@/lib/supabase/server', () => {
         ? state.snapshots
         : table === 'posts'
           ? state.posts
-          : state.events
+          : table === 'post_publish_logs'
+            ? // Every post is live unless a test says otherwise (IL-08 below).
+              (state.liveLogs ?? state.posts.map((p) => ({ post_id: p.id })))
+            : state.events
     const chain: Record<string, unknown> = {
       select: () => chain,
       eq: (col: string, val: unknown) => {
@@ -81,6 +85,24 @@ describe('readRanking', () => {
   it('withholds a ranking of one post, because one post is not a ranking', async () => {
     state.snapshots = [{ post_id: 'p1', channel: 'x', value: 900 }]
     expect(await readRanking(WS, '2026-08-17', '2026-08-23')).toBeNull()
+  })
+
+  it('a post that only a fixture ever published cannot be ranked (IL-08)', async () => {
+    state.snapshots = [
+      { post_id: 'p1', channel: 'x', value: 100 },
+      { post_id: 'p2', channel: 'linkedin', value: 900 },
+      { post_id: 'p3', channel: 'instagram', value: 5000 },
+    ]
+    state.posts = [
+      { id: 'p1', title: 'Quiet one' },
+      { id: 'p2', title: 'Loud one' },
+      { id: 'p3', title: 'Fixture only' },
+    ]
+    state.liveLogs = [{ post_id: 'p1' }, { post_id: 'p2' }]
+    const r = await readRanking(WS, '2026-08-17', '2026-08-23')
+    expect(r?.top.title).toBe('Loud one')
+    expect(r?.postsMeasured).toBe(2)
+    state.liveLogs = null
   })
 
   it('names the top and the bottom once two posts were measured', async () => {
@@ -129,8 +151,11 @@ describe('readRanking', () => {
       { post_id: 'p2', channel: 'x', value: 900 },
     ]
     state.posts = [{ id: 'p2', title: 'Known' }]
+    // Both went out live; only the title row is missing.
+    state.liveLogs = [{ post_id: 'p1' }, { post_id: 'p2' }]
     const r = await readRanking(WS, '2026-08-17', '2026-08-23')
     expect(r?.bottom.title).toBe('Untitled')
+    state.liveLogs = null
   })
 })
 

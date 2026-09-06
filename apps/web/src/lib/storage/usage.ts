@@ -73,18 +73,32 @@ export async function readStorageUsage(workspaceId: string | null): Promise<Stor
 /**
  * The refusal an upload gets when the workspace has no room, or `null` when it fits.
  *
- * ── IT FAILS OPEN, DELIBERATELY, AND ONLY FOR A READ WE COULD NOT DO ─────────
- * If usage cannot be read the upload is ALLOWED. The alternative is refusing every
- * upload in the product the moment one query fails, or before the migration is
- * applied — turning a reporting fault into an outage. The cost is bounded: every
- * single file is already capped at 4 MB by the platform, so a workspace cannot run
- * away while the read is broken, and the next successful read shows the true figure.
+ * ── IT FAILS CLOSED ON A READ WE COULD NOT DO (DB-20) ────────────────────────
+ * If usage cannot be read the upload is REFUSED, with a sentence that says the
+ * check did not happen rather than that the workspace is full. The earlier
+ * version failed open here, reasoning that every file is capped at 4 MB so
+ * nothing could run away. It can: a workspace already at its line, during any
+ * outage of the counting function, could take as many 4 MB files as it liked,
+ * and the ceiling would exist only when the meter happened to be working. A
+ * ceiling that holds only while it is watched is not a ceiling.
+ *
+ * The ONE exception is `not_deployed`: the counting function does not exist
+ * yet, which is a condition only we can fix and which would otherwise refuse
+ * every upload in the product for a reason no customer could act on. That
+ * window closes when the migration is applied.
  *
  * A workspace that is genuinely full is refused, every time, before one byte is
  * accepted.
  */
+export const STORAGE_UNREADABLE_REFUSAL =
+  'Sahoda could not check your storage just now. Try again in a moment.'
+
 export function storageRefusal(usage: StorageUsage, incomingBytes: number): string | null {
-  if (usage.kind !== 'ok') return null
+  if (usage.kind === 'not_deployed') return null
+  if (usage.kind === 'read_failed') return STORAGE_UNREADABLE_REFUSAL
+  if (usage.kind === 'no_workspace') {
+    return 'There is no workspace to store this in, so nothing was uploaded.'
+  }
   if (!storageWouldExceed(usage.state, incomingBytes)) return null
 
   const free = formatStorageBytes(usage.state.remainingBytes)

@@ -5,9 +5,11 @@ import type { ZernioConversation } from '@sahoda/publishing'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { activeWorkspaceRead } from '@/lib/workspaces'
 
+import type { InboxListRow } from './list-row'
+import { zernioPlatform } from './platform-spelling'
 import { countAccounts, readConversations } from './read'
 import type { StoreDecision } from './store-decision'
-import { readStoredThreads } from './store-read'
+import { readStoredThreads, threadsNeedingReply } from './store-read'
 
 /**
  * The conversations list, assembled the way the founder chose on 2026-08-21:
@@ -62,20 +64,10 @@ export interface ConversationsView {
    * thread, its id is the fallback. Only when neither can say is it left EMPTY,
    * because a plausible wrong value is worse than an obviously absent one.
    */
-  rows: ZernioConversation[]
+  rows: InboxListRow[]
   decision: StoreDecision
   /** How many rows came from the live read rather than the store. */
   historyRows: number
-}
-
-/**
- * Zernio's platform vocabulary, restored for the row the list renders. Only the
- * two spellings that differ are listed; every other channel (`instagram`,
- * `facebook`, `telegram`, …) is Zernio's own name already and falls through.
- */
-const PLATFORM: Readonly<Record<string, string>> = {
-  x: 'twitter',
-  gbp: 'googlebusiness',
 }
 
 /**
@@ -92,7 +84,7 @@ const PLATFORM: Readonly<Record<string, string>> = {
  * is allowed to throw, because the page must render what the store holds even
  * when this lookup cannot be made.
  */
-async function accountIdsByChannel(): Promise<ReadonlyMap<string, string>> {
+export async function accountIdsByChannel(): Promise<ReadonlyMap<string, string>> {
   try {
     const read = await activeWorkspaceRead()
     if (read.status !== 'ok') return new Map()
@@ -188,10 +180,20 @@ export async function readConversationsList(): Promise<ConversationsView> {
   const accountByChannel = view.rows.length > 0 ? await accountIdsByChannel() : new Map()
   const liveById = new Map((history ?? []).map((r) => [r.id, r]))
 
-  const stored: ZernioConversation[] = view.rows.map((r) => ({
+  // Asked once for the whole page rather than per row, and only when there are
+  // stored rows to ask about.
+  const awaitingReply =
+    view.rows.length > 0 ? await threadsNeedingReply(view.rows.map((r) => r.id)) : new Set<string>()
+
+  const stored: InboxListRow[] = view.rows.map((r) => ({
     id: r.platformThreadId,
-    platform: PLATFORM[r.channel] ?? r.channel,
+    platform: zernioPlatform(r.channel),
     accountId: accountByChannel.get(r.channel) ?? liveById.get(r.platformThreadId)?.accountId ?? '',
+    // OUR row id, carried so the row has a destination even with no account to
+    // address. Without it an account-less stored row rendered as a paragraph
+    // explaining why the message it was displaying could not be opened.
+    storedThreadId: r.id,
+    needsReply: awaitingReply.has(r.id),
     participantName: r.authorName ?? undefined,
     accountUsername: r.authorHandle ?? undefined,
     lastMessage: r.preview ?? undefined,
@@ -205,5 +207,28 @@ export async function readConversationsList(): Promise<ConversationsView> {
   const seen = new Set(stored.map((r) => r.id))
   const older = (history ?? []).filter((r) => !seen.has(r.id))
 
-  return { rows: [...stored, ...older], decision: view.decision, historyRows }
+  return { rows: byNewest([...stored, ...older]), decision: view.decision, historyRows }
+}
+
+/**
+ * Newest first, across BOTH halves of the merge.
+ *
+ * The list used to be every stored row followed by every live one, which is the
+ * order the two reads happened in and not an order anybody asked for: a DM that
+ * arrived this morning sat below a six-month-old conversation because one came from
+ * the store and the other from Zernio. The two halves describe one inbox and the
+ * only ordering a reader expects of an inbox is time.
+ *
+ * A row with NO timestamp sorts last rather than first. It is the absence of a
+ * measurement, and putting it at the top would be reading "we do not know when"
+ * as "just now" — the same fabrication as a zero standing in for a failed count.
+ * Ties keep their existing order (`sort` is stable), so the store still wins the
+ * collision it already won above.
+ */
+function byNewest(rows: InboxListRow[]): InboxListRow[] {
+  const at = (row: InboxListRow): number => {
+    const parsed = row.updatedTime ? Date.parse(row.updatedTime) : Number.NaN
+    return Number.isNaN(parsed) ? Number.NEGATIVE_INFINITY : parsed
+  }
+  return [...rows].sort((a, b) => at(b) - at(a))
 }

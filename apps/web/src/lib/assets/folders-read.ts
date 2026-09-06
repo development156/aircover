@@ -79,30 +79,33 @@ export async function readFolderTree(): Promise<FolderTreeRead> {
 
     const supabase = createServerSupabase()
 
-    const folderRows = await supabase
-      .from('asset_folders')
-      .select('*')
-      .eq('workspace_id', workspaceId)
-      .order('name', { ascending: true })
-      .limit(FOLDER_LIST_LIMIT)
+    // THREE INDEPENDENT READS, ONE ROUND TRIP. None of them needs another's
+    // answer, so awaiting them one after the other bought nothing and cost two
+    // round trips on every visit to the screen.
+    const [folderRows, smartRows, itemRows] = await Promise.all([
+      supabase
+        .from('asset_folders')
+        .select('*')
+        .eq('workspace_id', workspaceId)
+        .order('name', { ascending: true })
+        .limit(FOLDER_LIST_LIMIT),
+      supabase
+        .from('asset_smart_folders')
+        .select('*')
+        .eq('workspace_id', workspaceId)
+        .order('name', { ascending: true })
+        .limit(FOLDER_LIST_LIMIT),
+      supabase
+        .from('asset_folder_items')
+        .select('folder_id, asset_id')
+        .eq('workspace_id', workspaceId)
+        .limit(FOLDER_ITEM_LIMIT),
+    ])
     if (folderRows.error || !folderRows.data) return { status: 'unreadable' }
-
-    const smartRows = await supabase
-      .from('asset_smart_folders')
-      .select('*')
-      .eq('workspace_id', workspaceId)
-      .order('name', { ascending: true })
-      .limit(FOLDER_LIST_LIMIT)
     // Not survivable as an empty list: the smart folders are the saved questions,
     // and "you have none" would offer the person the remedy of making one they
     // already have.
     if (smartRows.error || !smartRows.data) return { status: 'unreadable' }
-
-    const itemRows = await supabase
-      .from('asset_folder_items')
-      .select('folder_id, asset_id')
-      .eq('workspace_id', workspaceId)
-      .limit(FOLDER_ITEM_LIMIT)
     // The counts under every folder come from these rows. A failed membership read
     // with the folder read intact would draw the whole tree with 0 under each
     // name, which is the most convincing wrong number the screen can show.
@@ -154,6 +157,46 @@ export async function readFolderTree(): Promise<FolderTreeRead> {
     }
   } catch {
     return { status: 'unreadable' }
+  }
+}
+
+/**
+ * Which folders each of THESE files is filed in.
+ *
+ * For a page loaded after the first one (`loadOlderAssets`, the server search):
+ * those cards render filing exactly as the first two hundred do, so they need
+ * the same memberships. Returns null for a failed read rather than an empty
+ * map, because an empty map says "filed nowhere" about every file in it.
+ */
+export async function readFolderIdsFor(
+  assetIds: readonly string[],
+): Promise<Map<string, string[]> | null> {
+  const byAsset = new Map<string, string[]>()
+  if (assetIds.length === 0) return byAsset
+  try {
+    const workspace = await activeWorkspaceRead()
+    if (workspace.status !== 'ok') return null
+
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase
+      .from('asset_folder_items')
+      .select('folder_id, asset_id')
+      .eq('workspace_id', workspace.workspace.id)
+      .in('asset_id', [...assetIds])
+      .limit(FOLDER_ITEM_LIMIT)
+
+    if (error || !data) return null
+    for (const row of data) {
+      const folderId = (row as { folder_id?: unknown }).folder_id
+      const assetId = (row as { asset_id?: unknown }).asset_id
+      if (typeof folderId !== 'string' || typeof assetId !== 'string') continue
+      const list = byAsset.get(assetId) ?? []
+      list.push(folderId)
+      byAsset.set(assetId, list)
+    }
+    return byAsset
+  } catch {
+    return null
   }
 }
 

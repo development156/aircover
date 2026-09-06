@@ -190,6 +190,10 @@ function harness(
     markVariant: async (u) => {
       spend.variantUpdates.push(u)
     },
+    recordPublished: async (e, u) => {
+      spend.logs.push(e)
+      spend.variantUpdates.push(u)
+    },
   }
 
   return { deps, spend }

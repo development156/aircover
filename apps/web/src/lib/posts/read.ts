@@ -108,6 +108,101 @@ export async function readPosts(): Promise<PostsRead> {
 }
 
 /**
+ * Cap on `readPostsInWindow`. Not `LIST_LIMIT`: a hundred is a PAGE, and a
+ * calendar window is the whole window. A thousand dated posts inside one
+ * six-week span is far past anything a workspace plans, and the cap exists so a
+ * runaway import cannot turn one render into an unbounded read.
+ */
+export const WINDOW_LIMIT = 1000
+
+/**
+ * Every post with a time inside `[fromIso, toIso)`, soonest first.
+ *
+ * ── WHY THE CALENDAR CANNOT READ THE LIST ────────────────────────────────────
+ * `readPosts` is the hundred most recently EDITED posts. That is the right shape
+ * for a list and the wrong one for a calendar: a post booked for Thursday and
+ * untouched since a hundred other edits fell off the week grid, off the mini
+ * calendar's dots and out of "Going out today", and nothing on screen said so.
+ * The list's own footnote ("Showing the 100 most recently updated") was the only
+ * warning, and it sat under a calendar it did not describe.
+ *
+ * This asks the question a calendar actually has. Same three-way answer as
+ * `readPosts`, for the same reason: an empty week and a failed read are
+ * different sentences.
+ */
+export async function readPostsInWindow(fromIso: string, toIso: string): Promise<PostsRead> {
+  // A bound that is not an instant is not a window. Refused before any read,
+  // rather than handed to Postgres as a string it would compare lexically.
+  if (Number.isNaN(Date.parse(fromIso)) || Number.isNaN(Date.parse(toIso))) {
+    return { status: 'unreadable' }
+  }
+  try {
+    const workspace = await activeWorkspaceRead()
+    if (workspace.status === 'unreadable') return { status: 'unreadable' }
+    if (workspace.status === 'none') return { status: 'no-workspace' }
+    const workspaceId = workspace.workspace.id
+
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase
+      .from('posts')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .gte('scheduled_at', fromIso)
+      .lt('scheduled_at', toIso)
+      .order('scheduled_at', { ascending: true })
+      .limit(WINDOW_LIMIT)
+
+    if (error || !data) {
+      if (error) console.error('[posts] window read failed', error.code, error.message)
+      return { status: 'unreadable' }
+    }
+    return {
+      status: 'ok',
+      posts: data.flatMap((row) => {
+        const parsed = PostSchema.safeParse(row)
+        return parsed.success ? [parsed.data] : []
+      }),
+    }
+  } catch (error) {
+    console.error('[posts] window read threw', error instanceof Error ? error.message : 'unknown')
+    return { status: 'unreadable' }
+  }
+}
+
+/**
+ * How many posts in the active workspace have no time at all.
+ *
+ * The off-grid note counts what a calendar structurally cannot draw, and the
+ * undated half of that count used to be measured on the capped list — so a
+ * workspace with 140 undated drafts read "100 posts are not on this view". A
+ * `head` count costs no rows. `null` means the question was not answered; a
+ * zero would claim every post has a date, which is the one thing this read
+ * must never say by accident.
+ */
+export async function readUndatedCount(): Promise<number | null> {
+  try {
+    const workspaceId = await activeWorkspaceId()
+    if (workspaceId === null) return null
+
+    const supabase = createServerSupabase()
+    const { count, error } = await supabase
+      .from('posts')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)
+      .is('scheduled_at', null)
+
+    if (error) {
+      console.error('[posts] undated count failed', error.code, error.message)
+      return null
+    }
+    return typeof count === 'number' ? count : null
+  } catch (error) {
+    console.error('[posts] undated count threw', error instanceof Error ? error.message : 'unknown')
+    return null
+  }
+}
+
+/**
  * The lossy view. Correct only where the caller has ALREADY decided which of the
  * three it is in — /home short-circuits on the wallet's `no-workspace` before it
  * reaches a post — and never where an empty list is about to be rendered as a

@@ -62,6 +62,14 @@ describe('evaluateSendWindow — instagram', () => {
     const r = evaluateSendWindow({ platform: 'instagram', lastInboundAt: T0, now: at(169) })
     expect(r.state).toBe('closed')
   })
+
+  it('every sentence a shop owner reads names the platform properly and no API tag', () => {
+    for (const hours of [1, 25, 169]) {
+      const r = evaluateSendWindow({ platform: 'instagram', lastInboundAt: T0, now: at(hours) })
+      expect(r.reason).toContain('Instagram')
+      expect(r.reason).not.toMatch(/HUMAN_AGENT|instagram thread|^instagram/)
+    }
+  })
 })
 
 describe('evaluateSendWindow — facebook', () => {

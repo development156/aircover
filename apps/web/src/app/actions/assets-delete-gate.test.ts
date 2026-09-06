@@ -88,3 +88,66 @@ describe('deleteAsset only works from the trash', () => {
     expect(state.rpcCalls.map((call) => call.fn)).toEqual(['delete_asset'])
   })
 })
+
+/**
+ * The database's own refusals, surfaced rather than replaced.
+ *
+ * `delete_asset` re-checks the gate inside a transaction with the posts locked,
+ * so the answer the SCREEN read a moment ago can be stale by the time the row
+ * is touched. Each code the RPC can raise is a different sentence, and every
+ * one leaves the row where it was.
+ */
+describe('deleteAsset surfaces the database’s refusal', () => {
+  const rpcError = vi.hoisted(() => ({ current: null as { code: string; message: string } | null }))
+
+  beforeEach(() => {
+    state.deletedAt = '2026-09-01T00:00:00.000Z'
+    rpcError.current = null
+  })
+
+  async function withRpcError(code: string, message: string) {
+    const supabase = await import('@/lib/supabase/server')
+    vi.spyOn(supabase, 'createServerSupabase').mockReturnValue({
+      rpc: () => Promise.resolve({ data: null, error: { code, message } }),
+      storage: {
+        from: () => ({
+          remove: () => Promise.resolve({ error: null }),
+          list: () => Promise.resolve({ data: [], error: null }),
+        }),
+      },
+    } as never)
+  }
+
+  test('23001 (the guard trigger) is a refusal carrying the trigger’s own sentence', async () => {
+    await withRpcError('23001', 'Diwali offer is scheduled to go out and cannot lose it.')
+
+    const result = await deleteAsset(ASSET_ID, false)
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.reason).toBe('refused')
+    expect(result.message).toContain('Diwali offer')
+  })
+
+  test('23503 (an attachment the caller did not consent to detach) is a refusal naming the post', async () => {
+    await withRpcError('23503', 'violates foreign key')
+
+    const result = await deleteAsset(ASSET_ID, false)
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.reason).toBe('refused')
+    expect(result.message).toMatch(/still on a post/i)
+  })
+
+  test('02000 (no such row) is a failure that says the file is not in the library', async () => {
+    await withRpcError('02000', 'no data')
+
+    const result = await deleteAsset(ASSET_ID, false)
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.reason).toBe('failed')
+    expect(result.message).toMatch(/not in your library/i)
+  })
+})

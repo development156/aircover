@@ -13,7 +13,7 @@
   "/(app)/loading": 604176,
   "/(app)/not-found": 609307,
   "/(app)/campaigns/[id]": 766963,
-  "/(app)/approvals": 683121,
+  "/(app)/approvals": 701030,
   "/(app)/analytics/loading": 604176,
   "/(app)/analytics": 609300,
   "/(app)/assets": 830888,
@@ -28,10 +28,10 @@
   "/(app)/loop": 757813,
   "/(app)/playbooks": 733186,
   "/(app)/posts/loading": 604176,
-  "/(app)/posts/[id]": 917214,
+  "/(app)/posts/[id]": 929587,
   "/(app)/posts": 698239,
   "/(app)/planner/loading": 604176,
-  "/(app)/planner": 811402,
+  "/(app)/planner": 821658,
   "/(app)/radar/[id]": 722398,
   "/(app)/sites": 766081,
   "/(auth)/layout": 618240,
@@ -81,5 +81,6 @@
   "/(app)/settings": 689406,
   "/(app)/settings/plan": 735601,
   "/(app)/settings/profile": 604176,
-  "/(app)/brain/audience": 609307
+  "/(app)/brain/audience": 609307,
+  "/(app)/inbox/threads/store/[threadId]": 642780
 }

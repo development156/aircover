@@ -7,7 +7,8 @@ import { Search } from 'lucide-react'
 
 import { PaneHeader, PaneScroll } from '@/components/inbox/inbox-panes'
 import { platformLabel } from '@/components/inbox/platform-label'
-import { threadHref } from '@/components/inbox/thread-href'
+import { conversationHref } from '@/components/inbox/thread-href'
+import type { InboxListRow } from '@/lib/inbox/list-row'
 import { cn } from '@/lib/utils'
 import type { ZernioConversation } from '@sahoda/publishing'
 
@@ -32,7 +33,7 @@ function initialsOf(name: string): string {
   return (letters || '?').toUpperCase()
 }
 
-function nameOf(c: ZernioConversation): string {
+function nameOf(c: InboxListRow): string {
   return c.participantName ?? c.participantId ?? 'Unknown sender'
 }
 
@@ -41,7 +42,7 @@ export function ConversationList({
   waitingLine,
   title = 'Conversations',
 }: {
-  conversations: ZernioConversation[]
+  conversations: InboxListRow[]
   /**
    * ── NOT AN EMPTY STATE. A STATEMENT OF WHAT THIS COLUMN HOLDS ─────────────
    * This prop used to be `emptyLine`, and the pages passed an absence claim into
@@ -156,14 +157,15 @@ export function ConversationList({
             {shown.map((conversation) => {
               const who = nameOf(conversation)
               const count = conversation.unreadCount ?? 0
-              /* ── A THREAD NOBODY CAN OPEN IS NOT A LINK ─────────────────
-                 A stored thread carries no account; `lib/inbox/conversations.ts`
-                 resolves one through this workspace's connections and leaves it
-                 EMPTY when no connected account on that channel can say.
-                 MEASURED 2026-09-06 (wt-core preview): this row rendered
+              /* ── EVERY ROW WITH A MESSAGE BEHIND IT IS A DOOR ───────────
+                 A stored thread carries no account; this row rendered
                  `/inbox/threads//qa-thread-1` and the click landed on "This
-                 page isn't here". The message is real; the door is not. */
-              const canOpen = conversation.accountId !== ''
+                 page isn't here" (MEASURED 2026-09-06, wt-core preview). The
+                 sentence that replaced the link stopped the 404 and left the
+                 message unreadable — it is in THIS database, and our own row
+                 needs no Zernio account. `conversationHref` routes such a row
+                 to the store thread instead. */
+              const href = conversationHref(conversation)
               const rowClass =
                 'flex items-start gap-[10px] border-b border-line-soft px-3 py-3 last:border-b-0'
               const body = (
@@ -191,31 +193,32 @@ export function ConversationList({
                         <span className="grid h-[18px] min-w-[18px] shrink-0 place-items-center rounded-pill bg-brand px-[5px] text-[11px] font-bold text-primary-foreground tabular-nums">
                           {count}
                         </span>
+                      ) : conversation.needsReply ? (
+                        /* Words, not a numeral: `unreadCount` is Zernio's and
+                           the store has no read state to count. What it knows
+                           is which side spoke last. */
+                        <span className="shrink-0 rounded-pill bg-warn-bg px-1.5 type-chip font-semibold text-warn">
+                          Needs a reply
+                        </span>
                       ) : null}
                     </span>
-                    {canOpen ? null : (
+                    {href === null ? (
                       <span className="mt-1 block type-meta text-muted">
-                        No connected {platformLabel(conversation.platform)} account can open this.
-                        Reconnect it to read and reply.
+                        Sahoda holds no copy of this thread and no connected{' '}
+                        {platformLabel(conversation.platform)} account can address it.
                       </span>
-                    )}
+                    ) : null}
                   </span>
                 </>
               )
               return (
                 <li key={`${conversation.accountId}:${conversation.id}`}>
-                  {canOpen ? (
-                    <Link
-                      href={threadHref({
-                        accountId: conversation.accountId,
-                        conversationId: conversation.id,
-                      })}
-                      className={cn(rowClass, 'transition-micro hover:bg-s2')}
-                    >
+                  {href === null ? (
+                    <div className={rowClass}>{body}</div>
+                  ) : (
+                    <Link href={href} className={cn(rowClass, 'transition-micro hover:bg-s2')}>
                       {body}
                     </Link>
-                  ) : (
-                    <div className={rowClass}>{body}</div>
                   )}
                 </li>
               )

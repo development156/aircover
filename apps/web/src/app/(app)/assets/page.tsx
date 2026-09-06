@@ -111,6 +111,7 @@ export default async function AssetsPage() {
     // positional read would hang one photo's preview on another the day a row
     // fails to parse.
     previewUrl: urlById.get(asset.id) ?? null,
+    thumbUrl: null,
     usage,
     // `null`, not `[]`, when the memberships did not come back. An empty array
     // would state that every photo is filed nowhere, and the unfiled count on
@@ -136,6 +137,7 @@ export default async function AssetsPage() {
     height: asset.height,
     createdAt: asset.created_at,
     previewUrl: urlById.get(asset.id) ?? null,
+    thumbUrl: null,
     usage,
     folderIds: foldersReadable ? (tree.itemsByAsset.get(asset.id) ?? []) : null,
     deletedAt: asset.deleted_at,

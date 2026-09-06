@@ -18,6 +18,7 @@ import { hasLink } from '@/lib/posts/detect-link'
 import { isPostFormat, refuseFormat } from '@sahoda/publishing'
 import { casSaveVariant } from '@/lib/posts/cas-save'
 import { parseExtras } from '@/lib/posts/variant-extras'
+import { MEDIA_BUCKET } from '@/lib/posts/media-constants'
 import type { DeleteState, FormatState, SaveState } from '@/lib/posts/state'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { workspaceForWrite } from '@/lib/workspaces'
@@ -403,6 +404,14 @@ export async function setVariantFormat(
   }
 }
 
+/**
+ * The token `posts`' delete trigger raises for a post whose status is
+ * published, partial or publishing. Matched by substring, never echoed.
+ */
+const POST_HAS_PUBLISH_EVIDENCE = 'POST_HAS_PUBLISH_EVIDENCE'
+const POST_HAS_PUBLISH_EVIDENCE_COPY =
+  'This post went out, so it stays on record. You can hide it from Posts instead.'
+
 export async function deletePost(postId: string): Promise<DeleteState> {
   let workspaceId: string | undefined
   try {
@@ -415,6 +424,26 @@ export async function deletePost(postId: string): Promise<DeleteState> {
     workspaceId = workspace.id
 
     const supabase = createServerSupabase()
+
+    // ── DB-19: THE OBJECTS THE CASCADE CANNOT REACH ──────────────────────────
+    // `post_media` rows cascade away with the post; their bytes in the bucket do
+    // not. Read the paths BEFORE the delete, because afterwards nothing names
+    // them. Only DIRECT uploads (`asset_id is null`): a library file's object is
+    // shared with the library and every other post using it, and is
+    // `deleteAsset`'s to remove. RLS scopes this read; a refused or failed read
+    // is not a reason to keep the post — the storage sweep is the backstop for
+    // bytes this could not name.
+    const orphans = await supabase
+      .from('post_media')
+      .select('storage_path')
+      .eq('post_id', postId)
+      .is('asset_id', null)
+    const objectPaths = orphans.error
+      ? []
+      : ((orphans.data ?? []) as { storage_path?: unknown }[])
+          .map((row) => row.storage_path)
+          .filter((path): path is string => typeof path === 'string' && path.length > 0)
+
     // post_variants / post_media cascade from posts (on delete cascade).
     // `.select()` is not cosmetic: a delete matching ZERO rows is NOT an error in
     // PostgREST, so without the returned row this reports a successful deletion
@@ -427,12 +456,40 @@ export async function deletePost(postId: string): Promise<DeleteState> {
       .select('id')
       .maybeSingle()
 
-    if (error) return { ok: false, message: mapPostError(error) }
+    if (error) {
+      // A post with publish evidence (published / partial / publishing) is refused
+      // by a database trigger, as a P0001 raise naming this token. The code says
+      // nothing, so the token is matched in the message and never echoed. Mapped
+      // HERE rather than in lib/posts/post-error.ts, which is another engineer's
+      // file and does not carry the token yet.
+      if (error.message?.includes(POST_HAS_PUBLISH_EVIDENCE)) {
+        return { ok: false, message: POST_HAS_PUBLISH_EVIDENCE_COPY }
+      }
+      return { ok: false, message: mapPostError(error) }
+    }
 
     // Nothing was deleted. Routed through mapPostError's PGRST116 branch so this
     // reads IDENTICALLY to an RLS refusal — distinguishing "gone" from "not
     // yours" would turn this action into an existence oracle for post ids.
     if (!data) return { ok: false, message: mapPostError({ code: 'PGRST116' }) }
+
+    // Best effort, AFTER the row is gone: an object left behind is waste that
+    // the sweep can find, a row pointing at nothing is a broken image nobody can
+    // remove. Never a user-facing failure — the post they asked to delete is
+    // deleted — but always reported, because nothing else will mention it.
+    if (objectPaths.length > 0) {
+      try {
+        const removed = await supabase.storage.from(MEDIA_BUCKET).remove(objectPaths)
+        if (removed.error) {
+          reportServerError(new Error(`orphan objects left behind: ${removed.error.message}`), {
+            action: 'deletePost.removeObjects',
+            workspaceId,
+          })
+        }
+      } catch (removeError) {
+        reportServerError(removeError, { action: 'deletePost.removeObjects', workspaceId })
+      }
+    }
 
     revalidatePath('/posts')
     revalidatePath('/planner')

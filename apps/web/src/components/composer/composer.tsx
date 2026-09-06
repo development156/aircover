@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { Channel, ChannelSet, Post, PostMedia, PostVariant } from '@sahoda/shared'
+import type { Channel, ChannelSet, Post, PostMedia, PostStatus, PostVariant } from '@sahoda/shared'
 import type { PostFormat } from '@sahoda/publishing/format'
 
 import { createPost } from '@/app/actions/posts'
@@ -14,7 +14,7 @@ import type { MediaPreview } from '@/lib/posts/media-url'
 import type { TemplatesRead } from '@/lib/templates/read'
 
 import { CommitBar } from './commit-bar'
-import { ComposerHeader } from './composer-header'
+import { ComposerHeader, stashedPostIds } from './composer-header'
 import { DivergenceNotice } from './divergence-notice'
 import { FinishPanel } from './finish-panel'
 import { ExtrasPane } from './extras-pane'
@@ -44,6 +44,12 @@ export interface ComposerProps {
   autoPublish?: boolean
   /** Channels with a live connection. `undefined` means the read failed — see below. */
   connected?: ReadonlySet<Channel>
+  /**
+   * The signed-in Clerk subject, read on the server. The finish panel uses it
+   * to say "Approved by you" rather than "by a teammate" about the reader's own
+   * approval. Null outside a session; the panel then says "a teammate".
+   */
+  currentUserId?: string | null
 }
 
 /**
@@ -82,6 +88,7 @@ export function Composer({
   templates,
   autoPublish = false,
   connected,
+  currentUserId = null,
 }: ComposerProps) {
   /**
    * The row this composer is writing to.
@@ -114,16 +121,17 @@ export function Composer({
   const autosave = useAutosave(postId, post, ensurePostId)
 
   /**
-   * ── THE ADDRESS CHANGES ONLY ONCE THERE IS SOMETHING AT IT ──────────────────
-   * MEASURED: rewriting the URL inside `ensurePostId` puts `/posts/<id>` in the
-   * address bar while the save that created the row is still in flight —
-   * `createPost` runs first and `savePost` carries the title, body and CHANNELS.
-   * Reload in that window (or, in a browser test, navigate straight to the new
-   * address) and the row is real but empty: no channels, so no version cards, so
-   * the writer's first choice is silently gone.
+   * ── THE ADDRESS CHANGES THE MOMENT THE ROW EXISTS ───────────────────────────
+   * F-14, founder's ruling. This used to wait for `autosave.status === 'saved'`,
+   * on the measured worry that a reload between `createPost` and the first
+   * `savePost` would open a real but EMPTY row. The wait had a worse failure:
+   * a save that stayed in flight or errored left the writer on `/posts/new`
+   * with a row behind it, and a reload from THERE opened an empty editor with
+   * no row at all, because the crash buffer is keyed by id and `new` is not it.
    *
-   * So the rewrite waits for the save to be confirmed. The id appearing in the
-   * address bar then means what it looks like it means.
+   * The buffer is what closes the original worry: `useAutosave` moves the
+   * pre-row stash to the new id as soon as the row is created, so a reload at
+   * `/posts/<id>` in that window restores the words from the buffer.
    *
    * `window.history.replaceState`, never `router.replace`: MEASURED in the
    * deleted create flow, a replace re-renders the route and would remount this
@@ -131,11 +139,25 @@ export function Composer({
    * Router and rewrites the address with no navigation and no server round trip.
    */
   useEffect(() => {
-    if (postId === null || autosave.status !== 'saved') return
+    if (postId === null) return
     const href = `/posts/${postId}`
     if (window.location.pathname === href) return
     window.history.replaceState(window.history.state, '', href)
-  }, [postId, autosave.status])
+  }, [postId])
+  /**
+   * ── A DRAFT LOST IN ANOTHER TAB IS OFFERED BACK, NOT SILENTLY IGNORED ────────
+   * `/posts/new` only ever consulted the buffer under `new`. A writer whose tab
+   * died mid-sentence on `/posts/<id>` and who came back through "Create post"
+   * found an empty editor, while their words sat in `sessionStorage` under the
+   * id nobody was reading. Read ONCE on mount, only for a brand-new post, and
+   * only offered as a LINK: the words belong to that post's row, and restoring
+   * them into a different post would create a second copy of the same draft.
+   */
+  const [lostDrafts, setLostDrafts] = useState<readonly string[]>([])
+  useEffect(() => {
+    if (post !== null) return
+    setLostDrafts(stashedPostIds())
+  }, [post])
   /**
    * A GETTER, not the id.
    *
@@ -182,6 +204,25 @@ export function Composer({
 
   const actions = useComposerActions(autosave, variantsApi, formats, draft.channels, postIdRef)
 
+  /**
+   * ── WHAT THE POST IS WAITING ON, AS THE PANEL SHOULD SAY IT ────────────────
+   * The server's word comes from the live snapshot when there is one and the
+   * row otherwise. A review action changes it locally the moment the RPC
+   * confirms, keyed to the server value it replaced: once the server catches up
+   * (the action revalidates the page) the local word is dropped, so a later
+   * change made by somebody else is never masked by this tab's stale override.
+   */
+  const serverIntent: PostStatus = live?.intent ?? post?.status ?? 'draft'
+  const [localIntent, setLocalIntent] = useState<{ base: PostStatus; intent: PostStatus } | null>(
+    null,
+  )
+  const intent =
+    localIntent !== null && localIntent.base === serverIntent ? localIntent.intent : serverIntent
+  const changeIntent = useCallback(
+    (next: PostStatus) => setLocalIntent({ base: serverIntent, intent: next }),
+    [serverIntent],
+  )
+
   // ── WHERE THE ONE PRIMARY ACTION IS, RIGHT NOW ──────────────────────────────
   // docs/26 §1.5 allows one per view, and on this screen the next thing to do
   // genuinely changes as the work progresses. Adapting is the primary until every
@@ -202,6 +243,7 @@ export function Composer({
       />
 
       <ComposerHeader
+        lostDrafts={lostDrafts}
         title={draft.title}
         onTitleChange={(title) => autosave.update({ title })}
         channels={draft.channels}
@@ -313,6 +355,14 @@ export function Composer({
         saveVariantNow={actions.saveVersion}
         saveAllVersions={actions.saveAllAndWait}
         unsavedVersions={actions.unsaved.length}
+        readPostId={readPostId}
+        review={{
+          intent,
+          approvedBy: post?.approved_by ?? null,
+          approvedAt: post?.approved_at ?? null,
+          currentUserId,
+          onIntentChange: changeIntent,
+        }}
       />
 
       <CommitBar

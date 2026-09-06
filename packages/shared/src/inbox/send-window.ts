@@ -151,6 +151,21 @@ export interface SendWindowInput {
 const addHours = (isoMs: number, hours: number): string =>
   new Date(isoMs + hours * 3_600_000).toISOString()
 
+/**
+ * The platform as a shop owner reads it. The enum keys are lowercase wire values
+ * (`instagram`, `googlebusiness`) and five of the sentences below begin with one.
+ */
+export const PLATFORM_NAMES: Record<InboxPlatform, string> = {
+  facebook: 'Facebook',
+  instagram: 'Instagram',
+  whatsapp: 'WhatsApp',
+  twitter: 'X',
+  bluesky: 'Bluesky',
+  reddit: 'Reddit',
+  telegram: 'Telegram',
+  googlebusiness: 'Google Business Profile',
+}
+
 const unknown = (platform: InboxPlatform, reason: string): ReplyAffordance => ({
   state: 'unknown',
   platform,
@@ -199,7 +214,7 @@ export function evaluateSendWindow({
       state: 'open',
       platform,
       closesAt: addHours(inboundMs, spec.standardWindowHours),
-      reason: `Replies are open: ${platform} allows a free-form reply for ${spec.standardWindowHours} hours after the customer’s last message.`,
+      reason: `Replies are open: ${PLATFORM_NAMES[platform]} allows a free-form reply for ${spec.standardWindowHours} hours after the customer’s last message.`,
       canSendFromSahoda: true,
     }
   }
@@ -222,7 +237,10 @@ export function evaluateSendWindow({
     return {
       state: 'closed',
       platform,
-      reason: `The ${HUMAN_AGENT_WINDOW_HOURS / 24}-day HUMAN_AGENT window on this ${platform} thread has lapsed. The customer needs to write again before a reply is possible.`,
+      // No tag names here. "HUMAN_AGENT" is Meta's API vocabulary and a shop owner
+      // met it on screen (MEASURED 2026-09-06). The rule in their words: a reply for
+      // a day, a follow-up for a week, then the customer has to write first.
+      reason: `${PLATFORM_NAMES[platform]} allows a reply for ${spec.standardWindowHours} hours after the customer’s last message, and a follow-up for ${HUMAN_AGENT_WINDOW_HOURS / 24} days. Both have passed, so the customer needs to write again before a reply is possible.`,
       canSendFromSahoda: false,
     }
   }
@@ -234,7 +252,7 @@ export function evaluateSendWindow({
     .sort((a, b) => a - b)[0]
 
   const onlyTag = live.length === 1 ? live[0] : undefined
-  const closedSentence = `${platform} closed the free-form reply window ${spec.standardWindowHours} hours after the customer’s last message.`
+  const closedSentence = `${PLATFORM_NAMES[platform]} closed the free-form reply window ${spec.standardWindowHours} hours after the customer’s last message.`
 
   return {
     state: 'tagged',
@@ -242,7 +260,7 @@ export function evaluateSendWindow({
     tags: live,
     closesAt: soonestLapse === undefined ? null : addHours(inboundMs, soonestLapse),
     reason: onlyTag
-      ? `${closedSentence} Only a ${onlyTag}-tagged reply is allowed from here.`
+      ? `${closedSentence} A follow-up is still allowed for ${HUMAN_AGENT_WINDOW_HOURS / 24} days; Sahoda sends it as a human-agent reply.`
       : `${closedSentence} A reply now has to carry one of its message tags.`,
     canSendFromSahoda: true,
   }

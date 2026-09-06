@@ -1,11 +1,11 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, test } from 'vitest'
-import type { ZernioConversation } from '@sahoda/publishing'
+import type { InboxListRow } from '@/lib/inbox/list-row'
 
 import { ConversationRow } from './conversation-row'
 import { threadHref } from './thread-href'
 
-const conversation = (over: Partial<ZernioConversation> = {}): ZernioConversation => ({
+const conversation = (over: Partial<InboxListRow> = {}): InboxListRow => ({
   id: 'conv_1',
   platform: 'instagram',
   accountId: 'fedcba9876543210fedcba98',
@@ -24,15 +24,45 @@ describe('the row carries both halves of the thread key', () => {
     )
   })
 
-  test('renders no link when no connected account can open the thread', () => {
+  test('links a stored thread with no account to the store route', () => {
     // MEASURED 2026-09-06: a stored thread whose channel has no connected account
-    // rendered `/inbox/threads//<id>` and clicked through to a 404.
-    render(<ConversationRow conversation={{ ...conversation(), accountId: '' }} />)
-    expect(screen.queryByRole('link')).toBeNull()
-    expect(
-      screen.getByText(/no connected instagram account can open this thread/i),
-    ).toBeInTheDocument()
+    // rendered `/inbox/threads//<id>` and clicked through to a 404. Replacing the
+    // link with a sentence stopped the 404 and left a message this database holds
+    // unreadable. The row id is a whole key on our own table, so it opens there.
+    render(
+      <ConversationRow
+        conversation={conversation({
+          accountId: '',
+          storedThreadId: 'a1b2c3d4-0000-4000-8000-000000000001',
+        })}
+      />,
+    )
+    expect(screen.getByRole('link')).toHaveAttribute(
+      'href',
+      '/inbox/threads/store/a1b2c3d4-0000-4000-8000-000000000001',
+    )
     expect(document.querySelector('a[href*="/inbox/threads//"]')).toBeNull()
+  })
+
+  test('renders no link when there is neither an account nor a stored row', () => {
+    render(<ConversationRow conversation={conversation({ accountId: '' })} />)
+    expect(screen.queryByRole('link')).toBeNull()
+    expect(screen.getByText(/no way to open this thread/i)).toBeInTheDocument()
+    expect(document.querySelector('a[href*="/inbox/threads//"]')).toBeNull()
+  })
+
+  test('shows "Needs a reply" as words, never as a count', () => {
+    // The store has no read state to count, so a numeral here would be a number
+    // nobody took. `unreadCount` stays Zernio's alone.
+    render(<ConversationRow conversation={conversation({ needsReply: true })} />)
+    expect(screen.getByText('Needs a reply')).toBeInTheDocument()
+    expect(screen.queryByLabelText(/unread/)).toBeNull()
+  })
+
+  test('prefers a real unread count over the derived flag', () => {
+    render(<ConversationRow conversation={conversation({ unreadCount: 2, needsReply: true })} />)
+    expect(screen.getByLabelText('2 unread')).toBeInTheDocument()
+    expect(screen.queryByText('Needs a reply')).toBeNull()
   })
 
   test('a conversation id alone can never build a link — accountId is required', () => {

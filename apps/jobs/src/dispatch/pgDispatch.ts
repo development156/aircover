@@ -57,6 +57,20 @@ const STILL_PROCESSING = 'STILL_PROCESSING'
 export function createDispatchStore(opts: DispatchStoreOptions) {
   const { pool, limit = DEFAULT_LIMIT } = opts
   const gate = [...DISPATCHABLE_STATUSES]
+  /**
+   * The gate as a LITERAL in-list, for the pickup query only.
+   *
+   * ── WHY NOT `= any($1::text[])` LIKE THE TWO WRITES ────────────────────────
+   * `posts_due_idx` is a partial index: `(scheduled_at) where status in
+   * ('approved', 'scheduled') and scheduled_at is not null`. Postgres will only
+   * use a partial index when the query's WHERE clause provably IMPLIES the
+   * index predicate, and it decides that at plan time, from the SQL text. A
+   * parameter is opaque to that proof, so `status = any($1)` plans as a
+   * sequential scan of `posts` on every tick, index or no index. The literal
+   * list is derived from the SAME constant the writes use, so the two cannot
+   * drift; `pgDispatch.index-shape.test.ts` pins the text to the predicate.
+   */
+  const gateLiteral = gate.map((status) => `'${status}'`).join(', ')
 
   /**
    * Posts inside the gate whose time has come, each with its variants and the publish mode
@@ -72,17 +86,21 @@ export function createDispatchStore(opts: DispatchStoreOptions) {
    * there, with a provider id and nothing after it, means the platform accepted the
    * post and the reconcile pass has not yet said how it ended. The classifier holds
    * that variant instead of sending it again.
+   *
+   * Both laterals are `where variant_id = … order by created_at desc limit 1`, which
+   * is exactly the shape `post_publish_logs_variant_created_idx (variant_id,
+   * created_at desc)` answers with one index probe per variant.
    */
   async function listCandidates(): Promise<DispatchCandidate[]> {
     const r = await pool.query<CandidateRow>(
       `with due as (
          select p.id, p.workspace_id, p.status, p.scheduled_at
            from posts p
-          where p.status = any($1::text[])
+          where p.status in (${gateLiteral})
             and p.scheduled_at is not null
             and p.scheduled_at <= now()
           order by p.scheduled_at, p.id
-          limit $2
+          limit $1
        )
        select d.id            as post_id,
               d.workspace_id  as workspace_id,
@@ -115,7 +133,7 @@ export function createDispatchStore(opts: DispatchStoreOptions) {
                limit 1
             ) last on true
         order by d.scheduled_at, d.id, v.created_at, v.id`,
-      [gate, limit],
+      [limit],
     )
 
     const byPost = new Map<string, DispatchCandidate>()

@@ -16,6 +16,12 @@ import type { MetricCaptureDeps } from './capture'
 export interface MetricCaptureDepsOptions {
   limit?: number
   now?: Date
+  /**
+   * Narrow the pass to one workspace. Absent for the nightly sweep, which is
+   * meant to cover the fleet; set by "Measure now", where the batch belongs to
+   * the person who pressed it. See `MetricStoreOptions.workspaceId`.
+   */
+  workspaceId?: string
 }
 
 /**
@@ -34,7 +40,7 @@ export class ZernioNotProvisionedError extends Error {
 
 export function metricCaptureDeps(opts: MetricCaptureDepsOptions = {}): MetricCaptureDeps {
   const { env, pool } = getRuntime()
-  const store = createMetricStore({ pool, limit: opts.limit })
+  const store = createMetricStore({ pool, limit: opts.limit, workspaceId: opts.workspaceId })
 
   const reads: ZernioReads | null = env.zernioApiKey
     ? createZernioReads({ transport: fetchTransport(), apiKey: env.zernioApiKey })

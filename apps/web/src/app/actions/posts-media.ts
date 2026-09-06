@@ -75,7 +75,7 @@ export async function attachMedia(postId: string, formData: FormData): Promise<A
     // The per-WORKSPACE allowance, asked before the bytes are read. The ceiling
     // above is per file; this one is the 1 GB the whole workspace shares, and a
     // full workspace is refused here rather than after we have paid to move the
-    // file. Fails open on an unreadable figure — `storageRefusal` says why.
+    // file. Fails CLOSED on an unreadable figure (DB-20) — `storageRefusal` says why.
     const overAllowance = storageRefusal(await readStorageUsage(ws.workspace.id), file.size)
     if (overAllowance) return { ok: false, message: overAllowance }
 

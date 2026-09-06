@@ -65,6 +65,16 @@ export { runPlanWeek } from './ai/plan-week'
 export { runPlanWeekJob } from './ai/plan-week-job'
 export type { BriefInsert, PlanWeekJobDeps, PlanWeekJobResult } from './ai/plan-week-job'
 
+export { runStorageReconcile, storageReconcileMode, RECONCILED_FOLDERS } from './storage/reconcile'
+export type {
+  StorageReconcileDeps,
+  StorageReconcileMode,
+  StorageReconcileReport,
+} from './storage/reconcile'
+export { decideOrphans, ORPHAN_MIN_AGE_MS } from './storage/decide'
+export type { OrphanDecision, StorageObject } from './storage/decide'
+export { storageReconcileDeps } from './storage/deps'
+
 export { loadJobsEnv } from './env'
 export type { DispatchMode, JobsEnv } from './env'
 
@@ -74,3 +84,6 @@ export { holdSweepTask, HOLD_SWEEP_TASK_ID } from './trigger/holdSweep'
 export { dispatchSweepTask, DISPATCH_SWEEP_TASK_ID } from './trigger/dispatchSweep'
 export { planWeekTask, triggerPlanWeek, PLAN_WEEK_TASK_ID } from './trigger/planWeek'
 export { metricCaptureTask, METRIC_CAPTURE_TASK_ID } from './trigger/metricCapture'
+// Registered, NOT scheduled: no `cron` on the task, and deletes are behind
+// `SAHODA_STORAGE_RECONCILE=delete` besides. See trigger/storageReconcile.ts.
+export { storageReconcileTask, STORAGE_RECONCILE_TASK_ID } from './trigger/storageReconcile'

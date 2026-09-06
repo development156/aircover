@@ -351,6 +351,19 @@
     ]
   },
   {
+    "route": "/(app)/inbox/threads/store/[threadId]",
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "activeThemeTokens",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "accountIdsByChannel"
+    ]
+  },
+  {
     "route": "/(app)/leads",
     "awaits": [
       "decideLanding",

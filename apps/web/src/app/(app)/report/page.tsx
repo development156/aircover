@@ -20,11 +20,14 @@ import { PageTitle } from '@/components/page-title'
 import { reflectionWindow } from '@/lib/loop/iso-week'
 import { bestSlotSentence } from '@/lib/analytics/timing'
 import { readWindow } from '@/lib/analytics/window-data'
+import { measureLine } from '@/lib/analytics/measure-line'
+import { MeasureNow } from '@/components/analytics/measure-now'
 import { resolveView } from '@/lib/analytics/view-params'
 import { readBrainObservations, type BrainRead } from '@/lib/brain/read'
 import { brainWaiting } from '@/lib/brain/waiting'
 import { readLoop } from '@/lib/loop/read'
-import { readCycleLearnings, readRanking } from '@/lib/loop/report'
+import { readCycleLearnings, readPlanPostStatuses, readRanking } from '@/lib/loop/report'
+import { planPostSentence } from '@/lib/report/plan-status'
 import { creditWord } from '@/lib/credit-words'
 import { InertPanel } from '@/components/roadmap/parts'
 import { readBalance } from '@/lib/wallet/read'
@@ -133,7 +136,7 @@ export default async function ReportPage() {
   // Loop has still published captions, and "you have stopped using exclamation
   // marks" is computable from those alone. Gating this behind a cycle would have
   // hidden the one block that works before a customer has spent anything.
-  const [read, brain, balance] = await Promise.all([
+  const [read, brain, balance, measured] = await Promise.all([
     readLoop(),
     readBrainObservations(),
     /**
@@ -143,7 +146,9 @@ export default async function ReportPage() {
      * line would add a round trip in front of the two reads that were already
      * here, which `lib/perf/read-waterfall.test.ts` exists to refuse.
      */
+
     readBalance(),
+    measureLine(),
   ])
 
   // "You have no workspace" and "we could not look" are different claims with
@@ -154,7 +159,7 @@ export default async function ReportPage() {
   if (read.status !== 'ok') {
     return (
       <div className="space-y-6">
-        <ReportHeader week={null} />
+        <ReportHeader week={null} measured={measured} />
         <p className="surface-ring rounded-card bg-surface p-5 type-body text-muted">
           {read.status === 'no-workspace'
             ? 'Finish setting up your workspace and your reports appear here.'
@@ -192,7 +197,7 @@ export default async function ReportPage() {
      */
     return (
       <div className="space-y-6">
-        <ReportHeader week={null} />
+        <ReportHeader week={null} measured={measured} />
 
         <section className="surface-ring rounded-card bg-surface p-5 shadow-card">
           <h2 className="type-h2">No week has been reported yet</h2>
@@ -245,9 +250,13 @@ export default async function ReportPage() {
   }
 
   const window = reflectionWindow(new Date(cycle.startedAt))
-  const [ranking, learnings, timingRead] = await Promise.all([
+  const writtenIds = snapshot.briefs.flatMap((b) => (b.postId === null ? [] : [b.postId]))
+  const [ranking, learnings, postStatuses, timingRead] = await Promise.all([
     readRanking(workspace.id, window.fromIso, window.toIso),
     readCycleLearnings(workspace.id, cycle.id),
+    // Where each written post stands NOW, so the plan module never repeats a
+    // fact that was true on the day and false by Monday (IL-02).
+    readPlanPostStatuses(workspace.id, writtenIds),
     /**
      * THE SAME READ /analytics MAKES, calling the same function.
      *
@@ -291,7 +300,7 @@ export default async function ReportPage() {
 
   return (
     <div className="space-y-6">
-      <ReportHeader week={`Week ${cycle.isoWeek}, ${cycle.isoYear}`} />
+      <ReportHeader week={`Week ${cycle.isoWeek}, ${cycle.isoYear}`} measured={measured} />
 
       {/* ── THE BRIEFING, AND A COLUMN BESIDE IT ────────────────────────────
           THE MEASURE IS ON THE PROSE, NOT ON THE COLUMN. The document was
@@ -409,12 +418,25 @@ export default async function ReportPage() {
               <ul className="grid gap-2">
                 {written.map((brief) => (
                   <li key={brief.id} className="rounded-input bg-surface-2 p-3">
-                    <p className="type-body text-ink">{brief.title}</p>
+                    <p className="type-body text-ink">
+                      {brief.postId ? (
+                        <Link
+                          href={`/posts/${brief.postId}`}
+                          className="underline-offset-2 hover:underline"
+                        >
+                          {brief.title}
+                        </Link>
+                      ) : (
+                        brief.title
+                      )}
+                    </p>
                     <p className="type-sm mt-1 text-muted">
                       {brief.channels.map(channelName).join(' · ')}
-                      {brief.stageOutcome === 'awaiting_approval'
-                        ? '. Sent to Approvals when the plan was written'
-                        : '. A draft in your Planner'}
+                      {'. '}
+                      {planPostSentence(
+                        brief.postId ? (postStatuses.get(brief.postId) ?? null) : null,
+                        brief.stageOutcome,
+                      )}
                     </p>
                   </li>
                 ))}
@@ -537,7 +559,7 @@ export default async function ReportPage() {
  * the same defect class as a remedy that cannot work. It gets the calendar mark
  * and the pill, and no chevron, until something can be chosen.
  */
-function ReportHeader({ week }: { week: string | null }) {
+function ReportHeader({ week, measured }: { week: string | null; measured: string }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
       <div className="flex min-w-0 items-start gap-3">
@@ -551,12 +573,15 @@ function ReportHeader({ week }: { week: string | null }) {
           CMO Report
         </PageTitle>
       </div>
-      {week ? (
-        <p className="surface-ring inline-flex flex-none items-center gap-2 rounded-pill bg-surface px-3.5 py-2 type-sm font-[550] text-ink">
-          <CalendarDays size={15} strokeWidth={1.8} aria-hidden className="text-muted" />
-          <span className="num">{week}</span>
-        </p>
-      ) : null}
+      <div className="flex flex-col items-end gap-2">
+        {week ? (
+          <p className="surface-ring inline-flex flex-none items-center gap-2 rounded-pill bg-surface px-3.5 py-2 type-sm font-[550] text-ink">
+            <CalendarDays size={15} strokeWidth={1.8} aria-hidden className="text-muted" />
+            <span className="num">{week}</span>
+          </p>
+        ) : null}
+        <MeasureNow lastLine={measured} />
+      </div>
     </div>
   )
 }

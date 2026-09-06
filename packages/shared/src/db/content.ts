@@ -7,6 +7,7 @@ import {
   PlannerEventKindSchema,
   PublishModeSchema,
   PublishLogStatusSchema,
+  PostApprovalDecisionSchema,
 } from '../enums'
 import { JsonbSchema } from '../common'
 import { ChannelSetSchema, EMPTY_CHANNEL_SET } from './channel-set'
@@ -169,6 +170,47 @@ export const PostPublishLogSchema = z.object({
   created_at: z.string(),
 })
 export type PostPublishLog = z.infer<typeof PostPublishLogSchema>
+
+// ── post_approvals (written only by the review RPCs) ─────────────────────────
+// The record of the gate: who sent a post for review, who cleared it (with the
+// md5 of the body they cleared), who sent it back and why. Read shape only:
+// there is no insert schema because no client inserts here. Writes go through
+// send_post_for_review / approve_posts / return_post_to_draft, and the table's
+// INSERT/UPDATE/DELETE privileges are revoked from the PostgREST roles.
+export const PostApprovalSchema = z.object({
+  id: z.uuid(),
+  workspace_id: z.uuid(),
+  post_id: z.uuid(),
+  actor: z.string(),
+  decision: PostApprovalDecisionSchema,
+  reason: z.string().min(1).max(500).nullable(),
+  body_hash: z.string().nullable(),
+  created_at: z.string(),
+})
+export type PostApproval = z.infer<typeof PostApprovalSchema>
+
+// ── post_comments ─────────────────────────────────────────────────────────────
+// A note on a post. `author` is the Clerk subject and the insert policy pins it
+// to the caller, so the client never chooses it; `deleted_at` is the only
+// column an UPDATE may change (a trigger refuses the rest).
+export const PostCommentSchema = z.object({
+  id: z.uuid(),
+  workspace_id: z.uuid(),
+  post_id: z.uuid(),
+  author: z.string(),
+  body: z.string().min(1).max(2000),
+  created_at: z.string(),
+  deleted_at: z.string().nullable(),
+})
+export type PostComment = z.infer<typeof PostCommentSchema>
+
+export const PostCommentInsertSchema = z.object({
+  workspace_id: z.uuid(),
+  post_id: z.uuid(),
+  author: z.string().min(1),
+  body: z.string().trim().min(1).max(2000),
+})
+export type PostCommentInsert = z.infer<typeof PostCommentInsertSchema>
 
 // ── planner_events ────────────────────────────────────────────────────────────
 export const PlannerEventSchema = z.object({

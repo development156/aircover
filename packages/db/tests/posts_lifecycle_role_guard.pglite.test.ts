@@ -554,7 +554,13 @@ describe('posts: lifecycle writes are role-gated in the database', () => {
     await db.exec('begin')
     try {
       for (const status of ['scheduled', 'publishing', 'published', 'partial', 'failed', 'draft']) {
-        await db.query(`update posts set status = $2 where id = $1`, [POST_UNDATED, status])
+        // A time goes with `scheduled`: posts_scheduled_needs_time (20260906213000
+        // §8) holds for the pool too, and no publisher writes the one without
+        // the other. The guard under test here is the role gate, not that CHECK.
+        await db.query(
+          `update posts set status = $2, scheduled_at = coalesce(scheduled_at, now()) where id = $1`,
+          [POST_UNDATED, status],
+        )
         expect((await post(POST_UNDATED)).status).toBe(status)
       }
       await db.query(`update posts set approved_by = 'svc', approved_at = now() where id = $1`, [

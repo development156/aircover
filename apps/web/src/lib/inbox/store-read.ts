@@ -5,6 +5,7 @@ import { cache } from 'react'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { activeWorkspaceRead } from '@/lib/workspaces'
 
+import { zernioPlatform } from './platform-spelling'
 import { decideStoreSurface, type StoreDecision } from './store-decision'
 import type { InboxSurfaceKey } from './emptiness'
 
@@ -38,20 +39,6 @@ import type { InboxSurfaceKey } from './emptiness'
 const STORED_THREAD_PAGE = 200
 
 /**
- * Zernio's platform vocabulary, restored from our channel column. The same two
- * spellings `conversations.ts` maps, for the same reason: every other channel is
- * already Zernio's own name and falls through.
- */
-const STORED_PLATFORM: Readonly<Record<string, string>> = {
-  x: 'twitter',
-  gbp: 'googlebusiness',
-}
-
-function storedPlatform(channel: string): string {
-  return STORED_PLATFORM[channel] ?? channel
-}
-
-/**
  * A stored message in the shape the thread already speaks. Structurally a
  * `ZernioMessage`; declared here rather than imported so this module keeps no
  * dependency on the publishing package.
@@ -64,6 +51,26 @@ export interface StoredThreadMessage {
   message: string
   direction: string
   createdAt: string
+  /** What came attached, as the `attachments` column holds it. Empty, never absent. */
+  attachments: StoredMessageAttachment[]
+}
+
+/**
+ * One attachment on a stored message.
+ *
+ * Structurally the subset of Zernio's attachment object that survives being stored:
+ * the `url` on Instagram and Facebook is a SIGNED Meta CDN link that expires, and
+ * Zernio's own spec says not to persist it. We persist it anyway because it is the
+ * only value the webhook carries, and the renderer treats a dead image as a dead
+ * image rather than pretending. `refreshUrl` is stamped only on the REST read and is
+ * carried through when a REST read is what filled the row.
+ */
+export interface StoredMessageAttachment {
+  /** `image`, `video`, `audio`, `file`, `sticker`, `share`. Zernio's own vocabulary. */
+  type: string
+  url: string
+  name?: string
+  thumbnailUrl?: string
 }
 
 /** One conversation, as the list renders it. */
@@ -296,30 +303,211 @@ export async function readStoredThreadMessages(
 
     if (threadError || !thread) return []
 
-    const { data, error } = await supabase
-      .from('inbox_messages')
-      .select('id, direction, body, platform_message_id, sent_at, created_at')
-      .eq('workspace_id', workspaceId)
-      .eq('thread_id', thread.id as string)
-      .order('created_at', { ascending: true })
-      .limit(STORED_THREAD_PAGE)
-
-    if (error || !data) return []
-
-    return data.map((row) => ({
-      id: row.id as string,
+    return await messagesForThread({
+      workspaceId,
+      threadId: thread.id as string,
+      channel: thread.channel as string,
       conversationId: platformThreadId,
-      // The store has no Zernio account id and inventing one would be a claim.
-      // Nothing on the thread render path reads it.
-      accountId: '',
-      platform: storedPlatform(thread.channel as string),
-      message: (row.body as string | null) ?? '',
-      direction: row.direction as string,
-      // `sent_at` is when the platform says it happened; `created_at` is when we
-      // filed it. The first is the truth when we have it.
-      createdAt: (row.sent_at as string | null) ?? (row.created_at as string),
-    }))
+    })
   } catch {
     return []
+  }
+}
+
+/**
+ * The rows of one thread, in the thread view's own message shape.
+ *
+ * Extracted so the two ways of naming a thread — by the platform's id (the live
+ * route) and by our own row id (the store route) — read the SAME columns through
+ * the same mapping. Two copies of this projection would drift on the first column
+ * added, and the column being added right now is `attachments`.
+ */
+async function messagesForThread(args: {
+  workspaceId: string
+  threadId: string
+  channel: string
+  conversationId: string
+}): Promise<StoredThreadMessage[]> {
+  const supabase = createServerSupabase()
+  const { data, error } = await supabase
+    .from('inbox_messages')
+    .select('id, direction, body, platform_message_id, sent_at, created_at, attachments')
+    .eq('workspace_id', args.workspaceId)
+    .eq('thread_id', args.threadId)
+    .order('created_at', { ascending: true })
+    .limit(STORED_THREAD_PAGE)
+
+  if (error || !data) return []
+
+  return data.map((row) => ({
+    id: row.id as string,
+    conversationId: args.conversationId,
+    // The store has no Zernio account id and inventing one would be a claim.
+    // Nothing on the thread render path reads it.
+    accountId: '',
+    platform: zernioPlatform(args.channel),
+    message: (row.body as string | null) ?? '',
+    direction: row.direction as string,
+    // `sent_at` is when the platform says it happened; `created_at` is when we
+    // filed it. The first is the truth when we have it.
+    createdAt: (row.sent_at as string | null) ?? (row.created_at as string),
+    attachments: storedAttachments(row.attachments),
+  }))
+}
+
+/**
+ * `attachments` as the column holds it, narrowed to the entries a renderer can use.
+ *
+ * The column is `jsonb not null default '[]'`, but a JSON column is not a type:
+ * anything the projector was ever asked to write is in there, including rows
+ * written before the projector knew the shape. An entry with no `url` cannot be
+ * rendered as anything, so it is dropped rather than rendered as a broken link.
+ */
+function storedAttachments(value: unknown): StoredMessageAttachment[] {
+  if (!Array.isArray(value)) return []
+  const out: StoredMessageAttachment[] = []
+  for (const entry of value) {
+    if (typeof entry !== 'object' || entry === null) continue
+    const record = entry as Record<string, unknown>
+    const url = typeof record.url === 'string' ? record.url : null
+    if (url === null || url === '') continue
+    out.push({
+      type: typeof record.type === 'string' ? record.type : 'file',
+      url,
+      ...(typeof record.name === 'string' ? { name: record.name } : {}),
+      ...(typeof record.thumbnailUrl === 'string' ? { thumbnailUrl: record.thumbnailUrl } : {}),
+    })
+  }
+  return out
+}
+
+/**
+ * How far back the "who spoke last" scan reaches, across the whole page of threads.
+ *
+ * The question — is the newest message on this thread inbound? — is per thread, and
+ * PostgREST cannot express "the newest row per group". So one query walks the
+ * workspace's messages newest-first and the first row seen for a thread is that
+ * thread's newest. The bound is what stops a busy shop turning a list render into an
+ * unbounded read; a thread whose newest message falls outside it simply gets NO flag,
+ * which is the absence of a claim rather than a wrong one.
+ */
+const REPLY_SCAN_ROWS = 1_000
+
+/**
+ * Which of these threads are waiting on us: the newest stored message is INBOUND.
+ *
+ * Never a count. `unreadCount` is Zernio's, taken from the platform's own read state,
+ * and this store has none — so the list renders these as the words "Needs a reply"
+ * and never as a numeral. Returns an EMPTY set on any failure, which reads as "no
+ * flag" rather than as "nothing needs a reply", because the flag is only ever
+ * additive on the row.
+ */
+export async function threadsNeedingReply(threadIds: string[]): Promise<ReadonlySet<string>> {
+  const empty: ReadonlySet<string> = new Set()
+  if (threadIds.length === 0) return empty
+  const workspaceId = await activeWorkspaceId()
+  if (workspaceId === null) return empty
+
+  try {
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase
+      .from('inbox_messages')
+      .select('thread_id, direction, created_at')
+      .eq('workspace_id', workspaceId)
+      .in('thread_id', threadIds)
+      .order('created_at', { ascending: false })
+      .limit(REPLY_SCAN_ROWS)
+
+    if (error || !data) return empty
+
+    const decided = new Set<string>()
+    const needsReply = new Set<string>()
+    for (const row of data) {
+      const threadId = row.thread_id as string
+      // Newest-first, so the FIRST row seen for a thread is its newest message and
+      // every later one is history. Deciding again from an older row is how a
+      // conversation we already answered would light up as unanswered.
+      if (decided.has(threadId)) continue
+      decided.add(threadId)
+      if ((row.direction as string) === 'inbound') needsReply.add(threadId)
+    }
+    return needsReply
+  } catch {
+    return empty
+  }
+}
+
+/** A thread and its messages, addressed by OUR row id rather than the platform's. */
+export interface StoredThreadDetail {
+  thread: StoredConversation
+  messages: StoredThreadMessage[]
+}
+
+/** Postgres refuses a non-uuid `= uuid` comparison with 22P02, which is noise, not news. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * One stored thread, addressed by `inbox_threads.id`.
+ *
+ * ── WHY A SECOND WAY IN ──────────────────────────────────────────────────────
+ * The live thread route is keyed `(accountId, conversationId)` because Zernio
+ * resolves a conversation only within an account. A thread we hold in this
+ * database needs no account to be READ — it is our own row — and until now a
+ * stored thread whose channel had no connected Zernio account had no destination
+ * at all: the list rendered it as a dead row with a sentence. The message was
+ * real and there was no door to it.
+ *
+ * `null` means "not this workspace's", and the route turns that into a 404 rather
+ * than an explanation: confirming that some other tenant's thread id exists is
+ * itself a disclosure. A malformed id takes the same path, for the same reason.
+ *
+ * RLS already scopes the query; the explicit `workspace_id` filter is the
+ * correctness filter, because a member can belong to several workspaces.
+ */
+export async function readStoredThreadById(threadId: string): Promise<StoredThreadDetail | null> {
+  if (!UUID.test(threadId)) return null
+  const workspaceId = await activeWorkspaceId()
+  if (workspaceId === null) return null
+
+  try {
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase
+      .from('inbox_threads')
+      .select(
+        'id, channel, platform_thread_id, author_name, author_handle, body, posted_at, status, kind',
+      )
+      .eq('workspace_id', workspaceId)
+      .eq('id', threadId)
+      .maybeSingle()
+
+    if (error || !data) return null
+
+    const thread: StoredConversation = {
+      id: data.id as string,
+      channel: data.channel as string,
+      platformThreadId: data.platform_thread_id as string,
+      authorName: (data.author_name as string | null) ?? null,
+      authorHandle: (data.author_handle as string | null) ?? null,
+      preview: (data.body as string | null) ?? null,
+      postedAt: (data.posted_at as string | null) ?? null,
+      status: data.status as string,
+      kind: data.kind as string,
+    }
+
+    return {
+      thread,
+      messages: await messagesForThread({
+        workspaceId,
+        threadId: thread.id,
+        channel: thread.channel,
+        conversationId: thread.platformThreadId,
+      }),
+    }
+  } catch {
+    // A store that could not answer is NOT a thread that does not exist, but the
+    // route has only two shapes to render and a 404 claims nothing about the
+    // customer. The alternative — a 500 — says less and looks like our fault
+    // twice over.
+    return null
   }
 }

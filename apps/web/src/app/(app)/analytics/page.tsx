@@ -23,6 +23,8 @@ import {
 import { readMetricSeries } from '@/lib/analytics/series'
 import { hrefFor, resolveView, windowLabel } from '@/lib/analytics/view-params'
 import { readWindow } from '@/lib/analytics/window-data'
+import { measureLine } from '@/lib/analytics/measure-line'
+import { MeasureNow } from '@/components/analytics/measure-now'
 import { formatScheduledAt } from '@/lib/posts/schedule-format'
 
 export const metadata = { title: 'Analytics' }
@@ -78,10 +80,11 @@ export default async function AnalyticsPage({
    * hiccup in any one costs its own section and nothing else: every read below
    * returns its own absence rather than rejecting.
    */
-  const [window, { account, hasPublished }, series] = await Promise.all([
+  const [window, { account, hasPublished }, series, measured] = await Promise.all([
     readWindow(view),
     readAnalyticsPage(),
     readMetricSeries('reach'),
+    measureLine(),
   ])
 
   const sort = isSortKey(params.sort) ? params.sort : DEFAULT_SORT
@@ -176,7 +179,7 @@ export default async function AnalyticsPage({
   if (window.kind === 'no-workspace') {
     return (
       <div className="space-y-grid">
-        <Header label={label} timezone={null} view={view} channels={[]} />
+        <Header label={label} timezone={null} view={view} channels={[]} measured={measured} />
         <ReportExample
           headline="There is no workspace here yet to measure"
           detail="Sahoda measures a workspace. This account does not have one yet, so there is nothing for these numbers to be about."
@@ -189,7 +192,7 @@ export default async function AnalyticsPage({
   if (window.kind === 'unreadable') {
     return (
       <div className="space-y-grid">
-        <Header label={label} timezone={null} view={view} channels={[]} />
+        <Header label={label} timezone={null} view={view} channels={[]} measured={measured} />
         <ReportExample
           headline="Sahoda could not read your numbers just now"
           detail="The request went out and came back without an answer, so this is not a reading of your posts. Nothing is wrong with them. Refresh to try again."
@@ -207,7 +210,13 @@ export default async function AnalyticsPage({
   if (!hasPublished && window.rows.length === 0 && window.postsPublished === 0) {
     return (
       <div className="space-y-grid">
-        <Header label={label} timezone={window.timezone} view={view} channels={[]} />
+        <Header
+          label={label}
+          timezone={window.timezone}
+          view={view}
+          channels={[]}
+          measured={measured}
+        />
         <ReportExample
           headline="Nothing to measure yet"
           detail="Reach and followers come from the channel itself, so connecting an account starts the numbers even before you post."
@@ -233,7 +242,13 @@ export default async function AnalyticsPage({
 
   return (
     <div className="space-y-grid">
-      <Header label={label} timezone={window.timezone} view={view} channels={channels} />
+      <Header
+        label={label}
+        timezone={window.timezone}
+        view={view}
+        channels={channels}
+        measured={measured}
+      />
 
       {/* Renders NOTHING once anything on the page has a number. Every section
           below defers to it rather than re-diagnosing. */}
@@ -314,11 +329,14 @@ function Header({
   timezone,
   view,
   channels,
+  measured,
 }: {
   label: string
   timezone: string | null
   view: ReturnType<typeof resolveView>
   channels: readonly import('@sahoda/shared').Channel[]
+  /** When Sahoda last asked the platforms, as a sentence. */
+  measured: string
 }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
@@ -330,7 +348,10 @@ function Header({
         </p>
         <p className="sr-only">Showing {label}.</p>
       </div>
-      <ViewControls view={view} channels={channels} />
+      <div className="flex flex-col items-end gap-2">
+        <ViewControls view={view} channels={channels} />
+        <MeasureNow lastLine={measured} />
+      </div>
     </div>
   )
 }

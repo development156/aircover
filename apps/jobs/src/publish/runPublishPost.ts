@@ -169,6 +169,14 @@ export interface PublishLogEntry {
   error: PublishLogError | null
   jobRunId: string
   publishedAt: string | null
+  /**
+   * The adapter's de-duplication key for this send, `publishIdempotencyKey(postId,
+   * channel, scheduledAt)`, on EVERY row. A partial unique index on
+   * `post_publish_logs (idempotency_key) where status = 'succeeded'` is what turns
+   * the platform's ~5-minute courtesy into a permanent database fact: the same send
+   * cannot be recorded as succeeded twice.
+   */
+  idempotencyKey: string
 }
 
 export interface PublishLogError {
@@ -308,6 +316,16 @@ export interface PublishPostDeps {
   hostMedia?(channel: Channel, media: PublishRequestMedia[]): Promise<MediaRef[]>
   writeLog(entry: PublishLogEntry): Promise<void>
   markVariant(update: VariantUpdate): Promise<void>
+  /**
+   * The succeeded log row and the `published` mark, as ONE transaction (F-33).
+   *
+   * REQUIRED, for the reason `gate` and `countLiveSends` are: an optional
+   * `recordPublished?` that fell back to `writeLog` + `markVariant` would be the
+   * exact two-statement window this exists to close, reopened silently in
+   * whichever call site forgot it. Every deps-constructing site fails to compile
+   * until it supplies one.
+   */
+  recordPublished(entry: PublishLogEntry, update: VariantUpdate): Promise<void>
   /** Flip connections.status so the UI can raise a reconnect CTA. */
   markConnection?(connectionId: string, status: 'expired'): Promise<void>
   now?(): Date
@@ -795,22 +813,26 @@ export async function runPublishPost(
 
     // The adapter's own mode is authoritative: a fixture result is recorded as a fixture
     // even when this run believed it was live (CLAUDE.md honesty rule).
-    await deps.writeLog(
+    //
+    // ONE call, ONE transaction. The log row and the variant mark used to be two
+    // statements, and a process killed between them left a live post behind a
+    // variant that was still claimable once its lease ran out (F-33).
+    await deps.recordPublished(
       logRow(payload, ctx, result.mode, 'succeeded', {
         connectionId: connection.connectionId,
         platformPostId: result.platformPostId,
         permalink: result.permalink,
         publishedAt: result.publishedAt,
       }),
+      {
+        workspaceId: payload.workspaceId,
+        variantId: payload.variantId,
+        publishStatus: 'published',
+        platformPostId: result.platformPostId,
+        permalink: result.permalink,
+        lastError: null,
+      },
     )
-    await deps.markVariant({
-      workspaceId: payload.workspaceId,
-      variantId: payload.variantId,
-      publishStatus: 'published',
-      platformPostId: result.platformPostId,
-      permalink: result.permalink,
-      lastError: null,
-    })
     return {
       status: 'succeeded',
       mode: result.mode,
@@ -902,6 +924,10 @@ export async function runPublishPost(
       error: extra.error ?? null,
       jobRunId: c.jobRunId,
       publishedAt: status === 'succeeded' ? (extra.publishedAt ?? now().toISOString()) : null,
+      // The same key the adapter was handed, from the same three facts. Built here
+      // and not read back off the request so a failed row that never reached the
+      // adapter still carries it.
+      idempotencyKey: publishIdempotencyKey(p.postId, p.channel, p.scheduledAt),
     }
   }
 }

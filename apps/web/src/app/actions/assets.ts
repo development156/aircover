@@ -14,8 +14,9 @@ import {
 import { duplicateMessage } from '@/lib/assets/duplicate-copy'
 import { kindForProvenMime } from '@/lib/assets/kind'
 import { assetTitle, MAX_ASSET_TITLE } from '@/lib/assets/title'
-import { readAsset, readTrashedAssets } from '@/lib/assets/read'
+import { readAsset, readTrashedBatch } from '@/lib/assets/read'
 import { offerForAsset } from '@/lib/media/offer-asset'
+import { mintThumbnail } from '@/lib/media/thumb'
 import type {
   AttachAssetState,
   DeleteAssetState,
@@ -23,6 +24,7 @@ import type {
   RestoreAssetState,
   TrashAssetState,
   TrashAssetsState,
+  TrashCursor,
   UpdateAssetState,
   UploadAssetState,
 } from '@/lib/assets/state'
@@ -284,6 +286,30 @@ export async function uploadAsset(formData: FormData): Promise<UploadAssetState>
       return { ok: false, message: 'Added, but the response was unreadable. Reload to confirm.' }
     }
 
+    // ── THE THUMBNAIL, AFTER THE ROW AND NEVER IN ITS WAY ──────────────────
+    // The file is stored and its row is written; from here the upload has
+    // succeeded whatever happens next. A thumbnail that fails to encode or to
+    // store costs the tile its small copy (it loads the original instead) and
+    // is reported so the waste is seen. It is never allowed to fail the upload.
+    try {
+      const thumb = await mintThumbnail(supabase, {
+        workspaceId: workspace.id,
+        assetId,
+        userId,
+        bytes,
+        width: candidate.width,
+        height: candidate.height,
+      })
+      if (!thumb.ok) {
+        reportServerError(new Error(`[assets] thumbnail not minted: ${thumb.message}`), {
+          action: 'mintThumbnail',
+          workspaceId,
+        })
+      }
+    } catch (error) {
+      reportServerError(error, { action: 'mintThumbnail', workspaceId })
+    }
+
     revalidatePath('/assets')
     // The Studio's reference picker reads the same rows, and a picture added
     // from that screen has to appear on that screen. Without this the person
@@ -453,7 +479,7 @@ export async function trashAssets(assetIds: readonly string[]): Promise<TrashAss
     workspaceId = ws.workspace.id
 
     const ids = [...new Set(assetIds)].filter((id) => typeof id === 'string' && id !== '')
-    if (ids.length === 0) return { ok: true, trashed: 0, alreadyTrashed: 0 }
+    if (ids.length === 0) return { ok: true, trashed: 0, alreadyTrashed: 0, ids: [] }
 
     const supabase = createServerSupabase()
     const { data, error } = await supabase
@@ -466,12 +492,17 @@ export async function trashAssets(assetIds: readonly string[]): Promise<TrashAss
 
     if (error) return { ok: false, message: mapPostError(error) }
 
-    const trashed = Array.isArray(data) ? data.length : 0
+    const moved = movedIds(data)
     revalidatePath('/assets')
     // `alreadyTrashed` is what was ASKED FOR minus what moved. It counts files
     // already in the trash, and it would also absorb a file deleted for good in
     // another tab — both are "not newly trashed", which is what the number says.
-    return { ok: true, trashed, alreadyTrashed: ids.length - trashed }
+    return {
+      ok: true,
+      trashed: moved.length,
+      alreadyTrashed: ids.length - moved.length,
+      ids: moved,
+    }
   } catch (error) {
     reportServerError(error, { action: 'trashAssets', workspaceId })
     return { ok: false, message: 'Could not move those files to the trash. Try again.' }
@@ -490,7 +521,7 @@ export async function restoreAssets(assetIds: readonly string[]): Promise<TrashA
     workspaceId = ws.workspace.id
 
     const ids = [...new Set(assetIds)].filter((id) => typeof id === 'string' && id !== '')
-    if (ids.length === 0) return { ok: true, trashed: 0, alreadyTrashed: 0 }
+    if (ids.length === 0) return { ok: true, trashed: 0, alreadyTrashed: 0, ids: [] }
 
     const supabase = createServerSupabase()
     const { data, error } = await supabase
@@ -503,12 +534,26 @@ export async function restoreAssets(assetIds: readonly string[]): Promise<TrashA
     if (error) return { ok: false, message: mapPostError(error) }
 
     revalidatePath('/assets')
-    const restored = Array.isArray(data) ? data.length : 0
-    return { ok: true, trashed: restored, alreadyTrashed: ids.length - restored }
+    const restored = movedIds(data)
+    return {
+      ok: true,
+      trashed: restored.length,
+      alreadyTrashed: ids.length - restored.length,
+      ids: restored,
+    }
   } catch (error) {
     reportServerError(error, { action: 'restoreAssets', workspaceId })
     return { ok: false, message: 'Could not restore those files. Try again.' }
   }
+}
+
+/** The ids an update actually touched, read from its `select('id')`. */
+function movedIds(data: unknown): string[] {
+  if (!Array.isArray(data)) return []
+  return data.flatMap((row) => {
+    const id = (row as { id?: unknown }).id
+    return typeof id === 'string' ? [id] : []
+  })
 }
 
 /**
@@ -530,9 +575,18 @@ export async function restoreAssets(assetIds: readonly string[]): Promise<TrashA
  * usage, deletes the row and hands back the storage path so the BYTES can be
  * removed after. None of that composes into a single statement, and a bulk
  * version would be a second copy of the most safety-critical path in this
- * module. The trash is capped by the same 200-row limit as the library.
+ * module.
+ *
+ * ── IN BATCHES OF `TRASH_BATCH`, WITH A CURSOR ───────────────────────────────
+ * One pass used to walk two hundred rows, each a locked transaction plus two
+ * storage sweeps, inside a single server action, and reported nothing until the
+ * end. A trash of a few hundred files sat at "Deleting…" with no number and ran
+ * into the function's time limit with no account of how far it got. Now a pass
+ * deletes twenty, says what it did, and hands back where it stopped; the client
+ * loops and shows the running count. `more` and `cursor` are the READ's answer,
+ * never a guess from the count.
  */
-export async function emptyTrash(): Promise<EmptyTrashState> {
+export async function emptyTrash(after: TrashCursor | null = null): Promise<EmptyTrashState> {
   let workspaceId: string | undefined
   try {
     const { userId } = await auth()
@@ -542,8 +596,8 @@ export async function emptyTrash(): Promise<EmptyTrashState> {
     if (!ws.ok) return { ok: false, message: ws.message }
     workspaceId = ws.workspace.id
 
-    const trash = await readTrashedAssets()
-    if (trash.status !== 'ok') {
+    const batch = await readTrashedBatch(after)
+    if (batch.status !== 'ok') {
       // NOT an empty trash. Deleting nothing and reporting success would tell a
       // person their trash is clear when it may be full.
       return {
@@ -554,8 +608,12 @@ export async function emptyTrash(): Promise<EmptyTrashState> {
 
     let deleted = 0
     let kept = 0
-    for (const entry of trash.assets) {
-      const result = await deleteAsset(entry.asset.id, false)
+    let cursor: TrashCursor | null = after
+    for (const row of batch.rows) {
+      const result = await deleteAsset(row.id, false)
+      // The cursor advances past a KEPT row too: it stays in the trash, before
+      // the cursor, so the next pass does not meet it and refuse it again.
+      cursor = { deletedAt: row.deletedAt, id: row.id }
       if (result.ok) deleted += 1
       else if (result.reason === 'refused' || result.reason === 'needs-confirm') kept += 1
       else {
@@ -570,10 +628,7 @@ export async function emptyTrash(): Promise<EmptyTrashState> {
     }
 
     revalidatePath('/assets')
-    // `capped` is the read saying it stopped at ASSET_LIST_LIMIT rather than at
-    // the end of the trash. Dropping it here is what made "Deleted 200 files for
-    // good" a claim that the trash was empty when 300 files were still in it.
-    return { ok: true, deleted, kept, more: trash.capped }
+    return { ok: true, deleted, kept, more: batch.more, cursor }
   } catch (error) {
     reportServerError(error, { action: 'emptyTrash', workspaceId })
     return { ok: false, message: 'Could not empty the trash. Try again.' }

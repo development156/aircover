@@ -5,6 +5,7 @@ import type { Channel } from '@sahoda/shared'
 import { CampaignTag } from '@/components/campaigns/campaign-tag'
 import { ApproveButton } from '@/components/planner/approve-button'
 import { PlannerReschedule } from '@/components/planner/planner-reschedule'
+import { ReviewActions } from '@/components/planner/review-actions'
 import { AutoPublishNote } from '@/components/posts/auto-publish-note'
 import { LiveChannelChips } from '@/components/posts/live/live-channel-chips'
 import type { VariantStatusRow } from '@/lib/posts/variant-status'
@@ -168,6 +169,7 @@ export function PlannerRow({
             {/* Intent, legitimately: approving is a decision about the post, not a
                 claim about what it did. */}
             <ApproveButton postId={post.id} status={post.intent} />
+            <ReviewActions postId={post.id} status={post.intent} />
             <PlannerReschedule
               postId={post.id}
               zone={zone}

@@ -229,6 +229,24 @@ export interface ZernioMessage {
   createdAt?: string
   readAt?: string | null
   isDeleted?: boolean
+  /**
+   * What came attached. Absent on a message that carried none; the wire sends `[]`.
+   *
+   * `url` is a SNAPSHOT on Instagram and Facebook: a signed Meta CDN link that
+   * expires on Meta's schedule. `refreshUrl` is stamped only on a REST read and is
+   * Zernio's re-mint endpoint for that attachment; a webhook payload carries none,
+   * and the reader builds the same URL from the ids (`messageAttachmentUrl`).
+   */
+  attachments?: ZernioAttachment[]
+}
+
+/** One attachment on a message, as Zernio describes it. */
+export interface ZernioAttachment {
+  /** `image`, `video`, `file`, `sticker`, `audio`, `share`. Zernio's own vocabulary. */
+  type: string
+  url: string
+  refreshUrl?: string
+  payload?: Record<string, unknown>
 }
 
 /** What a message's `direction` means to us, including "we do not recognise it". */
@@ -461,6 +479,21 @@ export interface ZernioReads {
     conversationId: string,
     opts?: MessageListOpts,
   ): Promise<ZernioMessagePage>
+  /**
+   * A media url for one attachment that works RIGHT NOW, or null.
+   *
+   * `GET /inbox/conversations/{c}/messages/{m}/attachments/{i}?accountId&format=json`.
+   * Instagram and Facebook sign DM media per request; this re-mints a stale one
+   * from Meta. Other platforms answer their stored url while it resolves and 404
+   * once it does not, which is the null arm. `messageId` is the PLATFORM message
+   * id, the one `listMessages` returns as `id`.
+   */
+  messageAttachmentUrl(
+    account: ScopedAccountId,
+    conversationId: string,
+    messageId: string,
+    index: number,
+  ): Promise<string | null>
 
   // ── comments (read only) ───────────────────────────────────────────────────
   listCommentedPosts(
@@ -619,6 +652,21 @@ export function createZernioReads(deps: ZernioClientDeps): ZernioReads {
         messages: data.messages ?? [],
         pagination: cursor(data.pagination),
         sortOrderApplied: data.sortOrderApplied ?? null,
+      }
+    },
+
+    async messageAttachmentUrl(account, conversationId, messageId, index) {
+      try {
+        const { data } = await json<{ url?: unknown }>(
+          'GET',
+          `/inbox/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/attachments/${Math.max(0, Math.trunc(index))}${qs({ accountId: account, format: 'json' })}`,
+          'messageAttachmentUrl',
+        )
+        return typeof data.url === 'string' && data.url !== '' ? data.url : null
+      } catch {
+        // A 404 here is the documented answer for "the stored url no longer
+        // resolves and this platform cannot re-mint". Not an error to report.
+        return null
       }
     },
 

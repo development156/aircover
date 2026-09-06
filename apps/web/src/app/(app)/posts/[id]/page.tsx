@@ -1,6 +1,7 @@
 import type { Channel } from '@sahoda/shared'
 import { SquarePen } from 'lucide-react'
 import { notFound } from 'next/navigation'
+import { auth } from '@clerk/nextjs/server'
 
 import { Composer } from '@/components/composer/composer'
 import { EmptyState } from '@/components/empty-state'
@@ -83,7 +84,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
   // state the composer renders on its own.
   if (!isNew && post === null) notFound()
 
-  const [variants, versions, media, connected, templates, workspace] = await Promise.all([
+  const [variants, versions, media, connected, templates, workspace, session] = await Promise.all([
     post ? listVariants(post.id) : Promise.resolve([]),
     // With a post, the versions come out of rows already read. WITHOUT one, the
     // question is asked of the table itself — skipping that would put the very
@@ -99,6 +100,9 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
     // instants in it. In the batch, not on its own line — `read-waterfall.test.ts`
     // counts a bare await here as a sequential round trip and refuses it.
     getActiveWorkspace(),
+    // Who is writing, so the finish panel can say "your own post" beside the
+    // review state. Not a gate: the RPCs check the role themselves.
+    auth(),
   ])
   // The clock the picker speaks in: the workspace's own when it has one, the
   // shipped default when it does not. Same resolution the planner makes.
@@ -149,6 +153,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
       templates={templates}
       autoPublish={autoPublishEnabled()}
       connected={connectedChannels}
+      currentUserId={session.userId}
     />
   )
 

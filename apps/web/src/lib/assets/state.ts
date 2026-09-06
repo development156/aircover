@@ -1,5 +1,6 @@
 import type { Asset, AssetUsageSite } from '@sahoda/shared'
 
+import type { AssetCard } from '@/lib/assets/view'
 import type { CropOfferView } from '@/lib/media/offer-state'
 import type { ChannelRejection } from '@/lib/posts/attach-decision'
 
@@ -79,7 +80,24 @@ export type RestoreAssetState = { ok: true } | { ok: false; message: string }
  * person would go looking for nine new rows in the trash and find seven.
  */
 export type TrashAssetsState =
-  { ok: true; trashed: number; alreadyTrashed: number } | { ok: false; message: string }
+  | {
+      ok: true
+      trashed: number
+      alreadyTrashed: number
+      /**
+       * Exactly the ids THIS call moved. Undo restores these and nothing else:
+       * restoring the whole selection would take a file out of the trash that
+       * the person put there earlier and never asked to see again.
+       */
+      ids: string[]
+    }
+  | { ok: false; message: string }
+
+/** Where one `emptyTrash` pass stopped. `(deleted_at, id)`, because a bulk trash shares one timestamp. */
+export interface TrashCursor {
+  deletedAt: string
+  id: string
+}
 
 /**
  * Emptying the trash.
@@ -91,7 +109,41 @@ export type TrashAssetsState =
  * happen.
  */
 export type EmptyTrashState =
-  { ok: true; deleted: number; kept: number; more: boolean } | { ok: false; message: string }
+  | {
+      ok: true
+      deleted: number
+      kept: number
+      /** Another pass is needed. The client loops on this with `cursor`. */
+      more: boolean
+      cursor: TrashCursor | null
+    }
+  | { ok: false; message: string }
+
+/** The next page of files older than the cap, appended to the screen. */
+export type OlderAssetsState =
+  { ok: true; cards: AssetCard[]; more: boolean } | { ok: false; message: string }
+
+/** Files found by name on the server, for a search the capped screen cannot answer alone. */
+export type SearchAssetsState =
+  { ok: true; cards: AssetCard[]; capped: boolean } | { ok: false; message: string }
+
+/** The trash, read when it is opened rather than with the page. */
+export type TrashLoadState =
+  { ok: true; cards: AssetCard[]; capped: boolean } | { ok: false; message: string }
+
+/** A signed link that downloads rather than displays. */
+export type DownloadAssetState = { ok: true; url: string } | { ok: false; message: string }
+
+/**
+ * A new post with this photo on it.
+ *
+ * `attached` is false when the post was made and the attach was refused: a
+ * post with no channels yet has nothing to judge the photo against, and the
+ * composer is the place that says so. The post is still worth opening.
+ */
+export type WritePostState =
+  | { ok: true; postId: string; attached: boolean; message: string | null }
+  | { ok: false; message: string }
 
 export type UpdateAssetState = { ok: true; asset: Asset } | { ok: false; message: string }
 

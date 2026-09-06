@@ -5,6 +5,7 @@ import { auth } from '@clerk/nextjs/server'
 import { reportServerError } from '@/lib/observability/report'
 import { getPost } from '@/lib/posts/read'
 import { revalidatePostSurfaces } from '@/lib/posts/revalidate-surfaces'
+import { validateScheduleLead } from '@/lib/posts/schedule'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { workspaceForWrite } from '@/lib/workspaces'
 
@@ -88,6 +89,16 @@ export async function schedulePost(
         ok: false,
         message: 'Pick at least one channel before scheduling. Nothing can go out without one.',
       }
+    }
+
+    // ── THE LEAD, CHECKED WHERE IT CANNOT BE SKIPPED ───────────────────────
+    // `ScheduleField` refuses a past time and one inside a channel's lead, and
+    // that was the only check: a stale tab, a direct call, or a picker that
+    // sat open across the lead all booked a time already gone. The validator
+    // is the picker's own, so the sentence is the one the reader has seen.
+    const lead = validateScheduleLead(post.channels, when, new Date())
+    if (!lead.ok) {
+      return { ok: false, message: lead.message ?? 'Pick a time in the future.' }
     }
 
     const supabase = createServerSupabase()
