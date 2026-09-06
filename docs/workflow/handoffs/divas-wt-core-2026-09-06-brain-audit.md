@@ -1,7 +1,8 @@
 # Handoff — divas / wt-core (2026-09-06, /brain deep audit)
 
-**Four defects fixed in `57e443c7`, pushed to `wt-core`.** The full report is an
-artifact (link in the session's closing message and in `.remember/`).
+**Four defects fixed in `57e443c7` and `8504eed5`, pushed to `wt-core`, verified live
+on the rebuilt preview.** Report artifact:
+https://claude.ai/code/artifact/3940ac3a-f8ec-45b1-9a19-9b8eaac34b92
 
 Audited in a real Chromium (DevTools bridge) against
 `https://sahodalabs-git-wt-core-development-4417s-projects.vercel.app/brain`,
@@ -34,13 +35,23 @@ instance, on build `41ec9462`. The preview reads and writes **production**
 - `FieldEditor` takes `autoFocus`; both editors pass it. Console heading fraction is one span.
 - Tests: 11 new (`blank.test.ts`, `brand-resolve.revalidate.test.ts`, `brain-sections.test.tsx`, additions to `brand-field.test.ts`, `field-row.test.tsx`, `confirm-all.test.tsx` rewritten), each watched red first. 881 pass across the brain suites; `tsc` and `pnpm lint` clean.
 
+## `8504eed5` and the live check
+
+The first build of `57e443c7` failed `scripts/perf/js-budget.mjs`: importing
+`CreateWorkspaceButton` into `BrainSections` put `sonner` on `/brain/identity`
+and `/brain/voice` (+35.8 kB each). `8504eed5` renders a plain `<form action>`
+bound to `createWorkspace` instead. On the rebuilt preview: focus lands in the
+editor; a blank draft disables Save and shows the reason; the core promise was
+restored as v12; "Confirm all 2" made one POST and one version (v13); an
+offline confirm shows "Could not reach Sahoda…" inline and the tab stays.
+
 ## Not done
 
 - The paid re-resolve was not spent. Two-session concurrency (BR-04) is INFERRED from code, not driven.
 - 768 px screenshots: the DevTools screenshot call timed out after viewport emulation; DOM measurements only.
 - Smoke leg not run locally.
 - Four files modified by another session in this worktree (`templates.spec.ts`, `command-palette.tsx`, `nav-item.tsx`, `create-workspace-button.tsx`) were left uncommitted and untouched.
-- The QA workspace keeps its 12-version "Sahoda QA Bakery" brain in production; it is test data for the next pass.
+- The QA workspace keeps its 13-version "Sahoda QA Bakery" brain in production; it is test data for the next pass.
 
 ## Decisions owed
 
