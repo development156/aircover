@@ -60,6 +60,7 @@ export * from './publishing/schedule'
 // what a channel will accept — `presets.ts` hands that back to the Constraint
 // Engine above rather than restating a single limit.
 export * from './studio/generation'
+export * from './studio/prompt-refine-settings'
 export * from './studio/presets'
 export * from './studio/paint'
 export * from './studio/svg'

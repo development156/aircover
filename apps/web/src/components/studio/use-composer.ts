@@ -5,7 +5,9 @@ import {
   DEFAULT_STAMP_OPTIONS,
   IMAGE_TIER_ACTION,
   creditCost,
+  shapeFromDimensions,
   type GenerationMode,
+  type PromptRefineSettings,
   type ReferenceFollow,
   type StampAnchor,
   type StampSizeStep,
@@ -87,6 +89,19 @@ export function useComposer({
   const modelLabel = modelById(modelId)?.label ?? 'None'
   const chosen = formats.find((f) => f.id === formatId) ?? null
   const sizeLabel = chosen === null ? 'None' : `${chosen.label} (${aspectRatioLabel(chosen)})`
+  // `chosen` is null only when no format is offered at all, which the rest of
+  // this bar already treats as "not ready" (`ready` below). `square` is a
+  // harmless default for that unreachable-in-practice gap: it never renders
+  // a ratio or a size, only the shape the refiner composes toward.
+  const refineSettings: PromptRefineSettings = {
+    mode,
+    shape: chosen === null ? 'square' : shapeFromDimensions(chosen.width, chosen.height),
+    hasReference: picked.length > 0,
+    stampEnabled,
+    stampAnchor,
+    excludeText: excludeText.trim() === '' ? undefined : excludeText.trim(),
+    referenceFollow: picked.length > 0 ? referenceFollow : undefined,
+  }
   const cost = creditCost(imageActionFor(modelId) ?? IMAGE_TIER_ACTION.draft)
   const total = cost * count
   const libraryPictures = library.status === 'ok' ? library.pictures : []
@@ -213,6 +228,7 @@ export function useComposer({
     rule,
     modelLabel,
     sizeLabel,
+    refineSettings,
     total,
     libraryPictures,
     blocked,

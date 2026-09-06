@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { RotateCcw, Sparkles } from 'lucide-react'
-import { creditCost } from '@sahoda/shared'
+import { creditCost, type PromptRefineSettings } from '@sahoda/shared'
 
 import { refineStudioPrompt, type RefinePromptState } from '@/app/actions/studio-prompt'
 import { creditWord } from '@/lib/credit-words'
@@ -40,6 +40,13 @@ import { describeInsufficient } from '@/lib/studio/refusal-copy'
  * `wanted` field, so accepting a refinement can always be undone back to the
  * exact words somebody typed, even after the refined text itself has been
  * edited further.
+ *
+ * ── `settings`, AND WHY THIS COMPONENT DOES NOT COMPUTE IT ──────────────────
+ * `use-composer.ts`'s `refineSettings` is the single place the bar's own
+ * mode, shape, stamp, exclusion text and reference-follow choice are turned
+ * into `PromptRefineSettings` — the same shape a fresh diffusion generation
+ * will use. This component only carries it through to the server action,
+ * so the two can never compute the shape or the corner differently.
  */
 
 const REFINE_COST = creditCost('studio_prompt_refine')
@@ -47,9 +54,11 @@ const REFINE_COST = creditCost('studio_prompt_refine')
 export function PromptRefineControl({
   wanted,
   onChange,
+  settings,
 }: {
   wanted: string
   onChange: (next: string) => void
+  settings: PromptRefineSettings
 }) {
   const [busy, setBusy] = useState(false)
   const pressLocked = useRef(false)
@@ -64,7 +73,7 @@ export function PromptRefineControl({
     setBusy(true)
     const asked = wanted
     try {
-      const state = await refineStudioPrompt({ wanted: asked })
+      const state = await refineStudioPrompt({ wanted: asked, settings })
       setResult(state)
       if (state.ok) {
         setOriginal(asked)

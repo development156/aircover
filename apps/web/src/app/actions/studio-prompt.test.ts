@@ -48,6 +48,15 @@ const { refineStudioPrompt } = await import('./studio-prompt')
 
 const ACTION = 'studio_prompt_refine'
 
+/** A complete, valid settings object: the shape a real press from the composer sends. */
+const SETTINGS = {
+  mode: 'on_brand' as const,
+  shape: 'square' as const,
+  hasReference: false,
+  stampEnabled: false,
+  stampAnchor: 'bottom-right' as const,
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   auth.mockResolvedValue({ userId: 'user_1' })
@@ -72,7 +81,7 @@ beforeEach(() => {
 
 describe('priced like caption_rewrite', () => {
   it('holds and debits exactly the configured price', async () => {
-    const out = await refineStudioPrompt({ wanted: 'a shopfront' })
+    const out = await refineStudioPrompt({ wanted: 'a shopfront', settings: SETTINGS })
 
     expect(withCredits).toHaveBeenCalledTimes(1)
     const [opts] = withCredits.mock.calls[0]!
@@ -87,8 +96,8 @@ describe('priced like caption_rewrite', () => {
    * SAME objectRef, which would let a second press replay the first charge.
    */
   it('mints a fresh objectRef on every press', async () => {
-    await refineStudioPrompt({ wanted: 'a shopfront' })
-    await refineStudioPrompt({ wanted: 'a different shopfront' })
+    await refineStudioPrompt({ wanted: 'a shopfront', settings: SETTINGS })
+    await refineStudioPrompt({ wanted: 'a different shopfront', settings: SETTINGS })
 
     const [first] = withCredits.mock.calls[0]!
     const [second] = withCredits.mock.calls[1]!
@@ -116,7 +125,7 @@ describe('priced like caption_rewrite', () => {
       },
     )
 
-    const out = await refineStudioPrompt({ wanted: 'a shopfront' })
+    const out = await refineStudioPrompt({ wanted: 'a shopfront', settings: SETTINGS })
 
     expect(out.ok).toBe(false)
     if (!out.ok && !out.insufficient) {
@@ -131,7 +140,7 @@ describe('priced like caption_rewrite', () => {
       error: { code: 'CREDIT_INSUFFICIENT', details: { required: 1, available: 0 } },
     })
 
-    const out = await refineStudioPrompt({ wanted: 'a shopfront' })
+    const out = await refineStudioPrompt({ wanted: 'a shopfront', settings: SETTINGS })
 
     expect(out).toMatchObject({ ok: false, insufficient: true, required: 1, available: 0 })
   })
@@ -139,6 +148,39 @@ describe('priced like caption_rewrite', () => {
   it('never spends when nobody is signed in', async () => {
     auth.mockResolvedValue({ userId: null })
 
+    const out = await refineStudioPrompt({ wanted: 'a shopfront', settings: SETTINGS })
+
+    expect(out.ok).toBe(false)
+    expect(withCredits).not.toHaveBeenCalled()
+  })
+})
+
+describe('composing for the settings', () => {
+  /**
+   * MUTATION: drop `settings: parsed.data.settings` from the `runTask` call
+   * in `studio-prompt.ts` (pass only `wanted` and `signals`) and this goes
+   * red — the task would then never see the corner, the shape, the mode or
+   * the exclusion the screen actually holds.
+   */
+  it('passes the settings straight through to the mesh task, unchanged', async () => {
+    const settings = {
+      mode: 'match' as const,
+      shape: 'tall' as const,
+      hasReference: true,
+      stampEnabled: true,
+      stampAnchor: 'top-left' as const,
+      excludeText: 'birds',
+      referenceFollow: 'close' as const,
+    }
+
+    await refineStudioPrompt({ wanted: 'a shopfront', settings })
+
+    expect(runTask).toHaveBeenCalledTimes(1)
+    const [, taskInput] = runTask.mock.calls[0]!
+    expect(taskInput.settings).toEqual(settings)
+  })
+
+  it('never spends on a request with no settings at all', async () => {
     const out = await refineStudioPrompt({ wanted: 'a shopfront' })
 
     expect(out.ok).toBe(false)

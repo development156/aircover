@@ -178,7 +178,7 @@ export function Composer({
           onSubmit={c.generate}
         />
 
-        <PromptRefineControl wanted={c.wanted} onChange={c.setWanted} />
+        <PromptRefineControl wanted={c.wanted} onChange={c.setWanted} settings={c.refineSettings} />
 
         <ComposerStarters
           visible={c.wanted.trim() === ''}
