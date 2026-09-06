@@ -17,9 +17,8 @@ import { BrainSections } from './brain-sections'
 vi.mock('@/lib/brand/read-brain', () => ({
   readBrain: async () => ({ status: 'no-workspace' }),
 }))
-vi.mock('@/components/workspace/create-workspace-button', () => ({
-  CreateWorkspaceButton: () => <button type="button">Create a workspace</button>,
-}))
+// Bound and handed to a <form action>; the mock only needs to be bindable.
+vi.mock('@/app/actions/workspace', () => ({ createWorkspace: vi.fn() }))
 
 describe('BrainSections with no workspace', () => {
   test('offers the one remedy that can work, and does not ask for a resolve', async () => {
