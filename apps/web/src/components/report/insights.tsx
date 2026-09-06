@@ -2,7 +2,6 @@ import Link from 'next/link'
 import { Sparkles, Wallet } from 'lucide-react'
 
 import { NotYet, Unmeasured, Unreadable } from '@/components/design-system/absence-row'
-import { CountUp } from '@/components/motion/count-up'
 import { creditWord } from '@/lib/credit-words'
 import type { BalanceRead } from '@/lib/wallet/read'
 
@@ -98,19 +97,19 @@ export function AtAGlanceCard({ figures, note }: { figures: readonly Figure[]; n
               ) : (
                 <>
                   {/* ANIMATION 1 of 3 (founder's ruling, 2026-09-06: three are
-                      allowed on this screen). It counts up only when the value
-                      is a NUMBER — a string figure is a label, not a quantity,
-                      and rolling a label is nonsense. `CountUp` starts at the
-                      answer, so a reader with no JavaScript and a reader with
-                      reduced motion both see the final figure and never a zero
-                      that was never true. */}
-                  <span className="type-h2 num text-ink">
-                    {typeof figure.value === 'number' ? (
-                      <CountUp value={figure.value} />
-                    ) : (
-                      figure.value
-                    )}
-                  </span>
+                      allowed here). It ROLLED UP until 2026-09-07, and the
+                      founder removed the roll on the measurement: `CountUp` is
+                      a client component and /report had none, so two rolling
+                      numbers cost the route 28.6 kB of client runtime. His
+                      ruling: lightweight CSS instead.
+
+                      `.enter` is the product's one entrance keyframe — opacity
+                      and a 6px rise, no JavaScript, no bytes. It reveals the
+                      figure that is ALREADY in the markup rather than
+                      animating toward it, so a reader with no JavaScript sees
+                      the same number and `prefers-reduced-motion` clamps it to
+                      nothing, exactly as before. */}
+                  <span className="enter type-h2 num text-ink">{figure.value}</span>
                   {figure.unit ? <span className="type-sm text-muted">{figure.unit}</span> : null}
                 </>
               )}
@@ -174,8 +173,8 @@ export function CreditsCard({
               The same trap cost a build earlier in this lane. */}
           <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2">
             {readable ? (
-              <span className="type-hero-num num text-ink">
-                <CountUp value={balance.balance.available} />
+              <span className="enter type-hero-num num text-ink">
+                {balance.balance.available.toLocaleString('en-IN')}
               </span>
             ) : (
               <Unreadable what="Credits left" />

@@ -178,40 +178,51 @@ describe('the report module', () => {
   })
 })
 
-describe('the three animations the founder allowed, and no fourth', () => {
-  it('rolls a numeric figure and leaves a text one alone', () => {
+describe('the three animations the founder allowed, and none of them costs bytes', () => {
+  /**
+   * TWO OF THE THREE ROLLED UNTIL 2026-09-07, AND THE MEASUREMENT ENDED THAT.
+   * `CountUp` is a client component and /report had none, so two rolling
+   * numbers made the route carry 28.6 kB of client runtime — the founder's
+   * ruling, given the figure: lightweight CSS instead. These pin the new claim.
+   */
+  it('reveals the figure in CSS, with no client component behind it', () => {
     /**
-     * THE MUTATION THIS EXISTS FOR: `CountUp` wrapped around every figure. A
-     * figure on this card may be a STRING — a label, not a quantity — and
-     * rolling a label is nonsense. `CountUp` also takes `value: number` and
-     * would coerce.
+     * THE MUTATION THIS EXISTS FOR: `CountUp` put back. It reads better and it
+     * costs 28.6 kB on a route whose only interactive element it would be. The
+     * marker it renders is what this looks for, so restoring it goes red here
+     * rather than silently on the next deployment's budget check.
      */
-    const { container, unmount } = render(
+    const { container } = render(
       <AtAGlanceCard figures={[{ label: 'Posts measured', value: 7 }]} note="n" />,
     )
-    expect(container.querySelector('[data-countup]')).not.toBeNull()
-    unmount()
-
-    /**
-     * WRITTEN THE WEAK WAY FIRST AND THE MUTATION SURVIVED. The first version
-     * asserted only that "Tuesday" appears — and it does either way, because
-     * `CountUp` initialises to the answer, so a wrapped label renders exactly
-     * like an unwrapped one until it tries to animate. This asserts the WRAPPER
-     * instead, which is the thing that actually differs.
-     */
-    const text = render(
-      <AtAGlanceCard figures={[{ label: 'Best day', value: 'Tuesday' }]} note="n" />,
-    )
-    expect(screen.getByText('Tuesday')).toBeTruthy()
-    expect(text.container.querySelector('[data-countup]')).toBeNull()
+    expect(container.querySelector('[data-countup]')).toBeNull()
+    expect(container.querySelector('.enter')).not.toBeNull()
+    // The number is in the markup, not animated toward: a reader with no
+    // JavaScript sees the same figure.
+    expect(screen.getByText('7')).toBeTruthy()
   })
 
-  it('lands on the real figure, so no-JavaScript and reduced-motion both read it', () => {
-    // `CountUp` initialises to the ANSWER. A reader who never runs the
-    // animation must never see a zero that was never true — which is the same
-    // rule as every other figure on this page.
-    render(<CreditsCard balance={OK} spent={0} budget={null} />)
-    expect(screen.getByText('448')).toBeTruthy()
+  it('prints a text figure unchanged', () => {
+    render(<AtAGlanceCard figures={[{ label: 'Best day', value: 'Tuesday' }]} note="n" />)
+    expect(screen.getByText('Tuesday')).toBeTruthy()
+  })
+
+  it('groups the balance the way this product writes numbers', () => {
+    // `CountUp` did the grouping; without it the component has to. 448 is not
+    // enough digits to show a separator, so this pins a figure that is.
+    render(
+      <CreditsCard
+        balance={
+          {
+            status: 'ok',
+            balance: { total: 0, held: 0, available: 12400, hasHold: false, heldNote: null },
+          } as never
+        }
+        spent={0}
+        budget={null}
+      />,
+    )
+    expect(screen.getByText('12,400')).toBeTruthy()
   })
 
   it('keeps the drifting mark away from assistive tech', () => {
