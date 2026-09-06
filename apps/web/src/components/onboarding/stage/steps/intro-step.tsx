@@ -87,7 +87,18 @@ export function IntroStep({
         business does, who it is for and how it looks.
       </p>
       <div className="cta-row">
-        <button type="button" className="btn btn--primary" id="begin" onClick={onBegin}>
+        {/* The tour's first anchor. It lived on the retired onboarding flow
+            (`spark-step.tsx`, deleted 2026-09-06) and `anchor-integrity.test.ts`
+            went red the moment that tree left; this is the control the seeded
+            tour points at, so the anchor moves with it rather than being filed
+            as pending. */}
+        <button
+          type="button"
+          className="btn btn--primary"
+          id="begin"
+          data-guide="onboarding.start"
+          onClick={onBegin}
+        >
           <span className="btn__t">Build my Brand Brain</span>
           <ArrowRight className="arw" size={18} strokeWidth={1.9} aria-hidden />
         </button>
