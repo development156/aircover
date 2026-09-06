@@ -44,10 +44,20 @@ Two build failures on the way: `6ea80509` and `4e481a84` failed js-budget becaus
 
 **What the inbox pipeline actually holds (MEASURED 22:00 IST):** 0 webhook events in the last 36 hours; 5 active connections, of which ONE is a real messaging account (Instagram `testingg53`, a test account) with one conversation, last message 10 Aug; two LinkedIn (no DMs via Zernio) and two demo rows. The Zernio subscription is active and points at app.sahodalabs.com. So the inbox is quiet because nobody is writing to a connected account, not because a path is broken. Sending was not exercised: the only thread is past both Meta windows, which is exactly what the screen says.
 
+## Third pass, 22:19–22:40 IST (founder: "execute all the decisions")
+
+| Done | Evidence |
+|---|---|
+| **A live send, proven.** Replied to a real Instagram comment from the test account `testingg53` through /inbox/comments: Zernio answered with the platform's id `18140708104502050`, the count moved to "1 reply", and the reply is the FIRST ROW ever written to the inbox store (`inbox_threads` kind=comment + `inbox_messages` outbound, author = the QA user). | build `95a3a2d3`, deployment `dpl_948vyQvZVQJiQMm9XhnbVyhXBroW` |
+| IL-08: the ranking counts only posts with a live, succeeded publish log; snapshot read walled at 5,000 rows | `95a3a2d3`, test: a fixture-only post with the biggest number is not the top |
+| IL-02 proper: the plan module reads `posts.status` now and says the present fact ("Expired before it was approved", "Booked in your Planner"); titles link to the post | `95a3a2d3`, `lib/report/plan-status.ts` |
+| Leads: busy per card, not per board | `95a3a2d3` |
+| Waterfall baseline records the store thread route (8 reads) by hand, without absorbing the other session's /brain growth | `95a3a2d3` |
+
 ## Not done
 
-- A live send (free-form, tagged follow-up, failed send): no thread inside a window exists on any connected account. Needs a fresh DM to `testingg53` or a real customer account connected.
-- Comment and review replies live: same reason.
+- A live DM send (free-form and tagged follow-up) and a review reply: no DM thread inside Meta's window and no Google Business Profile connected. The comment reply above exercises the same action module, `toState` and `recordSentReply`.
+- The other session's /brain routes fail the read-waterfall ratchet (+1 to +2 reads each); theirs to record or trim.
 
 ## Traps met
 
