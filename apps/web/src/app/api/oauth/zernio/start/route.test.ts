@@ -46,6 +46,8 @@ const state = vi.hoisted(() => ({
    */
   mapping: null as { profile_id: string } | null,
   mappingError: null as { message: string } | null,
+  /** The abuse ceiling's verdict. Allowed by default; a test flips it to prove the 429. */
+  rateAllowed: true,
 }))
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -111,6 +113,11 @@ vi.mock('@/lib/billing/entitlements', () => ({
 
 vi.mock('@/lib/observability/report', () => ({ reportServerError: () => Promise.resolve() }))
 
+vi.mock('@/lib/ops/rate-limit', () => ({
+  fixedWindowAllow: () =>
+    Promise.resolve({ allowed: state.rateAllowed, count: 1, unmeasured: false }),
+}))
+
 vi.mock('@/lib/supabase/server', () => ({
   createServerSupabase: () => ({
     from: () => ({
@@ -156,6 +163,27 @@ beforeEach(() => {
   state.connectUrlRedirects = []
   state.mapping = null
   state.mappingError = null
+  state.rateAllowed = true
+})
+
+describe('an abuse ceiling stands before any external work', () => {
+  it('refuses with 429 and provisions nothing when the window is exceeded', async () => {
+    state.rateAllowed = false
+
+    const res = await call()
+
+    expect(res.status).toBe(429)
+    // The point of placing it above `ensureZernioProfile` and `connectUrl`: a
+    // refused connect must not touch Zernio at all.
+    expect(state.profileEnsured).toBe(0)
+    expect(state.connectUrlCalls).toBe(0)
+  })
+
+  it('lets a normal press through', async () => {
+    const res = await call()
+
+    expect(res.status).toBe(200)
+  })
 })
 
 /**

@@ -3,6 +3,7 @@ import { ensureZernioProfile } from '@sahoda/publishing'
 import { isZernioPlatform, type ZernioPlatform } from '@sahoda/shared'
 
 import { checkCountableLimit } from '@/lib/billing/entitlements'
+import { fixedWindowAllow } from '@/lib/ops/rate-limit'
 import { setPendingConnectHeader, type ConnectMode } from '@/lib/connections/pending-connect'
 import { readConnectionSlots } from '@/lib/connections/read'
 import { connectPlatformFor, needsPairingCode } from '@/lib/zernio/connect-platform'
@@ -102,6 +103,20 @@ export async function POST(request: Request): Promise<Response> {
     if (workspaceRead.status === 'none') return fail('Create a workspace first.', 400)
     const workspace = workspaceRead.workspace
     workspaceId = workspace.id
+
+    // ── AN ABUSE CEILING BEFORE ANY EXTERNAL WORK ────────────────────────────
+    // Below this line the route provisions a Zernio profile and calls the
+    // provider, whose quota is shared across the whole tenant (the return route
+    // records a 60/min ceiling from Zernio). A loop here — a stuck page
+    // retrying, a script, a wedged popup — would burn that shared budget for
+    // every workspace. A real person presses Connect a handful of times a
+    // minute, so a generous per-workspace window costs them nothing and caps the
+    // runaway. FAILS OPEN (see the helper): this is abuse control, not the
+    // tenant boundary, which already stands on the session above.
+    const rate = await fixedWindowAllow(`oauth-start:${workspace.id}`, 20, 60)
+    if (!rate.allowed) {
+      return fail('Too many connection attempts just now. Wait a minute and try again.', 429)
+    }
 
     // ── THE CHANNELS PLAN LIMIT, ENFORCED BEFORE THE CONSENT SCREEN ──────────
     // The return route enforces this too, and has to — it is the only place that
