@@ -31,10 +31,23 @@ Tests: 65 web files / 809 tests across the four areas green before my additions;
 
 Two build failures on the way: `6ea80509` and `4e481a84` failed js-budget because the Measure now island imported `ui/button` (+34 kB on two routes with no client code). Fixed in `2c664a42` with a plain button; the store route got its budget line. The Read now label lacked the number ("credits" alone), fixed in `870d86d2`.
 
+## Second pass, 21:17–22:15 IST (founder: "two keys are in place, execute all the decisions")
+
+| Done | Evidence |
+|---|---|
+| `inbox_messages.attachments` (jsonb) APPLIED to production; the store writer and reader had been using the column ahead of it, so every stored-thread read was answering 42703 | `ed3806b1`; PostgREST select on the column answers 200 |
+| Photos and files in a thread render: images inline, other kinds as named links, every `src` through `/api/inbox/attachment`, which re-mints Meta's expiring DM media by message id and position after `scopedAccount` proves the account is the caller's | `ed3806b1`; 3 renderer tests, 2 reads tests, 1 projector test |
+| `leads_one_per_conversation_idx` APPLIED to production (IL-09 closed by the database) plus the board index | `ed3806b1` |
+| wt-core builds again: three routes over budget from the other session's approvals/planner work, accepted at the measured byte figures | `06338ff4`, `06e64dff` (the first wrote kB where the file holds bytes) |
+| The reply-window sentence no longer says "HUMAN_AGENT" or "instagram thread" | `680c163e`; test pins the name and refuses the tag |
+| **Inbox verified live on the one real Instagram account** (workspace 56d57400, QA user added as editor then removed): list, thread with three correctly attributed messages, a real comment on /inbox/comments, honest empty state on /inbox/reviews, reply box disabled with the reason | build `06e64dff`, deployment `dpl_3ft8a8cUyyS7TWVc3W6faD1E6YJe` |
+
+**What the inbox pipeline actually holds (MEASURED 22:00 IST):** 0 webhook events in the last 36 hours; 5 active connections, of which ONE is a real messaging account (Instagram `testingg53`, a test account) with one conversation, last message 10 Aug; two LinkedIn (no DMs via Zernio) and two demo rows. The Zernio subscription is active and points at app.sahodalabs.com. So the inbox is quiet because nobody is writing to a connected account, not because a path is broken. Sending was not exercised: the only thread is past both Meta windows, which is exactly what the screen says.
+
 ## Not done
 
-- Inbox attachments (images in DMs): the projector, an `inbox_message_attachments` migration and the renderer. Not started; the agent that owned it died before writing a line of it.
-- Leads dedupe migration (unique partial index on the inbox conversation ref). Still advisory check-then-insert.
+- A live send (free-form, tagged follow-up, failed send): no thread inside a window exists on any connected account. Needs a fresh DM to `testingg53` or a real customer account connected.
+- Comment and review replies live: same reason.
 
 ## Traps met
 
