@@ -1,6 +1,6 @@
 # Handoff — divas / wt-core (2026-09-06, deep audit: /inbox, /leads, /report, /radar, 18:15–19:50 IST)
 
-**Done, verified live.** Fixes `deb355c7` (verified on its own deployment `dpl_BFAumpXG`) and `e169a41e` (tests + typecheck; not yet on a live build). Report: https://claude.ai/code/artifact/820392c0-6b3a-49d6-a800-2c0b8ee257b1 (36 findings, IL-01..IL-36, every one marked MEASURED / INFERRED / BLOCKED).
+**Done, verified live.** Fixes `deb355c7` (verified on its own deployment `dpl_BFAumpXG`), `e169a41e` and `0a1ae3fd` (tests + typecheck; not yet on a live build). Report: https://claude.ai/code/artifact/820392c0-6b3a-49d6-a800-2c0b8ee257b1 (36 findings, IL-01..IL-36, every one marked MEASURED / INFERRED / BLOCKED).
 
 ## The verdict in one paragraph
 
@@ -22,7 +22,7 @@ The four screens are careful and never lie; the pipelines behind them are dorman
 
 1. IL-05 register Zernio message/comment/review subscriptions; fix account routing (59% of events unroutable).
 2. IL-06 APIFY_TOKEN in prod; wire `radar_fetch_log` into the feed's `attempts` (hardcoded `[]`, so NotChecked never renders).
-3. IL-07 active workspace = oldest membership when no cookie; a membership added mid-session retargeted my next write into the demo workspace. Pin the cookie on first resolution.
+3. ~~IL-07~~ done in `0a1ae3fd` (own workspace first when no cookie).
 4. IL-02 proper, IL-08 (fixture rows can enter the ranking; unbounded read), IL-09 (lead dedupe is check-then-insert, no unique key; same conversation is a lead in two workspaces), IL-10 (sent replies never written to the store).
 5. IL-36 `pnpm --filter @sahoda/web lint` is red at HEAD: `asset-detail.tsx` over the font-size ratchet + 3 raw hex (c5ae7c92, not this audit).
 
