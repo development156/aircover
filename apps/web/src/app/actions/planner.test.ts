@@ -1,3 +1,4 @@
+import { revalidatePath } from 'next/cache'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 /**
@@ -161,6 +162,19 @@ describe('approvePost', () => {
     state.result = { data: { ...APPROVED_ROW }, error: null }
 
     await expect(approvePost(POST_ID)).resolves.toEqual({ ok: true, status: 'approved' })
+  })
+
+  test('refreshes every surface that shows the post: the planner, Posts, Approvals and Home', async () => {
+    // Approving from the planner left /approvals and /home holding the old
+    // count until a reload. `approvePosts` in approvals.ts refreshed all four;
+    // this one refreshed two.
+    state.result = { data: { ...APPROVED_ROW }, error: null }
+
+    await approvePost(POST_ID)
+
+    for (const path of ['/planner', '/posts', '/approvals', '/home']) {
+      expect(vi.mocked(revalidatePath)).toHaveBeenCalledWith(path)
+    }
   })
 
   test('writes ONLY status, and carries the allowlist in the SQL filter', async () => {

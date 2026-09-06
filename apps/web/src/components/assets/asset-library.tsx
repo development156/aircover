@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ImagePlus } from 'lucide-react'
 import { folderPath, isNarrowing, parseSearch, unparseRule } from '@sahoda/shared'
 import type { AssetFolder, AssetSmartFolder } from '@sahoda/shared'
@@ -27,7 +27,7 @@ import {
   selectWithRange,
   type SelectionState,
 } from '@/lib/assets/select-range'
-import { sortCards, type SortOption } from '@/lib/assets/sort-cards'
+import { DEFAULT_SORT, sortCards, type SortOption } from '@/lib/assets/sort-cards'
 import type { AssetCard } from '@/lib/assets/view'
 
 /**
@@ -76,8 +76,20 @@ export function AssetLibrary({
   // drift apart. `select-range.ts` owns every rule about how they move.
   const [selection, setSelection] = useState<SelectionState>(EMPTY_SELECTION)
   const selected = selection.selected
-  const [view, setView] = useState<LibraryView>(() => readLibraryView())
-  const [sort, setSort] = useState<SortOption>(() => readLibrarySort())
+  // ── READ THE SAVED VIEW AFTER HYDRATION, NEVER DURING IT ──────────────────
+  // MEASURED on the preview (2026-09-06): with List saved, every reload logged
+  // React #418. The server has no storage and renders Grid; reading storage in
+  // the initial-state callback made the first CLIENT render List, so the two
+  // trees disagreed at the toggle and React threw the server HTML away. The
+  // first client render now matches the server exactly, and the saved
+  // preference is applied one effect later. `asset-library.hydration.test.tsx`
+  // hydrates real server HTML and fails on any mismatch.
+  const [view, setView] = useState<LibraryView>('grid')
+  const [sort, setSort] = useState<SortOption>(DEFAULT_SORT)
+  useEffect(() => {
+    setView(readLibraryView())
+    setSort(readLibrarySort())
+  }, [])
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [sidebarOpenOnPhone, setSidebarOpenOnPhone] = useState(false)
   // F4: OFF by default. Turning it on repurposes `openId` — the SAME "which
@@ -359,6 +371,11 @@ export function AssetLibrary({
         sidebarProps,
         openCard,
         onCloseDetail: () => setOpenId(null),
+        // `trashSingle` closes the drawer itself (via `onFileDeleted`) once the
+        // file is on its way to the trash.
+        onTrashOpen: () => {
+          if (openId !== null) trashSingle(openId)
+        },
       }}
       shortcutSheet={{
         open: shortcutSheetOpen,

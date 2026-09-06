@@ -207,10 +207,32 @@ describe('upcoming', () => {
     post({ id: 'past', intent: 'scheduled' as PostStatus, scheduled_at: '2026-08-27T09:00:00Z' }),
     post({ id: 'soon', intent: 'scheduled' as PostStatus, scheduled_at: '2026-08-28T18:00:00Z' }),
     post({ id: 'undated', intent: 'draft' as PostStatus }),
+    // Every "Plan my week" output: a draft with a time. Nothing sends it.
+    post({
+      id: 'dated-draft',
+      intent: 'draft' as PostStatus,
+      scheduled_at: '2026-08-28T15:00:00Z',
+    }),
+    post({
+      id: 'approved',
+      intent: 'approved' as PostStatus,
+      scheduled_at: '2026-08-29T09:00:00Z',
+    }),
   ]
 
   it('is soonest first', () => {
-    expect(upcoming(rows, now, 5).map((p) => p.id)).toEqual(['soon', 'later'])
+    expect(upcoming(rows, now, 5).map((p) => p.id)).toEqual(['soon', 'approved', 'later'])
+  })
+
+  it('excludes a dated DRAFT — the dispatcher only sends approved or scheduled posts', () => {
+    // `isDispatchable` in @sahoda/shared is the one definition of "waiting to
+    // go out". A draft with a time is a plan, and listing it under "Upcoming"
+    // told the reader it would be sent.
+    expect(upcoming(rows, now, 5).map((p) => p.id)).not.toContain('dated-draft')
+  })
+
+  it('includes an APPROVED post with a time — that is what the app writes when it schedules', () => {
+    expect(upcoming(rows, now, 5).map((p) => p.id)).toContain('approved')
   })
 
   it('excludes the past — an upcoming list holding this morning is not upcoming', () => {

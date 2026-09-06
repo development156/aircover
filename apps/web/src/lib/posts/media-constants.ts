@@ -63,3 +63,26 @@ export const MEDIA_UPLOAD_CAP_BYTES: number = Math.min(CHANNEL_MEDIA_CAP_BYTES, 
  * 4.5 up to "5 MB" would promise a file the server refuses.
  */
 export const MEDIA_UPLOAD_CAP_MB: number = Math.floor(MEDIA_UPLOAD_CAP_BYTES / 1_000_000)
+
+/**
+ * The refusal for a file over the cap, said ONCE.
+ *
+ * The server actions (`uploadAsset`, `attachMedia`) and the two pickers that
+ * feed them all say it. The pickers have to: MEASURED 2026-09-06 on the
+ * preview, a 5.7 MB PNG never reached the action at all. Vercel answered 413
+ * at the edge, the awaited action threw inside the transition, and the route
+ * fell to the error boundary, so the server's sentence was never read. The
+ * client check exists so the person reads THIS sentence instead of "This
+ * screen didn't load", and sharing the string is what stops the two drifting.
+ */
+export const MEDIA_UPLOAD_TOO_LARGE = `That file is larger than ${MEDIA_UPLOAD_CAP_MB} MB, which is the most an upload can carry.`
+
+/**
+ * What a picker says when the action itself could not be reached: a dropped
+ * connection, a 413 the client check did not predict, a deploy mid-request.
+ * Names the file, because with several picked at once the person needs to know
+ * which one to try again.
+ */
+export function uploadTransportRefusal(fileName: string): string {
+  return `Sahoda could not add ${fileName}. Check your connection and try again.`
+}

@@ -8,12 +8,13 @@ import { resolveDisplayZone, zoneLabel } from '@/lib/time/zone'
 /**
  * The next few things that are actually going to happen.
  *
- * ── WHY IT IS SCHEDULED-ONLY AND FUTURE-ONLY ─────────────────────────────────
- * `upcoming()` in `lib/planner/filters.ts` filters on a parseable
- * `scheduled_at` strictly ahead of now. A draft has no time to be next at, and a
- * post whose time passed this morning is not upcoming — putting either here
- * would make the panel answer a different question from the one its heading
- * asks, which is the failure mode of every "recent activity" widget.
+ * ── WHY IT IS DISPATCHABLE-ONLY AND FUTURE-ONLY ──────────────────────────────
+ * `upcoming()` in `lib/planner/filters.ts` keeps only what the dispatcher will
+ * send (`willGoOut`: approved or scheduled, with a time) and only strictly
+ * ahead of now. A dated draft is a plan nothing sends, and a post whose time
+ * passed this morning is not upcoming — putting either here would make the
+ * panel answer a different question from the one its heading asks, which is
+ * the failure mode of every "recent activity" widget.
  *
  * ── IT SHOWS NOTHING WHEN THERE IS NOTHING ───────────────────────────────────
  * The caller renders it only when the list is non-empty. An "Upcoming" heading

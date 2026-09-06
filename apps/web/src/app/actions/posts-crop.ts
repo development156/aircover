@@ -4,6 +4,7 @@ import { auth } from '@clerk/nextjs/server'
 import { revalidatePath } from 'next/cache'
 
 import { readAsset } from '@/lib/assets/read'
+import { ATTACH_NEEDS_RESTORE } from '@/lib/assets/state'
 import { normaliseFocal } from '@/lib/media/crop-geometry'
 import type { AcceptCropState } from '@/lib/media/crop-state'
 import { mintCroppedAttachment } from '@/lib/media/mint'
@@ -126,6 +127,9 @@ export async function acceptCropForAsset(
     if (read.status !== 'ok') {
       return { ok: false, message: 'Sahoda could not read that file. Reload and try again.' }
     }
+    // A crop of a library file is an attach of it, so the trash rule is the
+    // same one `attachAssetToPost` applies.
+    if (read.asset.asset.deleted_at !== null) return { ok: false, message: ATTACH_NEEDS_RESTORE }
 
     // Hoisted OUT of the call below. `readVariantFormats(postId)` was awaited
     // inline as an argument, which made it strictly sequential after

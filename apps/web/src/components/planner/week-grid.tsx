@@ -76,6 +76,7 @@ function DayChip({
           screen. The cell has no room for the sentence, so it abbreviates —
           and carries the full one for screen readers. */}
       <AutoPublishNote
+        channels={post.channels}
         intent={post.intent}
         scheduledAt={post.scheduled_at}
         now={now}

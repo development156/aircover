@@ -26,9 +26,14 @@ import type {
   UpdateAssetState,
   UploadAssetState,
 } from '@/lib/assets/state'
+import { ATTACH_NEEDS_RESTORE, DELETE_NEEDS_TRASH } from '@/lib/assets/state'
 import { reportServerError } from '@/lib/observability/report'
 import { decideAttach, type ChannelRejection } from '@/lib/posts/attach-decision'
-import { MEDIA_BUCKET, MEDIA_UPLOAD_CAP_BYTES } from '@/lib/posts/media-constants'
+import {
+  MEDIA_BUCKET,
+  MEDIA_UPLOAD_CAP_BYTES,
+  MEDIA_UPLOAD_TOO_LARGE,
+} from '@/lib/posts/media-constants'
 import { assetObjectPath, derivativePrefix } from '@/lib/posts/media-path'
 import { mapPostError } from '@/lib/posts/post-error'
 import { getPost, readMedia, readVariantFormatsStrict } from '@/lib/posts/read'
@@ -151,10 +156,7 @@ export async function uploadAsset(formData: FormData): Promise<UploadAssetState>
     }
 
     if (file.size > MEDIA_UPLOAD_CAP_BYTES) {
-      return {
-        ok: false,
-        message: `That file is larger than ${Math.floor(MEDIA_UPLOAD_CAP_BYTES / 1_000_000)} MB, which is the most an upload can carry.`,
-      }
+      return { ok: false, message: MEDIA_UPLOAD_TOO_LARGE }
     }
 
     // THE WORKSPACE ALLOWANCE, CHECKED BEFORE THE BYTES ARE READ.
@@ -604,6 +606,15 @@ export async function deleteAsset(assetId: string, confirmed = false): Promise<D
       }
     }
 
+    // ── ONLY FROM THE TRASH ─────────────────────────────────────────────────
+    // A live row is refused whatever `confirmed` says. `emptyTrash` and the
+    // trash view's "Delete for good" both arrive here with `deleted_at` set;
+    // anything else is a caller that skipped the recoverable step, and the
+    // person reading the answer needs the step named, not a generic failure.
+    if (read.asset.asset.deleted_at === null) {
+      return { ok: false, reason: 'refused', message: DELETE_NEEDS_TRASH, locked: [] }
+    }
+
     const decision = decideAssetDelete(read.asset.usage)
     if (!decision.ok) {
       return { ok: false, reason: 'refused', message: decision.message, locked: decision.locked }
@@ -775,6 +786,10 @@ export async function attachAssetToPost(
       return { ok: false, message: 'Sahoda could not read that file. Reload and try again.' }
     }
     const asset = read.asset.asset
+
+    // In the trash means "stop using this". The picker never lists a trashed
+    // file, but the id reaches this action all the same.
+    if (asset.deleted_at !== null) return { ok: false, message: ATTACH_NEEDS_RESTORE }
 
     // A row whose facts were never established cannot be judged, and attaching
     // it would hand the engine nulls that slide under every limit.

@@ -4,6 +4,7 @@ import { CalendarClock, ChevronRight, FileText, Sun, Timer } from 'lucide-react'
 import { needsAPerson } from '@/lib/approvals/queue'
 import type { DisplayPost } from '@/lib/posts/display-post'
 import { formatScheduledAt } from '@/lib/posts/schedule-format'
+import { willGoOut } from '@/lib/planner/filters'
 import { istDayKey } from '@/lib/planner/week-window'
 import { cn } from '@/lib/utils'
 
@@ -37,9 +38,17 @@ import { cn } from '@/lib/utils'
  * The founder asked for a TODAY group. The temptation was to file the existing
  * "Needs approval" under it, and that would have been a false claim: an approval
  * has no date, so nothing about it is today-scoped. What IS today-scoped is how
- * many scheduled posts fall inside today's IST day, so that is what the tile
- * counts — keyed with `istDayKey`, the same function the week window and the
- * month grid bucket by, so this number can never disagree with the grid below.
+ * many posts that will go out fall inside today's IST day, so that is what the
+ * tile counts — keyed with `istDayKey`, the same function the week window and
+ * the month grid bucket by, so this number can never disagree with the grid
+ * below.
+ *
+ * ── "WILL GO OUT" MEANS THE DISPATCHER WILL SEND IT ──────────────────────────
+ * "Going out today", its "scheduled in all" note and "Next up" all read
+ * `willGoOut` (`isDispatchable` from the shared package): `approved` or
+ * `scheduled`, with a time. They used to read `scheduled_at` alone, so a dated
+ * DRAFT — every "Plan my week" output — was counted as going out, and the
+ * dispatcher never sends a draft. A figure that says "going out" has to mean it.
  *
  * ── NEXT UP IS THE NEXT FUTURE POST, OR THE SLOT SAYS SO ─────────────────────
  * Not "the first row", which is a different claim and would name a post that has
@@ -112,24 +121,19 @@ export function PlannerSummary({
   now: Date
   zone?: string | null
 }) {
-  const scheduled = posts.filter((p) => p.intent === 'scheduled').length
+  // Only what the dispatcher will send. `willGoOut` also proves the time
+  // parses, which is what keeps `istDayKey` below from throwing on a bad row.
+  const goingOut = posts.filter(willGoOut)
+  const scheduled = goingOut.length
   const awaiting = posts.filter((p) => needsAPerson(p)).length
   const drafts = posts.filter((p) => p.intent === 'draft').length
 
   const todayKey = istDayKey(now)
-  // The NaN guard is not defensive padding: `Intl.DateTimeFormat.format` THROWS
-  // `RangeError: Invalid time value` on an unparseable date, so one bad row in
-  // the column would take the whole screen down rather than render one tile
-  // wrong. `lib/planner/filters.ts` guards the same read for the same reason.
-  const today = posts.filter((p) => {
-    if (p.scheduled_at === null) return false
-    const at = new Date(p.scheduled_at)
-    return !Number.isNaN(at.getTime()) && istDayKey(at) === todayKey
-  }).length
+  const today = goingOut.filter((p) => istDayKey(new Date(p.scheduled_at!)) === todayKey).length
 
   const at = now.getTime()
-  const next = posts
-    .filter((p) => p.scheduled_at !== null && new Date(p.scheduled_at).getTime() > at)
+  const next = goingOut
+    .filter((p) => new Date(p.scheduled_at!).getTime() > at)
     .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime())[0]
 
   return (

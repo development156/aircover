@@ -1,12 +1,12 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
 import { auth } from '@clerk/nextjs/server'
 import { PostSchema } from '@sahoda/shared'
 
 import { reportServerError } from '@/lib/observability/report'
 import { APPROVABLE_FROM } from '@/lib/planner/transitions'
 import type { ApproveState } from '@/lib/planner/state'
+import { revalidatePostSurfaces } from '@/lib/posts/revalidate-surfaces'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { workspaceForWrite } from '@/lib/workspaces'
 import {
@@ -65,8 +65,7 @@ export async function approvePost(postId: string): Promise<ApproveState> {
       }
     }
 
-    revalidatePath('/planner')
-    revalidatePath('/posts')
+    revalidatePostSurfaces()
     return { ok: true, status: parsed.data.status }
   } catch (error) {
     reportServerError(error, { action: 'approvePost', workspaceId })

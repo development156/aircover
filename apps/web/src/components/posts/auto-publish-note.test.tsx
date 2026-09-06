@@ -74,6 +74,9 @@ function row(
   }
 }
 
+/** The channel every direct render below is aimed at. */
+const ONE_CHANNEL = toChannelSet(['x'])
+
 /** Still waiting — what a post that genuinely never published looks like. */
 const WAITING = [row('x', 'pending')]
 /** Live on the platform. The case the old rule got wrong. */
@@ -85,20 +88,42 @@ const COPY_IT_ACROSS = /copy it across/i
 
 describe('AutoPublishNote', () => {
   test('says a scheduled post will not post itself', () => {
-    render(<AutoPublishNote intent="scheduled" scheduledAt={FUTURE} now={NOW} variants={WAITING} />)
+    render(
+      <AutoPublishNote
+        channels={ONE_CHANNEL}
+        intent="scheduled"
+        scheduledAt={FUTURE}
+        now={NOW}
+        variants={WAITING}
+      />,
+    )
 
     expect(screen.getByText(NOT_LIVE)).toBeInTheDocument()
   })
 
   test('says outright that a past-due one did not publish', () => {
-    render(<AutoPublishNote intent="scheduled" scheduledAt={PAST} now={NOW} variants={WAITING} />)
+    render(
+      <AutoPublishNote
+        channels={ONE_CHANNEL}
+        intent="scheduled"
+        scheduledAt={PAST}
+        now={NOW}
+        variants={WAITING}
+      />,
+    )
 
     expect(screen.getByText(NOTHING_PUBLISHED)).toBeInTheDocument()
   })
 
   test('stays silent on a post that promises nothing', () => {
     const { container } = render(
-      <AutoPublishNote intent="draft" scheduledAt={PAST} now={NOW} variants={WAITING} />,
+      <AutoPublishNote
+        channels={ONE_CHANNEL}
+        intent="draft"
+        scheduledAt={PAST}
+        now={NOW}
+        variants={WAITING}
+      />,
     )
 
     expect(container).toBeEmptyDOMElement()
@@ -109,6 +134,7 @@ describe('AutoPublishNote', () => {
     // posted"; anyone on a screen reader must not get LESS of the truth.
     render(
       <AutoPublishNote
+        channels={ONE_CHANNEL}
         intent="scheduled"
         scheduledAt={PAST}
         now={NOW}
@@ -122,7 +148,13 @@ describe('AutoPublishNote', () => {
 
   test('says nothing at all over a post that is fully out', () => {
     const { container } = render(
-      <AutoPublishNote intent="scheduled" scheduledAt={PAST} now={NOW} variants={PUBLISHED} />,
+      <AutoPublishNote
+        channels={ONE_CHANNEL}
+        intent="scheduled"
+        scheduledAt={PAST}
+        now={NOW}
+        variants={PUBLISHED}
+      />,
     )
 
     expect(container).toBeEmptyDOMElement()
@@ -133,6 +165,7 @@ describe('AutoPublishNote', () => {
     // channels were already done, told to publish itself again.
     render(
       <AutoPublishNote
+        channels={ONE_CHANNEL}
         intent="scheduled"
         scheduledAt={PAST}
         now={NOW}
@@ -148,6 +181,7 @@ describe('AutoPublishNote', () => {
   test('names the simulation when every publish ran on the fixture rail', () => {
     render(
       <AutoPublishNote
+        channels={ONE_CHANNEL}
         intent="scheduled"
         scheduledAt={PAST}
         now={NOW}
@@ -159,6 +193,57 @@ describe('AutoPublishNote', () => {
 
     expect(screen.getByText(/ran as a simulation/i)).toBeInTheDocument()
     expect(screen.queryByText(NOTHING_PUBLISHED)).not.toBeInTheDocument()
+  })
+})
+
+describe('a post with no channel at all', () => {
+  test('never says it goes out on its own — nothing can, with nowhere to go', () => {
+    // MEASURED 2026-09-06: an empty post with zero channels, scheduled from the
+    // composer, read "Scheduled" + "Goes out on its own at this time." on the
+    // planner. The dispatcher has nothing to send to.
+    render(
+      <AutoPublishNote
+        channels={toChannelSet([])}
+        intent="scheduled"
+        scheduledAt={FUTURE}
+        now={NOW}
+        variants={[]}
+        autoPublish
+      />,
+    )
+
+    expect(screen.queryByText(/goes out on its own/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/no channel picked/i)).toBeInTheDocument()
+  })
+
+  test('says the same when auto-publish is not live here', () => {
+    render(
+      <AutoPublishNote
+        channels={toChannelSet([])}
+        intent="scheduled"
+        scheduledAt={FUTURE}
+        now={NOW}
+        variants={[]}
+      />,
+    )
+
+    expect(screen.getByText(/no channel picked/i)).toBeInTheDocument()
+  })
+
+  test('the compact form carries it for screen readers too', () => {
+    render(
+      <AutoPublishNote
+        channels={toChannelSet([])}
+        intent="scheduled"
+        scheduledAt={FUTURE}
+        now={NOW}
+        variants={[]}
+        variant="compact"
+        autoPublish
+      />,
+    )
+
+    expect(screen.getByText(/no channel picked/i)).toBeInTheDocument()
   })
 })
 

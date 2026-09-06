@@ -319,6 +319,7 @@ export function PostCard({
       {/* Directly under the badge and the time it qualifies — the two things
             that together read as "this goes out on its own". */}
       <AutoPublishNote
+        channels={post.channels}
         intent={post.intent}
         scheduledAt={post.scheduled_at}
         now={now}

@@ -109,6 +109,21 @@ export function autoPublishCopy(enabled: boolean) {
   return enabled ? AUTO_PUBLISH_COPY_LIVE : AUTO_PUBLISH_COPY
 }
 
+/**
+ * The note for a post that carries a time and NO channel.
+ *
+ * True whether or not the dispatcher is live here, so it has no `_LIVE` twin:
+ * with nowhere to send it, "goes out on its own" and "won't post itself" are
+ * both the wrong sentence. MEASURED 2026-09-06: an empty post with zero
+ * channels, scheduled from the composer, read "Goes out on its own at this
+ * time." on the planner. Same tone as the picker's own "not connected" mark:
+ * a fact and the remedy, not a fault.
+ */
+export const NO_CHANNEL_COPY: AutoPublishCopy = {
+  note: 'No channel picked, so nothing can go out. Open the post and pick one.',
+  short: 'No channel',
+}
+
 const isValidDate = (date: Date): boolean => !Number.isNaN(date.getTime())
 
 /**

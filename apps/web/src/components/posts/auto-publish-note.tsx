@@ -1,7 +1,7 @@
 import { AlertCircle, FlaskConical, TriangleAlert } from 'lucide-react'
-import type { PostStatus } from '@sahoda/shared'
+import type { Channel, PostStatus } from '@sahoda/shared'
 
-import { autoPublishTruth, autoPublishCopy } from '@/lib/posts/schedule-status'
+import { autoPublishTruth, autoPublishCopy, NO_CHANNEL_COPY } from '@/lib/posts/schedule-status'
 import type { VariantStatusRow } from '@/lib/posts/variant-status'
 import { cn } from '@/lib/utils'
 
@@ -35,6 +35,12 @@ const ICONS = {
 
 export interface AutoPublishNoteProps {
   /**
+   * The post's channels. Required in position, like `variants`: a post with a
+   * time and NO channel cannot go out, and a call site that forgot to say so
+   * would let the note promise "goes out on its own" over nothing.
+   */
+  channels: ReadonlyArray<Channel>
+  /**
    * `posts.status`, under the name that says what it is. Used ONLY for the
    * promise gate — whether this post claims it will publish itself — never as
    * evidence about what happened. That comes from `variants`.
@@ -64,6 +70,7 @@ export interface AutoPublishNoteProps {
 }
 
 export function AutoPublishNote({
+  channels,
   intent,
   scheduledAt,
   now,
@@ -75,8 +82,12 @@ export function AutoPublishNote({
   const truth = autoPublishTruth(intent, scheduledAt, now, variants)
   if (truth === 'none') return null
 
-  const copy = autoPublishCopy(autoPublish)[truth]
-  const Icon = ICONS[truth]
+  // Evidence still wins: `partial` and `simulated` are read off rows that
+  // exist, and a row cannot exist without a channel. Only the two promises
+  // about the FUTURE are replaced, because a future with no channel is empty.
+  const noChannel = channels.length === 0 && (truth === 'awaiting' || truth === 'overdue')
+  const copy = noChannel ? NO_CHANNEL_COPY : autoPublishCopy(autoPublish)[truth]
+  const Icon = noChannel ? TriangleAlert : ICONS[truth]
 
   if (variant === 'compact') {
     return (

@@ -172,6 +172,7 @@ export function PlannerRow({
         {/* Full width under the row: this qualifies the badge and the time above
             it, and must not compete with them for space on a narrow screen. */}
         <AutoPublishNote
+          channels={post.channels}
           intent={post.intent}
           scheduledAt={post.scheduled_at}
           now={now}

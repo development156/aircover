@@ -87,6 +87,54 @@ describe('the figures above the plan', () => {
     expect(within(today).getByText('1')).toBeTruthy()
   })
 
+  it('"going out today" does not count a dated DRAFT, because nothing will send it', () => {
+    const withDatedDraft = [
+      ...rows,
+      post({
+        id: 'plan',
+        title: 'Plan my week output',
+        intent: 'draft' as PostStatus,
+        scheduled_at: '2026-08-28T10:00:00.000Z', // 15:30 IST, today — and a draft
+      }),
+    ]
+    render(<PlannerSummary posts={withDatedDraft} now={NOW} />)
+    const today = screen.getByRole('link', { name: /going out today/i })
+    expect(within(today).getByText('1')).toBeTruthy()
+  })
+
+  it('"next up" skips a dated DRAFT even when it is sooner', () => {
+    const withSoonerDraft = [
+      ...rows,
+      post({
+        id: 'plan',
+        title: 'Plan my week output',
+        intent: 'draft' as PostStatus,
+        scheduled_at: '2026-08-28T07:00:00.000Z', // before Cardamom chai
+      }),
+    ]
+    render(<PlannerSummary posts={withSoonerDraft} now={NOW} />)
+    expect(screen.queryByRole('link', { name: /plan my week output/i })).toBeNull()
+    expect(screen.getByRole('link', { name: /cardamom chai/i })).toHaveAttribute('href', '/posts/d')
+  })
+
+  it('an APPROVED post with a time counts and can be next — that is how the app schedules', () => {
+    const approved = [
+      post({
+        id: 'ok',
+        title: 'Approved and dated',
+        intent: 'approved' as PostStatus,
+        scheduled_at: '2026-08-28T09:00:00.000Z',
+      }),
+    ]
+    render(<PlannerSummary posts={approved} now={NOW} />)
+    const today = screen.getByRole('link', { name: /going out today/i })
+    expect(within(today).getByText('1')).toBeTruthy()
+    expect(screen.getByRole('link', { name: /approved and dated/i })).toHaveAttribute(
+      'href',
+      '/posts/ok',
+    )
+  })
+
   it('names the next future post, never a past one', () => {
     render(<PlannerSummary posts={rows} now={NOW} />)
     expect(screen.getByRole('link', { name: /cardamom chai/i })).toHaveAttribute('href', '/posts/d')

@@ -7,7 +7,8 @@ import { adminClient, expect, test } from './fixtures/seeded-user'
  *
  *   fresh account → workspace → upload a real photo → RELOAD → attach it to a
  *   post from the composer → read it back on a screen that did not write it →
- *   try to delete it while a scheduled post depends on it.
+ *   move it to the trash → try to delete it for good while a scheduled post
+ *   depends on it.
  *
  * ── WHAT "READ IT BACK THROUGH A SURFACE THAT DID NOT WRITE IT" MEANS HERE ───
  * The composer writes the attachment. The LIBRARY reads the usage record, and
@@ -196,7 +197,21 @@ test.describe('media library', () => {
     // The tile says so before anyone presses anything.
     await expect(page.getByText('In use')).toBeVisible({ timeout: 30_000 })
 
+    // ── 9a. The drawer's only destructive door is the TRASH ──────────────────
+    // It used to render the permanent delete: MEASURED 2026-09-06, "Delete
+    // file" on an unused live file removed it for good in one press, with no
+    // trash entry. The drawer now moves the file to the trash, with Undo, and
+    // the gate below is asked where the act is final. Trashing itself refuses
+    // nothing, because it takes nothing away: the scheduled post keeps its
+    // photo, and the banner says so.
     await page.getByRole('button', { name: /shopfront\.png/i }).click()
+    await page.getByRole('button', { name: /^move shopfront\.png to the trash$/i }).click()
+    await expect(page.getByText(/moved shopfront\.png to the trash/i)).toBeVisible({
+      timeout: 30_000,
+    })
+
+    // ── 9b. THE DELETE GATE, from the trash ──────────────────────────────────
+    await page.getByRole('button', { name: /^Trash/ }).click()
     await page.getByRole('button', { name: /^delete shopfront\.png$/i }).click()
 
     // The refusal, naming the post BY TITLE and saying why.
@@ -207,9 +222,10 @@ test.describe('media library', () => {
     // eslint-disable-next-line no-console
     console.log('[assets] REFUSAL:', (await refusal.innerText()).replace(/\s+/g, ' '))
 
-    // And the file is still there after the refusal.
+    // And the file is still in the trash after the refusal, restorable.
     await page.reload()
-    await expect(page.getByRole('button', { name: /shopfront\.png/i })).toBeVisible({
+    await page.getByRole('button', { name: /^Trash/ }).click()
+    await expect(page.getByRole('button', { name: /^restore shopfront\.png$/i })).toBeVisible({
       timeout: 30_000,
     })
 
@@ -221,25 +237,24 @@ test.describe('media library', () => {
         .eq('id', postId as string)
     }
     await page.reload()
-    await page.getByRole('button', { name: /shopfront\.png/i }).click()
+    await page.getByRole('button', { name: /^Trash/ }).click()
     await page.getByRole('button', { name: /^delete shopfront\.png$/i }).click()
 
-    // By NAME, not by contained text. The confirm modal is mounted INSIDE the
-    // detail drawer, so both are `role=dialog` and `filter({hasText})` matches
-    // the outer one — which contains the modal's markup even while it is closed.
-    // That version of this assertion passed against the drawer and proved
-    // nothing about the modal.
+    // By NAME, not by contained text: the trash row and the confirm modal are
+    // both dialogs' worth of markup, and `filter({hasText})` matched the wrong
+    // one once before (see the earlier version of this step).
     const confirm = page.getByRole('dialog', { name: /^Delete/ })
     await expect(confirm).toBeVisible({ timeout: 30_000 })
     await expect(confirm).toContainText('Diwali offer')
     await expect(confirm).toContainText(/removes it from 1 post/i)
     await confirm.getByRole('button', { name: /delete and remove/i }).click()
 
-    // `too-small.png` is still there, so the library is not empty — the one
-    // photo the gate was about is gone and nothing else moved.
-    await expect(page.getByRole('button', { name: /shopfront\.png/i })).toHaveCount(0, {
+    // Gone from the trash, and `too-small.png` is still in the library — the
+    // one photo the gate was about is gone and nothing else moved.
+    await expect(page.getByRole('button', { name: /^restore shopfront\.png$/i })).toHaveCount(0, {
       timeout: 30_000,
     })
+    await page.getByRole('button', { name: /^All files/ }).click()
     await expect(page.getByRole('button', { name: /too-small\.png/i })).toBeVisible()
   })
 })

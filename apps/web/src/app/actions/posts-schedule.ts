@@ -1,9 +1,10 @@
 'use server'
 
 import { auth } from '@clerk/nextjs/server'
-import { revalidatePath } from 'next/cache'
 
 import { reportServerError } from '@/lib/observability/report'
+import { getPost } from '@/lib/posts/read'
+import { revalidatePostSurfaces } from '@/lib/posts/revalidate-surfaces'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { workspaceForWrite } from '@/lib/workspaces'
 
@@ -73,6 +74,22 @@ export async function schedulePost(
       return { ok: false, message: 'Pick a real date and time.' }
     }
 
+    // ── NOTHING CAN GO OUT WITH NOWHERE TO GO ──────────────────────────────
+    // The RPCs check the role and whether anything has already published; they
+    // do not read `channels`. MEASURED 2026-09-06: an empty post with no
+    // channels was scheduled from the composer and the planner then promised
+    // "Goes out on its own at this time." The dispatcher would have found no
+    // variant to send. Refused here, before the status moves, and with the
+    // remedy in the sentence.
+    const post = await getPost(postId)
+    if (!post) return { ok: false, message: messageFor('INVALID_POST') }
+    if (post.channels.length === 0) {
+      return {
+        ok: false,
+        message: 'Pick at least one channel before scheduling. Nothing can go out without one.',
+      }
+    }
+
     const supabase = createServerSupabase()
     const { data, error } = hasExistingSchedule
       ? await supabase.rpc('reschedule_post', { p_post_id: postId, p_when: when.toISOString() })
@@ -84,9 +101,7 @@ export async function schedulePost(
     if (error) return { ok: false, message: messageFor(error.message) }
 
     const scheduledAt = (data as { scheduled_at?: unknown } | null)?.scheduled_at
-    revalidatePath('/posts')
-    revalidatePath('/planner')
-    revalidatePath(`/posts/${postId}`)
+    revalidatePostSurfaces(postId)
     return { ok: true, scheduledAt: typeof scheduledAt === 'string' ? scheduledAt : null }
   } catch (error) {
     reportServerError(error, { action: 'schedulePost', workspaceId })
@@ -110,9 +125,7 @@ export async function cancelSchedule(postId: string): Promise<ScheduleState> {
     const { error } = await supabase.rpc('cancel_scheduled_post', { p_post_id: postId })
     if (error) return { ok: false, message: messageFor(error.message) }
 
-    revalidatePath('/posts')
-    revalidatePath('/planner')
-    revalidatePath(`/posts/${postId}`)
+    revalidatePostSurfaces(postId)
     return { ok: true, scheduledAt: null }
   } catch (error) {
     reportServerError(error, { action: 'cancelSchedule', workspaceId })

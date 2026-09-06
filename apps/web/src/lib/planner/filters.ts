@@ -1,3 +1,5 @@
+import { isDispatchable } from '@sahoda/shared'
+
 import type { DisplayPost } from '@/lib/posts/display-post'
 import { needsAPerson } from '@/lib/approvals/queue'
 import { istDayKey } from '@/lib/planner/week-window'
@@ -103,13 +105,29 @@ export function isFiltered({ tab, query, dateKey }: PlannerFilter): boolean {
 }
 
 /**
- * The next few scheduled posts, soonest first. Future only: an "Upcoming" list
- * that includes this morning is not upcoming, and the reader cannot act on it.
+ * Whether the dispatcher will actually send this post: `approved` or
+ * `scheduled`, with a real time. `isDispatchable` in `@sahoda/shared` is the
+ * one definition, shared with the dispatcher's own candidate query.
+ *
+ * ── WHY EVERY "WILL GO OUT" FIGURE READS THIS ────────────────────────────────
+ * "Going out today", "Next up" and "Upcoming" all filtered on `scheduled_at`
+ * alone. A dated DRAFT (every "Plan my week" output) therefore counted as
+ * something that would go out, and the dispatcher never looks at a draft.
+ * MEASURED 2026-09-06: three figures promising posts nothing would send.
+ */
+export function willGoOut(post: DisplayPost): boolean {
+  return isDispatchable(post.intent, post.scheduled_at)
+}
+
+/**
+ * The next few posts that will go out, soonest first. Future only: an
+ * "Upcoming" list that includes this morning is not upcoming, and the reader
+ * cannot act on it. Dispatchable only: see `willGoOut`.
  */
 export function upcoming(posts: readonly DisplayPost[], now: Date, limit: number): DisplayPost[] {
   const at = now.getTime()
   return posts
-    .filter((p) => p.scheduled_at !== null && new Date(p.scheduled_at).getTime() > at)
+    .filter((p) => willGoOut(p) && new Date(p.scheduled_at!).getTime() > at)
     .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime())
     .slice(0, limit)
 }

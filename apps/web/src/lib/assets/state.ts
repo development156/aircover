@@ -13,6 +13,22 @@ import type { ChannelRejection } from '@/lib/posts/attach-decision'
  */
 
 /**
+ * The two sentences the trash column decides, said once each.
+ *
+ * `deleteAsset` refuses a LIVE row: MEASURED 2026-09-06, "Delete file" in the
+ * detail drawer of an unused live file removed it for good in one press while
+ * the trash stayed at 0. The permanent delete belongs to the trash, where the
+ * word "Delete for good" is read, and the action is where every caller can be
+ * refused at once.
+ *
+ * `attachAssetToPost` and `acceptCropForAsset` refuse a TRASHED row: the
+ * picker never lists one, but the actions took the id all the same.
+ */
+export const DELETE_NEEDS_TRASH =
+  'Move this file to the trash first. Delete for good only works from the trash.'
+export const ATTACH_NEEDS_RESTORE = 'This photo is in the trash. Restore it first, then add it.'
+
+/**
  * `unusable` names the channels that will NOT take this file. The upload still
  * succeeds — a library is not a post and a photo that only Instagram accepts is
  * a photo worth keeping — but the tile has to be able to say so, or the writer

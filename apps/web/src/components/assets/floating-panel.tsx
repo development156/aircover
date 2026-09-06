@@ -87,8 +87,16 @@ export function FloatingPanel({
       onClose()
     }
     // Capture phase: `scroll` does not bubble, so this is the only way an
-    // ancestor (or the window) sees a descendant's scroll at all.
-    function onScroll() {
+    // ancestor (or the window) sees a descendant's scroll at all. Which is
+    // also why the panel's OWN scroll arrives here: "File into folder" has a
+    // folder list that scrolls once there are more folders than fit, and the
+    // panel closed the instant it was scrolled. The page moving under the
+    // panel is the thing to dismiss on; the panel moving inside itself is not.
+    function onScroll(event: Event) {
+      // `instanceof Node`, not a cast: a scroll fired at the window itself has
+      // the window as its target, and `contains(window)` throws.
+      const target = event.target
+      if (target instanceof Node && panelRef.current?.contains(target)) return
       onClose()
     }
     document.addEventListener('keydown', onKey)

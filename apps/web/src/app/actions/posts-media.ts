@@ -11,7 +11,11 @@ import { orientedSize, renderDerivative } from '@/lib/media/derive'
 import { offerFor } from '@/lib/media/offer'
 import { targetsFor } from '@/lib/media/targets'
 import { decideAttach } from '@/lib/posts/attach-decision'
-import { MEDIA_BUCKET, MEDIA_UPLOAD_CAP_BYTES } from '@/lib/posts/media-constants'
+import {
+  MEDIA_BUCKET,
+  MEDIA_UPLOAD_CAP_BYTES,
+  MEDIA_UPLOAD_TOO_LARGE,
+} from '@/lib/posts/media-constants'
 import { mediaObjectPath } from '@/lib/posts/media-path'
 import { mapPostError } from '@/lib/posts/post-error'
 import { getPost, readMedia, readVariantFormatsStrict } from '@/lib/posts/read'
@@ -64,7 +68,7 @@ export async function attachMedia(postId: string, formData: FormData): Promise<A
     if (file.size > MEDIA_UPLOAD_CAP_BYTES) {
       return {
         ok: false,
-        message: `That file is larger than ${Math.floor(MEDIA_UPLOAD_CAP_BYTES / 1_000_000)} MB, which is the most an upload can carry.`,
+        message: MEDIA_UPLOAD_TOO_LARGE,
       }
     }
 

@@ -22,12 +22,15 @@ export function LibraryOverlays({
   sidebarProps,
   openCard,
   onCloseDetail,
+  onTrashOpen,
 }: {
   sidebarOpenOnPhone: boolean
   onCloseSidebarOnPhone: () => void
   sidebarProps: React.ComponentProps<typeof LibrarySidebar>
   openCard: AssetCard | null
   onCloseDetail: () => void
+  /** Moves the OPEN file to the trash: the same banner-and-Undo path the file menu uses. */
+  onTrashOpen: () => void
 }) {
   return (
     <>
@@ -46,7 +49,7 @@ export function LibraryOverlays({
         title={openCard === null ? 'File' : displayName(openCard)}
         className="text-left"
       >
-        {openCard !== null ? <AssetDetail card={openCard} onDeleted={onCloseDetail} /> : null}
+        {openCard !== null ? <AssetDetail card={openCard} onTrash={onTrashOpen} /> : null}
       </Drawer>
     </>
   )

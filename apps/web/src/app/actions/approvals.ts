@@ -1,11 +1,11 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
 import { auth } from '@clerk/nextjs/server'
 
 import { reportServerError } from '@/lib/observability/report'
 import { APPROVABLE_FROM } from '@/lib/planner/transitions'
 import type { BulkApproveState } from '@/lib/approvals/state'
+import { revalidatePostSurfaces } from '@/lib/posts/revalidate-surfaces'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { workspaceForWrite } from '@/lib/workspaces'
 import {
@@ -93,10 +93,7 @@ export async function approvePosts(postIds: readonly string[]): Promise<BulkAppr
 
     const approved = data?.length ?? 0
 
-    revalidatePath('/approvals')
-    revalidatePath('/planner')
-    revalidatePath('/posts')
-    revalidatePath('/home')
+    revalidatePostSurfaces()
 
     return { ok: true, approved, moved: ids.length - approved, failed: 0 }
   } catch (error) {
