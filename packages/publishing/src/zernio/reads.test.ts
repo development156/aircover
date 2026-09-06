@@ -390,7 +390,10 @@ describe('inbox analytics reads', () => {
       timeseries: [{ date: '2026-08-01', sent: 1, received: 2, read: 1, failed: 0 }],
       byPlatform: [{ platform: 'instagram', sent: 1, received: 2, read: 1, failed: 0 }],
     })
-    const result = await reads.inboxVolume(profile, { fromDate: '2026-08-01', toDate: '2026-08-31' })
+    const result = await reads.inboxVolume(profile, {
+      fromDate: '2026-08-01',
+      toDate: '2026-08-31',
+    })
     expect(result.summary.received).toBe(40)
     expect(result.summary.uniqueConversations).toBe(9)
     expect(result.timeseries).toHaveLength(1)
