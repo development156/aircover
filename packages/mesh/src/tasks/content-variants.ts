@@ -38,10 +38,13 @@ except Google Business Profile, which takes none because Google indexes the body
 const SYSTEM = `You adapt one canonical social post into native per-channel variants for Sahoda.
 Output ONLY a JSON object matching:
 { "variants": [ { "channel": <one of the requested channels>, "body": string,
-  "extras": { "hashtags"?: string[], "gbpCta"?: string } } ] }
+  "extras": { "hashtags": string[], "gbpCta"?: string } } ] }
 Rules: exactly one variant per requested channel; stay within each channel's character
 limit; follow each platform's norms for links and (GBP) call-to-action; keep
 the core message and the brand voice. No markdown, no commentary.
+Every variant MUST carry "extras.hashtags" with 2 to 5 search keywords, EXCEPT Google
+Business Profile, which sets it to []. A non-GBP variant with an empty or missing
+"hashtags" is incomplete: fill it before you answer.
 ${KEYWORD_RULE}
 ${SEO_RULES}
 ${SEARCH_SURFACE_RULE}
