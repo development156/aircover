@@ -243,6 +243,70 @@ export async function setWorkspaceTimezone(
   }
 }
 
+/**
+ * Auto-detect: store the browser's own zone as the workspace's, but ONLY when
+ * the workspace has none. Called on load from the client with
+ * `Intl.DateTimeFormat().resolvedOptions().timeZone`.
+ *
+ * ── WHY THIS IS NOT `setWorkspaceTimezone` ───────────────────────────────────
+ * That one OVERWRITES, because a person opened Settings and chose. This runs
+ * unbidden on every visit, so it must never move a chosen zone. `.is('timezone',
+ * null)` makes "only if unset" a condition of the UPDATE itself rather than a
+ * read-then-write two tabs could both pass — the write matches no row the moment
+ * a zone exists.
+ *
+ * ── WHY STORING A DETECTED ZONE IS HONEST, WHERE A DEFAULT IS NOT ─────────────
+ * `lib/time/zone.ts` refuses to write a DISPLAY fallback (IST/UTC) into the
+ * column because that fabricates a claim about where somebody lives. A zone the
+ * browser resolved is the reader's ACTUAL clock, not a fabrication — the same
+ * signal a person would type in Settings, arriving without the typing. It is
+ * validated by the same `isKnownZone` gate, so auto-detect can never store what
+ * a person could not, and Settings still overrides it.
+ *
+ * No row is not a failure: it means the zone was already set (every visit after
+ * the first) or RLS declined. Either way nothing changed and nothing is
+ * revalidated. Only a zone that actually landed revalidates the screens that
+ * render a scheduled time, so the display and the picker agree from that load.
+ */
+export async function autoDetectWorkspaceTimezone(
+  workspaceId: string,
+  detected: string,
+): Promise<{ ok: true; timezone: string | null } | { ok: false; message: string }> {
+  try {
+    const { userId } = await auth()
+    if (!userId) return { ok: false, message: 'Sign in first.' }
+
+    const id = z.uuid().safeParse(workspaceId)
+    if (!id.success) return { ok: false, message: 'That workspace could not be found.' }
+
+    // The same gate Settings applies: an offset, an abbreviation, or a name Intl
+    // cannot resolve is refused. Auto-detect must never write what a person could
+    // not type.
+    if (!isKnownZone(detected)) return { ok: false, message: 'Unrecognised time zone.' }
+
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase
+      .from('workspaces')
+      .update({ timezone: detected })
+      .eq('id', id.data)
+      .is('timezone', null) // never moves a zone a person chose
+      .select('timezone')
+      .maybeSingle()
+
+    if (error) return { ok: false, message: 'Could not save the time zone.' }
+    // Already set, or RLS declined — a no-op, not a write we may claim.
+    if (!data) return { ok: true, timezone: null }
+
+    revalidatePath('/posts')
+    revalidatePath('/planner')
+    revalidatePath('/home')
+    revalidatePath('/settings')
+    return { ok: true, timezone: (data as { timezone: string | null }).timezone }
+  } catch {
+    return { ok: false, message: 'Could not save the time zone.' }
+  }
+}
+
 export async function renameWorkspace(
   workspaceId: string,
   name: string,

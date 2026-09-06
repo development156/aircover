@@ -9,6 +9,7 @@ import { FirstRun } from '@/components/home/first-run'
 import { BottomNav } from '@/components/shell/bottom-nav'
 import { Rail } from '@/components/shell/rail'
 import { AppToaster } from '@/components/shell/app-toaster'
+import { TimezoneAutodetect } from '@/components/shell/timezone-autodetect'
 import { Topbar } from '@/components/shell/topbar'
 
 /**
@@ -164,6 +165,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </main>
       </div>
       <BottomNav hasWorkspace={workspace.status !== 'none'} />
+      {/* When the workspace has no zone yet, learn it from the reader's own
+          browser once — so the schedule display stops rendering in the IST
+          fallback while the picker builds in the reader's clock. Renders
+          nothing, and never touches a zone a person chose in Settings. */}
+      {workspace.status === 'ok' ? (
+        <TimezoneAutodetect
+          workspaceId={workspace.workspace.id}
+          current={workspace.workspace.timezone}
+        />
+      ) : null}
       <AppToaster />
     </div>
   )
