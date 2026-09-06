@@ -74,10 +74,18 @@ interface MarkProps {
 }
 
 /** The attributes every mark repeats. Decorative, square, and sized in both the
- *  SVG box and the style, because a bare `width` loses to a flex parent. */
-function frame(size: number, className?: string) {
+ *  SVG box and the style, because a bare `width` loses to a flex parent.
+ *
+ *  `data-mark` names WHICH platform this is, and it is the only way a test can
+ *  say so: these marks carry no text, no title and no accessible name, by
+ *  design. Without it a screen that swapped a brand mark for a grey glyph would
+ *  pass every assertion anyone could write about it, and the alternative —
+ *  matching on a brand hex in a test file — is refused outright by
+ *  `design-lint.mjs`, correctly. */
+function frame(mark: string, size: number, className?: string) {
   return {
     'aria-hidden': true,
+    'data-mark': mark,
     focusable: 'false' as const,
     viewBox: '0 0 24 24',
     width: size,
@@ -96,7 +104,7 @@ function frame(size: number, className?: string) {
  */
 export function FacebookMark({ size, className }: MarkProps) {
   return (
-    <svg {...frame(size, className)}>
+    <svg {...frame('facebook', size, className)}>
       <rect width="24" height="24" rx={APP_ICON_RADIUS} fill={FACEBOOK_BLUE} />
       <path
         d="M15.36 24v-9.06h3.04l.46-3.53h-3.5V9.15c0-1.02.28-1.72 1.75-1.72h1.87V4.27a25 25 0 0 0-2.72-.14c-2.7 0-4.54 1.64-4.54 4.66v2.62H8.7v3.53h3.02V24Z"
@@ -117,7 +125,7 @@ export function FacebookMark({ size, className }: MarkProps) {
  */
 export function GoogleMark({ size, className }: MarkProps) {
   return (
-    <svg {...frame(size, className)}>
+    <svg {...frame('google', size, className)}>
       <path
         d="M23.52 12.27c0-.79-.07-1.55-.2-2.27H12v4.51h6.47a5.54 5.54 0 0 1-2.4 3.58v3h3.87c2.26-2.09 3.58-5.17 3.58-8.82Z"
         fill={GOOGLE_BLUE}
@@ -145,7 +153,7 @@ export function GoogleMark({ size, className }: MarkProps) {
  */
 export function InstagramMark({ size, className }: MarkProps) {
   return (
-    <svg {...frame(size, className)}>
+    <svg {...frame('instagram', size, className)}>
       <defs>
         <radialGradient id="sahoda-ig-warm" cx="0.28" cy="1.05" r="1.32">
           <stop offset="0" stopColor={IG_YELLOW} />
@@ -187,7 +195,7 @@ export function InstagramMark({ size, className }: MarkProps) {
  */
 export function PinterestMark({ size, className }: MarkProps) {
   return (
-    <svg {...frame(size, className)}>
+    <svg {...frame('pinterest', size, className)}>
       <circle cx="12" cy="12" r="12" fill={PINTEREST_RED} />
       {/* The letterform: a bowl on a stem whose tail falls below the baseline and
           curls left, which is the one feature separating it from a plain sans P. */}
@@ -208,7 +216,7 @@ export function PinterestMark({ size, className }: MarkProps) {
  */
 export function RedditMark({ size, className }: MarkProps) {
   return (
-    <svg {...frame(size, className)}>
+    <svg {...frame('reddit', size, className)}>
       <circle cx="12" cy="12" r="12" fill={REDDIT_ORANGE} />
       <path
         d="M14.55 4.9 15.4 8.7"

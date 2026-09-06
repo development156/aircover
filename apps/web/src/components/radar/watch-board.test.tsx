@@ -126,6 +126,31 @@ describe('the watch board', () => {
     expect(screen.getAllByText(/switched off/i).length).toBeGreaterThan(0)
   })
 
+  /**
+   * ── THE MARK IS THE PLATFORM'S OWN, NOT A STAND-IN FOR IT ─────────────────
+   * The card used to draw an at-sign for Instagram and a map pin for a Google
+   * listing, while the Connections screen showed the same person the real marks.
+   * Asserted through `data-mark`, which `brand-marks.tsx` puts on every mark for
+   * exactly this: they carry no text, no title and no accessible name, so a
+   * screen that swapped one for a grey glyph would otherwise pass every
+   * assertion anyone could write about it. Matching on the brand hex instead is
+   * refused by `design-lint.mjs`, and rightly.
+   */
+  it("draws the platform's own mark for an Instagram account", () => {
+    const { container } = board([watch({ kind: 'instagram', name: 'Sunrise on Instagram' })])
+    expect(container.querySelector('[data-mark="instagram"]')).not.toBeNull()
+  })
+
+  it('draws no brand mark for a plain website, because a website has none', () => {
+    const { container } = board([watch({ kind: 'website' })])
+    expect(container.querySelector('[data-mark]')).toBeNull()
+  })
+
+  it('draws the Google mark for a Google Business Profile', () => {
+    const { container } = board([watch({ kind: 'google_business' })])
+    expect(container.querySelector('[data-mark="google"]')).not.toBeNull()
+  })
+
   it('shows the filter only where the third tab can be anything but empty', () => {
     // Every business quiet: a "Changed" tab that always reads nothing is chrome
     // teaching the reader that the feature is broken.

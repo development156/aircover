@@ -1,6 +1,7 @@
 import Link from 'next/link'
-import { ArrowRight, AtSign, Building2, MapPin, Timer } from 'lucide-react'
+import { ArrowRight, Building2, Timer } from 'lucide-react'
 
+import { GoogleMark, InstagramMark } from '@/components/connections/brand-marks'
 import { RemoveWatch } from '@/components/radar/remove-watch'
 import type { WatchCard as Card } from '@/lib/radar/cards'
 import { COMPETITOR_KIND_LABELS, type CompetitorKind } from '@/lib/radar/types'
@@ -20,14 +21,35 @@ import { COMPETITOR_KIND_LABELS, type CompetitorKind } from '@/lib/radar/types'
  */
 
 /**
- * One mark per kind of page. `AtSign` for Instagram rather than a brand glyph:
- * this lucide build ships no brand icons, and a handle is what the reader
- * actually typed in.
+ * THE PLATFORM'S OWN MARK, WHERE ONE EXISTS.
+ *
+ * ── WHY THIS IS NOT A LUCIDE GLYPH ANY MORE ─────────────────────────────────
+ * It used to be `AtSign` for Instagram and `MapPin` for a Google listing, with a
+ * comment explaining that this lucide build ships no brand icons. That is still
+ * true — VERIFIED, there is no `Instagram` export in lucide-react 1.25 — but it
+ * was never the whole picture: the founder supplied the official marks on
+ * 2026-08-29 and `connections/brand-marks.tsx` has drawn them ever since. The
+ * Connections screen showed a person the real Instagram icon and this screen
+ * showed them an at-sign for the same account.
+ *
+ * `@` is also the wrong idea twice over: a map pin is a PLACE, and an at-sign is
+ * a handle rather than a platform. Neither says which of the three kinds of page
+ * Sahoda will be reading, which is the only job this glyph has.
+ *
+ * A website has no brand and keeps `Building2`.
+ *
+ * ── THE MARKS CARRY THEIR OWN COLOURS, AND NO BOX ───────────────────────────
+ * docs/26 §1.6: a platform mark keeps its brand colours, and it is the ONE
+ * exception to the palette, because a logo is identity rather than UI chrome.
+ * RETHEME §4 then says a logo inside a bordered box is a box inside a box, so
+ * the ring around this slot is gone and the mark sits on the card's own surface.
+ * They are decorative and `aria-hidden` inside `brand-marks.tsx`, because the
+ * card already names the kind in words directly underneath.
  */
-const KIND_ICON: Record<CompetitorKind, typeof Building2> = {
-  website: Building2,
-  instagram: AtSign,
-  google_business: MapPin,
+function KindMark({ kind }: { kind: CompetitorKind }) {
+  if (kind === 'instagram') return <InstagramMark size={28} />
+  if (kind === 'google_business') return <GoogleMark size={28} />
+  return <Building2 size={20} strokeWidth={1.8} aria-hidden className="text-muted" />
 }
 
 export function WatchCard({
@@ -41,7 +63,6 @@ export function WatchCard({
   /** Whether the weekly pass is switched on in this environment. */
   scanArmed: boolean
 }) {
-  const Icon = KIND_ICON[competitor.kind]
   const moved = status.claim === 'changed'
 
   return (
@@ -52,8 +73,8 @@ export function WatchCard({
     // It is carried on both, because either one refusing to shrink is enough.
     <div className="surface-ring flex min-w-0 flex-col gap-3 rounded-card bg-surface p-4 transition-micro hover:bg-surface-2">
       <div className="flex min-w-0 items-start gap-3">
-        <span className="surface-ring flex size-[36px] shrink-0 items-center justify-center rounded-card text-muted">
-          <Icon size={16} strokeWidth={1.8} aria-hidden />
+        <span className="flex size-[28px] shrink-0 items-center justify-center">
+          <KindMark kind={competitor.kind} />
         </span>
         <span className="min-w-0 flex-1">
           <span className="type-sm block truncate font-[550] text-ink">{competitor.name}</span>
