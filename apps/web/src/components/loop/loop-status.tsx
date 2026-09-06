@@ -46,13 +46,23 @@ export interface LoopStatusProps {
   paused: boolean
   /** Whether a cycle is working right now. */
   running: boolean
+  /**
+   * Whether the Sunday job will actually ask this workspace. With the cron off
+   * the pill read "On, waiting for Sunday" beside a schedule facet reading "Not
+   * running automatically" (MEASURED on the preview, 2026-09-06). Defaults to
+   * armed so a caller that has not been told cannot silently claim less.
+   */
+  autoSchedule?: 'armed' | 'off'
 }
 
-export function LoopStatus({ enabled, paused, running }: LoopStatusProps) {
+export function LoopStatus({ enabled, paused, running, autoSchedule = 'armed' }: LoopStatusProps) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
-  const view = loopStatusView({ enabled, paused, running }, WAITING_FOR)
+  const view = loopStatusView(
+    { enabled, paused, running },
+    autoSchedule === 'armed' ? WAITING_FOR : 'not scheduled',
+  )
 
   function toggle() {
     setError(null)

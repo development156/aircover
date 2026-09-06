@@ -73,3 +73,23 @@ describe('the status pill', () => {
     expect(screen.getByRole('button', { name: /Pause the Loop/ })).toBeTruthy()
   })
 })
+
+describe('LoopStatus — the pill knows whether Sunday is coming', () => {
+  /**
+   * With the cron off, the pill read "On, waiting for Sunday" beside a schedule
+   * facet reading "Not running automatically" (MEASURED on the preview,
+   * 2026-09-06). One screen, two answers to "will this run".
+   */
+  it('says "not scheduled" instead of "waiting for Sunday" when nothing will ask on Sunday', () => {
+    render(<LoopStatus enabled paused={false} running={false} autoSchedule="off" />)
+
+    expect(screen.getByText('On, not scheduled')).toBeInTheDocument()
+    expect(screen.queryByText(/waiting for/)).not.toBeInTheDocument()
+  })
+
+  it('keeps the day when the cron is armed', () => {
+    render(<LoopStatus enabled paused={false} running={false} autoSchedule="armed" />)
+
+    expect(screen.getByText(/^On, waiting for /)).toBeInTheDocument()
+  })
+})

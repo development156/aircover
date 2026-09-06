@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import {
   DEFAULT_AUTONOMY_LEVEL,
   creditCost,
@@ -14,14 +13,15 @@ import { GoingOut } from '@/components/loop/going-out'
 import { KillSwitch } from '@/components/loop/kill-switch'
 import { PendingLearnings } from '@/components/loop/learnings'
 import { LoopControls } from '@/components/loop/controls'
+import { CycleSummary } from '@/components/loop/cycle-summary'
 import { LoopStatus } from '@/components/loop/loop-status'
+import { ResumeCreate } from '@/components/loop/resume-create'
 import { PageTitle } from '@/components/page-title'
 import { loopCronEnabled } from '@/lib/cron/loop-enabled'
 import { explain, remedy } from '@/lib/loop/eligibility'
-import { readLoop, type LoopSnapshot } from '@/lib/loop/read'
+import { readLoop } from '@/lib/loop/read'
 import { readGoingOut } from '@/lib/loop/autopilot/going-out'
 import { GOING_OUT_UNREADABLE } from '@/lib/loop/autopilot/going-out-copy'
-import { reflectSentence } from '@/lib/loop/reflect'
 import {
   LOOP_SCHEDULE_SENTENCE,
   cycleDuration,
@@ -59,10 +59,8 @@ export const metadata = { title: 'The Loop' }
  * deployment runs, pinned by `lib/loop/schedule.test.ts`.
  */
 export default async function LoopPage() {
-  // Read alongside the Loop, not inside it. `readLoop`'s dial is typed with
-  // `AutonomyLevel`, which admits only 0-2, so an armed channel is invisible
-  // through it; `readGoingOut` reads the stored integer. Its own failures
-  // resolve to a state rather than throwing, so this cannot take the page down.
+  // Read alongside the Loop, not inside it: `readGoingOut` has its own failure
+  // state, so a broken autopilot read cannot take the page down with it.
   const [read, goingOut] = await Promise.all([readLoop(), readGoingOut()])
 
   // Two answers, two sentences, two remedies. `getActiveWorkspace()` collapsed
@@ -88,6 +86,14 @@ export default async function LoopPage() {
   const cycle = snapshot.cycle
   const atHalt = cycle?.status === 'awaiting_cost_approval'
   const running = Boolean(cycle) && !atHalt && !isOver(cycle?.status)
+  // Approved and never finished: the create stage was refused, crashed, or the
+  // tab closed between approving and writing. Without a control for this the
+  // page showed "Running now" for ever (MEASURED 2026-09-06).
+  const unfinished = cycle?.status === 'creating' || cycle?.status === 'staging'
+  const unwrittenBriefs = unfinished
+    ? snapshot.briefs.filter((b) => b.included && b.postId === null)
+    : []
+  const writtenBriefs = unfinished ? snapshot.briefs.filter((b) => b.postId !== null) : []
 
   const chosen: Record<string, AutonomyLevel> = {}
   for (const [channel, level] of snapshot.dial) chosen[channel] = level
@@ -104,10 +110,17 @@ export default async function LoopPage() {
   // switch defaults OFF because that job spends 20 credits per workspace.
   const autoSchedule = loopCronEnabled() ? ('armed' as const) : ('off' as const)
   const verdict = loopVerdict(snapshot, new Date())
+  // The same expression `LoopControls` disables its button with, plus the halt:
+  // a week waiting for approval is not one to plan again.
+  const canPlanByHand =
+    !snapshot.paused && snapshot.connected.length > 0 && !running && !atHalt && !unfinished
   const refusal =
     verdict.eligible && autoSchedule === 'armed'
       ? null
-      : { sentence: explain(verdict, { autoSchedule }), remedy: remedy(verdict) }
+      : {
+          sentence: explain(verdict, { autoSchedule, canPlanByHand }),
+          remedy: remedy(verdict),
+        }
 
   return (
     <div className="space-y-grid">
@@ -115,19 +128,37 @@ export default async function LoopPage() {
         <PageTitle sub="A weekly cycle that plans, writes, tests and reports, as far as you let it go on its own.">
           The Loop
         </PageTitle>
-        <LoopStatus enabled={snapshot.enabled} paused={snapshot.paused} running={running} />
+        <LoopStatus
+          enabled={snapshot.enabled}
+          paused={snapshot.paused}
+          running={running}
+          autoSchedule={autoSchedule}
+        />
       </div>
 
       <CycleStrip status={cycle?.status as LoopCycleStatus | undefined} />
 
       {/* The cost preview is the whole point of the halt, so it sits above
           everything else the moment there is one to look at. */}
+      {/* `already_planned`'s remedy links to `#loop-current`; at the halt this
+          preview IS the current week, so it carries the anchor. */}
       {atHalt && cycle ? (
-        <CostPreview
+        <div id="loop-current">
+          <CostPreview
+            cycleId={cycle.id}
+            briefs={snapshot.briefs}
+            budgetCredits={cycle.budgetCredits}
+            spentCredits={cycle.spentCredits}
+          />
+        </div>
+      ) : null}
+
+      {unfinished && cycle ? (
+        <ResumeCreate
           cycleId={cycle.id}
-          briefs={snapshot.briefs}
-          budgetCredits={cycle.budgetCredits}
-          spentCredits={cycle.spentCredits}
+          unwritten={unwrittenBriefs.length}
+          unwrittenCredits={unwrittenBriefs.reduce((sum, b) => sum + b.estimatedCredits, 0)}
+          written={writtenBriefs.length}
         />
       ) : null}
 
@@ -136,7 +167,7 @@ export default async function LoopPage() {
         weeklyBudgetCredits={snapshot.weeklyBudgetCredits}
         cycleCost={creditCost('loop_cycle')}
         hasChannels={snapshot.connected.length > 0}
-        cycleRunning={running}
+        cycleRunning={running || unfinished}
         refusal={refusal}
         /* ── THE FACET HAD TO MOVE WITH THE SENTENCE ──────────────────────
            These were passed unconditionally, so with the cron off the same card
@@ -163,7 +194,9 @@ export default async function LoopPage() {
             : null
         }
       >
-        {cycle && !atHalt ? (
+        {/* An unfinished cycle has its own panel above; "This week is running"
+            under it would be the sentence this page showed for ever. */}
+        {cycle && !atHalt && !unfinished ? (
           <CycleSummary cycle={cycle} briefCount={snapshot.briefs.length} />
         ) : null}
       </LoopControls>
@@ -206,103 +239,4 @@ export default async function LoopPage() {
 
 function isOver(status: string | undefined): boolean {
   return status === 'reported' || status === 'cancelled' || status === 'failed'
-}
-
-/**
- * Where the current cycle got to, in sentences.
- *
- * ── THE REFLECT LINE IS THREE DIFFERENT SENTENCES ────────────────────────────
- * "Sahoda had nothing to reflect on" and "Sahoda reflected and found nothing
- * worth saying" are different claims, and only one of them is an admission that
- * the product has no history yet. `reflect_skipped_no_history` is a stored
- * column precisely so this line is a lookup rather than an inference.
- *
- * It sits INSIDE the controls panel now rather than in a card of its own. The
- * card was the same shape as the panel above it and said, by that shape, that
- * these were two unrelated things; they are the same thing — what the Loop is
- * doing, and the controls for it.
- */
-function CycleSummary({
-  cycle,
-  briefCount,
-}: {
-  cycle: NonNullable<LoopSnapshot['cycle']>
-  briefCount: number
-}) {
-  const failed = cycle.status === 'failed'
-  const cancelled = cycle.status === 'cancelled'
-
-  return (
-    <div className="border-t border-line-soft pt-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        {/* `already_planned`'s remedy links here by id. Deleting it made
-            "Review this week" scroll nowhere — a remedy that cannot work. */}
-        <h3 id="loop-current" className="type-h3 text-ink">
-          {cancelled
-            ? 'This week was stopped'
-            : failed
-              ? 'This week did not run'
-              : cycle.status === 'reported'
-                ? 'This week is done'
-                : 'This week is running'}
-        </h3>
-        <p className="type-sm num text-muted">
-          Week {cycle.isoWeek}, {cycle.isoYear}
-        </p>
-      </div>
-
-      {failed && cycle.failureReason === 'CHANNELS_UNREADABLE' ? (
-        <p className="type-body mt-1 max-w-[68ch] text-muted">
-          Sahoda couldn’t check which channels you have connected, so it stopped rather than
-          planning for the wrong ones. Nothing was charged. Run it again.
-        </p>
-      ) : failed && cycle.failureReason === 'NO_CHANNELS' ? (
-        <p className="type-body mt-1 max-w-[68ch] text-muted">
-          Sahoda has nowhere to plan for.{' '}
-          <Link href="/connections" className="font-[550] text-accent underline underline-offset-2">
-            Connect a channel
-          </Link>{' '}
-          and run it again. Nothing was charged.
-        </p>
-      ) : failed ? (
-        <p className="type-body mt-1 max-w-[68ch] text-muted">
-          Sahoda could not finish planning this week, and you were not charged for the part that
-          failed.
-        </p>
-      ) : cancelled ? (
-        <p className="type-body mt-1 max-w-[68ch] text-muted">
-          You stopped this cycle. Anything it had written is still in your Planner.
-        </p>
-      ) : (
-        <p className="type-body mt-1 max-w-[68ch] text-muted">
-          Sahoda planned <span className="num">{briefCount}</span>{' '}
-          {briefCount === 1 ? 'post' : 'posts'} for this week.
-        </p>
-      )}
-
-      {!failed && !cancelled ? (
-        <p className="type-sm mt-2 max-w-[68ch] text-muted">
-          {/*
-            The stored reason first, because it is the specific one. The
-            boolean is the fallback for cycles that ran before `reflect_reason`
-            existed, and the last sentence is for a cycle that DID produce a
-            learning — three different facts, and the screen used to have two
-            sentences for all three.
-          */}
-          {reflectSentence(cycle.reflectReason) ??
-            (cycle.reflectSkippedNoHistory
-              ? 'It had nothing to reflect on. No post of yours has been measured yet, so there was nothing to learn from.'
-              : 'It read last week’s numbers before planning.')}
-        </p>
-      ) : null}
-
-      {cycle.status === 'reported' ? (
-        <p className="type-sm mt-3">
-          <Link href="/report" className="font-[550] text-accent underline underline-offset-2">
-            Read the report for this week
-          </Link>
-        </p>
-      ) : null}
-    </div>
-  )
 }

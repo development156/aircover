@@ -98,6 +98,7 @@ export function KillSwitch() {
       <Modal
         open={open}
         onClose={() => setOpen(false)}
+        busy={pending}
         title="Stop the Loop?"
         footer={
           <>

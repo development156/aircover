@@ -356,7 +356,7 @@ export async function readApprovedCycleForCreate(
       where id = $1 and workspace_id = $2
         and cost_approved_at is not null
         and approved_credits is not null
-        and status = 'creating'`,
+        and status in ('creating', 'staging')`,
     [cycleId, workspaceId],
   )
   return r.rows[0] ?? null

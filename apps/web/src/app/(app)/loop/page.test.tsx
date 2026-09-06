@@ -191,3 +191,114 @@ describe('the going-out section is mounted, in every state the read can answer',
     expect(screen.getByRole('heading', { name: /^the loop$/i })).toBeInTheDocument()
   })
 })
+
+describe('an approved week that was never finished has a way back in', () => {
+  const stuck = {
+    id: 'cyc_1',
+    isoYear: 2026,
+    isoWeek: 36,
+    status: 'creating',
+    estimatedCredits: 9,
+    approvedCredits: 6,
+    costApprovedAt: '2026-09-06T14:02:14.829Z',
+    spentCredits: 20,
+    budgetCredits: 150,
+    reflectSkippedNoHistory: true,
+    reflectReason: 'no_history',
+    failureReason: null,
+    startedAt: '2026-09-06T13:58:00.000Z',
+    reportedAt: null,
+  }
+  const briefs = [
+    {
+      id: 'b1',
+      priority: 1,
+      title: 'A',
+      body: '',
+      channels: ['x'],
+      suggestedSlot: null,
+      rationale: null,
+      estimatedCredits: 3,
+      included: true,
+      postId: null,
+    },
+    {
+      id: 'b2',
+      priority: 2,
+      title: 'B',
+      body: '',
+      channels: ['x'],
+      suggestedSlot: null,
+      rationale: null,
+      estimatedCredits: 3,
+      included: true,
+      postId: 'post_b',
+    },
+    {
+      id: 'b3',
+      priority: 3,
+      title: 'C',
+      body: '',
+      channels: ['x'],
+      suggestedSlot: null,
+      rationale: null,
+      estimatedCredits: 3,
+      included: false,
+      postId: null,
+    },
+  ]
+
+  /**
+   * The approval revalidated the page, the cost preview unmounted, and the
+   * create stage's failure had nowhere to land. "Running now", step 4 of 7,
+   * nothing to press, for ever (MEASURED 2026-09-06).
+   */
+  it('renders the resume panel for a cycle stuck in creating, and not "This week is running"', async () => {
+    loop.readLoop.mockResolvedValue({
+      status: 'ok',
+      snapshot: { ...snapshot, cycle: stuck, briefs },
+    })
+
+    render(await LoopPage())
+
+    expect(screen.getByRole('heading', { name: 'Approved, not yet written' })).toBeInTheDocument()
+    expect(screen.getByText(/1 post still to write/)).toBeInTheDocument()
+    expect(screen.queryByText('This week is running')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Plan my week/ })).toBeDisabled()
+  })
+
+  it('renders it for a cycle stuck in staging too', async () => {
+    loop.readLoop.mockResolvedValue({
+      status: 'ok',
+      snapshot: {
+        ...snapshot,
+        cycle: { ...stuck, status: 'staging' },
+        briefs: briefs.map((b) => ({ ...b, postId: 'p' })),
+      },
+    })
+
+    render(await LoopPage())
+
+    expect(screen.getByRole('button', { name: 'Finish this week' })).toBeInTheDocument()
+  })
+
+  it('carries the "current week" anchor on the cost preview at the halt', async () => {
+    loop.readLoop.mockResolvedValue({
+      status: 'ok',
+      snapshot: {
+        ...snapshot,
+        cycle: {
+          ...stuck,
+          status: 'awaiting_cost_approval',
+          approvedCredits: null,
+          costApprovedAt: null,
+        },
+        briefs,
+      },
+    })
+
+    const { container } = render(await LoopPage())
+
+    expect(container.querySelector('#loop-current')).not.toBeNull()
+  })
+})

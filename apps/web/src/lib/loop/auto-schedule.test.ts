@@ -171,3 +171,24 @@ describe('when the Sunday schedule is switched off', () => {
     expect(explain(PAUSED, { autoSchedule: 'off' })).toMatch(/paused/i)
   })
 })
+
+describe('the "plan yours here" tail follows the button it points at', () => {
+  /**
+   * `assess()` answers `never_enabled` before it reads channels, so the enum
+   * fallback says the button can be pressed. On a workspace with no channel it
+   * cannot: the sentence offered a greyed-out control (MEASURED on the preview,
+   * 2026-09-06). The screen tells `explain` what its own button does.
+   */
+  it('drops the remedy when the screen says the button is disabled', () => {
+    const withButton = explain(NEVER_ENABLED, { autoSchedule: 'off', canPlanByHand: true })
+    const without = explain(NEVER_ENABLED, { autoSchedule: 'off', canPlanByHand: false })
+
+    expect(withButton).toMatch(/plan yours here/)
+    expect(without).not.toMatch(/plan yours here/)
+    expect(without).toMatch(/not planning weeks automatically/)
+  })
+
+  it('falls back to the verdict when the screen says nothing', () => {
+    expect(explain(NEVER_ENABLED, { autoSchedule: 'off' })).toMatch(/plan yours here/)
+  })
+})

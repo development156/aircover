@@ -2,6 +2,7 @@ import 'server-only'
 
 import type { Channel } from '@sahoda/shared'
 
+import { reportServerError } from '@/lib/observability/report'
 import { activeWorkspaceRead } from '@/lib/workspaces'
 import { AUTOPILOT_LEVEL } from './decide'
 import { goingOutView, type GoingOutView } from './going-out-copy'
@@ -52,9 +53,13 @@ export async function readGoingOut(): Promise<GoingOut> {
     }
 
     return { status: 'ready', view: goingOutView({ armed, waiting }), waiting }
-  } catch {
+  } catch (cause) {
     // No error text is carried out of here. A database message can hold a
-    // connection string and this value is rendered in a browser.
+    // connection string and this value is rendered in a browser. It IS
+    // reported: this section read "could not check" on every load of the
+    // wt-core preview for a missing SUPABASE_DB_URL, and a bare catch meant
+    // nothing anywhere said why.
+    reportServerError(cause, { action: 'readGoingOut' })
     return { status: 'unreadable' }
   }
 }

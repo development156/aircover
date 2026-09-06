@@ -291,6 +291,16 @@ function list(channels: readonly Channel[]): string {
  */
 export interface ExplainOptions {
   autoSchedule: 'armed' | 'off'
+  /**
+   * Whether the plan-a-week button on the screen can actually be pressed. The
+   * verdict alone cannot know: `assess()` answers `never_enabled` and
+   * `brain_not_resolved` before it reads channels, so a workspace with no
+   * channel was told "plan yours here whenever you want one" over a disabled
+   * button (MEASURED on the preview, 2026-09-06). The screen mirrors its own
+   * `disabled` expression into this field; the enum below is the fallback for
+   * a caller that has not.
+   */
+  canPlanByHand?: boolean
 }
 
 /**
@@ -342,7 +352,10 @@ export function explain(verdict: LoopVerdict, options?: ExplainOptions): string 
   // still paused, and swapping one wrong sentence for a different wrong sentence
   // would be no fix at all.
   if (options?.autoSchedule === 'off') {
-    const tail = canPlanByHand(verdict) ? NO_AUTO_SCHEDULE_WITH_REMEDY : NO_AUTO_SCHEDULE_PLAIN
+    const tail =
+      (options.canPlanByHand ?? canPlanByHand(verdict))
+        ? NO_AUTO_SCHEDULE_WITH_REMEDY
+        : NO_AUTO_SCHEDULE_PLAIN
     return `${withoutSundayPromise(verdict)} ${tail}`
   }
   return explainArmed(verdict)

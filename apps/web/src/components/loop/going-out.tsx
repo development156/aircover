@@ -1,5 +1,7 @@
 'use client'
 
+import { CHANNEL_LABELS, type Channel } from '@sahoda/shared'
+
 import { useState, useTransition } from 'react'
 import { SendHorizontal } from 'lucide-react'
 
@@ -97,7 +99,9 @@ function WaitingRow({ row }: { row: GoingOutRow }) {
         />
         <div className="min-w-0 flex-1">
           <p className="type-body truncate text-ink">{row.postTitle}</p>
-          <p className="type-sm mt-1.5 text-muted">On {row.channel}.</p>
+          <p className="type-sm mt-1.5 text-muted">
+            On {CHANNEL_LABELS[row.channel as Channel] ?? row.channel}.
+          </p>
         </div>
 
         {settled ? (
