@@ -1,6 +1,7 @@
-import { cleanup, render } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { creditCost } from '@sahoda/shared'
-import { afterEach, describe, expect, test } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 
 import { ModelPicker } from '@/components/studio/model-picker'
 import {
@@ -107,64 +108,98 @@ describe('one option is one choice, not a comparison table', () => {
   })
 
   /**
-   * MUTATION: put "when to reach for it" back inline alongside the reference
-   * ceiling and the billing basis, and this fails to catch anything wrong on
-   * its own — so pair it with the two below, which each check ONE moved fact
-   * stayed reachable rather than deleted.
+   * MUTATION: put "when to reach for it" (`goodAt`) back on the button, and
+   * this fails to catch anything wrong on its own — so pair it with the
+   * drawer-content tests below, which each check ONE moved fact stayed
+   * reachable rather than deleted.
    */
-  test('an option carries its name, its price and a short reach-for-it line, and nothing else up front', () => {
+  test('an option carries its name and its price, and nothing else up front', () => {
     const { container } = open()
     const picker = container.querySelector('[data-guide="studio-model"]') as HTMLElement
     const card = cardFor(picker, 'Everyday')
     const button = card.querySelector('button') as HTMLElement
     expect(button.textContent).toContain('Everyday')
     expect(button.textContent).toContain('Costs')
-    // The button itself never carries the reference ceiling or the billing
-    // basis: those moved into the card's own disclosure, checked below.
-    expect(button.querySelector('details')).toBeNull()
+    // The button itself never carries why to reach for it: that moved into
+    // the control's own drawer, checked below. Checked against the ONE model
+    // whose `goodAt` sentence cannot collide with another model's, since
+    // `Everyday, a matching set` shares the word "Everyday".
+    const everyday = routedModels().find((m) => m.id === 'google/gemini-2.5-flash-image')!
+    expect(button.textContent).not.toContain(everyday.goodAt)
+  })
+
+  /**
+   * MUTATION: render two `<details>`/`<button aria-haspopup>` triggers for
+   * the Model control, or none at all, and this goes red — exactly one
+   * "Details" affordance per control, never one per option.
+   */
+  test('exactly one "Details" affordance for the whole control, not one per option', () => {
+    const { container } = open()
+    const picker = container.querySelector('[data-guide="studio-model"]') as HTMLElement
+    expect(
+      within(picker).getAllByRole('button', { name: /read what each model does/i }),
+    ).toHaveLength(1)
   })
 })
 
-describe('the moved facts are moved, not deleted', () => {
-  /**
-   * MUTATION: delete `unlocks` from a card's disclosure instead of moving it
-   * there, and this goes red for every model that has one.
-   */
-  test('the reference ceiling lives inside the option’s own details disclosure', () => {
-    const { container } = open()
-    const picker = container.querySelector('[data-guide="studio-model"]') as HTMLElement
+describe('the moved facts are reachable from the control’s drawer, not deleted', () => {
+  // jsdom implements `<dialog>` but not `showModal`/`close`. Without these the
+  // `Drawer` never reaches its open state, per `delete-post-button.test.tsx`.
+  beforeEach(() => {
+    HTMLDialogElement.prototype.showModal = function showModal() {
+      this.open = true
+    }
+    HTMLDialogElement.prototype.close = function close() {
+      this.open = false
+      this.dispatchEvent(new Event('close'))
+    }
+  })
 
+  async function openDrawer(): Promise<HTMLElement> {
+    const user = userEvent.setup()
+    open()
+    await user.click(screen.getByRole('button', { name: /read what each model does/i }))
+    return screen.getByRole('dialog')
+  }
+
+  /**
+   * MUTATION: delete `unlocks` from `ModelReasons` instead of moving it into
+   * the drawer, and this goes red for every model that has one.
+   */
+  test('the reference ceiling lives in the drawer, for every model that has one', async () => {
+    const drawer = await openDrawer()
     for (const model of STUDIO_MODELS) {
       if (model.unlocks === null) continue
-      const card = cardFor(picker, model.label)
-      const details = card.querySelector('details')
-      if (!details) throw new Error(`${model.id} has an unlocks fact but no details disclosure`)
-      expect(details.textContent, model.id).toContain(model.unlocks)
-      // And not repeated up front, outside the disclosure.
-      const summary = details.querySelector('summary')
-      const outsideDetails = Array.from(card.childNodes)
-        .filter((node) => node !== details)
-        .map((node) => node.textContent ?? '')
-        .join('')
-      expect(outsideDetails, model.id).not.toContain(model.unlocks)
-      expect(summary).not.toBeNull()
+      expect(drawer.textContent, model.id).toContain(model.unlocks)
     }
   })
 
   /**
-   * MUTATION: delete `costNote` from the disclosure, and this goes red for
+   * MUTATION: delete `costNote` from `ModelReasons`, and this goes red for
    * every model.
    */
-  test('the billing basis lives inside the option’s own details disclosure', () => {
-    const { container } = open()
-    const picker = container.querySelector('[data-guide="studio-model"]') as HTMLElement
-
+  test('the billing basis lives in the drawer, for every model', async () => {
+    const drawer = await openDrawer()
     for (const model of STUDIO_MODELS) {
-      const card = cardFor(picker, model.label)
-      const details = card.querySelector('details')
-      if (!details) throw new Error(`${model.id} has no details disclosure`)
-      expect(details.textContent, model.id).toContain(model.costNote)
+      expect(drawer.textContent, model.id).toContain(model.costNote)
     }
+  })
+
+  /**
+   * MUTATION: delete `goodAt` from `ModelReasons`, and this goes red for
+   * every model.
+   */
+  test('what each model is good at lives in the drawer, for every model', async () => {
+    const drawer = await openDrawer()
+    for (const model of STUDIO_MODELS) {
+      expect(drawer.textContent, model.id).toContain(model.goodAt)
+    }
+  })
+
+  test('closes on Escape, the X and the backdrop, driven through the dialog’s own close event', async () => {
+    const drawer = await openDrawer()
+    drawer.dispatchEvent(new Event('close'))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 })
 

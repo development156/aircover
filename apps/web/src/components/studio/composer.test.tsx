@@ -176,18 +176,35 @@ describe('the shape of the bar', () => {
 })
 
 describe('choosing which model draws it', () => {
-  test('the reachable models are offered by what they are good at, never by id', async () => {
+  /**
+   * RETARGETED, not deleted: `model.goodAt` used to print inline on the
+   * option itself and is checked there for `within(picker).getAllByRole
+   * ('button')`.  The founder's ruling on `/connections` vs. `/studio` moved
+   * "what it is good at" off the choosing surface and into the Model
+   * control's own drawer (`model-picker.tsx`'s `ControlDetails`), so the
+   * count now excludes that one "Details" trigger (`button[aria-pressed]`
+   * rather than every button), and `goodAt` is asserted inside the opened
+   * drawer instead of inline. `model-picker.test.tsx` pins the same claim
+   * against the component directly and in more detail; this keeps the
+   * composer's own wiring honest.
+   */
+  test('the reachable models are offered by their name, never by id, and say what they are good at in the drawer', async () => {
     const user = userEvent.setup()
     const { container } = open()
     await openModel(user)
     const picker = container.querySelector('[data-guide="studio-model"]') as HTMLElement
     expect(picker).not.toBeNull()
 
-    expect(within(picker).getAllByRole('button')).toHaveLength(routedModels().length)
+    expect(picker.querySelectorAll('button[aria-pressed]')).toHaveLength(routedModels().length)
     for (const model of routedModels()) {
       expect(picker.textContent, model.id).toContain(model.label)
-      expect(picker.textContent, model.id).toContain(model.goodAt)
       expect(picker.textContent, model.id).not.toContain(model.id)
+    }
+
+    await user.click(within(picker).getByRole('button', { name: /read what each model does/i }))
+    const drawer = screen.getByRole('dialog')
+    for (const model of routedModels()) {
+      expect(drawer.textContent, model.id).toContain(model.goodAt)
     }
   })
 
@@ -197,7 +214,7 @@ describe('choosing which model draws it', () => {
     await openModel(user)
 
     const picker = container.querySelector('[data-guide="studio-model"]') as HTMLElement
-    expect(within(picker).getAllByRole('button')).toHaveLength(routedModels().length)
+    expect(picker.querySelectorAll('button[aria-pressed]')).toHaveLength(routedModels().length)
 
     const waiting = container.querySelectorAll('[data-guide="studio-model-waiting"]')
     expect(waiting).toHaveLength(unroutedModels().length)

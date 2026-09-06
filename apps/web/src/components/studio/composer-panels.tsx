@@ -1,9 +1,11 @@
 import type { GenerationMode, StampAnchor, StampSizeStep } from '@sahoda/shared'
 
+import { ComposerLogoPanel } from '@/components/studio/composer-logo-panel'
+import { ComposerMatchPanel } from '@/components/studio/composer-match-panel'
+import { ControlDetails } from '@/components/studio/control-details'
 import { ModelPicker } from '@/components/studio/model-picker'
-import { ReferenceUpload } from '@/components/studio/reference-upload'
 import { aspectRatioLabel, type StudioFormat } from '@/lib/studio/formats'
-import { readyModes, type ModeRule } from '@/lib/studio/modes'
+import { MODE_RULES, readyModes, type ModeRule } from '@/lib/studio/modes'
 import type { LibraryRead } from '@/lib/studio/read'
 
 /**
@@ -15,20 +17,6 @@ import type { LibraryRead } from '@/lib/studio/read'
  * this component only renders whichever that is, so the panels themselves
  * stay out of the file that owns the bar's own state.
  */
-
-const ANCHOR_OPTIONS: readonly { value: StampAnchor; label: string }[] = [
-  { value: 'top-left', label: 'Top left' },
-  { value: 'top-right', label: 'Top right' },
-  { value: 'bottom-left', label: 'Bottom left' },
-  { value: 'bottom-right', label: 'Bottom right' },
-]
-
-/** The three named sizes, smallest first. Never a slider: see `StampOptionsSchema`'s own header. */
-const SIZE_STEP_OPTIONS: readonly { value: StampSizeStep; label: string }[] = [
-  { value: 'small', label: 'Small' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'large', label: 'Large' },
-]
 
 export type ComposerOpenPanel = 'model' | 'approach' | 'size' | 'match' | 'logo' | null
 
@@ -85,7 +73,19 @@ export function ComposerPanels({
 
       {openPanel === 'approach' ? (
         <fieldset className="flex flex-col gap-2">
-          <legend className="type-sm text-muted">How should Sahoda approach it?</legend>
+          {/* Nested inside the legend, not beside it in a wrapping `<div>`: see
+              `model-picker.tsx`'s own comment on why a `<legend>` must stay the
+              fieldset's direct child to keep supplying its accessible name. */}
+          <legend className="flex w-full items-center justify-between gap-2 type-sm text-muted">
+            <span>How should Sahoda approach it?</span>
+            <ControlDetails
+              label="Read what each approach does"
+              title="How should Sahoda approach it?"
+              dataGuide="studio-approach-details"
+            >
+              <ApproachReasons />
+            </ControlDetails>
+          </legend>
           <div className="grid gap-2 narrow:grid-cols-3 max-narrow:grid-cols-1">
             {readyModes(modelId).map((option) => (
               <button
@@ -98,7 +98,6 @@ export function ComposerPanels({
                 }`}
               >
                 <span className="block type-sm font-[550]">{option.label}</span>
-                <span className="block type-sm">{option.what}</span>
               </button>
             ))}
           </div>
@@ -131,163 +130,45 @@ export function ComposerPanels({
       ) : null}
 
       {openPanel === 'match' ? (
-        <fieldset className="flex flex-col gap-2" data-guide="studio-references">
-          <legend className="type-sm text-muted">
-            {rule.maxReferences === 0
-              ? 'Picking a picture here moves you to Match a picture.'
-              : rule.minReferences > 0
-                ? 'Which picture should Sahoda match?'
-                : 'Anything Sahoda should match? (optional)'}
-          </legend>
-
-          <ReferenceUpload
-            disabled={rule.maxReferences > 0 && picked.length >= rule.maxReferences}
-            onAdded={onAddReference}
-          />
-
-          {library.status === 'unreadable' ? (
-            <p
-              role="status"
-              className="surface-ring rounded-card bg-s2 px-3 py-2 type-sm text-muted"
-            >
-              Sahoda could not read your pictures just now. You can still add one from this device,
-              or make one below.
-            </p>
-          ) : library.status === 'no-workspace' ? (
-            <p
-              role="status"
-              className="surface-ring rounded-card bg-s2 px-3 py-2 type-sm text-muted"
-            >
-              There is no workspace to read pictures from, so there is nothing here to match.
-            </p>
-          ) : library.pictures.length === 0 ? (
-            <p className="surface-ring rounded-card bg-s2 px-3 py-2 type-sm text-muted">
-              You have no pictures yet. Add one from this device, or make one below, and it appears
-              here to match.
-            </p>
-          ) : (
-            <ul className="grid grid-cols-6 gap-1.5">
-              {library.pictures.map((picture) => {
-                const at = picked.indexOf(picture.assetId)
-                const on = at !== -1
-                return (
-                  <li key={picture.assetId}>
-                    <button
-                      type="button"
-                      onClick={() => onToggleReference(picture.assetId)}
-                      aria-pressed={on}
-                      aria-label={
-                        on
-                          ? `${picture.title ?? 'A picture in your library'}, picked ${at + 1} of ${picked.length}`
-                          : (picture.title ?? 'A picture in your library')
-                      }
-                      className={`surface-ring relative block w-full overflow-hidden rounded-card transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-                        on ? 'ring-2 ring-accent' : ''
-                      }`}
-                    >
-                      {picture.url === null ? (
-                        <span className="flex aspect-square items-center justify-center bg-s2 type-sm text-muted">
-                          no preview
-                        </span>
-                      ) : (
-                        // eslint-disable-next-line @next/next/no-img-element -- a
-                        // short-lived signed URL from a private bucket cannot be
-                        // optimised without proxying the credential.
-                        <img
-                          src={picture.url}
-                          alt={picture.title ?? 'A picture in your library'}
-                          className="aspect-square w-full object-cover object-top"
-                        />
-                      )}
-                      {on ? (
-                        <span className="absolute right-1 top-1 flex size-[18px] items-center justify-center rounded-full bg-primary type-sm text-primary-foreground">
-                          <span className="num">{at + 1}</span>
-                        </span>
-                      ) : null}
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </fieldset>
+        <ComposerMatchPanel
+          rule={rule}
+          library={library}
+          picked={picked}
+          onToggleReference={onToggleReference}
+          onAddReference={onAddReference}
+        />
       ) : null}
 
       {openPanel === 'logo' ? (
-        <fieldset className="flex flex-col gap-2" data-guide="studio-logo">
-          <legend className="type-sm text-muted">Stamp your logo on this picture?</legend>
-          <div
-            role="group"
-            aria-label="Stamp your logo on this picture"
-            className="surface-ring flex w-fit gap-1 rounded-pill bg-s2 p-1"
-          >
-            {(
-              [
-                { value: true, label: 'Stamp it' },
-                { value: false, label: 'Leave it off' },
-              ] as const
-            ).map((option) => (
-              <button
-                key={String(option.value)}
-                type="button"
-                onClick={() => onSetStampEnabled(option.value)}
-                aria-pressed={stampEnabled === option.value}
-                className={`rounded-pill px-3 py-1 type-sm font-[550] transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-                  stampEnabled === option.value
-                    ? 'bg-surface-3 text-ink'
-                    : 'text-muted hover:text-ink'
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap gap-2" data-guide="studio-logo-corner">
-            {ANCHOR_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                disabled={!stampEnabled}
-                onClick={() => onSetStampAnchor(option.value)}
-                aria-pressed={stampAnchor === option.value}
-                className={`surface-ring rounded-card px-3 py-1 type-sm transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50 ${
-                  stampAnchor === option.value
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-s2 text-muted'
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap gap-2" data-guide="studio-logo-size">
-            {SIZE_STEP_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                disabled={!stampEnabled}
-                onClick={() => onSetStampSizeStep(option.value)}
-                aria-pressed={stampSizeStep === option.value}
-                className={`surface-ring rounded-card px-3 py-1 type-sm transition-micro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50 ${
-                  stampSizeStep === option.value
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-s2 text-muted'
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-
-          <p className="type-sm text-muted">
-            {stampEnabled
-              ? 'Sahoda keeps the unstamped original too, so this is never a one-way choice.'
-              : 'This picture is drawn without your logo. Nothing already made changes, and you can turn it back on for the next one.'}
-          </p>
-        </fieldset>
+        <ComposerLogoPanel
+          stampEnabled={stampEnabled}
+          onSetStampEnabled={onSetStampEnabled}
+          stampAnchor={stampAnchor}
+          onSetStampAnchor={onSetStampAnchor}
+          stampSizeStep={stampSizeStep}
+          onSetStampSizeStep={onSetStampSizeStep}
+        />
       ) : null}
     </div>
+  )
+}
+
+/**
+ * Every mode's "what it does" sentence, for every mode the catalogue
+ * declares. `MODE_RULES` rather than `readyModes(modelId)`: the drawer is
+ * reference material for the whole control, not a live reflection of what the
+ * chosen model currently allows, so it says what "A set that matches" would
+ * do too, even on a press where the model has taken it off the list.
+ */
+function ApproachReasons() {
+  return (
+    <dl className="space-y-3">
+      {MODE_RULES.map((rule) => (
+        <div key={rule.mode} className="border-t border-line-soft pt-3 first:border-t-0 first:pt-0">
+          <dt className="type-sm font-[550]">{rule.label}</dt>
+          <dd className="type-sm text-muted">{rule.what}</dd>
+        </div>
+      ))}
+    </dl>
   )
 }
